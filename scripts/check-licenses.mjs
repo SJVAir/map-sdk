@@ -4,11 +4,8 @@
 // unbundled tooling). Run through `npm run test:licenses`, which builds dist/ first.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { build } from "vite";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { bundleFiles, root } from "./fixture-build.mjs";
 
-const root = fileURLToPath(new URL("../", import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 
 const ALLOWED = new Set([
@@ -24,7 +21,6 @@ const ALLOWED = new Set([
 const EXCEPTIONS = new Set(["@jsr/sjvair__sdk"]);
 // Expected once the entries import the map; reported when absent, never a failure.
 const EXPECTED = ["maplibre-gl", "@maptiler/sdk", "@maptiler/client"];
-const FIXTURE = "virtual:license-check";
 const ENTRIES = [".", "./stores", "./data"];
 
 // The package directory a node_modules file belongs to (handles scoped names and nesting).
@@ -59,32 +55,27 @@ function allowed(expression) {
 		.every((part) => part.split(/\s+OR\s+/).some((id) => ALLOWED.has(id.trim())));
 }
 
-const files = ENTRIES.map((subpath) => {
-	const file = pkg.exports[subpath]?.svelte;
-	return file && existsSync(resolve(root, file)) ? resolve(root, file) : null;
-}).filter(Boolean);
-const code =
-	files.map((file, i) => `import * as m${i} from ${JSON.stringify(file)};`).join("\n") +
-	`\nglobalThis.__keep = [${files.map((_, i) => `m${i}`).join(", ")}];\n`;
+const unresolved = [];
+const files = [];
+for (const subpath of ENTRIES) {
+	const entry = pkg.exports[subpath];
+	const file = typeof entry === "object" && entry !== null ? entry.svelte : undefined;
+	if (file && existsSync(resolve(root, file))) files.push(resolve(root, file));
+	else unresolved.push(subpath);
+}
+if (unresolved.length > 0 || files.length === 0) {
+	console.error("License check failed:");
+	for (const subpath of unresolved) {
+		console.error(`  - entry "${subpath}" does not resolve to an existing "svelte" file`);
+	}
+	if (files.length === 0) console.error("  - no entries to bundle");
+	process.exit(1);
+}
 
-const result = await build({
-	configFile: false,
-	root,
-	logLevel: "error",
-	plugins: [
-		{
-			name: "license-check-fixture",
-			resolveId: (id) => (id === FIXTURE ? "\0" + FIXTURE : null),
-			load: (id) => (id === "\0" + FIXTURE ? code : null)
-		},
-		svelte()
-	],
-	build: { write: false, rolldownOptions: { input: FIXTURE } }
-});
+const chunks = await bundleFiles(files);
 
 const roots = new Set();
-for (const item of (Array.isArray(result) ? result[0] : result).output) {
-	if (item.type !== "chunk") continue;
+for (const item of chunks) {
 	for (const id of Object.keys(item.modules)) {
 		const dir = packageRoot(id);
 		if (dir) roots.add(dir);

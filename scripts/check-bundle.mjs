@@ -3,19 +3,19 @@
 // Run through `npm run test:bundle`, which builds dist/ first.
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { build } from "vite";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { bundleFiles, root } from "./fixture-build.mjs";
 
-const root = fileURLToPath(new URL("../", import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 
 const HEAVY = /maplibre|maptiler/i;
-const FIXTURE = "virtual:bundle-check";
 const failures = [];
 
 // Every exports target file must exist in dist/.
 for (const [subpath, entry] of Object.entries(pkg.exports)) {
+	if (typeof entry !== "object" || entry === null) {
+		failures.push(`"${subpath}" export is not an object with conditions`);
+		continue;
+	}
 	for (const [condition, file] of Object.entries(entry)) {
 		if (!existsSync(resolve(root, file))) {
 			failures.push(`"${subpath}" export's "${condition}" file is missing: ${file}`);
@@ -24,7 +24,7 @@ for (const [subpath, entry] of Object.entries(pkg.exports)) {
 }
 
 function entryFile(subpath) {
-	const file = pkg.exports[subpath]?.svelte;
+	const file = typeof pkg.exports[subpath] === "object" ? pkg.exports[subpath]?.svelte : undefined;
 	if (!file) {
 		failures.push(`package.json has no "${subpath}" export with a "svelte" condition`);
 		return null;
@@ -35,25 +35,7 @@ function entryFile(subpath) {
 // Bundles a module that imports everything from `file` and returns the chunks loaded up
 // front (the entry and its static imports).
 async function eagerChunks(file) {
-	const code = `import * as m from ${JSON.stringify(file)};\n` + `globalThis.__keep = [m];\n`;
-
-	const result = await build({
-		configFile: false,
-		root,
-		logLevel: "error",
-		plugins: [
-			{
-				name: "bundle-check-fixture",
-				resolveId: (id) => (id === FIXTURE ? "\0" + FIXTURE : null),
-				load: (id) => (id === "\0" + FIXTURE ? code : null)
-			},
-			svelte()
-		],
-		build: { write: false, rolldownOptions: { input: FIXTURE } }
-	});
-
-	const output = (Array.isArray(result) ? result[0] : result).output;
-	const chunks = output.filter((item) => item.type === "chunk");
+	const chunks = await bundleFiles([file]);
 	const byName = new Map(chunks.map((chunk) => [chunk.fileName, chunk]));
 	const eager = new Set();
 	const queue = chunks.filter((chunk) => chunk.isEntry).map((chunk) => chunk.fileName);
