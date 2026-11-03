@@ -47,13 +47,9 @@
 			"default": "./dist/data/index.js"
 		},
 		"./messages/en.json": {
-			"svelte": "./dist/data/messages/en.json",
-			"types": "./dist/data/messages/en.json",
 			"default": "./dist/data/messages/en.json"
 		},
 		"./theme.css": {
-			"svelte": "./dist/theme.css",
-			"types": "./dist/theme.css",
 			"default": "./dist/theme.css"
 		}
 	},

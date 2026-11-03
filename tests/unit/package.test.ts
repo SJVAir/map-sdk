@@ -8,13 +8,18 @@ describe("package.json", () => {
 		expect(pkg.license).toBe("MIT");
 	});
 
-	it("gives every export subpath svelte, types, and default conditions", () => {
-		const subpaths = Object.entries<Record<string, string>>(pkg.exports);
-		expect(subpaths.length).toBeGreaterThan(0);
-		for (const [subpath, conditions] of subpaths) {
+	it("gives the JS entries svelte, types, and default conditions", () => {
+		for (const subpath of [".", "./stores", "./data"]) {
+			const conditions = pkg.exports[subpath];
 			expect(conditions, subpath).toHaveProperty("svelte");
 			expect(conditions, subpath).toHaveProperty("types");
 			expect(conditions, subpath).toHaveProperty("default");
+		}
+	});
+
+	it("gives the non-JS entries a default condition", () => {
+		for (const subpath of ["./messages/en.json", "./theme.css"]) {
+			expect(pkg.exports[subpath], subpath).toHaveProperty("default");
 		}
 	});
 
