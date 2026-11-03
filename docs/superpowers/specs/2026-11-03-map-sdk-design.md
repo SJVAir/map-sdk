@@ -302,10 +302,31 @@ metadata.
 
 ### Finished on-screen pieces
 
-Svelte components, styled with Tailwind v4 utilities and shadcn-svelte's theme tokens
-(`--primary`, `--popover`, `--border`, …), which both the dashboard and monitor-map already
-define, so each host's colors and dark mode carry over. Each sits on a plain data function
+Svelte components, styled with Tailwind v4 utilities and shadcn-svelte's theme tokens, so each
+host's colors and dark mode carry over. Each sits on a plain data function
 (e.g. `legendData(plugin)`), so a host can draw its own instead.
+
+**Styling rules** (agreed with the dashboard's design pass, 2026-11-03; its spec is
+data-dashboard `docs/superpowers/specs/2026-11-03-design-pass-design.md`):
+
+- **Only theme tokens, never hardcoded colors, sizes, radii, or durations.** Standard shadcn
+  names (`--background`, `--foreground`, `--card`, `--card-foreground`, `--popover`,
+  `--primary`, `--muted-foreground`, `--border`, `--ring`, `--radius`) and their Tailwind
+  aliases (`bg-card`, `text-muted-foreground`, …), plus the family tokens the dashboard is adding
+  (`--highlight`, `--highlight-subtle`, `--highlight-foreground`, `--card-border`,
+  `--shadow-card`, `--radius-control`, `--overlay`, `--link`). `--highlight` is never used for
+  text. The final list comes when the design pass's first PR lands; map-sdk follows it.
+- **Hosts that lack a family token still work.** Each family token falls back to a standard one
+  (e.g. `var(--card-border, var(--border))`, `var(--radius-control, var(--radius))`), so
+  monitor-map 5.0 keeps its current look with its current tokens until it adopts the family
+  palette after launch. The README lists every token map-sdk reads.
+- **Dark mode** follows whatever the host sets: `prefers-color-scheme`, overridden by
+  `data-theme="light|dark"` on `<html>`. map-sdk uses Tailwind's `dark:` variant as the host
+  configures it and never assumes a `.dark` class.
+- **Level and scale colors come from metadata only,** always with a label and an outlined
+  swatch.
+- **Selected features** use `--highlight` for the ring, plus the check mark, so selection
+  matches the dashboard's highlight color and never relies on color alone.
 
 - **Legend:** one section per plugin, built from its scale: a gradient for continuous scales,
   blocks for categorical ones, the same look as monitor-map's unified legend. Labels and ticks
