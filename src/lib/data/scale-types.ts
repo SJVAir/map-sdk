@@ -1,5 +1,5 @@
 // Mirrors the server shape in sjvair.com docs/superpowers/specs/2026-11-03-metadata-scales-design.md.
-// Types only; the scale helpers arrive in a later task.
+// Types only; runtime helpers live in scale.ts.
 
 export interface Level {
 	key: string;
