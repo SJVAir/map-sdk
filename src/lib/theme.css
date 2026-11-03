@@ -13,6 +13,14 @@
 	--color-card-border: var(--card-border, var(--border));
 	--color-overlay: var(--overlay, var(--background));
 	--color-link: var(--link, var(--primary));
-	--shadow-card: var(--shadow-card, none);
-	--radius-control: var(--radius-control, var(--radius));
+}
+
+/* Utilities, not theme keys: a theme key named like the host token would emit a self-referencing
+   `--shadow-card: var(--shadow-card, …)` in the theme layer, overriding the host's value. */
+@utility shadow-card {
+	box-shadow: var(--shadow-card, none);
+}
+
+@utility rounded-control {
+	border-radius: var(--radius-control, var(--radius));
 }

@@ -40,8 +40,11 @@
 			return gl;
 		});
 		return () => {
-			ctx.detach();
-			gl.remove();
+			try {
+				ctx.detach();
+			} finally {
+				gl.remove();
+			}
 		};
 	});
 </script>

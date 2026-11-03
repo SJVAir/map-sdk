@@ -36,7 +36,11 @@ export function maptilerKeyTransform(key: string): (url: string) => { url: strin
 }
 
 type SetStyle = MaptilerMap["setStyle"];
-/** A private field of MapTiler's `Map` (SDK 4.2). */
+/**
+ * A private field of MapTiler's `Map` (SDK 4.2). `GlMap` depends on 4.2 internals (this field and
+ * `setStyle(null)`'s fallback), which is why package.json pins `~4.2.0`: re-check both on any SDK
+ * upgrade.
+ */
 type SpaceboxLoadingState = { styleLoadedCallbackFired: boolean };
 
 /** MapLibre's own `setStyle`, which MapTiler's `Map` overrides. */
@@ -61,10 +65,12 @@ class GlMap extends MaptilerMap {
 	}
 }
 
-function styleOf(ctx: MapContext): string | StyleSpecification | undefined {
+/** The style of `ctx`'s current basemap. Throws when there is none, rather than letting MapTiler fall back to its own default style. */
+function styleOf(ctx: MapContext): string | StyleSpecification {
 	const id = ctx.basemap.current;
 	const entry = ctx.config.basemaps?.styles.find((s) => s.id === id);
-	return entry?.style as string | StyleSpecification | undefined;
+	if (!entry) throw new Error(`map-sdk: no basemap style for "${id}"`);
+	return entry.style as string | StyleSpecification;
 }
 
 function recordView(gl: MaptilerMap, ctx: MapContext): void {

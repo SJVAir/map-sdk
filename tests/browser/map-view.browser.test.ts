@@ -5,7 +5,11 @@ import { config as maptilerConfig } from "@maptiler/sdk";
 import { MapView, createMap } from "../../src/lib/index.js";
 import type { MapContext } from "../../src/lib/core/create-map.svelte.js";
 import type { GlMapLike } from "../../src/lib/core/gl.js";
-import { defaultBasemaps, maptilerKeyTransform } from "../../src/lib/view/create-gl-map.js";
+import {
+	createGlMap,
+	defaultBasemaps,
+	maptilerKeyTransform
+} from "../../src/lib/view/create-gl-map.js";
 import MapViewWithOverlay from "../fixtures/MapViewWithOverlay.svelte";
 
 /** Inline styles, so no style document, key, or network is needed. */
@@ -86,9 +90,11 @@ afterAll(() => {
 });
 
 describe("MapView", () => {
-	it("gives two maps on one page their own canvas", async () => {
+	it("gives two maps on one page their own canvas and camera", async () => {
 		const mapA = newMap();
 		const mapB = newMap();
+		const attachedA = trackAttach(mapA);
+		const attachedB = trackAttach(mapB);
 		const a = await render(MapView, { map: mapA, class: "test-map" });
 		const b = await render(MapView, { map: mapB, class: "test-map" });
 		const canvasA = a.container.querySelectorAll("canvas");
@@ -98,6 +104,25 @@ describe("MapView", () => {
 		expect(canvasA[0]).not.toBe(canvasB[0]);
 		expect(mapA.attached).toBe(true);
 		expect(mapB.attached).toBe(true);
+
+		await Promise.all([whenLoaded(attachedA[0]), whenLoaded(attachedB[0])]);
+		const cameraB = mapB.camera;
+		const boundsB = mapB.bounds;
+		attachedA[0].jumpTo({ center: [-121, 38], zoom: 10 });
+		expect(mapA.camera.center[0]).toBeCloseTo(-121);
+		expect(mapB.camera).toEqual(cameraB);
+		expect(mapB.bounds).toEqual(boundsB);
+		expect(attachedB[0].getCenter().lng).toBeCloseTo(cameraB.center[0]);
+	});
+
+	it("refuses to create a GL map when the current basemap has no style", async () => {
+		const map = createMap({
+			config: { maptilerKey: "test-key", basemaps: { styles: [], defaultId: "missing" } }
+		});
+		const container = document.createElement("div");
+		document.body.append(container);
+		expect(() => createGlMap(container, map)).toThrow('map-sdk: no basemap style for "missing"');
+		expect(container.querySelector("canvas")).toBeNull();
 	});
 
 	it("marks its container with the map's uid", async () => {

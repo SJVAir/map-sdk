@@ -31,7 +31,23 @@ describe("theme.css", () => {
 		expect(css).toContain("border-color: var(--card-border, var(--border))");
 		expect(css).toContain("background-color: var(--overlay, var(--background))");
 		expect(css).toContain("color: var(--link, var(--primary))");
-		expect(css).toContain("var(--shadow-card, none)");
+		expect(css).toContain("box-shadow: var(--shadow-card, none)");
 		expect(css).toContain("border-radius: var(--radius-control, var(--radius))");
+	});
+
+	it("never redeclares a host token, which would override the host's value", async () => {
+		const css = await build(["shadow-card", "rounded-control", "bg-highlight", "text-link"]);
+		for (const token of [
+			"highlight",
+			"highlight-subtle",
+			"highlight-foreground",
+			"card-border",
+			"overlay",
+			"link",
+			"shadow-card",
+			"radius-control"
+		]) {
+			expect(css, token).not.toMatch(new RegExp(`--${token}\\s*:`));
+		}
 	});
 });
