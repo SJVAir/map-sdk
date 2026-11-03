@@ -66,6 +66,23 @@ describe("PluginHost", () => {
 		expect(errorSpy).not.toHaveBeenCalled();
 	});
 
+	it("sets up on idle when isStyleLoaded stays false, and only once", () => {
+		const { host } = makeHost();
+		const log: string[] = [];
+		host.add(resourcePlugin("a", log));
+		const gl = createFakeGl();
+		gl.isStyleLoaded = () => false;
+		host.attach(gl);
+		gl.styleLoaded = true; // addLayer works, but isStyleLoaded() still says false
+		gl.emit("idle");
+		expect(log).toEqual(["setup:a"]);
+		expect(gl.listeners).toEqual([]);
+		gl.emit("style.load");
+		gl.emit("idle");
+		expect(log).toEqual(["setup:a"]);
+		expect(errorSpy).not.toHaveBeenCalled();
+	});
+
 	it("sets up at once when the style is already loaded, and for plugins added later", () => {
 		const { host } = makeHost();
 		const log: string[] = [];
@@ -149,6 +166,7 @@ describe("PluginHost", () => {
 		host.attach(oldGl);
 		host.detach();
 		expect(oldGl.listeners).toEqual([]);
+		oldGl.emit("idle");
 
 		const newGl = createFakeGl();
 		host.attach(newGl);

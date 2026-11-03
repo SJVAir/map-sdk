@@ -15,6 +15,9 @@ export interface PluginHostOptions {
 /* eslint-disable @typescript-eslint/no-explicit-any -- MapLibre's event payloads vary by type */
 type Listener = (e: any) => void;
 
+/** Setup runs on whichever of these fires first. */
+const STYLE_READY_EVENTS = ["style.load", "idle"] as const;
+
 /** Everything one running plugin added through its context, so the host can remove it. */
 interface Running {
 	gl: GlMapLike;
@@ -42,7 +45,10 @@ export class PluginHost {
 	#gl: GlMapLike | null = null;
 	/** True once the current gl's style has loaded and plugins are set up on it. */
 	#live = false;
-	/** The pending `style.load` listener on `#gl`, if waiting for one. */
+	/**
+	 * The pending one-shot listener on `#gl` for `style.load` and `idle`, if waiting. `idle` covers
+	 * a style that already loaded while `isStyleLoaded()` is false because sources are loading.
+	 */
 	#onStyleLoad: (() => void) | null = null;
 
 	constructor(opts: PluginHostOptions) {
@@ -106,11 +112,14 @@ export class PluginHost {
 			this.#setupAll();
 		};
 		this.#onStyleLoad = onStyleLoad;
-		gl.on("style.load", onStyleLoad);
+		for (const type of STYLE_READY_EVENTS) gl.on(type, onStyleLoad);
 	}
 
 	#cancelStyleWait(): void {
-		if (this.#onStyleLoad && this.#gl) this.#gl.off("style.load", this.#onStyleLoad);
+		const listener = this.#onStyleLoad;
+		if (listener && this.#gl) {
+			for (const type of STYLE_READY_EVENTS) this.#gl.off(type, listener);
+		}
 		this.#onStyleLoad = null;
 	}
 
