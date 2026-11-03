@@ -221,7 +221,7 @@ second batch (sjvair.com `feature/metadata-scales`,
 
 ```
 Scale  { id, label, units, kind: "range" | "category", levels: Level[], source? }
-Level  { key, label, color, tier (0–4 or null), description, guidance,
+Level  { key, label, color, opacity (0–1 or null), tier (0–4 or null), description, guidance,
          min/max (range; half-open, top max null) | value (category) }
 ```
 
@@ -233,11 +233,10 @@ scales by catalog entry-type id: `pm25`, `o3` (the new `scale` field on `monitor
 `{ dataset, entryType }`. Level `color` can be empty (an unknown burn status); the plugin then
 draws a neutral fill with the label, never omits the feature.
 
-The HMS colors move from monitor-map's code into `hms/meta/` unchanged, so today's look
-carries over. **Smoke opacity** (light 0.2, medium 0.3, heavy 0.4 today) is not in the draft
-`Level`; this session has asked the server session for an optional `opacity` (2026-11-03). If
-it isn't added, map-sdk uses one fill opacity for smoke as presentation, a slight change in
-look the user would see first.
+The HMS colors and smoke opacities (light 0.2, medium 0.3, heavy 0.4) move from monitor-map's
+code into `hms/meta/` unchanged, so today's look carries over. `opacity` was added to `Level` at
+this session's request (2026-11-03) and is null on every level but smoke's; a plugin uses its
+own default fill opacity when it's null. Fire FRP and burn status have `tier: null`.
 
 Until a domain's meta is live, its preset is built and tested against fixtures in this shape,
 and shows `unavailable` on a server without it. It never falls back to hardcoded values.
@@ -396,20 +395,21 @@ default-calibrations.yaml` before PM2.5 shows; the README says so.
 The sjvair.com session (step 3) owns sdk-js and the server metadata. What map-sdk needs, and
 where it stands:
 
-| Needed                                                        | Where                                                   | Waits on it                                                  |
-| ------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------ |
-| Shared `Scale`/`Level` types; `tier` and `scale` on AQ levels | step 3 batch 2, spec 1 (in review)                      | real data for every preset (fixtures until then)             |
-| `hms/meta/` (smoke density, fire FRP)                         | spec 1                                                  | HMS presets on real data                                     |
-| `calheatscore/meta/` and the `calheatscore/` wrapper          | spec 1                                                  | `calHeatScorePlugin` on real data                            |
-| `forecasts/meta/` (AQI scale, zone list) and wrapper          | spec 1                                                  | `forecastZonesPlugin` on real data                           |
-| `regions/geojson/` wrapper (by type and code)                 | a later spec; **asked to move it earlier** (2026-11-03) | boundaries for region fill, ZIPs, and zones on the demo page |
-| Optional `opacity` on `Level` (smoke)                         | **asked** (2026-11-03)                                  | today's exact smoke look                                     |
-| `@sjvair/sdk` 4.8.0 released                                  | after #293 reaches production                           | publishing a map-sdk release that needs 4.8 APIs             |
+| Needed                                                                                                                | Where                                       | Waits on it                                      |
+| --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------ |
+| Shared `Scale`/`Level` types; `tier` and `scale` on AQ levels                                                         | step 3 batch 2, spec 1 (in review)          | real data for every preset (fixtures until then) |
+| `hms/meta/` (smoke density, fire FRP)                                                                                 | spec 1                                      | HMS presets on real data                         |
+| `calheatscore/meta/` and the `calheatscore/` wrapper                                                                  | spec 1                                      | `calHeatScorePlugin` on real data                |
+| `forecasts/meta/` (AQI scale, zone list) and wrapper                                                                  | spec 1                                      | `forecastZonesPlugin` on real data               |
+| `regions/geojson/` wrapper (type required, regions by code, several at once; keeps `within`/`slug`/`name`/`simplify`) | spec 1 (moved in at this session's request) | boundaries for region fill, ZIPs, and zones      |
+| Optional `opacity` on `Level` (smoke)                                                                                 | spec 1 (added at this session's request)    | today's exact smoke look                         |
+| `@sjvair/sdk` 4.8.0 released                                                                                          | after #293 reaches production               | publishing a map-sdk release that needs 4.8 APIs |
 
 **Build order:** core, the general plugins, monitors, and region fill first, then the other
-presets against fixtures, switching each to real data as its meta lands. Until the
-`regions/geojson/` wrapper exists, the demo page may fetch boundaries with a plain request
-through the same origin. That's a demo-only stopgap, never in the package.
+presets against fixtures, switching each to real data as its meta lands. The server session
+will say when an `@sjvair/sdk` beta with these types is out; map-sdk pins that beta, as the
+dashboard pins its betas. Spec 1 is still waiting on the user's approval, so any of this can
+change.
 
 **Milestone 1 is done** when all six presets run on real server data on the demo page. Early
 `0.x` releases (each with the user's yes) can go out before that, once monitors and region fill
