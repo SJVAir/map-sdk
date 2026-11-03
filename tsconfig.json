@@ -14,11 +14,13 @@
 		"target": "es2024",
 		"allowImportingTsExtensions": true,
 		"noEmit": true,
-		"lib": ["esnext", "dom", "dom.iterable"]
+		"lib": ["esnext", "dom", "dom.iterable"],
+		"types": ["node", "vite/client"]
 	},
 	"include": [
 		"src/**/*.ts",
 		"src/**/*.svelte",
+		"tests/**/*.svelte",
 		"tests/**/*.ts",
 		"vite.config.ts",
 		"vitest.config.ts"

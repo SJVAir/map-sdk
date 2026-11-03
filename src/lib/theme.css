@@ -1,1 +1,18 @@
-/* Theme tokens: filled in by a later task. */
+/*
+ * map-sdk's theme: import after Tailwind, e.g. `@import "@sjvair/map-sdk/theme.css";`.
+ *
+ * The components use the host's shadcn tokens (--background, --card, --primary, --border, …)
+ * and these family tokens. A host that defines a family token gets it; one that doesn't falls
+ * back to a standard shadcn token. Inline, so each utility reads the token where it is used and
+ * follows the host's dark mode.
+ */
+@theme inline {
+	--color-highlight: var(--highlight, var(--primary));
+	--color-highlight-subtle: var(--highlight-subtle, var(--muted));
+	--color-highlight-foreground: var(--highlight-foreground, var(--primary-foreground));
+	--color-card-border: var(--card-border, var(--border));
+	--color-overlay: var(--overlay, var(--background));
+	--color-link: var(--link, var(--primary));
+	--shadow-card: var(--shadow-card, none);
+	--radius-control: var(--radius-control, var(--radius));
+}
