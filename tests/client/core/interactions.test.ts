@@ -117,6 +117,37 @@ describe("picking", () => {
 		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["2"] });
 	});
 
+	it("treats a MouseEvent click after a touch pointerdown as a touch tap", () => {
+		// Safari before 17 dispatches click as a MouseEvent, with no pointerType.
+		const { map, gl } = setUp("multiple", ["1"]);
+		gl.setRenderedFeatures([rendered(map, "monitors", "2")]);
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
+		click(gl, {});
+		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["1", "2"] });
+
+		// Cleared after each click: a later plain click replaces.
+		click(gl, {});
+		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["2"] });
+	});
+
+	it("lets the click's own pointerType win over the recorded one", () => {
+		const { map, gl } = setUp("multiple", ["1"]);
+		gl.setRenderedFeatures([rendered(map, "monitors", "2")]);
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
+		click(gl, { pointerType: "mouse" });
+		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["2"] });
+	});
+
+	it("stops recording pointerdown after detach", () => {
+		const { map, gl } = setUp("multiple", ["1"]);
+		map.detach();
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
+		map.attach(gl);
+		gl.setRenderedFeatures([rendered(map, "monitors", "2")]);
+		click(gl, {});
+		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["2"] });
+	});
+
 	it("replaces on shift-click and touch in single mode", () => {
 		const { map, gl } = setUp("single", ["1"]);
 		gl.setRenderedFeatures([rendered(map, "monitors", "2")]);

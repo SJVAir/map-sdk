@@ -39,6 +39,12 @@ export class InteractionRouter {
 	#pickHandlers = new Set<(e: ClickEvent) => void>();
 	/* eslint-enable svelte/prefer-svelte-reactivity */
 	#gl: GlMapLike | null = null;
+	#canvas: HTMLCanvasElement | null = null;
+	/**
+	 * The `pointerType` of the latest `pointerdown` on the canvas, for clicks whose original event
+	 * has none (Safari before 17 dispatches `click` as a `MouseEvent`). Cleared after each click.
+	 */
+	#lastPointerType: string | null = null;
 	#hovered = $state.raw<Hovered | null>(null);
 
 	/** The top hit under the pointer and where it is. Reactive, for the tooltip. */
@@ -68,6 +74,8 @@ export class InteractionRouter {
 		gl.on("click", this.#onClick);
 		gl.on("mousemove", this.#onMove);
 		gl.on("mouseout", this.#onOut);
+		this.#canvas = gl.getCanvas();
+		this.#canvas.addEventListener("pointerdown", this.#onPointerDown);
 	}
 
 	/** Stops listening and clears `hovered`. */
@@ -77,6 +85,9 @@ export class InteractionRouter {
 		gl.off("click", this.#onClick);
 		gl.off("mousemove", this.#onMove);
 		gl.off("mouseout", this.#onOut);
+		this.#canvas?.removeEventListener("pointerdown", this.#onPointerDown);
+		this.#canvas = null;
+		this.#lastPointerType = null;
 		this.#gl = null;
 		this.#hovered = null;
 	}
@@ -119,13 +130,20 @@ export class InteractionRouter {
 		};
 	}
 
+	#onPointerDown = (e: Event) => {
+		this.#lastPointerType = (e as PointerEvent).pointerType || null;
+	};
+
 	#onClick = (e: PointerEventLike) => {
+		const recorded = this.#lastPointerType;
+		this.#lastPointerType = null;
 		const hits = this.hitsAt([e.point.x, e.point.y]);
 		if (hits.length === 0) return;
 		const o = e.originalEvent;
+		const pointerType = o?.pointerType || recorded;
 		const event: ClickEvent = {
 			hits,
-			additive: Boolean(o?.shiftKey || o?.metaKey || o?.ctrlKey || o?.pointerType === "touch"),
+			additive: Boolean(o?.shiftKey || o?.metaKey || o?.ctrlKey || pointerType === "touch"),
 			lngLat: [e.lngLat.lng, e.lngLat.lat]
 		};
 		for (const handler of [...this.#pickHandlers]) {

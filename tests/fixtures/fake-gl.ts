@@ -15,6 +15,8 @@ export interface FakeGl extends GlMapLike {
 	readonly listeners: Array<{ type: string; layerId?: string; listener: Listener }>;
 	/** Every GlMapLike call, as `method:firstArg`. */
 	readonly calls: string[];
+	/** The one canvas `getCanvas()` returns: a real `EventTarget`, so DOM listeners work. */
+	readonly canvas: HTMLCanvasElement;
 	/** Calls listeners for `type` (with `layerId`, only those registered on that layer). */
 	emit(type: string, e?: unknown, layerId?: string): void;
 	/** Marks the style loaded and emits `style.load`. */
@@ -41,6 +43,7 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 	let bearing = 0;
 	let pitch = 0;
 	let removed = false;
+	const canvas = Object.assign(new EventTarget(), { style: {} }) as unknown as HTMLCanvasElement;
 
 	function log(method: string, arg?: unknown) {
 		if (removed) throw new Error(`fake-gl: ${method} after remove()`);
@@ -59,6 +62,7 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 		featureStates,
 		listeners,
 		calls,
+		canvas,
 
 		addSource(id, source) {
 			log("addSource", id);
@@ -203,7 +207,7 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 		},
 		getCanvas() {
 			log("getCanvas");
-			return { style: {} } as HTMLCanvasElement;
+			return canvas;
 		},
 		remove() {
 			log("remove");
