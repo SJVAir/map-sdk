@@ -1,7 +1,7 @@
 import type { LayerSpecification } from "@maptiler/sdk";
 import { untrack } from "svelte";
 import type { GlMapLike } from "./gl.js";
-import type { InteractionRouter } from "./interactions.js";
+import type { InteractionRouter } from "./interactions.svelte.js";
 import type { MapPlugin, PluginContext, Providers } from "./plugin.js";
 
 export interface PluginHostOptions {

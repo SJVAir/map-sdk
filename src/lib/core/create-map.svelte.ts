@@ -3,12 +3,12 @@ import { SvelteMap } from "svelte/reactivity";
 import { createDefaultFormat, type FormatProvider } from "../data/format.js";
 import { defaultMessages, type MessageProvider } from "../data/messages.js";
 import { createDefaultMetadata, type MetadataProvider } from "../data/metadata.js";
-import { selectionKeys } from "../data/selection.js";
+import { applyPick, selectionKeys } from "../data/selection.js";
 import type { FeatureRef, SelectionMode, SpatialSelection } from "../data/types.js";
 import { BasemapState, type BasemapConfig } from "./basemap.svelte.js";
 import type { GlMapLike } from "./gl.js";
-import { InteractionRouter } from "./interactions.js";
-import type { FeatureHit, MapPlugin } from "./plugin.js";
+import { InteractionRouter, type Hovered } from "./interactions.svelte.js";
+import type { ClickEvent, FeatureHit, MapPlugin } from "./plugin.js";
 import { PluginHost } from "./plugin-host.svelte.js";
 
 export interface CameraState {
@@ -76,14 +76,21 @@ export interface MapContext {
 	getSelection(pluginId: string): SpatialSelection | null;
 	setSelectionMode(pluginId: string, mode: SelectionMode): void;
 	/**
-	 * Called for every feature click, whatever the selection mode. Returns an unsubscribe
-	 * function. Handlers are stored now and fired once interactions are wired (Task 10).
+	 * Called for every feature click (the top hit), whatever the selection mode, before the
+	 * selection changes. Returns an unsubscribe function.
 	 */
 	on(event: "featureclick", handler: FeatureClickHandler): () => void;
-	/** Hits under a canvas point, topmost first. Returns `[]` until interactions are wired (Task 10). */
+	/** Hits under a canvas point, topmost first. `[]` while detached. */
 	featuresAt(point: { x: number; y: number }): FeatureHit[];
-	/** The hit for a feature-list element. Returns `null` until interactions are wired (Task 10). */
+	/**
+	 * The hit for a feature-list element: the nearest `[data-mapsdk-ref]` ancestor (or the element
+	 * itself), looked up in the plugins' `features()`. Only rows inside this map's own root count:
+	 * the row's nearest `[data-mapsdk-map]` ancestor must carry this map's `uid`, which MapView
+	 * sets on its container and FeatureList on its root. `null` otherwise.
+	 */
 	featureForElement(element: Element): FeatureHit | null;
+	/** The top feature under the pointer and where it is. Reactive, for the tooltip. */
+	readonly hovered: Hovered | null;
 	/** Marks the feature focused and pans to it (no animation under reduced motion). */
 	focusFeature(refKey: string): void;
 	/** Reactive. */
@@ -121,12 +128,25 @@ function copySelection(sel: SpatialSelection | null): SpatialSelection | null {
 	return sel && { kind: sel.kind, ids: [...sel.ids] };
 }
 
+/** 8 hex characters. `crypto.randomUUID` is missing on insecure origins (a dev server on a LAN IP). */
+function randomUid(): string {
+	const bytes = crypto.getRandomValues(new Uint8Array(4));
+	return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function sameSelection(a: SpatialSelection | null, b: SpatialSelection | null): boolean {
+	if (!a || !b) return a === b;
+	return (
+		a.kind === b.kind && a.ids.length === b.ids.length && a.ids.every((id, i) => id === b.ids[i])
+	);
+}
+
 function prefersReducedMotion(): boolean {
 	return globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
 
 class MapContextImpl implements MapContext {
-	readonly uid = crypto.randomUUID().slice(0, 8);
+	readonly uid = randomUid();
 	readonly config: Readonly<MapConfig>;
 	readonly metadata: MetadataProvider;
 	readonly messages: MessageProvider;
@@ -162,6 +182,7 @@ class MapContextImpl implements MapContext {
 			router: this.#router,
 			selectedKeys: (pluginId) => selectionKeys(this.getSelection(pluginId))
 		});
+		this.#router.onPick((e) => this.#pick(e));
 	}
 
 	get camera(): CameraState {
@@ -184,15 +205,22 @@ class MapContextImpl implements MapContext {
 		return this.#focusedKey;
 	}
 
+	get hovered(): Hovered | null {
+		return this.#router.hovered;
+	}
+
 	addPlugin(plugin: MapPlugin, options: PluginOptions = {}): void {
 		this.#assertAlive();
 		const previous = untrack(() => this.#selections.get(plugin.id));
 		const state = new PluginSelection();
-		state.mode = options.selectionMode ?? previous?.mode ?? "none";
-		state.selection =
-			options.selection !== undefined
-				? copySelection(options.selection)
-				: (previous?.selection ?? null);
+		// Untracked: addPlugin may be called from inside an effect (e.g. a host component's).
+		untrack(() => {
+			state.mode = options.selectionMode ?? previous?.mode ?? "none";
+			state.selection =
+				options.selection !== undefined
+					? copySelection(options.selection)
+					: (previous?.selection ?? null);
+		});
 		state.onselectionchange = options.onselectionchange ?? previous?.onselectionchange;
 		// Stored before the host adds it, so a setup that runs at once sees its selection.
 		this.#selections.set(plugin.id, state);
@@ -211,6 +239,7 @@ class MapContextImpl implements MapContext {
 	}
 
 	setSelection(pluginId: string, selection: SpatialSelection | null): void {
+		if (this.#destroyed) return;
 		this.#stateFor(pluginId).selection = copySelection(selection);
 	}
 
@@ -219,6 +248,7 @@ class MapContextImpl implements MapContext {
 	}
 
 	setSelectionMode(pluginId: string, mode: SelectionMode): void {
+		if (this.#destroyed) return;
 		this.#stateFor(pluginId).mode = mode;
 	}
 
@@ -231,22 +261,33 @@ class MapContextImpl implements MapContext {
 	}
 
 	featuresAt(point: { x: number; y: number }): FeatureHit[] {
-		void point;
-		return [];
+		return this.#router.hitsAt([point.x, point.y]);
 	}
 
 	featureForElement(element: Element): FeatureHit | null {
-		void element;
-		return null;
+		const row = element.closest("[data-mapsdk-ref]");
+		if (!row || row.closest("[data-mapsdk-map]")?.getAttribute("data-mapsdk-map") !== this.uid) {
+			return null;
+		}
+		const refKey = row.getAttribute("data-mapsdk-ref");
+		return untrack(() => {
+			for (const plugin of this.plugins) {
+				const item = plugin.features?.().find((f) => f.refKey === refKey);
+				if (!item) continue;
+				return { pluginId: plugin.id, ref: item.ref, refKey: item.refKey, name: item.name };
+			}
+			return null;
+		});
 	}
 
 	focusFeature(refKey: string): void {
+		if (this.#destroyed) return;
 		this.#focusedKey = refKey;
 		const gl = this.#gl;
 		if (!gl) return;
-		const item = untrack(() => this.plugins)
-			.flatMap((p) => p.features?.() ?? [])
-			.find((f) => f.refKey === refKey);
+		const item = untrack(() =>
+			this.plugins.flatMap((p) => p.features?.() ?? []).find((f) => f.refKey === refKey)
+		);
 		if (!item) return;
 		gl.easeTo({ center: item.lngLat, ...(prefersReducedMotion() && { duration: 0 }) });
 	}
@@ -257,12 +298,14 @@ class MapContextImpl implements MapContext {
 		if (this.#gl) this.detach();
 		this.#gl = gl;
 		this.#host.attach(gl);
+		this.#router.attach(gl);
 		this.basemap.attach(gl, () => this.#host.restyle());
 		this.#attached = true;
 	}
 
 	detach(): void {
 		if (!this.#gl) return;
+		this.#router.detach();
 		this.basemap.detach();
 		this.#host.detach();
 		this.#gl = null;
@@ -282,6 +325,32 @@ class MapContextImpl implements MapContext {
 		this.#featureClickHandlers.clear();
 		this.#focusedKey = null;
 		this.#destroyed = true;
+	}
+
+	/** A click on a feature: report it, then apply it to the top hit's plugin's selection. */
+	#pick(e: ClickEvent): void {
+		if (this.#destroyed) return;
+		const [{ pluginId, ref }] = e.hits;
+		for (const handler of [...this.#featureClickHandlers]) {
+			try {
+				handler({ pluginId, ref });
+			} catch (error) {
+				console.error("map-sdk: a featureclick handler failed", error);
+			}
+		}
+		// A handler may have removed the plugin.
+		const state = untrack(() => this.#selections.get(pluginId));
+		if (!state) return;
+		const current = untrack(() => state.selection);
+		const next = applyPick(
+			current,
+			ref,
+			untrack(() => state.mode),
+			{ additive: e.additive }
+		);
+		if (sameSelection(current, next)) return;
+		state.selection = next;
+		state.onselectionchange?.(copySelection(next));
 	}
 
 	#stateFor(pluginId: string): PluginSelection {

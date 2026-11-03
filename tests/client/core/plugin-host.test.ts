@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushSync } from "svelte";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
-import { InteractionRouter } from "../../../src/lib/core/interactions.js";
+import { InteractionRouter } from "../../../src/lib/core/interactions.svelte.js";
 import type { MapPlugin, PluginContext, Providers } from "../../../src/lib/core/plugin.js";
 import { PluginHost } from "../../../src/lib/core/plugin-host.svelte.js";
 import { defaultMessages } from "../../../src/lib/data/messages.js";

@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushSync } from "svelte";
+import { SvelteMap } from "svelte/reactivity";
 import { createMap } from "../../../src/lib/core/create-map.svelte.js";
 import type { MapPlugin, PluginContext } from "../../../src/lib/core/plugin.js";
 import { defaultMessages } from "../../../src/lib/data/messages.js";
+import { NO_LEVEL } from "../../../src/lib/data/scale.js";
 import { rootEffect } from "../../fixtures/effects.svelte.js";
 import { createFakeGl } from "../../fixtures/fake-gl.js";
 
@@ -193,12 +195,6 @@ describe("createMap", () => {
 		expect(gl.getCenter()).toEqual({ lng: -118.5, lat: 35.25 });
 	});
 
-	it("returns no hits until interactions are wired", () => {
-		const map = createMap({ config });
-		expect(map.featuresAt({ x: 1, y: 2 })).toEqual([]);
-		expect(map.featureForElement({} as Element)).toBeNull();
-	});
-
 	it("destroy detaches, clears plugins, and refuses new plugins", () => {
 		const map = createMap({ config });
 		const log: string[] = [];
@@ -216,12 +212,79 @@ describe("createMap", () => {
 	});
 
 	it("drops featureclick handlers on destroy", () => {
-		// Firing is wired in Task 10; here, registering and unsubscribing stay safe after destroy.
 		const map = createMap({ config });
 		const off = map.on("featureclick", vi.fn());
 		map.destroy();
 		expect(() => off()).not.toThrow();
 		const late = map.on("featureclick", vi.fn());
 		expect(() => late()).not.toThrow();
+	});
+
+	it("ignores selection changes and focus after destroy", () => {
+		const map = createMap({ config });
+		map.addPlugin(plugin("monitors"), { selectionMode: "multiple" });
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		map.destroy();
+		map.setSelection("monitors", { kind: "monitors", ids: ["1"] });
+		map.setSelectionMode("monitors", "single");
+		map.focusFeature("monitor:1");
+		expect(map.getSelection("monitors")).toBeNull();
+		expect(map.focusedKey).toBeNull();
+		expect(gl.calls).not.toContain("easeTo");
+	});
+
+	it("doesn't make an effect depend on a previous plugin's options in addPlugin", () => {
+		const map = createMap({ config });
+		map.addPlugin(plugin("monitors"), { selectionMode: "single" });
+		let runs = 0;
+		stops.push(
+			rootEffect(() => {
+				runs++;
+				try {
+					map.addPlugin(plugin("monitors"));
+				} catch {
+					// A duplicate: the first plugin's state is restored.
+				}
+			})
+		);
+		flushSync();
+		expect(runs).toBe(1);
+		map.setSelectionMode("monitors", "multiple");
+		map.setSelection("monitors", { kind: "monitors", ids: ["2"] });
+		flushSync();
+		expect(runs).toBe(1);
+	});
+
+	it("doesn't make an effect depend on plugin features in focusFeature", () => {
+		const map = createMap({ config });
+		const names = new SvelteMap([["5", "Site 5"]]);
+		map.addPlugin(
+			plugin("monitors", [], {
+				features: () =>
+					[...names].map(([id, name]) => ({
+						refKey: `monitor:${id}`,
+						ref: { kind: "monitor" as const, id },
+						name,
+						value: null,
+						level: NO_LEVEL,
+						units: "",
+						lngLat: [-118.5, 35.25] as [number, number],
+						selectable: true
+					}))
+			})
+		);
+		map.attach(createFakeGl({ styleLoaded: true }));
+		let runs = 0;
+		stops.push(
+			rootEffect(() => {
+				runs++;
+				map.focusFeature("monitor:5");
+			})
+		);
+		flushSync();
+		names.set("6", "Site 6");
+		flushSync();
+		expect(runs).toBe(1);
 	});
 });

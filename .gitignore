@@ -31,3 +31,6 @@ vite.config.ts.timestamp-*
 
 # Plan execution scratch
 .superpowers/
+
+# Vitest browser-mode failure screenshots
+/.vitest
