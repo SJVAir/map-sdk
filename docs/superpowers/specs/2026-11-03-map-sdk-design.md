@@ -1,6 +1,6 @@
 # `@sjvair/map-sdk`: milestone 1 design
 
-Date: 2026-11-03. Status: draft for review.
+Date: 2026-11-03. Status: **approved by the user 2026-11-03.**
 Release 1, step 5, part 1 (data-dashboard `ROADMAP.md` item 5, `TODO.md` → "Release 1, step 5").
 
 ## Intent
