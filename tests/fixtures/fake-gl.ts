@@ -7,6 +7,7 @@ type Rendered = ReturnType<GlMapLike["queryRenderedFeatures"]>[number];
 
 export interface FakeGl extends GlMapLike {
 	styleLoaded: boolean;
+	/** Specs as added; a `setData` through `getSource(id)` replaces the spec's `data`. */
 	readonly sources: Map<string, SourceSpecification>;
 	/** In draw order. */
 	readonly layers: LayerSpecification[];
@@ -79,7 +80,16 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 		},
 		getSource(id) {
 			log("getSource", id);
-			return sources.get(id);
+			if (!sources.has(id)) return undefined;
+			// The part of a GeoJSONSource that plugins use.
+			return {
+				setData(data: unknown) {
+					log("setData", id);
+					const spec = sources.get(id);
+					if (!spec) throw new Error(`fake-gl: setData on removed source ${id}`);
+					sources.set(id, { ...spec, data } as SourceSpecification);
+				}
+			};
 		},
 		addLayer(layer, beforeId) {
 			log("addLayer", layer.id);

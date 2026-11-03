@@ -11,6 +11,31 @@ import { burnScale, fireScale, heatScale, pm25Scale, smokeScale } from "../../fi
 
 const NEUTRAL = "#888888";
 
+/** The step input every range lookup uses (see `numeric` in style.ts). */
+const numericValue = [
+	"let",
+	"v",
+	["get", "value"],
+	[
+		"case",
+		["==", ["typeof", ["var", "v"]], "number"],
+		["to-number", ["var", "v"]],
+		["==", ["typeof", ["var", "v"]], "string"],
+		[
+			"let",
+			"n",
+			["to-number", ["var", "v"], -1],
+			[
+				"case",
+				["all", ["==", ["var", "n"], 0], ["!", ["in", "0", ["to-string", ["var", "v"]]]]],
+				-1,
+				["var", "n"]
+			]
+		],
+		-1
+	]
+];
+
 function evaluate(expr: unknown, value: unknown, type: "color" | "number" | "string" = "color") {
 	const result = createExpression(expr, { type } as never);
 	if (result.result !== "success") throw new Error(JSON.stringify(result.value));
@@ -33,7 +58,7 @@ describe("colorExpression", () => {
 	it("builds a step over to-number with each level min as a breakpoint", () => {
 		const expr = colorExpression(pm25Scale, "value", NEUTRAL) as unknown[];
 		expect(expr[0]).toBe("step");
-		expect(expr[1]).toEqual(["to-number", ["coalesce", ["get", "value"], "none"], -1]);
+		expect(expr[1]).toEqual(numericValue);
 		expect(expr[2]).toBe(NEUTRAL);
 		const mins = expr.slice(3).filter((_, i) => i % 2 === 0);
 		expect(mins).toEqual(pm25Scale.levels.map((l) => l.min));
@@ -62,6 +87,24 @@ describe("colorExpression", () => {
 		const expr = colorExpression(pm25Scale, "value", NEUTRAL);
 		const neutral = colorOf(["literal", NEUTRAL], undefined);
 		for (const v of [-5, null, undefined, "abc"]) expect(colorOf(expr, v)).toBe(neutral);
+	});
+
+	it("maps blank strings, booleans and arrays to neutral, like levelFor", () => {
+		const expr = colorExpression(pm25Scale, "value", NEUTRAL);
+		const neutral = colorOf(["literal", NEUTRAL], undefined);
+		for (const v of ["", " ", "\t"]) expect(levelFor(v, pm25Scale)).toBe(NO_LEVEL);
+		for (const v of ["", " ", "\t", true, false, [5]]) expect(colorOf(expr, v)).toBe(neutral);
+	});
+
+	it("reads numeric strings as numbers, like levelFor", () => {
+		const expr = colorExpression(pm25Scale, "value", NEUTRAL);
+		for (const v of ["0", " 0 ", "0.0", "12", "9.1"]) {
+			const found = levelFor(v, pm25Scale);
+			expect(found).not.toBe(NO_LEVEL);
+			expect(colorOf(expr, v)).toBe(
+				colorOf(["literal", (found as { color: string }).color], undefined)
+			);
+		}
 	});
 
 	it("falls to neutral in a gap between levels", () => {
