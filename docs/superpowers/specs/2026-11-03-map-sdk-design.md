@@ -262,8 +262,9 @@ Thin wrappers over the general plugins, keeping today's live-map look:
 | `forecastZonesPlugin` | shapes   | forecast-zone boundaries (county and `custom` regions) with a category; forecast scale | `{ kind: "region", type, code }`        |
 
 **The monitors preset keeps today's look and behavior:** marker shapes by monitor type,
-level-colored fill, the current clustering (DBSCAN via `@turf/clusters-dbscan`) and cluster
-rendering, and the current tooltips. The shape for each monitor type stays a presentation
+level-colored fill, the current clustering (MapLibre source clustering per monitor type,
+radius 40, up to zoom 9, with the cluster's average value) and cluster rendering, and the
+current tooltips. (HMS fires keep their DBSCAN grouping via `@turf/clusters-dbscan`, 2 km.) The shape for each monitor type stays a presentation
 mapping in code, with a fallback shape for unknown types. Monitor type labels come from
 metadata.
 
