@@ -106,15 +106,68 @@ export const fireScale: Scale = {
 
 export const heatScale: Scale = {
 	id: "heat-score",
-	label: "Heat score",
+	label: "Heat Score",
 	units: "",
 	kind: "category",
+	source: { name: "CalHeatScore (CalEPA / OEHHA)", url: "https://calheatscore.calepa.ca.gov/" },
 	levels: [
-		category("none", "None", "#DEDEDE", 0, null, null),
-		category("minor", "Minor", "#fae0c8", 1, null, null),
-		category("moderate", "Moderate", "#ea8753", 2, null, null),
-		category("major", "Major", "#c23a00", 3, null, null),
-		category("extreme", "Extreme", "#700006", 4, null, null)
+		{
+			key: "low",
+			label: "Low",
+			color: "#DEDEDE",
+			opacity: null,
+			tier: 0,
+			description: "Little to no heat-related health impacts are expected.",
+			guidance: "",
+			value: 0
+		},
+		{
+			key: "mild",
+			label: "Mild",
+			color: "#fae0c8",
+			opacity: null,
+			tier: 1,
+			description:
+				"Warm day. A minor increase in heat-related health impacts is expected among those sensitive to heat.",
+			guidance: "People sensitive to heat should drink extra water and take breaks somewhere cool.",
+			value: 1
+		},
+		{
+			key: "moderate",
+			label: "Moderate",
+			color: "#ea8753",
+			opacity: null,
+			tier: 2,
+			description:
+				"Very warm day. A moderate increase in heat-related health impacts is expected among those sensitive to heat.",
+			guidance:
+				"People sensitive to heat should limit time outdoors in the afternoon, drink extra water, and stay somewhere cool during the hottest hours.",
+			value: 2
+		},
+		{
+			key: "high",
+			label: "High",
+			color: "#c23a00",
+			opacity: null,
+			tier: 3,
+			description:
+				"Hot day. An increase in heat-related health impacts is expected for everyone, especially those without access to adequate cooling and hydration or those engaged in strenuous physical activity outdoors. This level of heat can pose a significant risk to health.",
+			guidance:
+				"Everyone should drink extra water, limit strenuous outdoor activity, and spend the hottest hours somewhere cool.",
+			value: 3
+		},
+		{
+			key: "severe",
+			label: "Severe",
+			color: "#700006",
+			opacity: null,
+			tier: 4,
+			description:
+				"Extreme heat day. A major increase in heat-related health impacts is expected for everyone, especially those without access to adequate cooling and hydration or those engaged in strenuous physical activity outdoors. This level of heat can pose a very serious risk to health.",
+			guidance:
+				"Everyone should stay somewhere cool when possible, drink at least 2 glasses of water an hour, and check on people at higher risk.",
+			value: 4
+		}
 	]
 };
 
@@ -123,5 +176,5 @@ export const burnScale: Scale = {
 	label: "Burn status",
 	units: "",
 	kind: "category",
-	levels: [category("burn", "Burn", "", "burn", null, null)]
+	levels: [category("discouraged", "Burning Discouraged", "", "discouraged", null, null)]
 };
