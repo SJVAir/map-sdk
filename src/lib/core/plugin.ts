@@ -57,6 +57,10 @@ export interface ClickEvent {
  * plugin is torn down, whether or not the plugin's own teardown cleans up.
  */
 export interface PluginContext {
+	/**
+	 * The GL map. Don't use it after teardown: do late async work (an image that finishes
+	 * loading, a fetch) through the context's methods, which do nothing once torn down.
+	 */
 	readonly gl: GlMapLike;
 	/** `${mapUid}:${pluginId}:${local}` */
 	id(local: string): string;

@@ -60,18 +60,26 @@ export class PluginHost {
 		return this.#plugins;
 	}
 
+	/**
+	 * The host's own reads are untracked, so calling `add`, `attach`, etc. from inside an effect
+	 * doesn't make that effect depend on the plugin list.
+	 */
+	get #list(): readonly MapPlugin[] {
+		return untrack(() => this.#plugins);
+	}
+
 	add(plugin: MapPlugin): void {
-		if (this.#plugins.some((p) => p.id === plugin.id)) {
+		if (this.#list.some((p) => p.id === plugin.id)) {
 			throw new Error(`map-sdk: a plugin with id "${plugin.id}" is already added`);
 		}
-		this.#plugins = [...this.#plugins, plugin];
+		this.#plugins = [...this.#list, plugin];
 		if (this.#live) this.#setup(plugin);
 	}
 
 	remove(id: string): void {
-		if (!this.#plugins.some((p) => p.id === id)) return;
+		if (!this.#list.some((p) => p.id === id)) return;
 		this.#teardown(id);
-		this.#plugins = this.#plugins.filter((p) => p.id !== id);
+		this.#plugins = this.#list.filter((p) => p.id !== id);
 	}
 
 	/** Uses `gl` from now on, setting up every plugin once its style is loaded. */
@@ -124,13 +132,19 @@ export class PluginHost {
 	}
 
 	#setupAll(): void {
+		const gl = this.#gl;
 		this.#live = true;
-		for (const plugin of this.#plugins) this.#setup(plugin);
+		for (const plugin of this.#list) {
+			// A plugin's setup may add, remove, or detach; follow the host's current state.
+			if (this.#gl !== gl || !this.#live) return;
+			if (!this.#list.includes(plugin) || this.#running.has(plugin.id)) continue;
+			this.#setup(plugin);
+		}
 	}
 
 	#teardownAll(): void {
 		this.#live = false;
-		for (const plugin of this.#plugins) this.#teardown(plugin.id);
+		for (const plugin of this.#list) this.#teardown(plugin.id);
 	}
 
 	#setup(plugin: MapPlugin): void {
@@ -148,12 +162,24 @@ export class PluginHost {
 		};
 		this.#running.set(plugin.id, running);
 		const ctx = this.#context(plugin.id, running);
+		let teardown: () => void;
 		try {
 			// Untracked: setup may be called from inside an effect (e.g. MapView's).
-			running.teardown = untrack(() => plugin.setup(ctx));
+			teardown = untrack(() => plugin.setup(ctx));
 		} catch (error) {
 			console.error(`map-sdk: plugin "${plugin.id}" setup failed`, error);
-			this.#teardown(plugin.id);
+			if (this.#running.get(plugin.id) === running) this.#teardown(plugin.id);
+			return;
+		}
+		if (!running.dead) {
+			running.teardown = teardown;
+			return;
+		}
+		// Torn down during its own setup (it removed itself or detached the host).
+		try {
+			untrack(teardown);
+		} catch (error) {
+			console.error(`map-sdk: plugin "${plugin.id}" teardown failed`, error);
 		}
 	}
 
@@ -170,8 +196,9 @@ export class PluginHost {
 				console.error(`map-sdk: plugin "${pluginId}" ${what} failed`, error);
 			}
 		};
-		if (running.teardown) attempt("teardown", untrack.bind(null, running.teardown));
+		// Effects stop first so none re-runs against a half-removed plugin.
 		for (const stop of running.effects) attempt("effect cleanup", stop);
+		if (running.teardown) attempt("teardown", untrack.bind(null, running.teardown));
 		// A style change may already have dropped these, so check before removing.
 		for (const id of running.layers.toReversed()) {
 			attempt(`removing layer ${id}`, () => gl.getLayer(id) && gl.removeLayer(id));

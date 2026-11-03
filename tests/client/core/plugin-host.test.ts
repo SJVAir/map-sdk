@@ -7,6 +7,7 @@ import { PluginHost } from "../../../src/lib/core/plugin-host.svelte.js";
 import { defaultMessages } from "../../../src/lib/data/messages.js";
 import type { FormatProvider } from "../../../src/lib/data/format.js";
 import type { MetadataProvider } from "../../../src/lib/data/metadata.js";
+import { rootEffect } from "../../fixtures/effects.svelte.js";
 import { createFakeGl } from "../../fixtures/fake-gl.js";
 
 const providers: Providers = {
@@ -144,18 +145,30 @@ describe("PluginHost", () => {
 	});
 
 	it("never touches a gl after detach", () => {
-		const { host } = makeHost();
+		const { host, router } = makeHost();
 		let ctx!: PluginContext;
 		host.add(resourcePlugin("a", [], (c) => (ctx = c)));
 		const gl = createFakeGl({ styleLoaded: true });
 		host.attach(gl);
 		host.detach();
+		const register = vi.spyOn(router, "register");
 		const before = gl.calls.length;
 		// A plugin's late async work through its context is ignored.
 		ctx.addSource("late", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
 		ctx.addImage("late", { width: 1, height: 1 } as ImageData);
+		ctx.addLayer("late", { type: "background" });
+		ctx.on("click", "m1:a:fill", () => {});
+		ctx.interactive(["m1:a:fill"], () => null);
+		let effectRuns = 0;
+		ctx.effect(() => {
+			effectRuns++;
+		});
+		flushSync();
 		gl.fireStyleLoad();
+		gl.emit("idle");
 		expect(gl.calls.length).toBe(before);
+		expect(register).not.toHaveBeenCalled();
+		expect(effectRuns).toBe(0);
 	});
 
 	it("detached during a style load and re-attached: sets up once on the new map only", () => {
@@ -239,7 +252,9 @@ describe("PluginHost", () => {
 	it("throws on a duplicate plugin id", () => {
 		const { host } = makeHost();
 		host.add(resourcePlugin("a"));
-		expect(() => host.add(resourcePlugin("a"))).toThrow(/a/);
+		expect(() => host.add(resourcePlugin("a"))).toThrow(
+			'map-sdk: a plugin with id "a" is already added'
+		);
 		expect(host.plugins).toHaveLength(1);
 	});
 
@@ -282,6 +297,63 @@ describe("PluginHost", () => {
 		selected.set("a", new SvelteSet(["monitor:3"]));
 		flushSync();
 		expect(seen).toEqual([0, 2]);
+	});
+
+	it("can be driven from inside an effect without depending on the plugin list", () => {
+		const { host } = makeHost();
+		const log: string[] = [];
+		const gl = createFakeGl({ styleLoaded: true });
+		let runs = 0;
+		const stop = rootEffect(() => {
+			runs++;
+			host.add(resourcePlugin("a", log));
+			host.attach(gl);
+			host.restyle();
+		});
+		flushSync();
+		expect(runs).toBe(1);
+		expect(log).toEqual(["setup:a", "teardown:a", "setup:a"]);
+
+		host.add(resourcePlugin("b", log));
+		host.remove("b");
+		flushSync();
+		expect(runs).toBe(1);
+		expect(log).toEqual(["setup:a", "teardown:a", "setup:a", "setup:b", "teardown:b"]);
+		expect(errorSpy).not.toHaveBeenCalled();
+		stop();
+	});
+
+	it("re-runs an effect reading plugins after add and remove", () => {
+		const { host } = makeHost();
+		const seen: string[] = [];
+		const stop = rootEffect(() => {
+			seen.push(host.plugins.map((p) => p.id).join(","));
+		});
+		flushSync();
+		host.add(resourcePlugin("a"));
+		flushSync();
+		host.add(resourcePlugin("b"));
+		flushSync();
+		host.remove("a");
+		flushSync();
+		expect(seen).toEqual(["", "a", "a,b", "b"]);
+		stop();
+	});
+
+	it("follows adds, removes, and detaches made by a plugin's setup", () => {
+		const { host } = makeHost();
+		const log: string[] = [];
+		host.add(resourcePlugin("a", log, () => host.remove("b")));
+		host.add(resourcePlugin("b", log));
+		host.add(resourcePlugin("c", log, () => host.detach()));
+		host.add(resourcePlugin("d", log));
+		const gl = createFakeGl({ styleLoaded: true });
+		host.attach(gl);
+		// c's own teardown runs as soon as its setup returns into a detached host.
+		expect(log).toEqual(["setup:a", "setup:c", "teardown:a", "teardown:c"]);
+		expect(gl.layers).toEqual([]);
+		expect(gl.sources.size).toBe(0);
+		expect(host.plugins.map((p) => p.id)).toEqual(["a", "c", "d"]);
 	});
 
 	it("tears down a plugin whose setup throws and keeps the others running", () => {
