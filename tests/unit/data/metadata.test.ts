@@ -117,7 +117,8 @@ describe("default metadata", () => {
 		const meta = createDefaultMetadata();
 		expect(await meta.entryType({ dataset, entryType })).toEqual({
 			label: scale.label,
-			units: scale.units
+			units: scale.units,
+			precision: null
 		});
 		expect(await meta.entryType({ dataset, entryType: "nope" })).toBe("unavailable");
 		await meta.scale({ dataset, entryType });
@@ -137,10 +138,40 @@ describe("default metadata", () => {
 	it("gives label and units for an entry type", async () => {
 		getMonitorsMeta.mockResolvedValue(legacyMeta());
 		const meta = createDefaultMetadata();
-		expect(await meta.entryType(pm25)).toEqual({ label: "PM2.5", units: "µg/m³" });
+		expect(await meta.entryType(pm25)).toEqual({ label: "PM2.5", units: "µg/m³", precision: null });
 		expect(await meta.entryType({ dataset: "air-quality", entryType: "o3" })).toEqual({
 			label: "Ozone",
-			units: "ppb"
+			units: "ppb",
+			precision: null
+		});
+	});
+
+	it("gives the catalog's display precision, searching split datasets", async () => {
+		getMonitorsMeta.mockResolvedValue(legacyMeta());
+		getHMSMeta.mockResolvedValue({ scales: { "fire-frp": fireScale } });
+		const entry = (id: string, precision: number | null) => ({ id, display: { precision } });
+		getDatasetCatalog.mockResolvedValue({
+			datasets: [
+				{ id: "air-quality", entry_types: [entry("pm25", 1), entry("o3", null)] },
+				{ id: "hms-fire", entry_types: [entry("fire-frp", 2)] }
+			]
+		});
+		const meta = createDefaultMetadata();
+		expect(await meta.entryType(pm25)).toMatchObject({ precision: 1 });
+		expect(await meta.entryType({ dataset: "air-quality", entryType: "o3" })).toMatchObject({
+			precision: null
+		});
+		expect(await meta.entryType({ dataset: "hms", entryType: "fire-frp" })).toMatchObject({
+			precision: 2
+		});
+	});
+
+	it("gives a null precision when the catalog fails", async () => {
+		getMonitorsMeta.mockResolvedValue(legacyMeta());
+		getDatasetCatalog.mockRejectedValue(new Error("404"));
+		expect(await createDefaultMetadata().entryType(pm25)).toMatchObject({
+			label: "PM2.5",
+			precision: null
 		});
 	});
 

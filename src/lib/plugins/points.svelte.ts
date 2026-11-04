@@ -50,6 +50,8 @@ export type { ClusterInfo, ClusterLayerArgs } from "./points-clusters.js";
 export interface PointsTooltipEnv extends Providers {
 	/** Null while it resolves or when unavailable. */
 	scale: Scale | null;
+	/** Decimal places for values, as the list items carry it. */
+	precision: number;
 }
 
 export interface PointsOptions<P extends MapFeatureProperties> {
@@ -131,7 +133,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		if (!providers) return null;
 		const resolved = currentScale();
 		const scale = resolved === null || resolved === "unavailable" ? null : resolved;
-		return { ...providers, scale };
+		return { ...providers, scale, precision: scales.precision() };
 	}
 
 	function featureTooltip(item: FeatureListItem): Snippet | undefined {
@@ -168,6 +170,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		if (!collection) return [];
 		const resolved = currentScale();
 		const scale = resolved === null || resolved === "unavailable" ? null : resolved;
+		const precision = scales.precision();
 		const items: FeatureListItem[] = [];
 		for (const feature of collection.features) {
 			const props = feature.properties;
@@ -183,6 +186,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				value: props.value,
 				level: scale ? levelFor(props.value, scale) : NO_LEVEL,
 				units: scale?.units ?? "",
+				precision,
 				lngLat: [lng, lat],
 				selectable: selectable && selectionId(ref) !== null
 			});

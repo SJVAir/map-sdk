@@ -119,6 +119,15 @@ describe("typeaheadIndex", () => {
 describe("rowLabel", () => {
 	const format = createDefaultFormat();
 
+	it("rounds the value to the item's precision", () => {
+		expect(
+			rowLabel(item("1", "Fresno", { value: 7.971, precision: 1 }), defaultMessages, format)
+		).toBe("Fresno, 8.0 µg/m³, Good");
+		expect(
+			rowLabel(item("1", "Fresno", { value: 7.971, precision: 0 }), defaultMessages, format)
+		).toBe("Fresno, 8 µg/m³, Good");
+	});
+
 	it("reads the name, formatted value, units, and level label", () => {
 		expect(rowLabel(item("1", "Fresno", { value: 1234.5 }), defaultMessages, format)).toBe(
 			"Fresno, 1,234.5 µg/m³, Good"

@@ -37,7 +37,8 @@ function setup(
 	const router = new InteractionRouter();
 	const providers: Providers = {
 		metadata: {
-			scale: spy.mockImplementation(() => Promise.resolve(meta))
+			scale: spy.mockImplementation(() => Promise.resolve(meta)),
+			entryType: () => Promise.resolve("unavailable")
 		} as unknown as MetadataProvider,
 		messages: defaultMessages,
 		format: {} as FormatProvider

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatValue } from "../ui/value-format.js";
 	import type { FeatureListItem } from "../core/plugin.js";
 	import type { FormatProvider } from "../data/format.js";
 	import type { MessageProvider } from "../data/messages.js";
@@ -24,7 +25,8 @@
 	const level = $derived(item.level !== NO_LEVEL ? item.level : null);
 	const reading = $derived.by(() => {
 		const n = numericValue(item.value);
-		return n === null ? null : format.number(Math.round(n));
+		// Monitor-map's whole number unless the item says otherwise.
+		return n === null ? null : formatValue(n, item.precision ?? 0, format);
 	});
 	const time = $derived.by(() => {
 		if (!timestamp || Number.isNaN(Date.parse(timestamp))) return null;

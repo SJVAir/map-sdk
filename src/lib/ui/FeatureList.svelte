@@ -14,6 +14,7 @@
 		typeaheadIndex,
 		type SortBy
 	} from "./feature-list.js";
+	import { formatValue as formatNumber } from "./value-format.js";
 
 	interface Props {
 		map: MapContext;
@@ -267,7 +268,9 @@
 
 	function formatValue(row: Row): string {
 		if (row.value === null) return "";
-		return typeof row.value === "number" ? map.format.number(row.value) : row.value;
+		return typeof row.value === "number"
+			? formatNumber(row.value, row.precision, map.format)
+			: row.value;
 	}
 
 	onDestroy(() => {

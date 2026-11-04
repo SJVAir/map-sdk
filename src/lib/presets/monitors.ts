@@ -213,6 +213,7 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 						componentSnippet(MonitorClusterTooltip, {
 							cluster,
 							scale: env.scale,
+							precision: env.precision,
 							messages: env.messages,
 							format: env.format,
 							metadata: env.metadata

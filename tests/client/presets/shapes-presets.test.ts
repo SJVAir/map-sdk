@@ -112,7 +112,10 @@ describe.each(PRESETS)("%s", (_name, factory, defaultId, ref) => {
 		const source = new TestSource<Props>({ features: ZIP, scale: ref });
 		const map = createMap({
 			config: { maptilerKey: "test-key" },
-			metadata: { scale: () => Promise.resolve("unavailable") } as unknown as MetadataProvider
+			metadata: {
+				scale: () => Promise.resolve("unavailable"),
+				entryType: () => Promise.resolve("unavailable")
+			} as unknown as MetadataProvider
 		});
 		map.addPlugin(factory({ source, layerLabel: "Zones" }));
 		const gl = createFakeGl({ styleLoaded: true });

@@ -50,6 +50,11 @@ export interface FeatureListItem {
 	value: number | string | null;
 	level: Level | typeof NO_LEVEL;
 	units: string;
+	/**
+	 * Decimal places to show a numeric `value` with (the built-in plugins take it from the
+	 * metadata's display hint). Without it the value is formatted as given.
+	 */
+	precision?: number;
 	lngLat: [number, number];
 	selectable: boolean;
 }

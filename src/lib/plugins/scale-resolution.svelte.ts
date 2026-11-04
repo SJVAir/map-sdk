@@ -42,6 +42,11 @@ export interface ScaleResolver {
 	current(): Resolved | null;
 	/** The legend entry for the source's status and scale. */
 	legend(): LegendData | null;
+	/**
+	 * Decimal places for the source's values: the metadata's display precision for a `ScaleRef`
+	 * once known, else 0 on a range scale and 1 otherwise.
+	 */
+	precision(): number;
 	/** Resolves a `ScaleRef` through the metadata provider whenever the input changes. */
 	track(ctx: PluginContext, isDead: () => boolean): void;
 }
@@ -54,6 +59,8 @@ export function createScaleResolver<P extends MapFeatureProperties>(
 ): ScaleResolver {
 	/** The scale resolved for a source scale input, from the latest setup. */
 	let resolution = $state.raw<{ input: ScaleInput; scale: Resolved } | null>(null);
+	/** The metadata's display precision for a source scale input, once known. */
+	let hint = $state.raw<{ input: ScaleInput; precision: number | null } | null>(null);
 
 	function current(): Resolved | null {
 		const input = source.scale;
@@ -77,7 +84,30 @@ export function createScaleResolver<P extends MapFeatureProperties>(
 		return { pluginId, title: layerLabel, units: scale.units, scale };
 	}
 
+	function precision(): number {
+		if (hint !== null && hint.input === source.scale && hint.precision !== null) {
+			return hint.precision;
+		}
+		const scale = current();
+		return scale !== null && scale !== "unavailable" && scale.kind === "range" ? 0 : 1;
+	}
+
 	function track(ctx: PluginContext, isDead: () => boolean): void {
+		ctx.effect(() => {
+			const input = source.scale;
+			if (input === null || isScale(input)) return;
+			if (untrack(() => hint)?.input === input) return;
+			const controller = new AbortController();
+			// A display hint only: a failure keeps the default.
+			ctx.metadata.entryType(input, controller.signal).then(
+				(info) => {
+					if (isDead() || controller.signal.aborted) return;
+					hint = { input, precision: info === "unavailable" ? null : info.precision };
+				},
+				() => {}
+			);
+			return () => controller.abort();
+		});
 		ctx.effect(() => {
 			const input = source.scale;
 			if (input === null || isScale(input)) return;
@@ -99,5 +129,5 @@ export function createScaleResolver<P extends MapFeatureProperties>(
 		});
 	}
 
-	return { current, legend, track };
+	return { current, legend, precision, track };
 }

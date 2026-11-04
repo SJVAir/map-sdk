@@ -123,6 +123,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 		if (!collection) return [];
 		const resolved = currentScale();
 		const scale = resolved === null || resolved === "unavailable" ? null : resolved;
+		const precision = choropleth ? scales.precision() : 1;
 		const items: FeatureListItem[] = [];
 		for (const feature of collection.features) {
 			const props = feature.properties;
@@ -137,6 +138,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 				value: props.value,
 				level: scale ? levelFor(props.value, scale) : NO_LEVEL,
 				units: scale?.units ?? "",
+				precision,
 				lngLat,
 				selectable: selectable && selectionId(ref) !== null
 			});

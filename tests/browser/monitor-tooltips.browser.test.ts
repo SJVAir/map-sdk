@@ -47,6 +47,17 @@ describe("MonitorTooltip", () => {
 		expect(getComputedStyle(box).color).toBe("rgb(0, 0, 0)");
 	});
 
+	it("rounds the reading to the item's precision", async () => {
+		render(MonitorTooltip, {
+			item: { ...item(12.64), precision: 1 },
+			timestamp: null,
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format
+		});
+		expect(document.body.textContent!.replace(/\s+/g, " ")).toContain("PM2.5 12.6");
+	});
+
 	it("shows no reading and No level in a neutral box", async () => {
 		render(MonitorTooltip, {
 			item: item(null),
@@ -133,6 +144,23 @@ describe("MonitorClusterTooltip", () => {
 		expect(text).toContain("PM2.5 9 (cluster avg)");
 		expect(text).toContain("Moderate");
 		expect(text).not.toContain("Good");
+	});
+
+	it("rounds the average, max, and min to the given precision", async () => {
+		const near = [monitor("1", "purpleair", 9.12), monitor("2", "purpleair", 9.16)];
+		render(MonitorClusterTooltip, {
+			cluster: cluster(near, coords),
+			scale: pm25Scale,
+			precision: 1,
+			messages: defaultMessages,
+			format,
+			metadata
+		});
+		await expect.element(page.getByText(/^Max:/)).toBeVisible();
+		const text = document.body.textContent!.replace(/\s+/g, " ");
+		expect(text).toContain("PM2.5 9.1 (cluster avg)");
+		expect(text).toContain("Max: 9.2 µg/m³");
+		expect(text).toContain("Min: 9.1 µg/m³");
 	});
 
 	it("keeps the bubble's count and average when the leaves fail", async () => {

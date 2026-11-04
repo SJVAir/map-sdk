@@ -83,6 +83,12 @@ describe("MapTooltip", () => {
 		await expect.element(tip).toHaveTextContent("Fresno Yosemite 12.34 µg/m³ Moderate");
 	});
 
+	it("rounds the value to the item's precision", async () => {
+		const rounded = { ...item("a", "Fresno", level("Moderate", "#ff7e00")), precision: 1 };
+		render(MapTooltip, { map: fakeMap([rounded], { focusedKey: "a" }), project });
+		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Fresno 12.3 µg/m³ Moderate");
+	});
+
 	it("uses black text on a yellow chip", async () => {
 		const map = fakeMap([item("a", "Yellow", level("Moderate", "#ffff00"))], { focusedKey: "a" });
 		render(MapTooltip, { map, project });

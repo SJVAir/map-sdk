@@ -11,6 +11,11 @@ import type { Scale, ScaleRef } from "./scale-types.js";
 export interface EntryTypeInfo {
 	label: string;
 	units: string;
+	/**
+	 * Decimal places to show values with (the catalog's display hint), or null when the metadata
+	 * gives none.
+	 */
+	precision: number | null;
 }
 
 export interface MetadataProvider {
@@ -88,6 +93,26 @@ export function createDefaultMetadata(): MetadataProvider {
 		}
 	}
 
+	/**
+	 * The catalog's display precision for an entry type, or null. The catalog splits some datasets
+	 * (`hms` into `hms-smoke` and `hms-fire`), so `${dataset}-…` datasets are searched too. Only
+	 * the caller's abort rejects.
+	 */
+	async function precisionOf(ref: ScaleRef, signal?: AbortSignal): Promise<number | null> {
+		try {
+			const { datasets } = await catalog(signal);
+			const entry = datasets
+				.filter((d) => d.id === ref.dataset || d.id.startsWith(`${ref.dataset}-`))
+				.flatMap((d) => d.entry_types)
+				.find((e) => e.id === ref.entryType);
+			const precision = entry?.display?.precision;
+			return typeof precision === "number" ? precision : null;
+		} catch (error) {
+			if (signal?.aborted) throw error;
+			return null;
+		}
+	}
+
 	async function entryMeta(ref: ScaleRef, signal?: AbortSignal) {
 		if (ref.dataset !== AIR_QUALITY) return undefined;
 		return (await monitorsMeta(signal)).entries[ref.entryType];
@@ -109,13 +134,16 @@ export function createDefaultMetadata(): MetadataProvider {
 			}),
 		entryType: (ref, signal) =>
 			guarded(signal, async () => {
+				let info: Omit<EntryTypeInfo, "precision"> | undefined;
 				if (hasScales(ref.dataset)) {
 					const { scales } = await datasetScales[ref.dataset](signal);
 					const scale = Object.hasOwn(scales, ref.entryType) ? scales[ref.entryType] : undefined;
-					return scale && { label: scale.label, units: scale.units };
+					info = scale && { label: scale.label, units: scale.units };
+				} else {
+					const entry = await entryMeta(ref, signal);
+					info = entry && { label: entry.label, units: entry.units ?? "" };
 				}
-				const entry = await entryMeta(ref, signal);
-				return entry && { label: entry.label, units: entry.units ?? "" };
+				return info && { ...info, precision: await precisionOf(ref, signal) };
 			}),
 		monitorTypeLabel: (type, signal) =>
 			guarded(signal, async () => (await monitorsMeta(signal)).monitors[type]?.label),

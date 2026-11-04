@@ -8,6 +8,7 @@
 	import type { Scale } from "../data/scale-types.js";
 	import type { MonitorFeatureProperties } from "../data/types.js";
 	import type { ClusterInfo } from "../plugins/points-clusters.js";
+	import { formatValue } from "../ui/value-format.js";
 	import MonitorReadingBox from "./MonitorReadingBox.svelte";
 
 	// Ported from monitor-map's MonitorClusterTooltip: the cluster's average in a level-colored
@@ -18,12 +19,14 @@
 	interface Props {
 		cluster: ClusterInfo<MonitorFeatureProperties>;
 		scale: Scale | null;
+		/** Decimal places for the average, max, and min. Default 0, as monitor-map. */
+		precision?: number;
 		messages: MessageProvider;
 		format: FormatProvider;
 		metadata: MetadataProvider;
 	}
 
-	let { cluster, scale, messages, format, metadata }: Props = $props();
+	let { cluster, scale, precision = 0, messages, format, metadata }: Props = $props();
 
 	/** From the cluster's monitors, once they load. */
 	interface Leaves {
@@ -94,8 +97,7 @@
 		if (typeof sum !== "number" || typeof count !== "number" || count <= 0) return null;
 		return sum / count;
 	});
-	/** As the bubble shows it. */
-	const average = $derived(mean === null ? null : Math.round(mean));
+	const average = $derived(mean === null ? null : formatValue(mean, precision, format));
 	const level = $derived.by(() => {
 		if (mean === null || !scale) return null;
 		const found = levelFor(mean, scale);
@@ -110,7 +112,7 @@
 	<MonitorReadingBox
 		color={level?.color || null}
 		header={scale?.label ?? ""}
-		value={average === null ? messages("mapsdk_no_reading") : format.number(average)}
+		value={average ?? messages("mapsdk_no_reading")}
 		large={average !== null}
 		subheading={messages("mapsdk_monitor_cluster_average")}
 	/>
@@ -134,10 +136,16 @@
 		<span>{level ? level.label : messages("mapsdk_no_level")}</span>
 		{#if max !== null && min !== null}
 			<span class="text-base">
-				{messages("mapsdk_monitor_cluster_max", { value: format.number(max), units })}
+				{messages("mapsdk_monitor_cluster_max", {
+					value: formatValue(max, precision, format),
+					units
+				})}
 			</span>
 			<span class="text-base">
-				{messages("mapsdk_monitor_cluster_min", { value: format.number(min), units })}
+				{messages("mapsdk_monitor_cluster_min", {
+					value: formatValue(min, precision, format),
+					units
+				})}
 			</span>
 		{/if}
 	</div>

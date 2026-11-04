@@ -4,6 +4,7 @@ import type { FormatProvider } from "../data/format.js";
 import type { MessageProvider } from "../data/messages.js";
 import { NO_LEVEL } from "../data/scale.js";
 import type { Level } from "../data/scale-types.js";
+import { formatValue } from "./value-format.js";
 
 export type { Bounds };
 export type SortBy = "name" | "value";
@@ -86,7 +87,8 @@ export function rowLabel(
 	const level = shownLevel(item);
 	const params = {
 		name: item.name,
-		value: typeof item.value === "number" ? format.number(item.value) : item.value,
+		value:
+			typeof item.value === "number" ? formatValue(item.value, item.precision, format) : item.value,
 		units: item.units,
 		level: level ? level.label : messages("mapsdk_no_level")
 	};

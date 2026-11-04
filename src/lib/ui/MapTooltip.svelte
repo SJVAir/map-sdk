@@ -4,6 +4,7 @@
 	import type { FeatureListItem, MapPlugin } from "../core/plugin.js";
 	import { NO_LEVEL } from "../data/scale.js";
 	import { levelChip } from "./level-chip.js";
+	import { formatValue } from "./value-format.js";
 
 	interface Props {
 		map: MapContext;
@@ -79,7 +80,7 @@
 		item?.value == null
 			? null
 			: typeof item.value === "number"
-				? map.format.number(item.value)
+				? formatValue(item.value, item.precision, map.format)
 				: item.value
 	);
 </script>

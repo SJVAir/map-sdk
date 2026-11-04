@@ -18,7 +18,7 @@ import {
 	levelKeyExpression
 } from "../../../src/lib/plugins/style.js";
 import { createFakeGl, type FakeGl } from "../../fixtures/fake-gl.js";
-import { burnScale, fireScale, pm25Scale } from "../../fixtures/scales.js";
+import { burnScale, fireScale, pm25Scale, smokeScale } from "../../fixtures/scales.js";
 import { points, TestSource } from "../../fixtures/sources.svelte.js";
 
 type Props = MapFeatureProperties & { type?: string };
@@ -27,7 +27,8 @@ const PM25_REF: ScaleRef = { dataset: "air-quality", entryType: "pm25" };
 
 function metadata(result: Scale | "unavailable" | Promise<Scale | "unavailable">) {
 	return {
-		scale: vi.fn(() => Promise.resolve(result))
+		scale: vi.fn(() => Promise.resolve(result)),
+		entryType: vi.fn(() => Promise.resolve("unavailable"))
 	} as unknown as MetadataProvider & { scale: ReturnType<typeof vi.fn> };
 }
 
@@ -213,10 +214,32 @@ describe("pointsPlugin", () => {
 			value: 4,
 			level: pm25Scale.levels[0],
 			units: "µg/m³",
+			precision: 0,
 			lngLat: [-119.5, 36.2],
 			selectable: true
 		});
 		expect(items[1].level).toBe(NO_LEVEL);
+	});
+
+	it("gives items the metadata's display precision once known, else 0 for a range scale", async () => {
+		const meta = {
+			scale: vi.fn(() => Promise.resolve(pm25Scale)),
+			entryType: vi.fn(() => Promise.resolve({ label: "PM2.5", units: "µg/m³", precision: 1 }))
+		} as unknown as MetadataProvider;
+		const source = new TestSource<Props>({
+			features: points([{ refKey: "monitor:a", name: "Alpha", value: 7.971 }]),
+			scale: PM25_REF
+		});
+		const { plugin } = setup({ source }, meta);
+		await settle();
+		expect(plugin.features!()[0].precision).toBe(1);
+		expect(meta.entryType).toHaveBeenCalledWith(PM25_REF, expect.any(AbortSignal));
+
+		// A literal scale has no display hint: 0 for a range scale, 1 otherwise.
+		source.scale = fireScale;
+		expect(plugin.features!()[0].precision).toBe(0);
+		source.scale = smokeScale;
+		expect(plugin.features!()[0].precision).toBe(1);
 	});
 
 	it("creates one clustered source per group", () => {
@@ -358,7 +381,8 @@ describe("pointsPlugin", () => {
 	it("ignores a scale that resolves after teardown", async () => {
 		let resolve!: (s: Scale) => void;
 		const meta = {
-			scale: vi.fn(() => new Promise<Scale>((r) => (resolve = r)))
+			scale: vi.fn(() => new Promise<Scale>((r) => (resolve = r))),
+			entryType: () => Promise.resolve("unavailable")
 		} as unknown as MetadataProvider;
 		const source = new TestSource<Props>({ features: points(ROWS), scale: PM25_REF });
 		const { host, gl, plugin } = setup({ source }, meta);
@@ -373,7 +397,8 @@ describe("pointsPlugin", () => {
 		const meta = {
 			scale: vi.fn((ref: ScaleRef) =>
 				Promise.resolve(ref.entryType === "pm25" ? pm25Scale : fireScale)
-			)
+			),
+			entryType: () => Promise.resolve("unavailable")
 		} as unknown as MetadataProvider;
 		const source = new TestSource<Props>({ features: points(ROWS), scale: PM25_REF });
 		const { gl, plugin } = setup({ source }, meta);

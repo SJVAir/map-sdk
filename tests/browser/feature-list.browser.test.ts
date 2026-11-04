@@ -101,6 +101,15 @@ describe("FeatureList", () => {
 		expect(option("Arvin").querySelector(".mapsdk-list-level")!.textContent).toContain("Unknown");
 	});
 
+	it("shows each row's value rounded to its precision", async () => {
+		const { map } = newMap("single", [item("1", "Arvin", { value: 7.971, precision: 1 })]);
+		render(FeatureList, { map });
+		await expect.element(listbox()).toBeVisible();
+		expect(option("Arvin").querySelector(".mapsdk-list-value")!.textContent!.trim()).toBe(
+			"8.0\u00a0µg/m³"
+		);
+	});
+
 	it("holds under 100 rows in the DOM with 5,000 features, and follows the scroll", async () => {
 		const many = Array.from({ length: 5000 }, (_, i) =>
 			item(String(i), `Site ${String(i).padStart(4, "0")}`)
