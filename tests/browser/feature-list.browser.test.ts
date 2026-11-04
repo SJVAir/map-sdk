@@ -18,7 +18,10 @@ const good: Level = {
 	opacity: null,
 	tier: 0,
 	description: "",
-	guidance: ""
+	guidance: "",
+	min: null,
+	max: null,
+	value: null
 };
 
 function item(id: string, name: string, extra: Partial<FeatureListItem> = {}): FeatureListItem {

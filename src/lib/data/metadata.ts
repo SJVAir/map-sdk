@@ -1,5 +1,11 @@
-import { getDatasetCatalog, getMonitorsMeta } from "@sjvair/sdk";
-import { scaleFromLegacyLevels, type LegacyLevel } from "./scale.js";
+import {
+	getCalHeatScoreMeta,
+	getDatasetCatalog,
+	getForecastsMeta,
+	getHMSMeta,
+	getMonitorsMeta
+} from "@sjvair/sdk";
+import { scaleFromLegacyLevels } from "./scale.js";
 import type { Scale, ScaleRef } from "./scale-types.js";
 
 export interface EntryTypeInfo {
@@ -14,27 +20,15 @@ export interface MetadataProvider {
 	attribution(dataset: string, signal?: AbortSignal): Promise<string | "unavailable">;
 }
 
-/**
- * The part of a monitors-meta entry read here. `scale` is the server's new field and is not in
- * this SDK version's types yet, so it is typed locally (Task 25 swaps in the SDK's type).
- */
-interface EntryMeta {
-	label: string;
-	units: string | null;
-	levels: Record<string, LegacyLevel> | null;
-	scale?: Scale;
-}
-
-interface MonitorsMetaShape {
-	entries: Record<string, EntryMeta | undefined>;
-	monitors: Record<string, { label: string } | undefined>;
-}
-
-interface CatalogShape {
-	datasets: { id: string; source?: string | null }[];
-}
-
 const AIR_QUALITY = "air-quality";
+
+/** Datasets whose meta carries `scales` keyed by entry-type id. */
+const SCALE_DATASETS = ["hms", "calheatscore", "forecasts"] as const;
+type ScaleDataset = (typeof SCALE_DATASETS)[number];
+
+function hasScales(dataset: string): dataset is ScaleDataset {
+	return (SCALE_DATASETS as readonly string[]).includes(dataset);
+}
 
 function abortError(): Error {
 	return new DOMException("The operation was aborted.", "AbortError");
@@ -70,10 +64,16 @@ function memoize<T>(fetch: () => Promise<T>): (signal?: AbortSignal) => Promise<
 }
 
 export function createDefaultMetadata(): MetadataProvider {
-	const monitorsMeta = memoize(
-		async () => (await getMonitorsMeta()) as unknown as MonitorsMetaShape
-	);
-	const catalog = memoize(async () => (await getDatasetCatalog()) as unknown as CatalogShape);
+	const monitorsMeta = memoize(() => getMonitorsMeta());
+	const catalog = memoize(() => getDatasetCatalog());
+	const datasetScales: Record<
+		ScaleDataset,
+		ReturnType<typeof memoize<{ scales: Record<string, Scale> }>>
+	> = {
+		hms: memoize(() => getHMSMeta()),
+		calheatscore: memoize(() => getCalHeatScoreMeta()),
+		forecasts: memoize(() => getForecastsMeta())
+	};
 
 	/** The value, `"unavailable"` when `read` finds nothing or the fetch fails; only the caller's abort rejects. */
 	async function guarded<T>(
@@ -88,7 +88,7 @@ export function createDefaultMetadata(): MetadataProvider {
 		}
 	}
 
-	async function entryMeta(ref: ScaleRef, signal?: AbortSignal): Promise<EntryMeta | undefined> {
+	async function entryMeta(ref: ScaleRef, signal?: AbortSignal) {
 		if (ref.dataset !== AIR_QUALITY) return undefined;
 		return (await monitorsMeta(signal)).entries[ref.entryType];
 	}
@@ -96,9 +96,13 @@ export function createDefaultMetadata(): MetadataProvider {
 	return {
 		scale: (ref, signal) =>
 			guarded(signal, async () => {
+				if (hasScales(ref.dataset)) {
+					const { scales } = await datasetScales[ref.dataset](signal);
+					return Object.hasOwn(scales, ref.entryType) ? scales[ref.entryType] : undefined;
+				}
 				const entry = await entryMeta(ref, signal);
 				if (!entry) return undefined;
-				if ("scale" in entry && entry.scale) return entry.scale;
+				if (entry.scale) return entry.scale;
 				if (!entry.levels) return undefined;
 				const levels = Object.values(entry.levels).sort((a, b) => a.range[0] - b.range[0]);
 				return scaleFromLegacyLevels(ref.entryType, entry.label, entry.units ?? "", levels);

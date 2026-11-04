@@ -1,27 +1,9 @@
-// Mirrors the server shape in sjvair.com docs/superpowers/specs/2026-11-03-metadata-scales-design.md.
-// Types only; runtime helpers live in scale.ts.
+// The scale shapes come from the SDK (the server's shared scale types); `Level` is this
+// library's public name for the SDK's `ScaleLevel`. Runtime helpers live in scale.ts.
+import type { Scale, ScaleLevel, ScaleSource } from "@sjvair/sdk/meta/types";
 
-export interface Level {
-	key: string;
-	label: string;
-	color: string;
-	opacity: number | null;
-	tier: number | null;
-	description: string;
-	guidance: string;
-	min?: number;
-	max?: number | null;
-	value?: string | number;
-}
-
-export interface Scale {
-	id: string;
-	label: string;
-	units: string;
-	kind: "range" | "category";
-	levels: Level[];
-	source?: { name: string; url: string };
-}
+export type { Scale, ScaleSource };
+export type Level = ScaleLevel;
 
 export interface ScaleRef {
 	dataset: string;

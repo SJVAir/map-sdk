@@ -182,7 +182,7 @@ function rangeStep(
 	const stops: Output[] = [];
 	let last: number | null = null;
 	const levels = scale.levels
-		.filter((l) => l.min !== undefined)
+		.filter((l) => l.min !== null)
 		.sort((a, b) => (a.min as number) - (b.min as number));
 	for (const level of levels) {
 		const min = level.min as number;
@@ -205,7 +205,7 @@ function categoryMatch(
 ): ExpressionSpecification {
 	const arms: Output[] = [];
 	for (const level of scale.levels) {
-		if (level.value === undefined) continue;
+		if (level.value === null) continue;
 		arms.push(level.value, pick(level) ?? fallback);
 	}
 	if (arms.length === 0) return ["literal", fallback] as unknown as ExpressionSpecification;

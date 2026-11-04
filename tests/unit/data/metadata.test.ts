@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { pm25Scale } from "../../fixtures/scales.js";
+import { burnScale, fireScale, heatScale, pm25Scale, smokeScale } from "../../fixtures/scales.js";
 
 const getMonitorsMeta = vi.fn();
 const getDatasetCatalog = vi.fn();
+const getHMSMeta = vi.fn();
+const getCalHeatScoreMeta = vi.fn();
+const getForecastsMeta = vi.fn();
 vi.mock("@sjvair/sdk", () => ({
+	getHMSMeta: (...args: unknown[]) => getHMSMeta(...args),
+	getCalHeatScoreMeta: (...args: unknown[]) => getCalHeatScoreMeta(...args),
+	getForecastsMeta: (...args: unknown[]) => getForecastsMeta(...args),
 	getMonitorsMeta: (...args: unknown[]) => getMonitorsMeta(...args),
 	getDatasetCatalog: (...args: unknown[]) => getDatasetCatalog(...args)
 }));
@@ -38,6 +44,9 @@ function legacyMeta() {
 beforeEach(() => {
 	getMonitorsMeta.mockReset();
 	getDatasetCatalog.mockReset();
+	getHMSMeta.mockReset();
+	getCalHeatScoreMeta.mockReset();
+	getForecastsMeta.mockReset();
 });
 
 describe("default metadata", () => {
@@ -72,10 +81,43 @@ describe("default metadata", () => {
 		const meta = createDefaultMetadata();
 		expect(await meta.scale({ dataset: "air-quality", entryType: "nope" })).toBe("unavailable");
 		expect(await meta.scale({ dataset: "air-quality", entryType: "o3" })).toBe("unavailable");
-		expect(await meta.scale({ dataset: "hms", entryType: "smoke-density" })).toBe("unavailable");
+		expect(await meta.scale({ dataset: "nope", entryType: "x" })).toBe("unavailable");
 		expect(await meta.entryType({ dataset: "hms", entryType: "smoke-density" })).toBe(
 			"unavailable"
 		);
+	});
+
+	it.each([
+		["hms", "smoke-density", smokeScale, getHMSMeta],
+		["hms", "fire-frp", fireScale, getHMSMeta],
+		["calheatscore", "heat-score", heatScale, getCalHeatScoreMeta],
+		["forecasts", "burn-status", burnScale, getForecastsMeta],
+		["forecasts", "aqi-forecast", pm25Scale, getForecastsMeta]
+	])("reads the %s dataset's %s scale from its meta", async (dataset, entryType, scale, mock) => {
+		mock.mockResolvedValue({
+			scales: {
+				"smoke-density": smokeScale,
+				"fire-frp": fireScale,
+				"heat-score": heatScale,
+				"burn-status": burnScale,
+				"aqi-forecast": pm25Scale
+			},
+			zones: []
+		});
+		const meta = createDefaultMetadata();
+		expect(await meta.scale({ dataset, entryType })).toBe(scale);
+		expect(await meta.scale({ dataset, entryType: "nope" })).toBe("unavailable");
+		expect(mock).toHaveBeenCalledTimes(1);
+	});
+
+	it("is unavailable when a dataset meta fails, and retries", async () => {
+		getHMSMeta
+			.mockRejectedValueOnce(new Error("down"))
+			.mockResolvedValue({ scales: { "fire-frp": fireScale } });
+		const meta = createDefaultMetadata();
+		const ref = { dataset: "hms", entryType: "fire-frp" };
+		expect(await meta.scale(ref)).toBe("unavailable");
+		expect(await meta.scale(ref)).toBe(fireScale);
 	});
 
 	it("gives label and units for an entry type", async () => {

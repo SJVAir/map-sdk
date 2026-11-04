@@ -11,7 +11,18 @@ import type { Level } from "../../src/lib/data/scale-types.js";
 import MapTooltip from "../../src/lib/ui/MapTooltip.svelte";
 
 function level(label: string, color: string): Level {
-	return { key: label, label, color, opacity: null, tier: 0, description: "", guidance: "" };
+	return {
+		key: label,
+		label,
+		color,
+		opacity: null,
+		tier: 0,
+		description: "",
+		guidance: "",
+		min: null,
+		max: null,
+		value: null
+	};
 }
 
 function item(refKey: string, name: string, lvl: FeatureListItem["level"]): FeatureListItem {

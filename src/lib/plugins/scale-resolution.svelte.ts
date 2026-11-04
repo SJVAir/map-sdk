@@ -4,7 +4,14 @@ import type { Scale, ScaleRef } from "../data/scale-types.js";
 import type { DataSource, DataStatus, MapFeatureProperties } from "../data/types.js";
 
 /** For a `null` source scale: features still draw, all neutral, with no legend. */
-export const NO_SCALE: Scale = { id: "", label: "", units: "", kind: "category", levels: [] };
+export const NO_SCALE: Scale = {
+	id: "",
+	label: "",
+	units: "",
+	kind: "category",
+	source: null,
+	levels: []
+};
 
 type ScaleInput = ScaleRef | Scale | null;
 export type Resolved = Scale | "unavailable";

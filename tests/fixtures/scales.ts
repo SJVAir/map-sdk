@@ -9,7 +9,18 @@ function range(
 	tier: number | null,
 	guidance = ""
 ): Level {
-	return { key, label, color, opacity: null, tier, description: "", guidance, min, max };
+	return {
+		key,
+		label,
+		color,
+		opacity: null,
+		tier,
+		description: "",
+		guidance,
+		min,
+		max,
+		value: null
+	};
 }
 
 export const pm25Scale: Scale = {
@@ -17,6 +28,7 @@ export const pm25Scale: Scale = {
 	label: "PM2.5",
 	units: "µg/m³",
 	kind: "range",
+	source: null,
 	levels: [
 		range("good", "Good", "#00e400", 0, 9.1, 0),
 		range(
@@ -75,7 +87,18 @@ function category(
 	opacity: number | null,
 	tier: number | null
 ): Level {
-	return { key, label, color, opacity, tier, description: "", guidance: "", value };
+	return {
+		key,
+		label,
+		color,
+		opacity,
+		tier,
+		description: "",
+		guidance: "",
+		min: null,
+		max: null,
+		value
+	};
 }
 
 export const smokeScale: Scale = {
@@ -83,6 +106,7 @@ export const smokeScale: Scale = {
 	label: "Smoke Density",
 	units: "",
 	kind: "category",
+	source: null,
 	levels: [
 		category("light", "Light", "#bfc8c3", "light", 0.2, 1),
 		category("medium", "Medium", "#757b78", "medium", 0.3, 2),
@@ -95,6 +119,7 @@ export const fireScale: Scale = {
 	label: "Fire Radiative Power",
 	units: "MW",
 	kind: "range",
+	source: null,
 	levels: [
 		range("sm", "<10", "#FFD700", 0, 10, null),
 		range("md", "10–49", "#FF8C00", 10, 50, null),
@@ -119,6 +144,8 @@ export const heatScale: Scale = {
 			tier: 0,
 			description: "Little to no heat-related health impacts are expected.",
 			guidance: "",
+			min: null,
+			max: null,
 			value: 0
 		},
 		{
@@ -130,6 +157,8 @@ export const heatScale: Scale = {
 			description:
 				"Warm day. A minor increase in heat-related health impacts is expected among those sensitive to heat.",
 			guidance: "People sensitive to heat should drink extra water and take breaks somewhere cool.",
+			min: null,
+			max: null,
 			value: 1
 		},
 		{
@@ -142,6 +171,8 @@ export const heatScale: Scale = {
 				"Very warm day. A moderate increase in heat-related health impacts is expected among those sensitive to heat.",
 			guidance:
 				"People sensitive to heat should limit time outdoors in the afternoon, drink extra water, and stay somewhere cool during the hottest hours.",
+			min: null,
+			max: null,
 			value: 2
 		},
 		{
@@ -154,6 +185,8 @@ export const heatScale: Scale = {
 				"Hot day. An increase in heat-related health impacts is expected for everyone, especially those without access to adequate cooling and hydration or those engaged in strenuous physical activity outdoors. This level of heat can pose a significant risk to health.",
 			guidance:
 				"Everyone should drink extra water, limit strenuous outdoor activity, and spend the hottest hours somewhere cool.",
+			min: null,
+			max: null,
 			value: 3
 		},
 		{
@@ -166,6 +199,8 @@ export const heatScale: Scale = {
 				"Extreme heat day. A major increase in heat-related health impacts is expected for everyone, especially those without access to adequate cooling and hydration or those engaged in strenuous physical activity outdoors. This level of heat can pose a very serious risk to health.",
 			guidance:
 				"Everyone should stay somewhere cool when possible, drink at least 2 glasses of water an hour, and check on people at higher risk.",
+			min: null,
+			max: null,
 			value: 4
 		}
 	]
@@ -176,5 +211,6 @@ export const burnScale: Scale = {
 	label: "Burn status",
 	units: "",
 	kind: "category",
+	source: null,
 	levels: [category("discouraged", "Burning Discouraged", "", "discouraged", null, null)]
 };

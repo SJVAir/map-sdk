@@ -23,15 +23,15 @@ export function legendSection(data: LegendData, format: FormatProvider): LegendS
 			? {
 					kind: "gradient",
 					stops: scale.levels.map((level) => ({
-						color: level.color,
+						color: level.color ?? "",
 						label: level.label,
-						tick: level.min === undefined ? "" : format.number(Math.floor(level.min))
+						tick: level.min === null ? "" : format.number(Math.floor(level.min))
 					}))
 				}
 			: {
 					kind: "blocks",
 					blocks: scale.levels.map((level) => ({
-						color: level.color,
+						color: level.color ?? "",
 						opacity: level.opacity,
 						label: level.label
 					}))

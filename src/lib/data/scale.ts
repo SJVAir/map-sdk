@@ -7,7 +7,7 @@ export interface LegacyLevel {
 	name: string;
 	label: string;
 	color: string;
-	range: [number, number];
+	range: readonly [number, number, ...unknown[]];
 	guidance: string | null;
 }
 
@@ -40,7 +40,7 @@ export function levelFor(
 
 	return (
 		scale.levels.find(
-			(level) => level.min !== undefined && n >= level.min && (level.max == null || n < level.max)
+			(level) => level.min !== null && n >= level.min && (level.max == null || n < level.max)
 		) ?? NO_LEVEL
 	);
 }
@@ -57,6 +57,7 @@ export function scaleFromLegacyLevels(
 		label,
 		units,
 		kind: "range",
+		source: null,
 		levels: levels.map((level, i) => ({
 			key: level.name.toLowerCase(),
 			label: level.label,
@@ -66,7 +67,8 @@ export function scaleFromLegacyLevels(
 			description: "",
 			guidance: level.guidance ?? "",
 			min: level.range[0],
-			max: levels[i + 1]?.range[0] ?? null
+			max: levels[i + 1]?.range[0] ?? null,
+			value: null
 		}))
 	};
 }

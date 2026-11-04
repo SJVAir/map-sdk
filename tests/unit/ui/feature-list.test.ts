@@ -13,7 +13,18 @@ import {
 } from "../../../src/lib/ui/feature-list.js";
 
 function level(label: string, tier: number, color = "#00e400"): Level {
-	return { key: label, label, color, opacity: null, tier, description: "", guidance: "" };
+	return {
+		key: label,
+		label,
+		color,
+		opacity: null,
+		tier,
+		description: "",
+		guidance: "",
+		min: null,
+		max: null,
+		value: null
+	};
 }
 
 const good = level("Good", 0);
