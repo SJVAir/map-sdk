@@ -1,5 +1,6 @@
 <script lang="ts">
 	import "@maptiler/sdk/dist/maptiler-sdk.css";
+	import "../ui/controls.css";
 	import type { Snippet } from "svelte";
 	import { untrack } from "svelte";
 	import { setMapContext } from "../core/context.js";
@@ -105,7 +106,7 @@
 	bind:this={root}
 	bind:clientWidth={width}
 	bind:clientHeight={height}
-	class={["mapsdk-map", className]}
+	class={["mapsdk-map mapsdk-focus-outline", className]}
 	role="region"
 	aria-label={label ?? map.messages("mapsdk_map_label")}
 	data-mapsdk-map={map.uid}
@@ -117,7 +118,7 @@
 			<button
 				bind:this={listButton}
 				type="button"
-				class="mapsdk-list-button"
+				class="mapsdk-list-button mapsdk-focus mapsdk-motion"
 				aria-label={map.messages("mapsdk_list_button_label")}
 				aria-expanded={listOpen}
 				aria-controls={listOpen ? listId : undefined}
@@ -146,12 +147,8 @@
 		position: relative;
 	}
 
-	/* The region takes focus only from script (the selection bar's Clear), never from Tab. */
-	.mapsdk-map:focus-visible {
-		outline: 2px solid var(--ring);
-		outline-offset: -2px;
-	}
-
+	/* The region takes focus only from script (the selection bar's Clear), never from Tab: the
+	   outline alone, from .mapsdk-focus-outline. */
 	.mapsdk-gl {
 		position: absolute;
 		inset: 0;
@@ -183,13 +180,12 @@
 		color: var(--foreground);
 		box-shadow: var(--shadow-card, none);
 		font: inherit;
-		font-size: 0.875rem;
+		font-size: var(--text-sm, 0.875rem);
 		cursor: pointer;
 		pointer-events: auto;
 	}
 
-	.mapsdk-list-button:focus-visible {
-		outline: 2px solid var(--ring);
-		outline-offset: 2px;
+	.mapsdk-list-button:hover {
+		background: var(--accent, var(--muted));
 	}
 </style>

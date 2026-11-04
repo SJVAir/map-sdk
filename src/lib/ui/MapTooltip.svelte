@@ -119,8 +119,8 @@
 		border-radius: var(--radius-control, var(--radius));
 		background: var(--popover, var(--background));
 		color: var(--popover-foreground, var(--foreground));
-		box-shadow: var(--shadow-card, none);
-		font-size: 0.875rem;
+		box-shadow: var(--shadow-lifted, var(--shadow-card, none));
+		font-size: var(--text-sm, 0.875rem);
 		pointer-events: none;
 	}
 
@@ -130,9 +130,10 @@
 
 	.mapsdk-tooltip-chip {
 		padding: 0.0625rem 0.5rem;
-		border: 1px solid var(--card-border, var(--border));
+		border: var(--swatch-outline-width, 1px) solid
+			var(--swatch-outline-color, color-mix(in srgb, var(--foreground) 75%, var(--background)));
 		border-radius: 999px;
-		font-size: 0.75rem;
+		font-size: var(--text-xs, 0.75rem);
 	}
 
 	.mapsdk-tooltip-chip.neutral {

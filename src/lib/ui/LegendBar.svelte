@@ -62,7 +62,8 @@
 	.mapsdk-legend-gradient {
 		height: 0.75rem;
 		border-radius: 0.25rem;
-		outline: 1px solid color-mix(in srgb, var(--foreground) 75%, var(--background));
+		outline: var(--swatch-outline-width, 1px) solid
+			var(--swatch-outline-color, color-mix(in srgb, var(--foreground) 75%, var(--background)));
 		outline-offset: 1px;
 	}
 
@@ -70,7 +71,7 @@
 		display: flex;
 		justify-content: space-between;
 		margin-top: 0.375rem;
-		font-size: 0.75rem;
+		font-size: var(--text-xs, 0.75rem);
 		font-variant-numeric: tabular-nums;
 	}
 
@@ -81,7 +82,7 @@
 		margin: 0.5rem 0 0;
 		padding: 0;
 		list-style: none;
-		font-size: 0.75rem;
+		font-size: var(--text-xs, 0.75rem);
 	}
 
 	/* Visually hidden, read after the label. */
@@ -108,7 +109,8 @@
 		height: 0.875rem;
 		flex: none;
 		border-radius: 0.125rem;
-		outline: 1px solid color-mix(in srgb, var(--foreground) 75%, var(--background));
+		outline: var(--swatch-outline-width, 1px) solid
+			var(--swatch-outline-color, color-mix(in srgb, var(--foreground) 75%, var(--background)));
 		outline-offset: 1px;
 	}
 </style>

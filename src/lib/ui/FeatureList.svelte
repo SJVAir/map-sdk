@@ -3,6 +3,7 @@
 	import type { Bounds, MapContext } from "../core/create-map.svelte.js";
 	import type { FeatureListItem } from "../core/plugin.js";
 	import { selectionKeys } from "../data/selection.js";
+	import "./controls.css";
 	import {
 		MENU_EVENT_WINDOW_MS,
 		inView,
@@ -279,10 +280,20 @@
 
 <div class={["mapsdk-list", className]} {id} data-mapsdk-map={map.uid}>
 	<div class="mapsdk-list-sort">
-		<button type="button" aria-pressed={sortBy === "name"} onclick={() => setSort("name")}>
+		<button
+			type="button"
+			class="mapsdk-focus mapsdk-motion"
+			aria-pressed={sortBy === "name"}
+			onclick={() => setSort("name")}
+		>
 			{map.messages("mapsdk_list_sort_name")}
 		</button>
-		<button type="button" aria-pressed={sortBy === "value"} onclick={() => setSort("value")}>
+		<button
+			type="button"
+			class="mapsdk-focus mapsdk-motion"
+			aria-pressed={sortBy === "value"}
+			onclick={() => setSort("value")}
+		>
 			{map.messages("mapsdk_list_sort_value")}
 		</button>
 	</div>
@@ -299,7 +310,7 @@
 	>
 		<div
 			bind:this={listbox}
-			class="mapsdk-list-box"
+			class="mapsdk-list-box mapsdk-focus-inset-active"
 			role="listbox"
 			tabindex="0"
 			aria-label={map.messages("mapsdk_list_label")}
@@ -322,6 +333,7 @@
 				<div
 					id={optionId(row)}
 					class="mapsdk-list-row"
+					class:mapsdk-active-option={index === activeIndex}
 					class:active={index === activeIndex}
 					class:selected={isOn}
 					role="option"
@@ -372,8 +384,8 @@
 		border-radius: var(--radius-control, var(--radius));
 		background: var(--background);
 		color: var(--foreground);
-		box-shadow: var(--shadow-card, none);
-		font-size: 0.875rem;
+		box-shadow: var(--shadow-lifted, var(--shadow-card, none));
+		font-size: var(--text-sm, 0.875rem);
 		pointer-events: auto;
 	}
 
@@ -399,11 +411,6 @@
 		border-color: var(--highlight, var(--primary));
 	}
 
-	.mapsdk-list-sort button:focus-visible {
-		outline: 2px solid var(--ring);
-		outline-offset: 2px;
-	}
-
 	.mapsdk-list-scroll {
 		flex: 1 1 auto;
 		min-height: 0;
@@ -415,9 +422,11 @@
 		outline: none;
 	}
 
-	.mapsdk-list-scroll:has(.mapsdk-list-box:focus-visible) {
+	/* With no active row to carry the ring (an empty list), the scroller shows it. */
+	.mapsdk-list-scroll:has(.mapsdk-list-box:focus-visible):not(:has(.active)) {
 		outline: 2px solid var(--ring);
-		outline-offset: -2px;
+		outline-offset: -3px;
+		box-shadow: inset 0 0 0 4px var(--ring-edge, var(--background));
 	}
 
 	.mapsdk-list-row {
@@ -443,11 +452,6 @@
 		box-shadow: inset 0 0 0 2px var(--highlight, var(--primary));
 	}
 
-	.mapsdk-list-box:focus-visible .mapsdk-list-row.active {
-		outline: 2px solid var(--ring);
-		outline-offset: -4px;
-	}
-
 	.mapsdk-list-name {
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -462,14 +466,14 @@
 		align-items: center;
 		gap: 0.375rem;
 		color: var(--muted-foreground);
-		font-size: 0.75rem;
+		font-size: var(--text-xs, 0.75rem);
 	}
 
 	.mapsdk-list-swatch {
 		width: 0.625rem;
 		height: 0.625rem;
 		border-radius: 999px;
-		outline: 1px solid var(--foreground);
+		outline: var(--swatch-outline-width, 1px) solid var(--swatch-outline-color, var(--foreground));
 		outline-offset: 1px;
 	}
 

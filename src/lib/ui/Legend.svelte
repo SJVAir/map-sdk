@@ -86,12 +86,12 @@
 	h3 {
 		margin: 0 0 0.5rem;
 		text-align: center;
-		font-size: 0.875rem;
+		font-size: var(--text-sm, 0.875rem);
 		font-weight: 600;
 	}
 
 	h3 span {
-		font-size: 0.75rem;
+		font-size: var(--text-xs, 0.75rem);
 		font-weight: 400;
 		color: var(--muted-foreground);
 	}

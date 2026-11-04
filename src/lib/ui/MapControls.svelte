@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy, untrack } from "svelte";
+	import "./controls.css";
 	import type { MapContext } from "../core/create-map.svelte.js";
 	import type { GlMapLike } from "../core/gl.js";
 
@@ -70,18 +71,29 @@
 </script>
 
 <div class="mapsdk-zoom" role="group" aria-label={map.messages("mapsdk_controls_label")}>
-	<button type="button" disabled={!gl} onclick={() => zoomBy(1)}>
+	<button type="button" class="mapsdk-focus mapsdk-motion" disabled={!gl} onclick={() => zoomBy(1)}>
 		<span class="mapsdk-zoom-icon" aria-hidden="true">+</span>
 		<span class="mapsdk-sr">{map.messages("mapsdk_zoom_in")}</span>
+		<span class="mapsdk-zoom-tip mapsdk-motion" aria-hidden="true"
+			>{map.messages("mapsdk_zoom_in")}</span
+		>
 	</button>
-	<button type="button" disabled={!gl} onclick={() => zoomBy(-1)}>
+	<button
+		type="button"
+		class="mapsdk-focus mapsdk-motion"
+		disabled={!gl}
+		onclick={() => zoomBy(-1)}
+	>
 		<span class="mapsdk-zoom-icon" aria-hidden="true">&minus;</span>
 		<span class="mapsdk-sr">{map.messages("mapsdk_zoom_out")}</span>
+		<span class="mapsdk-zoom-tip mapsdk-motion" aria-hidden="true"
+			>{map.messages("mapsdk_zoom_out")}</span
+		>
 	</button>
 </div>
 
 <div class="mapsdk-credits">
-	<a class="mapsdk-logo" href={MAPTILER_URL} target="_blank" rel="noopener">
+	<a class="mapsdk-logo mapsdk-focus" href={MAPTILER_URL} target="_blank" rel="noopener">
 		<img src={MAPTILER_LOGO} alt={map.messages("mapsdk_logo_maptiler")} width="80" height="24" />
 	</a>
 	<ul aria-label={map.messages("mapsdk_attribution_label")}>
@@ -89,12 +101,12 @@
 			<li>{credit}</li>
 		{/each}
 		<li>
-			<a href={MAPTILER_COPYRIGHT} target="_blank" rel="noopener">
+			<a class="mapsdk-focus" href={MAPTILER_COPYRIGHT} target="_blank" rel="noopener">
 				{map.messages("mapsdk_credit_maptiler")}
 			</a>
 		</li>
 		<li>
-			<a href={OSM_COPYRIGHT} target="_blank" rel="noopener">
+			<a class="mapsdk-focus" href={OSM_COPYRIGHT} target="_blank" rel="noopener">
 				{map.messages("mapsdk_credit_osm")}
 			</a>
 		</li>
@@ -136,13 +148,44 @@
 		cursor: default;
 	}
 
+	.mapsdk-zoom button {
+		position: relative;
+	}
+
+	.mapsdk-zoom button:hover:not(:disabled) {
+		background: var(--accent, var(--muted));
+	}
+
+	/* Above the next button, so the ring isn't cut by it. */
 	.mapsdk-zoom button:focus-visible {
-		outline: 2px solid var(--ring);
-		outline-offset: -2px;
+		z-index: 1;
+	}
+
+	/* The visible name: on hover and focus, left of the button; the screen-reader text stays. */
+	.mapsdk-zoom-tip {
+		position: absolute;
+		top: 50%;
+		right: calc(100% + 0.5rem);
+		padding: 0.125rem 0.5rem;
+		border: 1px solid var(--card-border, var(--border));
+		border-radius: var(--radius-control, var(--radius));
+		background: var(--popover, var(--background));
+		color: var(--popover-foreground, var(--foreground));
+		box-shadow: var(--shadow-lifted, var(--shadow-card, none));
+		font-size: var(--text-xs, 0.75rem);
+		white-space: nowrap;
+		opacity: 0;
+		pointer-events: none;
+		transform: translateY(-50%);
+	}
+
+	.mapsdk-zoom button:hover .mapsdk-zoom-tip,
+	.mapsdk-zoom button:focus-visible .mapsdk-zoom-tip {
+		opacity: 1;
 	}
 
 	.mapsdk-zoom-icon {
-		font-size: 1.25rem;
+		font-size: var(--text-lg, 1.125rem);
 		line-height: 1;
 	}
 
@@ -168,7 +211,7 @@
 		border-radius: var(--radius-control, var(--radius));
 		background: var(--overlay, var(--background));
 		color: var(--foreground);
-		font-size: 0.75rem;
+		font-size: var(--text-xs, 0.75rem);
 		pointer-events: auto;
 	}
 
@@ -193,10 +236,5 @@
 	.mapsdk-logo img {
 		display: block;
 		object-fit: contain;
-	}
-
-	.mapsdk-credits a:focus-visible {
-		outline: 2px solid var(--ring);
-		outline-offset: 2px;
 	}
 </style>

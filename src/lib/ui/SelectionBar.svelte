@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { MapContext } from "../core/create-map.svelte.js";
+	import "./controls.css";
 
 	let { map }: { map: MapContext } = $props();
 
@@ -48,6 +49,7 @@
 				</span>
 				<button
 					type="button"
+					class="mapsdk-focus mapsdk-motion"
 					aria-label={map.messages("mapsdk_selection_clear_layer", { layer: entry.layer })}
 					onclick={(e) => clear(entry.id, e.currentTarget)}
 				>
@@ -78,7 +80,7 @@
 		background: var(--background);
 		color: var(--foreground);
 		box-shadow: var(--shadow-card, none);
-		font-size: 0.875rem;
+		font-size: var(--text-sm, 0.875rem);
 		pointer-events: auto;
 	}
 
@@ -106,8 +108,7 @@
 		cursor: pointer;
 	}
 
-	button:focus-visible {
-		outline: 2px solid var(--ring);
-		outline-offset: 2px;
+	button:hover {
+		background: var(--accent, var(--muted));
 	}
 </style>

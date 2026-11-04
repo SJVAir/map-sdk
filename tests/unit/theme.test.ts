@@ -23,6 +23,8 @@ describe("theme.css", () => {
 			"bg-overlay",
 			"text-link",
 			"shadow-card",
+			"shadow-lifted",
+			"ring-ring-edge",
 			"rounded-control"
 		]);
 		expect(css).toContain("background-color: var(--highlight, var(--primary))");
@@ -32,11 +34,20 @@ describe("theme.css", () => {
 		expect(css).toContain("background-color: var(--overlay, var(--background))");
 		expect(css).toContain("color: var(--link, var(--primary))");
 		expect(css).toContain("box-shadow: var(--shadow-card, none)");
+		expect(css).toContain("box-shadow: var(--shadow-lifted, var(--shadow-card, none))");
+		expect(css).toContain("var(--ring-edge, var(--background))");
 		expect(css).toContain("border-radius: var(--radius-control, var(--radius))");
 	});
 
 	it("never redeclares a host token, which would override the host's value", async () => {
-		const css = await build(["shadow-card", "rounded-control", "bg-highlight", "text-link"]);
+		const css = await build([
+			"shadow-card",
+			"shadow-lifted",
+			"ring-ring-edge",
+			"rounded-control",
+			"bg-highlight",
+			"text-link"
+		]);
 		for (const token of [
 			"highlight",
 			"highlight-subtle",
@@ -45,7 +56,14 @@ describe("theme.css", () => {
 			"overlay",
 			"link",
 			"shadow-card",
-			"radius-control"
+			"shadow-lifted",
+			"ring-edge",
+			"radius-control",
+			"swatch-outline-width",
+			"swatch-outline-color",
+			"motion-duration-fast",
+			"motion-duration-base",
+			"motion-ease-standard"
 		]) {
 			expect(css, token).not.toMatch(new RegExp(`--${token}\\s*:`));
 		}

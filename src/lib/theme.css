@@ -13,6 +13,7 @@
 	--color-card-border: var(--card-border, var(--border));
 	--color-overlay: var(--overlay, var(--background));
 	--color-link: var(--link, var(--primary));
+	--color-ring-edge: var(--ring-edge, var(--background));
 }
 
 /* Utilities, not theme keys: a theme key named like the host token would emit a self-referencing
@@ -24,3 +25,10 @@
 @utility rounded-control {
 	border-radius: var(--radius-control, var(--radius));
 }
+
+@utility shadow-lifted {
+	box-shadow: var(--shadow-lifted, var(--shadow-card, none));
+}
+
+/* The motion, swatch-outline, and --ring-edge tokens are read with fallbacks where used (see
+   ui/controls.css and the components); they are never declared here. */
