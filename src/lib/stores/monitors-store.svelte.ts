@@ -59,9 +59,10 @@ export interface MonitorsStore {
 	/** The entry types the server publishes on the map (monitors meta `available_pollutants`). */
 	readonly availableEntryTypes: readonly string[];
 	/**
-	 * Sets the entry type. Once initialized, the readings blank at once (so markers never show
-	 * the previous entry type's readings) and are fetched again. Before init it is replaced by
-	 * the entry type init settles on: pass the entry type to `init` instead.
+	 * Sets the entry type. Once initialized, an entry type the server doesn't list falls back to
+	 * its default, and the readings blank at once (so markers never show the previous entry
+	 * type's readings) and are fetched again. Before init it is replaced by the entry type init
+	 * settles on: pass the entry type to `init` instead.
 	 */
 	entryTypeFor(next: string): void;
 	/**
@@ -194,6 +195,10 @@ class LiveMonitorsStore implements MonitorsStore {
 	}
 
 	entryTypeFor(next: string): void {
+		const meta = this.#meta;
+		if (this.initialized && meta && !meta.available_pollutants.includes(next)) {
+			next = meta.default_pollutant;
+		}
 		if (next === this.entryType) return;
 		this.entryType = next;
 		if (!this.initialized || this.#disposed) return;
@@ -311,6 +316,8 @@ class LiveMonitorsStore implements MonitorsStore {
 			? getReadings(fetchedEntryType, signal).catch(async (error: unknown) => {
 					const meta = await metaRequest;
 					if (this.#wantedEntryType(meta) === fetchedEntryType || signal.aborted) throw error;
+					// Nothing was fetched: if this entry type is wanted again, it is fetched again.
+					fetchedEntryType = null;
 					return null;
 				})
 			: metaRequest.then((meta) => {
@@ -377,7 +384,9 @@ class LiveMonitorsStore implements MonitorsStore {
 	}
 
 	async update(options: SignalOptions = {}): Promise<void> {
-		if (!this.initialized || this.#disposed) return;
+		// Always set once initialized; the null check only narrows the type.
+		const entryType = this.entryType;
+		if (!this.initialized || this.#disposed || entryType === null) return;
 
 		// Nothing has started yet, so an in-flight update is left alone.
 		if (options.signal?.aborted) throw options.signal.reason;
@@ -399,10 +408,9 @@ class LiveMonitorsStore implements MonitorsStore {
 		let abortedError: unknown;
 
 		try {
-			const entryType = this.entryType;
 			const [list, readings] = await Promise.all([
 				getMonitorsList({ signal: combined.signal }),
-				getReadings(entryType ?? this.#meta?.default_pollutant ?? "pm25", combined.signal)
+				getReadings(entryType, combined.signal)
 			]);
 
 			// Superseded or cancelled while the requests were settling.

@@ -200,6 +200,27 @@ describe("store.init", () => {
 		expect(store.latest.get("a")).toEqual(reading("pm25"));
 	});
 
+	it("refetches when an entry type whose failed readings were dropped is requested again", async () => {
+		const list = deferred<typeof LIST>();
+		const firstPm25 = deferred<ReturnType<typeof readings>>();
+		sdk.getMonitorsList.mockReturnValue(list.promise);
+		sdk.getMonitors.mockReturnValueOnce(firstPm25.promise);
+
+		const run = store.init("pm25");
+		void store.init("o3");
+		// o3 is wanted now, so the pm25 failure is dropped.
+		firstPm25.reject(new Error("pm25 failed"));
+		await flush();
+		void store.init("pm25");
+		list.resolve(LIST);
+		await run;
+
+		expect(entryTypesRequested()).toEqual(["pm25", "pm25"]);
+		expect(store.initialized).toBe(true);
+		expect(store.entryType).toBe("pm25");
+		expect(store.latest.get("a")).toEqual(reading("pm25"));
+	});
+
 	it("still fails when the default entry type's readings fail", async () => {
 		sdk.getMonitors.mockRejectedValueOnce(new Error("latest failed"));
 
@@ -764,6 +785,30 @@ describe("store.entryTypeFor", () => {
 		await flush();
 
 		expect(sdk.getMonitorsList).not.toHaveBeenCalled();
+		expect(store.latest.size).toBe(1);
+	});
+
+	it("falls back to the server's default for an entry type it doesn't list", async () => {
+		await store.init("o3");
+		sdk.getMonitors.mockClear();
+
+		store.entryTypeFor("none");
+
+		expect(store.entryType).toBe("pm25");
+		await flush();
+		expect(entryTypesRequested()).toEqual(["pm25"]);
+		expect(store.latest.get("a")).toEqual(reading("pm25"));
+	});
+
+	it("does nothing for an unlisted entry type while on the default", async () => {
+		await store.init();
+		sdk.getMonitors.mockClear();
+
+		store.entryTypeFor("none");
+		await flush();
+
+		expect(store.entryType).toBe("pm25");
+		expect(sdk.getMonitors).not.toHaveBeenCalled();
 		expect(store.latest.size).toBe(1);
 	});
 
