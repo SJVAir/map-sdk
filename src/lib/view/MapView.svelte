@@ -4,7 +4,7 @@
 	import { untrack } from "svelte";
 	import { setMapContext } from "../core/context.js";
 	import type { MapContext } from "../core/create-map.svelte.js";
-	import { createGlMap } from "./create-gl-map.js";
+	import { createGlMap, watchTheme } from "./create-gl-map.js";
 
 	interface Props {
 		/** The map to show. Fixed for the component's life. */
@@ -24,6 +24,7 @@
 	// svelte-ignore state_referenced_locally
 	setMapContext(map);
 
+	let root: HTMLDivElement;
 	let glContainer: HTMLDivElement;
 
 	$effect(() => {
@@ -39,7 +40,10 @@
 			}
 			return gl;
 		});
+		// Plugins bake theme colors into paint and images, so they set up again on a change.
+		const stopTheme = watchTheme(root, () => ctx.themeChanged());
 		return () => {
+			stopTheme();
 			try {
 				ctx.detach();
 			} finally {
@@ -50,6 +54,7 @@
 </script>
 
 <div
+	bind:this={root}
 	class={["mapsdk-map", className]}
 	role="region"
 	aria-label={label ?? map.messages("mapsdk_map_label")}

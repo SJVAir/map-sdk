@@ -274,4 +274,45 @@ describe("createMap", () => {
 		map.basemap.select("streets-v4-dark");
 		expect(map.basemap.current).toBe("streets-v4-dark");
 	});
+
+	it("sets plugins up again when the host's theme changes, and not after unmount", async () => {
+		const theme = document.createElement("style");
+		theme.textContent =
+			':root { --muted: #eeeeee; } :root[data-theme="dark"] { --muted: #222222; }';
+		document.head.append(theme);
+		try {
+			const map = newMap();
+			let setups = 0;
+			map.addPlugin({
+				id: "probe",
+				setup: () => {
+					setups++;
+					return () => {};
+				}
+			});
+			const attached = trackAttach(map);
+			const { unmount } = await render(MapView, { map, class: "test-map" });
+			await whenLoaded(attached[0]);
+			const before = setups;
+			expect(before).toBe(1);
+
+			document.documentElement.setAttribute("data-theme", "dark");
+			await new Promise((r) => setTimeout(r));
+			expect(setups).toBe(before + 1);
+
+			// An attribute change that leaves the tokens alone is ignored.
+			document.documentElement.style.setProperty("overflow", "hidden");
+			await new Promise((r) => setTimeout(r));
+			expect(setups).toBe(before + 1);
+
+			await unmount();
+			document.documentElement.setAttribute("data-theme", "light");
+			await new Promise((r) => setTimeout(r));
+			expect(setups).toBe(before + 1);
+		} finally {
+			theme.remove();
+			document.documentElement.removeAttribute("data-theme");
+			document.documentElement.style.removeProperty("overflow");
+		}
+	});
 });

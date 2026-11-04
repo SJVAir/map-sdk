@@ -287,4 +287,25 @@ describe("createMap", () => {
 		flushSync();
 		expect(runs).toBe(1);
 	});
+
+	it("sets every plugin up again on themeChanged, and does nothing while detached", () => {
+		const map = createMap({ config });
+		const log: string[] = [];
+		map.addPlugin(plugin("monitors", log));
+		map.addPlugin(plugin("regions", log));
+		map.themeChanged();
+		expect(log).toEqual([]);
+		map.attach(createFakeGl({ styleLoaded: true }));
+		flushSync();
+		log.length = 0;
+		map.themeChanged();
+		flushSync();
+		expect(log.filter((l) => !l.startsWith("keys"))).toEqual([
+			"teardown:monitors",
+			"teardown:regions",
+			"setup:monitors",
+			"setup:regions"
+		]);
+		map.destroy();
+	});
 });

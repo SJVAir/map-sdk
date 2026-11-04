@@ -69,6 +69,11 @@ const NO_SCALE: Scale = { id: "", label: "", units: "", kind: "category", levels
 type ScaleInput = ScaleRef | Scale | null;
 type Resolved = Scale | "unavailable";
 
+/** Equal for scales equal by value. */
+function scaleKey(scale: Scale): string {
+	return JSON.stringify(scale);
+}
+
 function isScale(input: ScaleInput): input is Scale {
 	return input !== null && "levels" in input;
 }
@@ -164,11 +169,11 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		/** refKey → group, from the latest data. */
 		let groupByKey = new Map<string, string>();
 		/* eslint-enable svelte/prefer-svelte-reactivity */
-		/** What the layers on the map were built for. */
-		let built: { scale: Scale; groups: string[] } | null = null;
-		/** Bumped per scale, so a new scale's icon images never collide with the old ones. */
+		/** What the layers on the map were built for (the scale by `scaleKey`). */
+		let built: { scaleKey: string; groups: string[] } | null = null;
+		/** Bumped per distinct scale, so a new scale's icon images never collide with the old. */
 		let scaleGeneration = -1;
-		let generationScale: Scale | null = null;
+		let generationKey: string | null = null;
 
 		const markerSize = icon ? icon.size : (options.circle?.radius ?? DEFAULT_RADIUS) * 2;
 
@@ -342,7 +347,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				for (const layerId of fresh) interactiveLayers.add(layerId);
 				ctx.interactive(fresh, toHit);
 			}
-			built = { scale, groups };
+			built = { scaleKey: scaleKey(scale), groups };
 		}
 
 		function toHit(props: Record<string, unknown>): FeatureHit | null {
@@ -409,15 +414,17 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			if (scale === null || scale === "unavailable") {
 				removeLayers();
 			} else {
-				if (scale !== generationScale) {
-					generationScale = scale;
+				// By value: a host may hand over an equal fresh Scale on every poll.
+				const key = scaleKey(scale);
+				if (key !== generationKey) {
+					generationKey = key;
 					scaleGeneration++;
 				}
 				ensureIcons(scale, categories);
 				const groups = [...sources.keys()];
 				if (
 					!built ||
-					built.scale !== scale ||
+					built.scaleKey !== key ||
 					groups.some((group) => !built!.groups.includes(group))
 				) {
 					buildLayers(scale, groups);

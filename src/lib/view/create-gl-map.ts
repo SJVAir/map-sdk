@@ -4,6 +4,34 @@ import type { StyleSpecification } from "@maptiler/sdk";
 import type { BasemapConfig } from "../core/basemap.svelte.js";
 import type { MapContext } from "../core/create-map.svelte.js";
 import type { GlMapLike } from "../core/gl.js";
+import { themeSignature } from "../plugins/style.js";
+
+/**
+ * Calls `onChange` when the host's theme changes the tokens map colors are read from: on a
+ * `prefers-color-scheme` change, or a `data-theme`, `class`, or `style` change on `<html>`.
+ * Changes that leave the tokens on `container` as they were (e.g. a scroll lock's inline style)
+ * are ignored. Returns the stop function.
+ */
+export function watchTheme(container: Element, onChange: () => void): () => void {
+	let last = themeSignature(container);
+	const check = () => {
+		const next = themeSignature(container);
+		if (next === last) return;
+		last = next;
+		onChange();
+	};
+	const media = matchMedia("(prefers-color-scheme: dark)");
+	media.addEventListener("change", check);
+	const observer = new MutationObserver(check);
+	observer.observe(document.documentElement, {
+		attributes: true,
+		attributeFilter: ["data-theme", "class", "style"]
+	});
+	return () => {
+		media.removeEventListener("change", check);
+		observer.disconnect();
+	};
+}
 
 /** Today's live map: MapTiler Streets v4 and its variants, without the busy POI label layers. */
 export function defaultBasemaps(): BasemapConfig {

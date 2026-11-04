@@ -45,7 +45,7 @@ export function themeColors(container: Element | null): ThemeColors {
 	const read = (names: string[], fallback: string): string => {
 		for (const name of names) {
 			const raw = style?.getPropertyValue(name).trim() ?? "";
-			if (raw && CSS.supports("color", raw)) return toRgba(raw);
+			if (raw && CSS.supports("color", raw)) return toRgba(raw, fallback);
 		}
 		return fallback;
 	};
@@ -56,10 +56,28 @@ export function themeColors(container: Element | null): ThemeColors {
 	return out;
 }
 
-function toRgba(color: string): string {
+/**
+ * The raw values of every token `themeColors` reads, as one string: when it changes, the colors
+ * plugins baked into paint and images are stale.
+ */
+export function themeSignature(container: Element): string {
+	const style = getComputedStyle(container);
+	return Object.values(THEME_TOKENS)
+		.flat()
+		.map((name) => style.getPropertyValue(name).trim())
+		.join("|");
+}
+
+/** A color canvas leaves `fillStyle` at when it rejects a value. */
+const SENTINEL = "#010203";
+
+function toRgba(color: string, fallback: string): string {
 	const ctx = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
 	if (!ctx) return color;
+	ctx.fillStyle = SENTINEL;
 	ctx.fillStyle = color;
+	// Unchanged: canvas couldn't parse it (an assignment it rejects is ignored), so not black.
+	if (ctx.fillStyle === SENTINEL && color.toLowerCase() !== SENTINEL) return fallback;
 	ctx.fillRect(0, 0, 1, 1);
 	const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
 	return `rgba(${r}, ${g}, ${b}, ${Math.round((a / 255) * 1000) / 1000})`;
@@ -76,6 +94,9 @@ const MISSING = -1;
  * MISSING. `to-number` alone would read null, "", " " and false as 0 (the first level) and
  * true as 1. There is no trim in expressions, so a string converting to 0 counts as blank unless
  * it contains a "0" (every non-blank string Number() reads as 0 does).
+ *
+ * Accepted gap: "Infinity" and "1e999" convert to Infinity and step to the top level, while
+ * `levelFor` says NO_LEVEL (expressions have no clean finiteness check).
  */
 function numeric(property: string): ExpressionSpecification {
 	const v = ["var", "v"];

@@ -348,4 +348,52 @@ describe("pointsPlugin", () => {
 			vi.unstubAllGlobals();
 		}
 	});
+
+	it("keeps layers and images when the source hands over an equal fresh scale", () => {
+		vi.stubGlobal(
+			"Image",
+			class {
+				set src(_: string) {}
+			}
+		);
+		try {
+			const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
+			const draw = vi.fn(() => "<svg/>");
+			const { gl } = setup({
+				source,
+				circle: undefined,
+				icon: { category: () => "c", draw, size: 16 }
+			});
+			const drawn = draw.mock.calls.length;
+			const before = gl.calls.length;
+			source.scale = structuredClone(pm25Scale);
+			flushSync();
+			const after = gl.calls.slice(before);
+			expect(after.filter((c) => /^(add|remove)Layer/.test(c))).toEqual([]);
+			expect(draw.mock.calls.length).toBe(drawn);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it("shows a selected key that appears later in a group as selected", () => {
+		const source = new TestSource<Props>({
+			features: points([{ refKey: "monitor:a", name: "A", value: 1, type: "purple" }]),
+			scale: pm25Scale
+		});
+		const { gl, selected } = setup({
+			source,
+			selectable: true,
+			cluster: { radius: 40, maxZoom: 9, groupBy: (p) => p.type ?? "" }
+		});
+		selected.set("pts", new SvelteSet(["monitor:late"]));
+		flushSync();
+		expect(gl.featureStates.get("m1:pts:points:purple/monitor:late")).toBeUndefined();
+		source.features = points([
+			{ refKey: "monitor:a", name: "A", value: 1, type: "purple" },
+			{ refKey: "monitor:late", name: "Late", value: 2, type: "airnow" }
+		]);
+		flushSync();
+		expect(gl.featureStates.get("m1:pts:points:airnow/monitor:late")).toEqual({ selected: true });
+	});
 });

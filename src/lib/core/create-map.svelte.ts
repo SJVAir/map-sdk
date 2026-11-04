@@ -101,6 +101,11 @@ export interface MapContext {
 	detach(): void;
 	/** For MapView only: records the camera and bounds after a move. */
 	updateView(camera: CameraState, bounds: Bounds): void;
+	/**
+	 * For MapView only: the host's theme changed, so plugins set up again and re-read the theme
+	 * colors they bake into paint and images. Does nothing while detached.
+	 */
+	themeChanged(): void;
 	/** Detaches, removes every plugin, and drops handlers. The context can't be used after. */
 	destroy(): void;
 }
@@ -310,6 +315,10 @@ class MapContextImpl implements MapContext {
 		this.#host.detach();
 		this.#gl = null;
 		this.#attached = false;
+	}
+
+	themeChanged(): void {
+		if (this.#gl) this.#host.restyle();
 	}
 
 	updateView(camera: CameraState, bounds: Bounds): void {
