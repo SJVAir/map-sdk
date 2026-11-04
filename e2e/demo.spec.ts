@@ -133,8 +133,13 @@ test("hide then show keeps the camera and the selection", async ({ page }) => {
 	const hide = page.getByRole("checkbox", { name: "Hide map" });
 	await hide.check();
 	await expect(leftMap(page).locator("canvas")).toHaveCount(0);
+	const updates = Number(await camera.getAttribute("data-view-updates"));
 	await hide.uncheck();
 	await expect(leftMap(page).locator("canvas")).toBeVisible();
+	// The rebuilt map reports its view once it loads; only then is the camera its own.
+	await expect
+		.poll(async () => Number(await camera.getAttribute("data-view-updates")))
+		.toBeGreaterThan(updates);
 
 	await expect(camera).toHaveText(zoomed ?? "");
 	const list = await openList(leftMap(page));
@@ -144,14 +149,39 @@ test("hide then show keeps the camera and the selection", async ({ page }) => {
 	);
 });
 
+const LAYERS = [
+	"Monitors",
+	"Region fill",
+	"CalHeatScore",
+	"Forecast zones",
+	"HMS smoke",
+	"HMS fire"
+];
+/** Each layer's legend heading: its layer label, then the units if the scale has any. */
+const LEGEND_SECTIONS = [
+	/^Monitors/,
+	/^Counties/,
+	/^CalHeatScore/,
+	/^Forecast zones/,
+	/^Smoke/,
+	/^Fires/
+];
+
 for (const theme of ["light", "dark"] as const) {
 	test(`no WCAG 2.2 AA violations in the ${theme} theme`, async ({ page }) => {
 		await page.getByRole("combobox", { name: "Theme" }).selectOption(theme);
-		for (const name of ["Region fill", "CalHeatScore", "Forecast zones", "HMS smoke", "HMS fire"]) {
-			await page.getByRole("checkbox", { name }).check();
+		for (const name of LAYERS.slice(1)) await page.getByRole("checkbox", { name }).check();
+		// Every layer has fixture data: wait until each has features and a legend section.
+		const panel = page.getByRole("region", { name: "Date-range sources" });
+		for (const name of LAYERS) {
+			await expect(
+				page.getByRole("checkbox", { name: new RegExp(`^${name} \\([1-9]\\d* features\\)$`) })
+			).toBeVisible();
+		}
+		for (const heading of LEGEND_SECTIONS) {
+			await expect(panel.getByRole("heading", { level: 3, name: heading })).toBeVisible();
 		}
 		const list = await openList(leftMap(page));
-		await expect(list.getByRole("option", { name: /Fresno County/ }).first()).toBeVisible();
 		await list.getByRole("option", { name: /Fixture Alpha/ }).click();
 		const results = await new AxeBuilder({ page })
 			.withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
@@ -167,10 +197,10 @@ test("keyboard only: Tab reaches the map, the List button, and the list; Space s
 	// Safari and WebKit skip buttons on Tab unless "Press Tab to highlight each item" is on;
 	// Option+Tab moves through every control.
 	const tab = browserName === "webkit" ? "Alt+Tab" : "Tab";
+	// A fresh page (the list closed), driven by keys alone from the top of the document.
+	await page.reload();
 	const left = leftMap(page);
-	// Start from a closed list, with focus on the page's first control.
-	await left.getByRole("button", { name: "List of features on the map" }).click();
-	await page.getByRole("combobox", { name: "Theme" }).focus();
+	await expect(left.locator("canvas")).toBeVisible();
 
 	async function tabUntil(target: Locator, limit = 40) {
 		for (let i = 0; i < limit; i++) {
@@ -186,6 +216,7 @@ test("keyboard only: Tab reaches the map, the List button, and the list; Space s
 	await expect(button).toBeFocused();
 	await page.keyboard.press("Enter");
 	const list = left.getByRole("listbox", { name: "Features on the map" });
+	await expect(list.getByRole("option", { name: /Fixture Alpha/ })).toBeVisible();
 	await tabUntil(list, 5);
 	await page.keyboard.press("Space");
 	await expect(list.getByRole("option", { selected: true })).toHaveCount(1);

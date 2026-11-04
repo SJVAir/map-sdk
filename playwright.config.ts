@@ -30,7 +30,8 @@ export default defineConfig({
 	webServer: {
 		command: `npx vite dev --port ${PORT} --strictPort`,
 		url: `http://localhost:${PORT}`,
-		reuseExistingServer: !process.env.CI,
+		// Never reuse a running dev server: it would carry the developer's real key.
+		reuseExistingServer: false,
 		// A placeholder key: MapTiler requests are routed to a local style, so no real key is needed,
 		// and the environment wins over `.env`, so a developer's key never reaches the tests.
 		env: { VITE_MAPTILER_KEY: "e2e-placeholder" }

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, onMount } from "svelte";
+	import { onDestroy, onMount, untrack } from "svelte";
 	import { SvelteMap } from "svelte/reactivity";
 	import {
 		calHeatScorePlugin,
@@ -193,6 +193,14 @@
 		else root.dataset.theme = theme;
 	});
 
+	// Counts the map's view reports (on load and after each move), so a test can tell a rebuilt
+	// map has loaded even when the camera reads the same.
+	let viewUpdates = $state(0);
+	$effect(() => {
+		void left.camera;
+		untrack(() => viewUpdates++);
+	});
+
 	const camera = $derived(
 		`zoom ${left.camera.zoom.toFixed(2)} · ${left.camera.center[1].toFixed(4)}, ${left.camera.center[0].toFixed(4)}`
 	);
@@ -256,7 +264,9 @@
 					<option value="multiple">Multiple</option>
 				</select>
 				<label><input type="checkbox" bind:checked={hidden} /> Hide map</label>
-				<output data-testid="left-camera" class="demo-muted">{camera}</output>
+				<output data-testid="left-camera" data-view-updates={viewUpdates} class="demo-muted"
+					>{camera}</output
+				>
 			</fieldset>
 			<div class="demo-selection">
 				<label for="selection-json">Monitors selection (JSON)</label>
