@@ -198,11 +198,12 @@ const loaders: Record<SourceKind, Loader> = {
 			options: { signal }
 		});
 		const groups = groupFires(
-			fires.flatMap((f) =>
-				f.frp === null
-					? []
-					: [{ id: f.id, coordinates: f.geometry.coordinates as [number, number], frp: f.frp }]
-			)
+			fires.map((f) => ({
+				id: f.id,
+				coordinates: f.geometry.coordinates as [number, number],
+				frp: f.frp,
+				timestamp: f.timestamp
+			}))
 		);
 		return collection(
 			groups.map((g) => ({

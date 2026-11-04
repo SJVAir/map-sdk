@@ -18,13 +18,37 @@ export interface FireGroup {
 
 const mean = (values: number[]) => values.reduce((s, v) => s + v, 0) / values.length;
 
-/** Groups nearby fires (DBSCAN, 2 km, every fire its own seed) into one point per group. */
-export function groupFires(
-	fires: Array<{ id: string; coordinates: [number, number]; frp: number }>
-): FireGroup[] {
-	if (!fires.length) return [];
+export interface FireDetection {
+	id: string;
+	coordinates: [number, number];
+	/** Fire radiative power; a fire without a finite one is skipped. */
+	frp: number | null;
+	/** ISO 8601. Of several fires at the same coordinates, the latest is kept (else the first). */
+	timestamp?: string;
+}
+
+/** One fire per exact coordinates: the latest by timestamp, else the first listed. */
+function dedupeByCoordinates<F extends FireDetection>(fires: F[]): F[] {
+	const latest = new Map<string, F>();
+	for (const fire of fires) {
+		const key = `${fire.coordinates[0]},${fire.coordinates[1]}`;
+		const existing = latest.get(key);
+		if (!existing || (fire.timestamp ?? "") > (existing.timestamp ?? "")) latest.set(key, fire);
+	}
+	return [...latest.values()];
+}
+
+/**
+ * Groups nearby fires (DBSCAN, 2 km, every fire its own seed) into one point per group, after
+ * skipping fires without a finite FRP and keeping one fire per coordinates, as monitor-map does.
+ */
+export function groupFires(fires: FireDetection[]): FireGroup[] {
+	const usable = dedupeByCoordinates(
+		fires.filter((f): f is FireDetection & { frp: number } => Number.isFinite(f.frp))
+	);
+	if (!usable.length) return [];
 	const clustered = clustersDbscan(
-		featureCollection(fires.map((f) => point(f.coordinates, { fireId: f.id, frp: f.frp }))),
+		featureCollection(usable.map((f) => point(f.coordinates, { fireId: f.id, frp: f.frp }))),
 		EPSILON_KM,
 		{ minPoints: MIN_POINTS, units: "kilometers" }
 	);
