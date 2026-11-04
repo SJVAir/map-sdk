@@ -54,14 +54,23 @@ afterEach(() => {
 describe("hmsSmokePlugin", () => {
 	const ref = { dataset: "hms", entryType: "smoke-density" };
 
-	it("has defaults, is not selectable, and lists nothing", () => {
+	it("has defaults, is not selectable, and lists its plumes with their level", () => {
 		const source = new TestSource<Props>({ features: SMOKE, scale: ref });
 		const plugin = hmsSmokePlugin({ source, layerLabel: "Smoke" });
 		expect(plugin.id).toBe("hms-smoke");
 		expect(plugin.label).toBe("Smoke");
 		expect(plugin.dataset).toBe("hms");
 		expect(plugin.selectable).toBe(false);
-		expect(plugin.features).toBeUndefined();
+		source.scale = smokeScale;
+		const items = plugin.features!();
+		expect(items.length).toBeGreaterThan(0);
+		expect(items[0]).toMatchObject({
+			refKey: "feature:smoke-1",
+			name: "Smoke",
+			value: "medium",
+			selectable: false
+		});
+		expect(items[0].level).toMatchObject({ key: "medium" });
 		expect(hmsSmokePlugin({ id: "x", source, layerLabel: "S" }).id).toBe("x");
 	});
 
