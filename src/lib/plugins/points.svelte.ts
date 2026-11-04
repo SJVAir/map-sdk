@@ -6,7 +6,6 @@ import type {
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { untrack } from "svelte";
 import type {
-	FeatureHit,
 	FeatureListItem,
 	LayerSpecWithoutId,
 	MapPlugin,
@@ -17,6 +16,7 @@ import { levelFor, NO_LEVEL } from "../data/scale.js";
 import type { Scale } from "../data/scale-types.js";
 import type { DataSource, MapFeatureProperties } from "../data/types.js";
 import { asDataURI, SELECTED_OVERLAY_PADDING, selectedOverlay } from "./icons.js";
+import { hitFromProps, SELECTED_OPACITY } from "./shared.js";
 import { createScaleResolver, scaleKey, type Resolved } from "./scale-resolution.svelte.js";
 import {
 	colorExpression,
@@ -57,12 +57,6 @@ const IMAGE_RATIO = 2;
 const DEFAULT_RADIUS = 6;
 const UNCLUSTERED: FilterSpecification = ["!", ["has", "point_count"]];
 const CLUSTERED: FilterSpecification = ["has", "point_count"];
-const SELECTED_OPACITY: ExpressionSpecification = [
-	"case",
-	["boolean", ["feature-state", "selected"], false],
-	1,
-	0
-];
 /**
  * Points with value-based color: anything with coordinates. Draws circles, or icons by
  * category (one image per category and level color), optionally clustered per group, with a
@@ -307,13 +301,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			built = { scaleKey: scaleKey(scale), groups };
 		}
 
-		function toHit(props: Record<string, unknown>): FeatureHit | null {
-			const refKey = props.refKey;
-			if (typeof refKey !== "string") return null;
-			const ref = decodeRef(refKey);
-			if (!ref) return null;
-			return { pluginId, ref, refKey, name: typeof props.name === "string" ? props.name : "" };
-		}
+		const toHit = (props: Record<string, unknown>) => hitFromProps(pluginId, props);
 
 		/** Sets `selected` feature-state for `keys` and clears it for everything else. */
 		function applySelection(keys: ReadonlySet<string>): void {

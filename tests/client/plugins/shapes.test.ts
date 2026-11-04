@@ -25,14 +25,20 @@ type Props = MapFeatureProperties;
 
 const SMOKE_REF: ScaleRef = { dataset: "smoke", entryType: "density" };
 
+const metaSpy = vi.fn();
+beforeEach(() => metaSpy.mockClear());
+
 function setup(
 	options: Partial<ShapesOptions<Props>> & { source: TestSource<Props> },
-	meta: Scale | "unavailable" = smokeScale
+	meta: Scale | "unavailable" = smokeScale,
+	spy = vi.fn()
 ) {
 	const selected = new SvelteMap<string, ReadonlySet<string>>();
 	const router = new InteractionRouter();
 	const providers: Providers = {
-		metadata: { scale: vi.fn(() => Promise.resolve(meta)) } as unknown as MetadataProvider,
+		metadata: {
+			scale: spy.mockImplementation(() => Promise.resolve(meta))
+		} as unknown as MetadataProvider,
 		messages: defaultMessages,
 		format: {} as FormatProvider
 	};
@@ -111,7 +117,12 @@ describe("shapesPlugin", () => {
 		const { gl, plugin } = setup({ source });
 		expect(gl.layers).toEqual([]);
 		await settle();
-		expect(layerIds(gl)).toEqual(["m1:shp:fill", "m1:shp:outline", "m1:shp:selected"]);
+		expect(layerIds(gl)).toEqual([
+			"m1:shp:fill",
+			"m1:shp:outline",
+			"m1:shp:selected",
+			"m1:shp:check"
+		]);
 		const fill = layer(gl, "m1:shp:fill") as Extract<LayerSpecification, { type: "fill" }>;
 		expect(fill.paint!["fill-color"]).toEqual(
 			colorExpression(smokeScale, "value", FALLBACK_THEME_COLORS.neutral)
@@ -139,12 +150,18 @@ describe("shapesPlugin", () => {
 
 	it("draws neutral with no scale in plain mode, and has no legend", () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
-		const { gl, plugin } = setup({ source, mode: "plain" });
-		expect(layerIds(gl)).toEqual(["m1:shp:fill", "m1:shp:outline", "m1:shp:selected"]);
+		const { gl, plugin } = setup({ source, mode: "plain" }, smokeScale, metaSpy);
+		expect(layerIds(gl)).toEqual([
+			"m1:shp:fill",
+			"m1:shp:outline",
+			"m1:shp:selected",
+			"m1:shp:check"
+		]);
 		const fill = layer(gl, "m1:shp:fill") as Extract<LayerSpecification, { type: "fill" }>;
 		expect(fill.paint!["fill-color"]).toBe(FALLBACK_THEME_COLORS.neutral);
 		expect(fill.paint!["fill-opacity"]).toBe(0.6);
 		expect(plugin.legend!()).toBeNull();
+		expect(metaSpy).not.toHaveBeenCalled();
 	});
 
 	it("sets the selected state and draws a thicker highlight outline", () => {
@@ -166,7 +183,12 @@ describe("shapesPlugin", () => {
 			1,
 			0
 		]);
-		expect(JSON.stringify(outline.paint!["line-width"])).not.toContain("3");
+		expect(outline.paint!["line-width"]).toEqual([
+			"case",
+			["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false],
+			2,
+			1
+		]);
 	});
 
 	it("updates data without rebuilding layers", () => {
@@ -242,5 +264,115 @@ describe("shapesPlugin", () => {
 		expect(router.hitsAt([0, 0])).toEqual([
 			{ pluginId: "shp", ref: { kind: "feature", id: "a" }, refKey: "feature:a", name: "Alpha" }
 		]);
+	});
+
+	const checkPoints = (gl: FakeGl) =>
+		(
+			(gl.sources.get("m1:shp:check") as GeoJSONSourceSpecification)
+				.data as FeatureCollection<Geometry>
+		).features.map((f) => (f.geometry as GeoJSON.Point).coordinates);
+
+	it("draws a check mark at the label point of each selected feature", () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl, selected } = setup({ source, selectable: true });
+		const check = layer(gl, "m1:shp:check") as Extract<LayerSpecification, { type: "symbol" }>;
+		expect(check.layout!["icon-image"]).toBe("m1:shp:selected");
+		expect(checkPoints(gl)).toEqual([]);
+		selected.set("shp", new SvelteSet(["feature:a"]));
+		flushSync();
+		expect(checkPoints(gl)).toEqual([[1, 1]]);
+		selected.set("shp", new SvelteSet());
+		flushSync();
+		expect(checkPoints(gl)).toEqual([]);
+	});
+
+	it("moves the check to the new label point when data is replaced", () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl, selected } = setup({ source, selectable: true });
+		selected.set("shp", new SvelteSet(["feature:a"]));
+		flushSync();
+		source.features = collection([
+			{
+				props: { refKey: "feature:a", name: "Alpha", value: 1 },
+				geometry: { type: "Polygon", coordinates: [square(10, 10, 2)] }
+			}
+		]);
+		flushSync();
+		expect(checkPoints(gl)).toEqual([[11, 11]]);
+	});
+
+	it("keeps a selected key absent from the data and shows it once it appears", () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl, selected } = setup({ source, selectable: true });
+		selected.set("shp", new SvelteSet(["feature:late"]));
+		flushSync();
+		expect(gl.featureStates.get("m1:shp:shapes/feature:late")).toEqual({ selected: true });
+		expect(checkPoints(gl)).toEqual([]);
+		source.features = collection([
+			{
+				props: { refKey: "feature:late", name: "Late", value: 1 },
+				geometry: { type: "Polygon", coordinates: [square(20, 20, 2)] }
+			}
+		]);
+		flushSync();
+		expect(gl.featureStates.get("m1:shp:shapes/feature:late")).toEqual({ selected: true });
+		expect(checkPoints(gl)).toEqual([[21, 21]]);
+	});
+
+	it("rebuilds the layers when the scale changes by value", () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl } = setup({ source });
+		const fillColor = () =>
+			(layer(gl, "m1:shp:fill") as Extract<LayerSpecification, { type: "fill" }>).paint![
+				"fill-color"
+			];
+		const first = fillColor();
+		source.scale = { ...smokeScale, levels: smokeScale.levels.slice(0, 2) };
+		flushSync();
+		expect(layerIds(gl)).toEqual([
+			"m1:shp:fill",
+			"m1:shp:outline",
+			"m1:shp:selected",
+			"m1:shp:check"
+		]);
+		expect(fillColor()).not.toEqual(first);
+		// An equal fresh scale does not rebuild.
+		const calls = gl.calls.length;
+		source.scale = { ...smokeScale, levels: smokeScale.levels.slice(0, 2) };
+		flushSync();
+		expect(gl.calls.slice(calls).some((c) => c.startsWith("addLayer"))).toBe(false);
+	});
+
+	it("adds no layers when the scale ref resolves to unavailable", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
+		const { gl, plugin } = setup({ source }, "unavailable");
+		await settle();
+		expect(gl.layers).toEqual([]);
+		expect(plugin.legend!()).toEqual({
+			pluginId: "shp",
+			status: { state: "unavailable", reason: expect.any(String) }
+		});
+	});
+
+	it("shows current data and selection after being attached again", () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { host, selected } = setup({ source, selectable: true });
+		host.detach();
+		source.features = collection([
+			{
+				props: { refKey: "feature:z", name: "Zulu", value: 1 },
+				geometry: { type: "Polygon", coordinates: [square(30, 30, 2)] }
+			}
+		]);
+		selected.set("shp", new SvelteSet(["feature:z"]));
+		flushSync();
+		const gl2 = createFakeGl({ styleLoaded: true });
+		host.attach(gl2);
+		flushSync();
+		const data = (gl2.sources.get("m1:shp:shapes") as GeoJSONSourceSpecification)
+			.data as FeatureCollection;
+		expect(data.features.map((f) => f.properties!.refKey)).toEqual(["feature:z"]);
+		expect(gl2.featureStates.get("m1:shp:shapes/feature:z")).toEqual({ selected: true });
+		expect(checkPoints(gl2)).toEqual([[31, 31]]);
 	});
 });

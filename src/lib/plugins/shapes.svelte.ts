@@ -1,9 +1,10 @@
 import type { ExpressionSpecification } from "@maptiler/sdk";
 import type { Feature, FeatureCollection, Geometry, Position } from "geojson";
 import { untrack } from "svelte";
-import type { FeatureHit, FeatureListItem, MapPlugin, PluginContext } from "../core/plugin.js";
+import type { FeatureListItem, MapPlugin, PluginContext } from "../core/plugin.js";
 import { decodeRef, selectionId } from "../data/refs.js";
 import { levelFor, NO_LEVEL } from "../data/scale.js";
+import type { Scale } from "../data/scale-types.js";
 import type { DataSource, MapFeatureProperties } from "../data/types.js";
 import {
 	createScaleResolver,
@@ -11,6 +12,8 @@ import {
 	scaleKey,
 	type Resolved
 } from "./scale-resolution.svelte.js";
+import { hitFromProps, SELECTED_OPACITY } from "./shared.js";
+import { asDataURI, SELECTED_OVERLAY_PADDING, selectedOverlay } from "./icons.js";
 import { colorExpression, opacityExpression, themeColors, type ThemeColors } from "./style.js";
 
 export interface ShapesOptions<P extends MapFeatureProperties> {
@@ -27,17 +30,16 @@ export interface ShapesOptions<P extends MapFeatureProperties> {
 	fillOpacity?: number;
 }
 
+/** The check image is drawn at this multiple of its size and scaled down, for sharp HiDPI. */
+const IMAGE_RATIO = 2;
+/** The check mark badge is sized for a marker this many pixels across. */
+const CHECK_SIZE = 12;
+const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const DEFAULT_FILL_OPACITY = 0.6;
 const OUTLINE_WIDTH = 1;
 const LINE_WIDTH = 2;
 const SELECTED_WIDTH = 3;
 const LINE_TYPES = ["LineString", "MultiLineString"];
-const SELECTED_OPACITY: ExpressionSpecification = [
-	"case",
-	["boolean", ["feature-state", "selected"], false],
-	1,
-	0
-];
 
 /** Twice the signed area of a ring, absolute. */
 function ringArea(ring: Position[]): number {
@@ -141,13 +143,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 		return items;
 	}
 
-	function toHit(props: Record<string, unknown>): FeatureHit | null {
-		const refKey = props.refKey;
-		if (typeof refKey !== "string") return null;
-		const ref = decodeRef(refKey);
-		if (!ref) return null;
-		return { pluginId, ref, refKey, name: typeof props.name === "string" ? props.name : "" };
-	}
+	const toHit = (props: Record<string, unknown>) => hitFromProps(pluginId, props);
 
 	function setup(ctx: PluginContext): () => void {
 		let dead = false;
@@ -156,6 +152,10 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 		const theme: ThemeColors = themeColors(container);
 
 		let sourceId: string | null = null;
+		let checkSourceId: string | null = null;
+		/** refKey → label point, from the latest data. */
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
+		let labels = new Map<string, [number, number]>();
 		/** Namespaced ids of the layers currently on the map, in draw order. */
 		let layers: string[] = [];
 		/** The scale (by `scaleKey`) the layers on the map were built for. */
@@ -172,7 +172,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 			builtKey = null;
 		}
 
-		function buildLayers(scale: Resolved & object, src: string): void {
+		function buildLayers(scale: Scale, src: string): void {
 			removeLayers();
 			const isLine: ExpressionSpecification = ["match", ["geometry-type"], LINE_TYPES, true, false];
 			const lineColor: ExpressionSpecification | string = choropleth
@@ -208,7 +208,17 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 					"line-opacity": SELECTED_OPACITY
 				}
 			});
-			layers = [fill, outline, selectedLayer];
+			const check = ctx.addLayer("check", {
+				type: "symbol",
+				source: checkSourceId!,
+				layout: {
+					"icon-image": ctx.id("selected"),
+					"icon-size": 1 / IMAGE_RATIO,
+					"icon-allow-overlap": true,
+					"icon-ignore-placement": true
+				}
+			});
+			layers = [fill, outline, selectedLayer, check];
 			// Layer ids repeat across rebuilds; register them once.
 			if (!interactiveDone) {
 				interactiveDone = true;
@@ -217,8 +227,28 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 			builtKey = scaleKey(scale);
 		}
 
+		/** One check-mark point per selected feature present in the data. */
+		function updateCheck(keys: ReadonlySet<string>): void {
+			if (!checkSourceId) return;
+			const out: Feature[] = [];
+			for (const key of keys) {
+				const at = labels.get(key);
+				if (at)
+					out.push({
+						type: "Feature",
+						geometry: { type: "Point", coordinates: at },
+						properties: {}
+					});
+			}
+			(gl.getSource(checkSourceId) as { setData(d: FeatureCollection): void }).setData({
+				type: "FeatureCollection",
+				features: out
+			});
+		}
+
 		function applySelection(keys: ReadonlySet<string>): void {
 			if (!sourceId) return;
+			updateCheck(keys);
 			for (const key of applied) {
 				if (!keys.has(key)) gl.removeFeatureState({ source: sourceId, id: key }, "selected");
 			}
@@ -236,10 +266,18 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 				type: "FeatureCollection",
 				features: [] as Feature[]
 			}) as FeatureCollection;
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
+			labels = new Map();
+			for (const feature of data.features) {
+				const props = feature.properties as P | null;
+				const at = props && feature.geometry ? labelPoint(feature.geometry) : null;
+				if (props && at) labels.set(props.refKey, at);
+			}
 			if (sourceId) {
 				(gl.getSource(sourceId) as { setData(d: FeatureCollection): void }).setData(data);
 			} else {
 				sourceId = ctx.addSource("shapes", { type: "geojson", data, promoteId: "refKey" });
+				checkSourceId = ctx.addSource("check", { type: "geojson", data: EMPTY });
 			}
 			if (scale === null || scale === "unavailable") {
 				removeLayers();
@@ -249,7 +287,18 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 			applySelection(untrack(() => ctx.selectedKeys));
 		}
 
-		scales.track(ctx, () => dead);
+		if (typeof Image !== "undefined") {
+			const total = CHECK_SIZE + 2 * SELECTED_OVERLAY_PADDING;
+			const image = new Image(total * IMAGE_RATIO, total * IMAGE_RATIO);
+			image.onload = () => {
+				if (!dead) ctx.addImage("selected", image);
+			};
+			image.src = asDataURI(
+				selectedOverlay(theme.highlight, theme.highlightForeground, CHECK_SIZE)
+			);
+		}
+
+		if (choropleth) scales.track(ctx, () => dead);
 
 		ctx.effect(() => {
 			const collection = source.features;
