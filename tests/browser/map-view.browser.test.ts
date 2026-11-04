@@ -13,6 +13,10 @@ import {
 import { NO_LEVEL } from "../../src/lib/data/scale.js";
 import MapViewWithOverlay from "../fixtures/MapViewWithOverlay.svelte";
 
+// The browser project resolves with the "browser" condition only, so esm-env's DEV would be
+// false; a Vite host in development gets true.
+vi.mock("esm-env", () => ({ BROWSER: true, DEV: true, NODE: false }));
+
 /** Inline styles, so no style document, key, or network is needed. */
 const basemaps = {
 	styles: [
@@ -319,6 +323,21 @@ describe("MapView tooltip", () => {
 		const types = off.mock.calls.map((c) => c[0]);
 		expect(types).toContain("move");
 		expect(types).toContain("resize");
+	});
+});
+
+describe("MapView map prop", () => {
+	it("warns in development when the map prop changes after mount", async () => {
+		const spy = vi.mocked(console.warn);
+		spy.mockClear();
+		const first = newMap();
+		const { rerender, unmount } = await render(MapView, { map: first, class: "test-map" });
+		const changed = () =>
+			spy.mock.calls.filter((args) => String(args[0]).includes("`map` prop changed"));
+		expect(changed()).toHaveLength(0);
+		await rerender({ map: newMap() });
+		await vi.waitFor(() => expect(changed()).toHaveLength(1));
+		await unmount();
 	});
 });
 

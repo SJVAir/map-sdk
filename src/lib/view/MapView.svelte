@@ -1,6 +1,7 @@
 <script lang="ts">
 	import "@maptiler/sdk/dist/maptiler-sdk.css";
 	import "../ui/controls.css";
+	import { DEV } from "esm-env";
 	import type { Snippet } from "svelte";
 	import { untrack } from "svelte";
 	import { setMapContext } from "../core/context.js";
@@ -67,6 +68,17 @@
 	// The map is fixed for the component's life, so its first value is the one to provide.
 	// svelte-ignore state_referenced_locally
 	setMapContext(map);
+	// svelte-ignore state_referenced_locally
+	const firstMap = map;
+	if (DEV) {
+		$effect(() => {
+			if (map !== firstMap) {
+				console.warn(
+					"map-sdk: MapView's `map` prop changed after mount. It is fixed for the component's life (overlays keep the first map); wrap MapView in {#key map} to show another map."
+				);
+			}
+		});
+	}
 
 	let root: HTMLDivElement;
 	let glContainer: HTMLDivElement;
