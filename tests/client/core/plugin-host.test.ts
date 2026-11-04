@@ -404,4 +404,177 @@ describe("PluginHost", () => {
 		expect(gl.sources.size).toBe(0);
 		expect(String(errorSpy.mock.calls[0][0])).toContain("a");
 	});
+
+	describe("draw order", () => {
+		const ids = (gl: ReturnType<typeof createFakeGl>) => gl.layers.map((l) => l.id);
+
+		/** A plugin whose `rebuild` removes its layers directly and adds them again. */
+		function rebuildingPlugin(id: string) {
+			let rebuild!: () => void;
+			const plugin: MapPlugin = {
+				id,
+				setup(ctx) {
+					const source = ctx.addSource("src", {
+						type: "geojson",
+						data: { type: "FeatureCollection", features: [] }
+					});
+					const add = () => [
+						ctx.addLayer("fill", { type: "fill", source }),
+						ctx.addLayer("line", { type: "line", source })
+					];
+					let layers = add();
+					rebuild = () => {
+						for (const layer of layers.toReversed()) ctx.gl.removeLayer(layer);
+						layers = add();
+					};
+					return () => {};
+				}
+			};
+			return { plugin, rebuild: () => rebuild() };
+		}
+
+		it("draws later plugins above earlier ones", () => {
+			const { host } = makeHost();
+			const gl = createFakeGl({ styleLoaded: true });
+			host.attach(gl);
+			host.add(resourcePlugin("a"));
+			host.add(resourcePlugin("b"));
+			expect(ids(gl)).toEqual(["m1:a:fill", "m1:a:line", "m1:b:fill", "m1:b:line"]);
+		});
+
+		it("adds a plugin before another, below its layers", () => {
+			const { host } = makeHost();
+			const gl = createFakeGl({ styleLoaded: true });
+			host.attach(gl);
+			host.add(resourcePlugin("a"));
+			host.add(resourcePlugin("b"));
+			host.add(resourcePlugin("c"), "a");
+			expect(host.plugins.map((p) => p.id)).toEqual(["c", "a", "b"]);
+			expect(ids(gl)).toEqual([
+				"m1:c:fill",
+				"m1:c:line",
+				"m1:a:fill",
+				"m1:a:line",
+				"m1:b:fill",
+				"m1:b:line"
+			]);
+		});
+
+		it("adds before a plugin whose layers aren't set up yet, in order once they are", () => {
+			const { host } = makeHost();
+			host.add(resourcePlugin("a"));
+			host.add(resourcePlugin("c"), "a");
+			const gl = createFakeGl();
+			host.attach(gl);
+			gl.fireStyleLoad();
+			expect(ids(gl)).toEqual(["m1:c:fill", "m1:c:line", "m1:a:fill", "m1:a:line"]);
+		});
+
+		it("throws for an unknown before id", () => {
+			const { host } = makeHost();
+			host.add(resourcePlugin("a"));
+			expect(() => host.add(resourcePlugin("b"), "nope")).toThrow(
+				'map-sdk: no plugin with id "nope"'
+			);
+			expect(host.plugins.map((p) => p.id)).toEqual(["a"]);
+			expect(() => host.move("a", "nope")).toThrow('map-sdk: no plugin with id "nope"');
+		});
+
+		it("moves a plugin to the top, or before another", () => {
+			const { host } = makeHost();
+			const gl = createFakeGl({ styleLoaded: true });
+			host.attach(gl);
+			host.add(resourcePlugin("a"));
+			host.add(resourcePlugin("b"));
+			host.add(resourcePlugin("c"));
+
+			host.move("a");
+			expect(host.plugins.map((p) => p.id)).toEqual(["b", "c", "a"]);
+			expect(ids(gl)).toEqual([
+				"m1:b:fill",
+				"m1:b:line",
+				"m1:c:fill",
+				"m1:c:line",
+				"m1:a:fill",
+				"m1:a:line"
+			]);
+
+			host.move("a", "c");
+			expect(host.plugins.map((p) => p.id)).toEqual(["b", "a", "c"]);
+			expect(ids(gl)).toEqual([
+				"m1:b:fill",
+				"m1:b:line",
+				"m1:a:fill",
+				"m1:a:line",
+				"m1:c:fill",
+				"m1:c:line"
+			]);
+
+			host.move("a", "a");
+			host.move("missing");
+			expect(host.plugins.map((p) => p.id)).toEqual(["b", "a", "c"]);
+			expect(errorSpy).not.toHaveBeenCalled();
+		});
+
+		it("moves a plugin while detached, and sets up in the new order", () => {
+			const { host } = makeHost();
+			host.add(resourcePlugin("a"));
+			host.add(resourcePlugin("b"));
+			host.move("a");
+			const gl = createFakeGl({ styleLoaded: true });
+			host.attach(gl);
+			expect(ids(gl)).toEqual(["m1:b:fill", "m1:b:line", "m1:a:fill", "m1:a:line"]);
+		});
+
+		it("keeps a plugin's slot when it rebuilds its layers", () => {
+			const { host } = makeHost();
+			const gl = createFakeGl({ styleLoaded: true });
+			host.attach(gl);
+			const a = rebuildingPlugin("a");
+			host.add(a.plugin);
+			host.add(resourcePlugin("b"));
+			a.rebuild();
+			expect(ids(gl)).toEqual(["m1:a:fill", "m1:a:line", "m1:b:fill", "m1:b:line"]);
+			const before = gl.calls.length;
+			host.remove("a");
+			expect(gl.calls.slice(before).filter((c) => c.startsWith("removeLayer"))).toEqual([
+				"removeLayer:m1:a:line",
+				"removeLayer:m1:a:fill"
+			]);
+		});
+
+		it("keeps the order across a restyle", () => {
+			const { host } = makeHost();
+			const gl = createFakeGl({ styleLoaded: true });
+			host.attach(gl);
+			host.add(resourcePlugin("a"));
+			host.add(resourcePlugin("b"));
+			host.add(resourcePlugin("c"), "a");
+			host.move("b", "c");
+			gl.setStyle({});
+			host.restyle();
+			gl.fireStyleLoad();
+			expect(ids(gl)).toEqual([
+				"m1:b:fill",
+				"m1:b:line",
+				"m1:c:fill",
+				"m1:c:line",
+				"m1:a:fill",
+				"m1:a:line"
+			]);
+			expect(errorSpy).not.toHaveBeenCalled();
+		});
+
+		it("keeps plugin layers above a basemap's layers", () => {
+			const { host } = makeHost();
+			const gl = createFakeGl({ styleLoaded: true });
+			gl.addLayer({ id: "basemap", type: "background" });
+			host.attach(gl);
+			host.add(resourcePlugin("a"));
+			host.add(resourcePlugin("b"), "a");
+			expect(ids(gl)).toEqual(["basemap", "m1:b:fill", "m1:b:line", "m1:a:fill", "m1:a:line"]);
+			host.move("b");
+			expect(ids(gl)).toEqual(["basemap", "m1:a:fill", "m1:a:line", "m1:b:fill", "m1:b:line"]);
+		});
+	});
 });

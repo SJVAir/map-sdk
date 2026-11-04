@@ -10,6 +10,8 @@ export interface GlMapLike {
 	removeSource(id: string): void;
 	getSource(id: string): unknown;
 	addLayer(layer: LayerSpecification, beforeId?: string): void;
+	/** Moves a layer below `beforeId`, or to the top without it. */
+	moveLayer(id: string, beforeId?: string): void;
 	removeLayer(id: string): void;
 	getLayer(id: string): unknown;
 	addImage(

@@ -100,6 +100,19 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 				throw new Error(`fake-gl: layer ${layer.id} uses missing source ${layer.source}`);
 			}
 			const at = beforeId === undefined ? -1 : layers.findIndex((l) => l.id === beforeId);
+			if (beforeId !== undefined && at < 0) throw new Error(`fake-gl: no layer ${beforeId}`);
+			if (at < 0) layers.push(layer);
+			else layers.splice(at, 0, layer);
+		},
+		moveLayer(id, beforeId) {
+			log("moveLayer", id);
+			const from = layers.findIndex((l) => l.id === id);
+			if (from < 0) throw new Error(`fake-gl: no layer ${id}`);
+			if (beforeId !== undefined && !layers.some((l) => l.id === beforeId)) {
+				throw new Error(`fake-gl: no layer ${beforeId}`);
+			}
+			const [layer] = layers.splice(from, 1);
+			const at = beforeId === undefined ? -1 : layers.findIndex((l) => l.id === beforeId);
 			if (at < 0) layers.push(layer);
 			else layers.splice(at, 0, layer);
 		},

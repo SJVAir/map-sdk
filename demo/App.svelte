@@ -89,6 +89,22 @@
 		}
 	];
 
+	/** Draw order, bottom first: fills, then smoke, fire, and monitors on top. */
+	const drawOrder: SourceKind[] = [
+		"regions",
+		"calheatscore",
+		"forecast-zones",
+		"hms-smoke",
+		"hms-fire",
+		"monitors"
+	];
+
+	/** The first added plugin that draws above `kind`, so it goes below it whatever the toggle order. */
+	function pluginAbove(kind: SourceKind): string | undefined {
+		const added = new Set(untrack(() => left.plugins).map((p) => p.id));
+		return drawOrder.slice(drawOrder.indexOf(kind) + 1).find((k) => added.has(k));
+	}
+
 	/** Today in Pacific time, `YYYY-MM-DD`, shifted by `days`. */
 	function pacificDate(days = 0): string {
 		const date = new Date(Date.now() + days * 86_400_000);
@@ -154,6 +170,7 @@
 		const plugin = preset.plugin(source);
 		const isMonitors = preset.kind === "monitors";
 		left.addPlugin(plugin, {
+			before: pluginAbove(preset.kind),
 			selectionMode: preset.selectable ? mode : "none",
 			selection: isMonitors ? monitorsSelection : null,
 			onselectionchange: isMonitors ? showSelection : undefined

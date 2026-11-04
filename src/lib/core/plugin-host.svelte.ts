@@ -35,6 +35,9 @@ interface Running {
  * Runs plugins against a GL map. Plugins are set up only when the map's style is loaded, and
  * everything they add through their `PluginContext` is removed on teardown, whatever their own
  * teardown does. The plugin list outlives any one GL map.
+ *
+ * Plugins draw in list order, later on top: each plugin's layers stay together, below the first
+ * layer of the next plugin in the list that has any.
  */
 export class PluginHost {
 	#opts: PluginHostOptions;
@@ -55,7 +58,7 @@ export class PluginHost {
 		this.#opts = opts;
 	}
 
-	/** In the order added. Reactive. */
+	/** In draw order, bottom first. Reactive. */
 	get plugins(): readonly MapPlugin[] {
 		return this.#plugins;
 	}
@@ -68,12 +71,63 @@ export class PluginHost {
 		return untrack(() => this.#plugins);
 	}
 
-	add(plugin: MapPlugin): void {
+	/** Adds `plugin` on top, or just below the plugin `before` names. */
+	add(plugin: MapPlugin, before?: string): void {
 		if (this.#list.some((p) => p.id === plugin.id)) {
 			throw new Error(`map-sdk: a plugin with id "${plugin.id}" is already added`);
 		}
-		this.#plugins = [...this.#list, plugin];
+		this.#plugins = this.#inserted(this.#list, plugin, before);
 		if (this.#live) this.#setup(plugin);
+	}
+
+	/**
+	 * Moves a plugin to the top, or just below the plugin `before` names, with its layers. Does
+	 * nothing for an unknown `id` or when `before` is `id`.
+	 */
+	move(id: string, before?: string): void {
+		const plugin = this.#list.find((p) => p.id === id);
+		if (!plugin || before === id) return;
+		this.#plugins = this.#inserted(
+			this.#list.filter((p) => p !== plugin),
+			plugin,
+			before
+		);
+		const running = this.#running.get(id);
+		if (!running || running.gl !== this.#gl) return;
+		const { gl } = running;
+		const beforeId = this.#layerAbove(id);
+		for (const layerId of running.layers) {
+			try {
+				if (gl.getLayer(layerId)) gl.moveLayer(layerId, beforeId);
+			} catch (error) {
+				console.error(`map-sdk: plugin "${id}" moving layer ${layerId} failed`, error);
+			}
+		}
+	}
+
+	/** `list` with `plugin` inserted before `before` (at the end without it). */
+	#inserted(list: readonly MapPlugin[], plugin: MapPlugin, before?: string): MapPlugin[] {
+		if (before === undefined) return [...list, plugin];
+		const at = list.findIndex((p) => p.id === before);
+		if (at < 0) throw new Error(`map-sdk: no plugin with id "${before}"`);
+		return [...list.slice(0, at), plugin, ...list.slice(at)];
+	}
+
+	/**
+	 * The bottom layer of the plugins drawn above `pluginId` on the current gl: where its layers
+	 * go. `undefined` (the top) when none above has a layer.
+	 */
+	#layerAbove(pluginId: string): string | undefined {
+		const gl = this.#gl;
+		if (!gl) return undefined;
+		const list = this.#list;
+		for (const plugin of list.slice(list.findIndex((p) => p.id === pluginId) + 1)) {
+			const running = this.#running.get(plugin.id);
+			if (running?.gl !== gl) continue;
+			const layerId = running.layers.find((l) => gl.getLayer(l));
+			if (layerId !== undefined) return layerId;
+		}
+		return undefined;
 	}
 
 	remove(id: string): void {
@@ -218,6 +272,7 @@ export class PluginHost {
 	#context(pluginId: string, running: Running): PluginContext {
 		const { mapUid, providers, router, selectedKeys } = this.#opts;
 		const { gl } = running;
+		const layerAbove = () => this.#layerAbove(pluginId);
 		const id = (local: string) => `${mapUid}:${pluginId}:${local}`;
 		return {
 			gl,
@@ -235,7 +290,10 @@ export class PluginHost {
 			addLayer(local, spec) {
 				const full = id(local);
 				if (running.dead) return full;
-				gl.addLayer({ ...spec, id: full } as LayerSpecification);
+				gl.addLayer({ ...spec, id: full } as LayerSpecification, layerAbove());
+				// A re-added layer (a plugin rebuilding its layers) is now its plugin's top layer.
+				const at = running.layers.indexOf(full);
+				if (at >= 0) running.layers.splice(at, 1);
 				running.layers.push(full);
 				return full;
 			},

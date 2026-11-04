@@ -51,6 +51,32 @@ describe("createMap", () => {
 		expect(map.attached).toBe(false);
 	});
 
+	it("orders plugins with addPlugin's before and movePlugin", () => {
+		const map = createMap({ config });
+		const layered = (id: string): MapPlugin => ({
+			id,
+			setup(ctx) {
+				ctx.addLayer("bg", { type: "background" });
+				return () => {};
+			}
+		});
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		map.addPlugin(layered("a"));
+		map.addPlugin(layered("b"), { before: "a", selectionMode: "single" });
+		expect(map.plugins.map((p) => p.id)).toEqual(["b", "a"]);
+		expect(map.getSelectionMode("b")).toBe("single");
+		expect(gl.layers.map((l) => l.id)).toEqual([`${map.uid}:b:bg`, `${map.uid}:a:bg`]);
+		expect(() => map.addPlugin(layered("c"), { before: "nope" })).toThrow("nope");
+		expect(map.getSelectionMode("c")).toBe("none");
+
+		map.movePlugin("b");
+		expect(map.plugins.map((p) => p.id)).toEqual(["a", "b"]);
+		expect(gl.layers.map((l) => l.id)).toEqual([`${map.uid}:a:bg`, `${map.uid}:b:bg`]);
+		map.movePlugin("b", { before: "a" });
+		expect(map.plugins.map((p) => p.id)).toEqual(["b", "a"]);
+	});
+
 	it("keeps two maps apart", () => {
 		const a = createMap({ config });
 		const b = createMap({ config });

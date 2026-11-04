@@ -40,6 +40,11 @@ export interface CreateMapOptions {
 }
 
 export interface PluginOptions {
+	/**
+	 * Draw the plugin just below the plugin with this id (which must be added already). Without
+	 * it the plugin goes on top.
+	 */
+	before?: string;
 	selectionMode?: SelectionMode;
 	selection?: SpatialSelection | null;
 	onselectionchange?(sel: SpatialSelection | null): void;
@@ -59,12 +64,23 @@ export interface MapContext {
 	/** Reactive; `null` until a map reports its bounds. */
 	readonly bounds: Bounds | null;
 	readonly basemap: BasemapState;
-	/** In the order added. Reactive. */
+	/**
+	 * In draw order, bottom first: later plugins draw above earlier ones, and each plugin's layers
+	 * stay together. Reactive.
+	 */
 	readonly plugins: readonly MapPlugin[];
 	/** Reactive. */
 	readonly attached: boolean;
-	/** Throws if a plugin with the same id is already added, or after `destroy()`. */
+	/**
+	 * Adds a plugin on top, or below `options.before`. Throws if a plugin with the same id is
+	 * already added, if `before` names no added plugin, or after `destroy()`.
+	 */
 	addPlugin(plugin: MapPlugin, options?: PluginOptions): void;
+	/**
+	 * Moves a plugin and its layers to the top, or just below `options.before`. Does nothing for
+	 * an unknown `id`; throws if `before` names no added plugin.
+	 */
+	movePlugin(id: string, options?: { before?: string }): void;
 	/** Tears the plugin down and forgets its selection, mode, and `onselectionchange`. */
 	removePlugin(id: string): void;
 	/**
@@ -260,12 +276,17 @@ class MapContextImpl implements MapContext {
 		// Stored before the host adds it, so a setup that runs at once sees its selection.
 		this.#selections.set(plugin.id, state);
 		try {
-			this.#host.add(plugin);
+			this.#host.add(plugin, options.before);
 		} catch (error) {
 			if (previous) this.#selections.set(plugin.id, previous);
 			else this.#selections.delete(plugin.id);
 			throw error;
 		}
+	}
+
+	movePlugin(id: string, options: { before?: string } = {}): void {
+		if (this.#destroyed) return;
+		this.#host.move(id, options.before);
 	}
 
 	removePlugin(id: string): void {
