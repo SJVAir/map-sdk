@@ -85,6 +85,11 @@ export interface MapContext {
 	 */
 	pickFromList(pluginId: string, refKey: string, additive: boolean): void;
 	/**
+	 * Internal, for the selection bar: the user clears a plugin's selection. Calls the plugin's
+	 * `onselectionchange(null)` when it had a selection; does nothing otherwise.
+	 */
+	clearSelection(pluginId: string): void;
+	/**
 	 * Called for every feature click (the top hit), whatever the selection mode, before the
 	 * selection changes. Returns an unsubscribe function.
 	 */
@@ -283,6 +288,14 @@ class MapContextImpl implements MapContext {
 		if (!found) return;
 		this.#emitClick(pluginId, found.item.ref);
 		if (found.item.selectable) this.#applyPick(pluginId, found.item.ref, additive);
+	}
+
+	clearSelection(pluginId: string): void {
+		if (this.#destroyed) return;
+		const state = untrack(() => this.#selections.get(pluginId));
+		if (!state || !untrack(() => state.selection)) return;
+		state.selection = null;
+		state.onselectionchange?.(null);
 	}
 
 	setSelectionMode(pluginId: string, mode: SelectionMode): void {

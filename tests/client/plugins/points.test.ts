@@ -88,6 +88,22 @@ afterEach(() => {
 });
 
 describe("pointsPlugin", () => {
+	it("names its layer and the dataset of a ScaleRef source, none for a Scale", () => {
+		const ref = new TestSource<Props>({ scale: PM25_REF });
+		const refPlugin = pointsPlugin({
+			id: "p",
+			source: ref,
+			layerLabel: "monitors",
+			circle: { radius: 5 }
+		});
+		expect(refPlugin.label).toBe("monitors");
+		expect(refPlugin.dataset).toBe("air-quality");
+		const literal = new TestSource<Props>({ scale: pm25Scale });
+		expect(
+			pointsPlugin({ id: "p", source: literal, layerLabel: "m", circle: { radius: 5 } }).dataset
+		).toBeUndefined();
+	});
+
 	it("adds no layers and reports the status while the scale is unavailable", async () => {
 		const source = new TestSource<Props>({ features: points(ROWS), scale: PM25_REF });
 		const meta = metadata("unavailable");

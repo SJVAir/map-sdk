@@ -9,6 +9,12 @@ export const NO_SCALE: Scale = { id: "", label: "", units: "", kind: "category",
 type ScaleInput = ScaleRef | Scale | null;
 export type Resolved = Scale | "unavailable";
 
+/** The dataset of a source whose scale is a `ScaleRef`; `undefined` for a literal scale or none. */
+export function datasetOf(source: DataSource): string | undefined {
+	const input = source.scale;
+	return input !== null && !("levels" in input) ? input.dataset : undefined;
+}
+
 /** Equal for scales equal by value. */
 export function scaleKey(scale: Scale): string {
 	return JSON.stringify(scale);

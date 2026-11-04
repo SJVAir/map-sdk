@@ -147,5 +147,7 @@ describe("optionIdPart", () => {
 		expect(optionIdPart("monitors", "monitor:2")).not.toBe(a);
 		expect(optionIdPart("monitors:monitor", "1")).not.toBe(optionIdPart("monitors", "monitor:1"));
 		expect(optionIdPart("a_3a_", "b")).not.toBe(optionIdPart("a:", "b"));
+		expect(optionIdPart("a--b", "c")).not.toBe(optionIdPart("a", "b--c"));
+		expect(optionIdPart("a-", "-b")).not.toBe(optionIdPart("a", "--b"));
 	});
 });

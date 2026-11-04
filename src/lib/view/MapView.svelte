@@ -7,7 +7,10 @@
 	import type { GlMapLike } from "../core/gl.js";
 	import FeatureList from "../ui/FeatureList.svelte";
 	import type { SortBy } from "../ui/feature-list.js";
+	import MapControls from "../ui/MapControls.svelte";
 	import MapTooltip from "../ui/MapTooltip.svelte";
+	import SelectionBar from "../ui/SelectionBar.svelte";
+	import ViewSummary from "../ui/ViewSummary.svelte";
 	import { createGlMap, watchTheme } from "./create-gl-map.js";
 
 	interface Props {
@@ -131,6 +134,10 @@
 			{/if}
 		</div>
 	{/if}
+	<!-- After the list, so Tab reaches the List button first. -->
+	<SelectionBar {map} />
+	<ViewSummary {map} />
+	<MapControls {map} gl={projector} />
 	{@render overlays?.()}
 </div>
 

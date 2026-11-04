@@ -235,12 +235,17 @@
 		}
 	}
 
-	function onblur() {
-		pointerFocus = false;
+	/** Clears the map's focus if it still points at the active row. */
+	function releaseFocus() {
 		const row = rows[activeIndex];
 		if (row && map.focusedKey === row.refKey && map.focusedPluginId === row.pluginId) {
 			map.focusFeature(null);
 		}
+	}
+
+	function onblur() {
+		pointerFocus = false;
+		releaseFocus();
 		frozen = null;
 	}
 
@@ -267,6 +272,8 @@
 	onDestroy(() => {
 		clearTimeout(typeaheadTimer);
 		clearTimeout(menuSentTimer);
+		// Unmounting a focused listbox may not fire blur.
+		untrack(releaseFocus);
 	});
 </script>
 

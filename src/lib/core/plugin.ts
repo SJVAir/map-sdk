@@ -89,6 +89,10 @@ export interface PluginContext {
 
 export interface MapPlugin {
 	id: string;
+	/** Already-translated layer name, for the selection bar and view summary. */
+	label?: string;
+	/** The metadata dataset the plugin's data comes from (for attribution); may change with its source. */
+	readonly dataset?: string;
 	/** Adds sources, layers, and icons; returns its teardown. Runs only once a style is loaded. */
 	setup(ctx: PluginContext): () => void;
 	legend?(): LegendData | null;

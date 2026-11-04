@@ -15,12 +15,13 @@ export type SortBy = "name" | "value";
 export const MENU_EVENT_WINDOW_MS = 1000;
 
 /**
- * A valid, stable id fragment for a row, from its plugin and refKey: anything but letters, digits,
- * and `-` is escaped as `_<hex>_` (`_` included), so different rows never share one.
+ * A valid, stable id fragment for a row, from its plugin and refKey: anything but letters and digits
+ * is escaped as `_<hex>_` (`_` and `-` included), so the `--` between the parts can only be the
+ * separator and different rows never share a fragment.
  */
 export function optionIdPart(pluginId: string, refKey: string): string {
 	const escape = (text: string) =>
-		text.replace(/[^A-Za-z0-9-]/g, (c) => `_${c.codePointAt(0)!.toString(16)}_`);
+		text.replace(/[^A-Za-z0-9]/g, (c) => `_${c.codePointAt(0)!.toString(16)}_`);
 	return `${escape(pluginId)}--${escape(refKey)}`;
 }
 

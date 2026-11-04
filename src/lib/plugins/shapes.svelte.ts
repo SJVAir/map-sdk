@@ -9,6 +9,7 @@ import type { DataSource, MapFeatureProperties } from "../data/types.js";
 import {
 	createScaleResolver,
 	NO_SCALE,
+	datasetOf,
 	scaleKey,
 	type Resolved
 } from "./scale-resolution.svelte.js";
@@ -316,7 +317,16 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 		};
 	}
 
-	const plugin: MapPlugin = { id: pluginId, setup, legend, selectable };
+	const plugin: MapPlugin = {
+		id: pluginId,
+		label: layerLabel,
+		get dataset() {
+			return datasetOf(source);
+		},
+		setup,
+		legend,
+		selectable
+	};
 	if (options.listed ?? true) plugin.features = features;
 	return plugin;
 }

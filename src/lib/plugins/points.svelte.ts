@@ -17,7 +17,12 @@ import type { Scale } from "../data/scale-types.js";
 import type { DataSource, MapFeatureProperties } from "../data/types.js";
 import { asDataURI, SELECTED_OVERLAY_PADDING, selectedOverlay } from "./icons.js";
 import { hitFromProps, SELECTED_OPACITY } from "./shared.js";
-import { createScaleResolver, scaleKey, type Resolved } from "./scale-resolution.svelte.js";
+import {
+	createScaleResolver,
+	datasetOf,
+	scaleKey,
+	type Resolved
+} from "./scale-resolution.svelte.js";
 import {
 	colorExpression,
 	levelKeyExpression,
@@ -402,7 +407,16 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		};
 	}
 
-	const plugin: MapPlugin = { id: pluginId, setup, legend, selectable };
+	const plugin: MapPlugin = {
+		id: pluginId,
+		label: layerLabel,
+		get dataset() {
+			return datasetOf(source);
+		},
+		setup,
+		legend,
+		selectable
+	};
 	if (options.listed ?? true) plugin.features = features;
 	return plugin;
 }

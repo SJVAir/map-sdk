@@ -313,6 +313,16 @@ describe("FeatureList", () => {
 		expect(map.focusedKey).toBe("monitor:3");
 	});
 
+	it("clears the map's focus when it unmounts while its active row is focused", async () => {
+		const { map } = newMap("single");
+		const view = await render(FeatureList, { map });
+		await focusList();
+		await userEvent.keyboard("{ArrowDown}");
+		expect(map.focusedKey).toBe("monitor:2");
+		await view.unmount();
+		expect(map.focusedKey).toBeNull();
+	});
+
 	it("lists a refKey a plugin repeats only once", async () => {
 		const { map } = newMap("single", [
 			item("1", "Arvin"),

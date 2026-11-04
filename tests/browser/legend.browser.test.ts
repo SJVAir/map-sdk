@@ -91,6 +91,15 @@ describe("Legend", () => {
 		expect(ticks).toEqual(["0", "9", "35", "55", "125", "225"]);
 	});
 
+	it("gives range levels' thresholds to screen readers", async () => {
+		applyTheme("light");
+		render(Legend, { map });
+		const item = page.getByText("Moderate", { exact: true }).element().closest("li")!;
+		expect(item.textContent).toContain("from 9");
+		const smoke = page.getByText("Heavy", { exact: true }).element().closest("li")!;
+		expect(smoke.textContent).not.toContain("from");
+	});
+
 	it("is hidden when no plugin has a legend", () => {
 		render(Legend, { map: fakeMap([{ id: "x" }]) });
 		expect(document.querySelector(".mapsdk-legend")!.hasAttribute("hidden")).toBe(true);

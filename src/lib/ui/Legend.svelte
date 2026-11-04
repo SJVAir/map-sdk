@@ -8,8 +8,9 @@
 	let { map }: { map: MapContext } = $props();
 
 	let root: HTMLElement | undefined = $state();
-	// The `--background` token as rgb, for mixing translucent swatches over it.
-	let background = $state("#ffffff");
+	// The `--background` token as rgb, for mixing translucent swatches over it. Read as soon as the
+	// element exists (the bars wait for it), so no color is assumed before.
+	let background = $state<string | null>(null);
 
 	const sections = $derived(
 		map.plugins.flatMap((plugin) => {
@@ -54,7 +55,9 @@
 					<span>({section.units})</span>
 				{/if}
 			</h3>
-			<LegendBar bar={section.bar} {background} />
+			{#if background !== null}
+				<LegendBar bar={section.bar} {background} messages={map.messages} />
+			{/if}
 		</div>
 	{/each}
 </section>

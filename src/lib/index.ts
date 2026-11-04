@@ -8,6 +8,23 @@ import { defaultBasemaps } from "./view/create-gl-map.js";
 export { default as MapView } from "./view/MapView.svelte";
 export { default as Legend } from "./ui/Legend.svelte";
 export { default as FeatureList } from "./ui/FeatureList.svelte";
+export { default as LegendBar } from "./ui/LegendBar.svelte";
+export { default as MapTooltip } from "./ui/MapTooltip.svelte";
+export { default as SelectionBar } from "./ui/SelectionBar.svelte";
+export { default as ViewSummary } from "./ui/ViewSummary.svelte";
+export { default as MapControls } from "./ui/MapControls.svelte";
+export { legendSection, swatchOverBackground } from "./ui/legend-data.js";
+export type { LegendBar as LegendBarData, LegendSection } from "./ui/legend-data.js";
+export {
+	inView,
+	optionIdPart,
+	rowLabel,
+	shownLevel,
+	sortItems,
+	typeaheadIndex
+} from "./ui/feature-list.js";
+export type { SortBy } from "./ui/feature-list.js";
+export { summaryText } from "./ui/view-summary.js";
 export { getMapContext } from "./core/context.js";
 export type { BasemapConfig } from "./core/basemap.svelte.js";
 export type {
