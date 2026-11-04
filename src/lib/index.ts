@@ -6,6 +6,7 @@ import {
 import { defaultBasemaps } from "./view/create-gl-map.js";
 
 export { default as MapView } from "./view/MapView.svelte";
+export { default as Legend } from "./ui/Legend.svelte";
 export { getMapContext } from "./core/context.js";
 export type { BasemapConfig } from "./core/basemap.svelte.js";
 export type {
