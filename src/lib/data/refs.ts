@@ -1,6 +1,8 @@
 import type { FeatureRef } from "./types.js";
 
-type PlaceRef = { kind: "monitor"; id: string } | { kind: "region"; type: string; code: string };
+/** A place as `@sjvair/sdk` and the dashboard name it: a monitor, or a region by type and code. */
+export type PlaceRef =
+	{ kind: "monitor"; id: string } | { kind: "region"; type: string; code: string };
 
 export function encodeRef(ref: FeatureRef): string {
 	switch (ref.kind) {

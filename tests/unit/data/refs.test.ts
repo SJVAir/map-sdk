@@ -7,6 +7,7 @@ import {
 	toPlaceRef
 } from "../../../src/lib/data/refs.js";
 import type { FeatureRef } from "../../../src/lib/data/types.js";
+import type { PlaceRef } from "../../../src/lib/data/index.js";
 
 describe("refs", () => {
 	it("round-trips all three kinds", () => {
@@ -47,7 +48,8 @@ describe("refs", () => {
 
 	it("converts to and from place refs", () => {
 		expect(toPlaceRef({ kind: "feature", id: "f1" })).toBeNull();
-		expect(toPlaceRef({ kind: "monitor", id: "m1" })).toEqual({ kind: "monitor", id: "m1" });
+		const place: PlaceRef | null = toPlaceRef({ kind: "monitor", id: "m1" });
+		expect(place).toEqual({ kind: "monitor", id: "m1" });
 		expect(toPlaceRef({ kind: "region", type: "county", code: "1" })).toEqual({
 			kind: "region",
 			type: "county",

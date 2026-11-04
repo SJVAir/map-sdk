@@ -60,11 +60,35 @@ describe("package.json", () => {
 			"forecastZonesPlugin",
 			"hmsSmokePlugin",
 			"hmsFirePlugin",
-			"groupFires"
+			"groupFires",
+			"levelKeyExpression",
+			"colorExpression",
+			"opacityExpression",
+			// Types for writing a plugin.
+			"MapPlugin",
+			"PluginContext",
+			"FeatureHit",
+			"FeatureListItem",
+			"LegendData",
+			"Providers",
+			"GlMapLike",
+			"LayerSpecWithoutId",
+			"ThemeColors",
+			"ClusterLayers",
+			"ClusterLayerArgs",
+			"BlockingClick",
+			"Hovered"
 		]) {
 			expect(exported, name).toContain(name);
 		}
-		for (const name of ["optionIdPart", "typeaheadIndex", "swatchOverBackground", "LegendBar"]) {
+		for (const name of [
+			"optionIdPart",
+			"typeaheadIndex",
+			"swatchOverBackground",
+			"LegendBar",
+			"PluginHost",
+			"InteractionRouter"
+		]) {
 			expect(exported, name).not.toContain(name);
 		}
 	});

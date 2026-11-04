@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { createMap, monitorsPlugin, regionsPlugin, shapesPlugin } from "../../src/lib/index.js";
-import type { MapContext } from "../../src/lib/index.js";
-import type { MapPlugin } from "../../src/lib/core/plugin.js";
+import type { FeatureListItem, MapContext, MapPlugin, PluginContext } from "../../src/lib/index.js";
 import {
 	decodeRef,
+	NO_LEVEL,
 	staticSource,
 	type FeatureRef,
 	type MessageKey,
 	type MessageParams,
 	type MessageProvider,
-	type MonitorFeatureProperties,
 	type SpatialSelection
 } from "../../src/lib/data/index.js";
 import { createMonitorsStore } from "../../src/lib/stores/index.js";
@@ -48,10 +47,72 @@ describe("README examples", () => {
 		map.destroy();
 	});
 
+	it("writing a plugin: setup through the context, features for the list", () => {
+		type Sites = FeatureCollection<Point, { refKey: string; name: string }>;
+
+		function sitesPlugin(sites: Sites): MapPlugin {
+			return {
+				id: "sites",
+				label: "Sites",
+				setup(ctx: PluginContext) {
+					const source = ctx.addSource("sites", { type: "geojson", data: sites });
+					const layer = ctx.addLayer("dots", {
+						type: "circle",
+						source,
+						paint: { "circle-radius": 5 }
+					});
+					ctx.interactive([layer], (props) => {
+						const ref = decodeRef(String(props.refKey));
+						const name = String(props.name);
+						return ref && { pluginId: "sites", ref, refKey: String(props.refKey), name };
+					});
+					return () => {};
+				},
+				features: (): FeatureListItem[] =>
+					sites.features.flatMap(({ properties: { refKey, name }, geometry }) => {
+						const ref = decodeRef(refKey);
+						const [lng, lat] = geometry.coordinates;
+						if (!ref) return [];
+						const lngLat: [number, number] = [lng, lat];
+						return [
+							{
+								refKey,
+								ref,
+								name,
+								value: null,
+								level: NO_LEVEL,
+								units: "",
+								lngLat,
+								selectable: false
+							}
+						];
+					})
+			};
+		}
+
+		const sites: Sites = {
+			type: "FeatureCollection",
+			features: [
+				{
+					type: "Feature",
+					geometry: { type: "Point", coordinates: [-119.8, 36.7] },
+					properties: { refKey: "feature:fresno", name: "Fresno" }
+				}
+			]
+		};
+		const map = createMap({ config: { maptilerKey: "" } });
+		map.addPlugin(sitesPlugin(sites));
+		expect(map.plugins[0].features!()).toEqual([
+			expect.objectContaining({ name: "Fresno", ref: { kind: "feature", id: "fresno" } })
+		]);
+		map.destroy();
+	});
+
 	it("selection: host-owned, featureclick, featuresAt, featureForElement", () => {
 		const map: MapContext = createMap({ config: { maptilerKey: "" } });
+		const store = createMonitorsStore();
 		const plugin: MapPlugin = monitorsPlugin({
-			source: createMonitorsStore().dataSource,
+			source: store.dataSource,
 			layerLabel: "Monitors"
 		});
 		map.addPlugin(plugin);
@@ -70,6 +131,7 @@ describe("README examples", () => {
 		expect(decodeRef("monitor:abc")).toEqual({ kind: "monitor", id: "abc" });
 		off();
 		map.destroy();
+		store.dispose();
 	});
 
 	it("a message provider (Paraglide-shaped)", () => {
@@ -80,10 +142,5 @@ describe("README examples", () => {
 		const map = createMap({ config: { maptilerKey: "" }, messages });
 		expect(map.messages("mapsdk_list_button")).toBe("Lista");
 		map.destroy();
-	});
-
-	it("the monitor feature type", () => {
-		const props: MonitorFeatureProperties | null = null;
-		expect(props).toBeNull();
 	});
 });

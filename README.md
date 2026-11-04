@@ -128,7 +128,9 @@ Use it for a map on a hidden tab.
 ### Plugins and draw order
 
 Plugins draw in the order they were added, later on top. `addPlugin(plugin, { before: "id" })`
-draws just below another plugin, and `map.movePlugin(id, { before? })` moves one later. The
+draws just below another plugin, and `map.movePlugin(id, { before? })` moves an added plugin and
+its layers to the top, or just below the plugin `before` names. A plugin object belongs to one
+map: create one per map (adding an object that is set up on another map throws). The
 presets are `monitorsPlugin`, `regionsPlugin`, `calHeatScorePlugin`, `forecastZonesPlugin`,
 `hmsSmokePlugin`, and `hmsFirePlugin`; `pointsPlugin` and `shapesPlugin` are the general ones they
 are built on. Presets don't fetch: the host supplies a `DataSource`. `monitorsPlugin` is
@@ -140,8 +142,10 @@ A `DataSource` is `{ status, features, scale }`: a load status (`loading`, `read
 `retry()`, or `unavailable`), a GeoJSON `FeatureCollection` whose features carry
 `{ refKey, name, value }` properties, and a scale. The scale is either a `ScaleRef`
 (`{ dataset, entryType }`, resolved by the metadata provider and used for the legend, tooltips,
-and level labels) or a full `Scale`. A value the scale doesn't cover (null, negative, a level with
-no color) draws neutral and reads "No level".
+and level labels) or a full `Scale`. A value the scale doesn't cover (null, negative) draws neutral
+and reads "No level"; a level with an empty color draws neutral with its own label. While a
+source loads, fails, or is unavailable, the legend says so (a failure offers "Try again", which
+calls `status.retry()`). Values are shown with the metadata's display precision.
 
 `createMonitorsStore()` (from `@sjvair/map-sdk/stores`) loads the monitors list and latest readings
 for an entry type, polls every two minutes, and exposes `dataSource`. `init()`, `update()`,
@@ -171,6 +175,54 @@ map.addPlugin(
 Pass `null` as the scale for features with no values. A feature's `refKey` is `monitor:<id>`,
 `region:<type>:<code>` (the region's `external_id`, never its sqid), or `feature:<id>` (shown but
 not selectable). `encodeRef`/`decodeRef` convert between refs and keys.
+
+### Writing a plugin
+
+A plugin is an object with an `id` and a `setup(ctx)` that adds sources, layers, and images
+through its `PluginContext` and returns a teardown. The host runs `setup` once the map's style is
+ready and again after a basemap or theme change; everything added through `ctx` is removed on
+teardown, and ids are namespaced per map. `features()` feeds the feature list, tooltip, and
+summary; `legend()` the legend.
+
+```ts
+import type { FeatureListItem, MapPlugin, PluginContext } from "@sjvair/map-sdk";
+import { decodeRef, NO_LEVEL } from "@sjvair/map-sdk/data";
+import type { FeatureCollection, Point } from "geojson";
+
+type Sites = FeatureCollection<Point, { refKey: string; name: string }>;
+
+function sitesPlugin(sites: Sites): MapPlugin {
+	return {
+		id: "sites",
+		label: "Sites",
+		setup(ctx: PluginContext) {
+			const source = ctx.addSource("sites", { type: "geojson", data: sites });
+			const layer = ctx.addLayer("dots", { type: "circle", source, paint: { "circle-radius": 5 } });
+			ctx.interactive([layer], (props) => {
+				const ref = decodeRef(String(props.refKey));
+				const name = String(props.name);
+				return ref && { pluginId: "sites", ref, refKey: String(props.refKey), name };
+			});
+			return () => {};
+		},
+		features: (): FeatureListItem[] =>
+			sites.features.flatMap(({ properties: { refKey, name }, geometry }) => {
+				const ref = decodeRef(refKey);
+				const [lng, lat] = geometry.coordinates;
+				if (!ref) return [];
+				const lngLat: [number, number] = [lng, lat];
+				return [
+					{ refKey, ref, name, value: null, level: NO_LEVEL, units: "", lngLat, selectable: false }
+				];
+			})
+	};
+}
+```
+
+The root entry exports the types a plugin needs (`MapPlugin`, `PluginContext`, `FeatureHit`,
+`FeatureListItem`, `LegendData`, `Providers`, `GlMapLike`, `LayerSpecWithoutId`, `ThemeColors`,
+`ClusterLayers`, `ClusterLayerArgs`, `BlockingClick`, `Hovered`) and the scale expressions the
+built-in plugins use (`colorExpression`, `opacityExpression`, `levelKeyExpression`).
 
 ## Selection
 
@@ -234,8 +286,10 @@ maps it to its own plural form. Layer names (`layerLabel`) are passed already tr
 
 ## Examples are checked
 
-The code above is mirrored in `tests/unit/readme-examples.test.ts`, which `npm run check`
-type-checks against the real exports and `npm test` runs. Update it with the README.
+`tests/unit/readme-examples.test.ts` repeats the TypeScript examples above (the map setup, plain
+GeoJSON, writing a plugin, selection, and a message provider) against the real exports: `npm run
+check` type-checks them and `npm test` runs them. The Svelte markup isn't mounted there. Update
+it with the README.
 
 ## Demo and the local stack
 

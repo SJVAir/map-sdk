@@ -23,6 +23,9 @@ export type {
 	PointsOptions,
 	PointsTooltipEnv
 } from "./plugins/points.svelte.js";
+export type { ClusterLayers } from "./plugins/points-clusters.js";
+export { colorExpression, levelKeyExpression, opacityExpression } from "./plugins/style.js";
+export type { ThemeColors, ValueInput } from "./plugins/style.js";
 export { shapesPlugin } from "./plugins/shapes.svelte.js";
 export type { ShapesOptions } from "./plugins/shapes.svelte.js";
 export { monitorShape, monitorsPlugin } from "./presets/monitors.js";
@@ -35,6 +38,19 @@ export { forecastZonesPlugin } from "./presets/forecast-zones.js";
 export type { ForecastZonesPluginOptions } from "./presets/forecast-zones.js";
 export { summaryText } from "./ui/view-summary.js";
 export { getMapContext } from "./core/context.js";
+// For writing your own plugins.
+export type {
+	BlockingClick,
+	FeatureHit,
+	FeatureListItem,
+	LayerSpecWithoutId,
+	LegendData,
+	MapPlugin,
+	PluginContext,
+	Providers
+} from "./core/plugin.js";
+export type { GlMapLike } from "./core/gl.js";
+export type { Hovered } from "./core/interactions.svelte.js";
 export type { BasemapConfig } from "./core/basemap.svelte.js";
 export type {
 	Bounds,
