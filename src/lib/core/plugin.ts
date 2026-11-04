@@ -1,4 +1,5 @@
 import type { LayerSpecification, SourceSpecification } from "@maptiler/sdk";
+import type { Geometry } from "geojson";
 import type { Snippet } from "svelte";
 import type { FormatProvider } from "../data/format.js";
 import type { MessageProvider } from "../data/messages.js";
@@ -29,6 +30,17 @@ export interface FeatureHit {
 	ref: FeatureRef;
 	refKey: string;
 	name: string;
+	/**
+	 * The rendered feature's properties, for hover content of a hit no plugin lists (e.g. a
+	 * cluster bubble's count and aggregates). Unset for ordinary hits.
+	 */
+	properties?: Readonly<Record<string, unknown>>;
+}
+
+/** The topmost feature of a blocking layer that was clicked. */
+export interface BlockingClick {
+	properties: Record<string, unknown>;
+	geometry: Geometry;
 }
 
 export interface FeatureListItem {
@@ -80,11 +92,13 @@ export interface PluginContext {
 	): void;
 	/**
 	 * Layers that hide what is beneath them (e.g. cluster bubbles): where one is topmost, a click
-	 * picks nothing and the hover is `toHover`'s hit for it (for its tooltip), or nothing.
+	 * picks nothing and calls `onClick` with that feature, and the hover is `toHover`'s hit for it
+	 * (for its tooltip), or nothing. `toHover` must have no side effects (lookups call it too).
 	 */
 	blocking(
 		layerIds: string[],
-		toHover?: (props: Record<string, unknown>) => FeatureHit | null
+		toHover?: (props: Record<string, unknown>) => FeatureHit | null,
+		onClick?: (feature: BlockingClick) => void
 	): void;
 	/** A layer event listener (e.g. a cluster click), removed on teardown. */
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- MapLibre's event payloads vary

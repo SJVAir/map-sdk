@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { NO_LEVEL, levelFor, scaleFromLegacyLevels } from "../../../src/lib/data/scale.js";
+import {
+	NO_LEVEL,
+	levelFor,
+	numericValue,
+	scaleFromLegacyLevels
+} from "../../../src/lib/data/scale.js";
 import { fireScale, heatScale, pm25Scale, smokeScale } from "../../fixtures/scales.js";
 
 function keyOf(value: Parameters<typeof levelFor>[0], scale = pm25Scale) {
@@ -79,5 +84,21 @@ describe("scaleFromLegacyLevels", () => {
 		expect(keyOf(9.05, scale)).toBe("good");
 		expect(keyOf(9.1, scale)).toBe("moderate");
 		expect(keyOf(500, scale)).toBe("hazardous");
+	});
+});
+
+describe("numericValue", () => {
+	it("reads numbers and non-blank numeric strings, as levelFor does", () => {
+		expect(numericValue(12)).toBe(12);
+		expect(numericValue("12.5")).toBe(12.5);
+		expect(numericValue(" 7 ")).toBe(7);
+		expect(numericValue("0")).toBe(0);
+		expect(numericValue("-1")).toBe(-1);
+	});
+
+	it("is null for everything else", () => {
+		for (const value of [null, undefined, "", " ", "abc", "Infinity", true, [1], Number.NaN]) {
+			expect(numericValue(value as never), String(value)).toBeNull();
+		}
 	});
 });

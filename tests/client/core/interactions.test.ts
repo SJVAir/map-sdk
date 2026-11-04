@@ -360,6 +360,9 @@ describe("hover", () => {
 });
 
 describe("blocking layers", () => {
+	/** Clicks the bubbles' plugin got, by cluster id. */
+	const bubbleClicks: unknown[] = [];
+
 	/** A plugin with a blocking `bubbles` layer; hovering a bubble yields `toHover`'s hit. */
 	function bubbles(id: string, hover: boolean): MapPlugin {
 		return {
@@ -379,7 +382,8 @@ describe("blocking layers", () => {
 								refKey: `feature:cluster:${String(props.cluster_id)}`,
 								name: ""
 							})
-						: undefined
+						: undefined,
+					(feature) => bubbleClicks.push(feature.properties.cluster_id)
 				);
 				return () => {};
 			}
@@ -405,7 +409,8 @@ describe("blocking layers", () => {
 		return { map, gl, onselectionchange };
 	}
 
-	it("picks nothing beneath a blocking layer that is topmost", () => {
+	it("picks nothing beneath a blocking layer that is topmost, and tells the layer", () => {
+		bubbleClicks.length = 0;
 		const { map, gl, onselectionchange } = blockingSetUp();
 		const handler = vi.fn();
 		map.on("featureclick", handler);
@@ -414,9 +419,11 @@ describe("blocking layers", () => {
 		expect(handler).not.toHaveBeenCalled();
 		expect(onselectionchange).not.toHaveBeenCalled();
 		expect(map.featuresAt({ x: 1, y: 2 })).toEqual([]);
+		expect(bubbleClicks).toEqual([7]);
 	});
 
-	it("picks a feature drawn above a blocking layer", () => {
+	it("picks a feature drawn above a blocking layer, without telling the layer", () => {
+		bubbleClicks.length = 0;
 		const { map, gl } = blockingSetUp();
 		const handler = vi.fn();
 		map.on("featureclick", handler);
@@ -426,6 +433,16 @@ describe("blocking layers", () => {
 			pluginId: "regions",
 			ref: { kind: "region", type: "county", code: "019" }
 		});
+		expect(bubbleClicks).toEqual([]);
+	});
+
+	it("doesn't tell the layer on hover or lookups", () => {
+		bubbleClicks.length = 0;
+		const { map, gl } = blockingSetUp();
+		gl.setRenderedFeatures([bubble(map, "clusters", 7)]);
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+		map.featuresAt({ x: 1, y: 2 });
+		expect(bubbleClicks).toEqual([]);
 	});
 
 	it("hovers the blocking layer's own hit instead of the feature beneath", () => {

@@ -1,11 +1,16 @@
 import type { ExpressionSpecification } from "@maptiler/sdk";
-import { readableColor } from "color2k";
 import { createRawSnippet, mount, unmount, type Component, type Snippet } from "svelte";
 import type { MapPlugin } from "../core/plugin.js";
 import type { DataSource, MonitorFeatureProperties } from "../data/types.js";
 import { circle, square, triangle } from "../plugins/icons.js";
 import { pointsPlugin, type ClusterLayerArgs } from "../plugins/points.svelte.js";
-import { levelKeyExpression, levelLookup, MISSING_VALUE } from "../plugins/style.js";
+import {
+	hasNumericValue,
+	levelKeyExpression,
+	levelLookup,
+	MISSING_VALUE
+} from "../plugins/style.js";
+import { levelChip } from "../ui/level-chip.js";
 import MonitorClusterTooltip from "./MonitorClusterTooltip.svelte";
 import MonitorTooltip from "./MonitorTooltip.svelte";
 
@@ -75,18 +80,16 @@ function category(props: MonitorFeatureProperties): string {
 	return `${monitorShape(props.type)}:${props.location === "inside" ? "inside" : "outside"}`;
 }
 
-const IS_NUMBER: ExpressionSpecification = ["==", ["typeof", ["get", "value"]], "number"];
+/** Readings by `numericValue`'s rule (numbers and numeric strings), as levels and tooltips count. */
+const IS_READING = hasNumericValue("value");
 const COUNT: ExpressionSpecification = ["get", "countValues"];
 const MEAN: ExpressionSpecification = ["/", ["get", "sumValues"], ["max", COUNT, 1]];
 /** The cluster's average reading, or MISSING_VALUE when none of its monitors has one. */
 const AVERAGE: ExpressionSpecification = ["case", [">", COUNT, 0], MEAN, MISSING_VALUE];
 
+/** Readable text on `color`, or `fallback` for an unparseable color. */
 function readable(color: string, fallback: string): string {
-	try {
-		return readableColor(color);
-	} catch {
-		return fallback;
-	}
+	return levelChip(color)?.text ?? fallback;
 }
 
 /** A type's cluster: its shape colored by the average's level, with the rounded average on it. */
@@ -201,8 +204,8 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 					maxZoom: CLUSTER_MAX_ZOOM,
 					groupBy: (props) => props.type,
 					properties: {
-						sumValues: ["+", ["case", IS_NUMBER, ["to-number", ["get", "value"]], 0]],
-						countValues: ["+", ["case", IS_NUMBER, 1, 0]]
+						sumValues: ["+", ["case", IS_READING, ["to-number", ["get", "value"], 0], 0]],
+						countValues: ["+", ["case", IS_READING, 1, 0]]
 					},
 					layers: clusterLayers,
 					tooltip: (cluster, env) =>

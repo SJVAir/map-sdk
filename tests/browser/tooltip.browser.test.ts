@@ -155,6 +155,18 @@ describe("MapTooltip", () => {
 		expect(document.querySelector(".mapsdk-tooltip-name")).toBeNull();
 	});
 
+	it("renders nothing for a nameless hit with no item or content", async () => {
+		const hit = {
+			pluginId: "points",
+			ref: { kind: "feature", id: "cluster:7" },
+			refKey: "feature:cluster:7",
+			name: ""
+		};
+		render(MapTooltip, { map: fakeMap([], { hovered: { hit, lngLat: [0, 0] } }), project });
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(page.getByRole("tooltip").elements()).toHaveLength(0);
+	});
+
 	it("uses a neutral chip for an unparseable color", async () => {
 		const map = fakeMap([item("a", "Odd", level("Weird", "not-a-color"))], { focusedKey: "a" });
 		render(MapTooltip, { map, project });

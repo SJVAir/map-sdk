@@ -104,7 +104,11 @@ export interface MapContext {
 	 * sets on its container and FeatureList on its root. `null` otherwise.
 	 */
 	featureForElement(element: Element): FeatureHit | null;
-	/** The top feature under the pointer and where it is. Reactive, for the tooltip. */
+	/**
+	 * The top feature under the pointer and where it is. Reactive, for the tooltip. Over a cluster
+	 * bubble it is the bubble's own hit: a `{ kind: "feature", id: "cluster:…" }` ref no plugin
+	 * lists, with the bubble's `properties`, never a feature beneath it.
+	 */
 	readonly hovered: Hovered | null;
 	/**
 	 * Marks the feature focused and pans to it (no animation under reduced motion): the item in

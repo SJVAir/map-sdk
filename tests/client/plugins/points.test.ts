@@ -245,6 +245,48 @@ describe("pointsPlugin", () => {
 		expect(unclustered.filter).toEqual(["!", ["has", "point_count"]]);
 	});
 
+	it("hides what is under a default bubble, shows no tooltip for it, and zooms on click", async () => {
+		const source = new TestSource<Props>({
+			features: points([
+				{ refKey: "monitor:a", name: "A", value: 1 },
+				{ refKey: "monitor:b", name: "B", value: 2 }
+			]),
+			scale: pm25Scale
+		});
+		const { gl, router, plugin } = setup({ source, cluster: { radius: 40, maxZoom: 9 } });
+		const expansionZoom = vi.fn(async () => 12);
+		const getSource = gl.getSource.bind(gl);
+		gl.getSource = (id: string) => {
+			const found = getSource(id) as object | undefined;
+			return found && { ...found, getClusterExpansionZoom: expansionZoom };
+		};
+		router.attach(gl);
+		gl.setRenderedFeatures([
+			{
+				layer: { id: "m1:pts:clusters" },
+				source: "m1:pts:points",
+				properties: { cluster: true, cluster_id: 9, point_count: 2 },
+				geometry: { type: "Point", coordinates: [-119, 36] }
+			},
+			{
+				layer: { id: "m1:pts:points" },
+				source: "m1:pts:points",
+				properties: { refKey: "monitor:a", name: "A" },
+				geometry: { type: "Point", coordinates: [-119, 36] }
+			}
+		]);
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119, lat: 36 } });
+		expect(router.hovered).toBeNull();
+		expect(plugin.hoverTooltip).toBeUndefined();
+		const picks = vi.fn();
+		router.onPick(picks);
+		gl.emit("click", { point: { x: 1, y: 2 }, lngLat: { lng: -119, lat: 36 } });
+		await settle();
+		expect(picks).not.toHaveBeenCalled();
+		expect(expansionZoom).toHaveBeenCalledWith(9);
+		expect(gl.getZoom()).toBe(12);
+	});
+
 	it("picks icons by category and level key and registers their images", async () => {
 		const images: string[] = [];
 		class FakeImage {

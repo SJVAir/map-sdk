@@ -4,6 +4,7 @@ import type {
 	GeoJSONSourceSpecification
 } from "@maptiler/sdk";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
+import type { GlMapLike } from "../core/gl.js";
 import { untrack, type Snippet } from "svelte";
 import type {
 	FeatureHit,
@@ -13,11 +14,21 @@ import type {
 	PluginContext,
 	Providers
 } from "../core/plugin.js";
-import { decodeRef, encodeRef, selectionId } from "../data/refs.js";
+import { decodeRef, selectionId } from "../data/refs.js";
 import { levelFor, NO_LEVEL } from "../data/scale.js";
 import type { Scale } from "../data/scale-types.js";
 import type { DataSource, MapFeatureProperties } from "../data/types.js";
 import { asDataURI, SELECTED_OVERLAY_PADDING, selectedOverlay } from "./icons.js";
+import {
+	clusterHit,
+	clusterLeaves,
+	defaultClusterLayers,
+	parseClusterHit,
+	zoomIntoCluster,
+	type ClusterInfo,
+	type ClusterLayerArgs,
+	type ClusterLayers
+} from "./points-clusters.js";
 import { hitFromProps, SELECTED_OPACITY } from "./shared.js";
 import {
 	createScaleResolver,
@@ -33,35 +44,12 @@ import {
 	type ThemeColors
 } from "./style.js";
 
+export type { ClusterInfo, ClusterLayerArgs } from "./points-clusters.js";
+
 /** What tooltip content gets: the map's providers and the plugin's resolved scale. */
 export interface PointsTooltipEnv extends Providers {
 	/** Null while it resolves or when unavailable. */
 	scale: Scale | null;
-}
-
-/** A hovered cluster bubble. */
-export interface ClusterInfo<P extends MapFeatureProperties> {
-	group: string;
-	pointCount: number;
-	/** The cluster feature's properties, including `cluster.properties` aggregates. */
-	properties: Record<string, unknown>;
-	/** Every point in the cluster; empty once the plugin is torn down. */
-	leaves(): Promise<Array<{ props: P; lngLat: [number, number] }>>;
-}
-
-/** What custom cluster layers are built from. */
-export interface ClusterLayerArgs {
-	group: string;
-	sourceId: string;
-	scale: Scale;
-	theme: ThemeColors;
-	/**
-	 * The `icon-image` for the plugin's icon of `category` at the level `levelKey` evaluates to
-	 * (use `levelKeyExpression`); registers that category's images.
-	 */
-	iconImage(category: string, levelKey: ExpressionSpecification): ExpressionSpecification;
-	/** The `icon-size` that shows an icon at its `size` (images are drawn larger for HiDPI). */
-	iconSizeScale: number;
 }
 
 export interface PointsOptions<P extends MapFeatureProperties> {
@@ -91,8 +79,8 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 		/** MapLibre `clusterProperties`: aggregates the layers and tooltip can read. */
 		properties?: GeoJSONSourceSpecification["clusterProperties"];
 		/** Replaces the neutral count bubbles. Local ids get the group appended. */
-		layers?(args: ClusterLayerArgs): Array<{ local: string; spec: LayerSpecWithoutId }>;
-		/** Tooltip content for a hovered cluster. */
+		layers?(args: ClusterLayerArgs): ClusterLayers;
+		/** Tooltip content for a hovered cluster. Without it, hovering a bubble shows nothing. */
 		tooltip?(cluster: ClusterInfo<P>, env: PointsTooltipEnv): Snippet | undefined;
 	};
 	/** Higher draws on top (and, clustered, a group with a higher key draws above the others). */
@@ -114,55 +102,6 @@ const MUTED_IMAGE = "mapsdk:muted";
 const IMAGE_RATIO = 2;
 const DEFAULT_RADIUS = 6;
 const UNCLUSTERED: FilterSpecification = ["!", ["has", "point_count"]];
-const CLUSTERED: FilterSpecification = ["has", "point_count"];
-
-function prefersReducedMotion(): boolean {
-	return globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-}
-
-/** The part of MapLibre's `GeoJSONSource` clusters use. */
-interface ClusterSource {
-	getClusterExpansionZoom(clusterId: number): Promise<number>;
-	getClusterLeaves(clusterId: number, limit: number, offset: number): Promise<Feature[]>;
-}
-
-/** Cluster bubbles: a neutral circle with the count. */
-function defaultClusterLayers({
-	sourceId,
-	theme
-}: ClusterLayerArgs): Array<{ local: string; spec: LayerSpecWithoutId }> {
-	return [
-		{
-			local: "clusters",
-			spec: {
-				type: "circle",
-				source: sourceId,
-				filter: CLUSTERED,
-				paint: {
-					"circle-radius": ["step", ["get", "point_count"], 12, 10, 16, 25, 20],
-					"circle-color": theme.neutral,
-					"circle-stroke-color": theme.foreground,
-					"circle-stroke-width": 1
-				}
-			}
-		},
-		{
-			local: "cluster-count",
-			spec: {
-				type: "symbol",
-				source: sourceId,
-				filter: CLUSTERED,
-				layout: {
-					"text-field": ["get", "point_count_abbreviated"],
-					"text-size": 12,
-					"text-allow-overlap": true
-				},
-				paint: { "text-color": theme.foreground }
-			}
-		}
-	];
-}
-
 /**
  * Points with value-based color: anything with coordinates. Draws circles, or icons by
  * category (one image per category and level color), optionally clustered per group, with a
@@ -179,8 +118,11 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 
 	/** The providers of the running setup, for tooltips; null while not set up. */
 	let providers: Providers | null = null;
-	/** The cluster under the pointer, by its hover hit's refKey. */
-	let hoveredCluster: { refKey: string; info: ClusterInfo<P> } | null = null;
+	/** The running setup's map and cluster sources, for cluster tooltips; null while not set up. */
+	let live: { gl: GlMapLike; sourceOf(group: string): string | undefined; dead(): boolean } | null =
+		null;
+	/** Bumped on every data render: cluster ids from older data name nothing. Reactive. */
+	let dataGeneration = $state(0);
 
 	function tooltipEnv(): PointsTooltipEnv | null {
 		if (!providers) return null;
@@ -198,10 +140,24 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		return options.tooltip?.(item, props, env);
 	}
 
+	/** A hovered bubble's content, from the hit alone; none once its data was replaced. */
 	function clusterTooltip(hit: FeatureHit): Snippet | undefined {
+		const named = parseClusterHit(hit);
+		if (!named || named.generation !== dataGeneration) return undefined;
 		const env = tooltipEnv();
-		if (!env || hoveredCluster?.refKey !== hit.refKey) return undefined;
-		return cluster?.tooltip?.(hoveredCluster.info, env);
+		const running = live;
+		const sourceId = running?.sourceOf(named.group);
+		if (!env || !running || !sourceId || !cluster?.tooltip) return undefined;
+		const properties = hit.properties ?? {};
+		const pointCount = typeof properties.point_count === "number" ? properties.point_count : 0;
+		const info: ClusterInfo<P> = {
+			group: named.group,
+			pointCount,
+			properties,
+			leaves: () =>
+				clusterLeaves<P>(running.gl, sourceId, named.clusterId, pointCount, running.dead)
+		};
+		return cluster.tooltip(info, env);
 	}
 
 	function features(): FeatureListItem[] {
@@ -235,6 +191,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		let dead = false;
 		const { gl } = ctx;
 		providers = { metadata: ctx.metadata, messages: ctx.messages, format: ctx.format };
+		live = { gl, sourceOf: (group) => sources.get(group), dead: () => dead };
 		const container = gl.getCanvas().closest?.("[data-mapsdk-map]") ?? null;
 		const theme: ThemeColors = themeColors(container);
 		const grouped = cluster?.groupBy !== undefined;
@@ -396,63 +353,6 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			};
 		}
 
-		/** The last click a cluster zoomed for: one click can hit several of a bubble's layers. */
-		let lastZoomClick: unknown = null;
-
-		function zoomIntoCluster(
-			sourceId: string,
-			e: { features?: Feature[]; originalEvent?: unknown }
-		) {
-			if (e.originalEvent !== undefined && e.originalEvent === lastZoomClick) return;
-			lastZoomClick = e.originalEvent;
-			const feature = e.features?.[0];
-			const clusterId = feature?.properties?.cluster_id;
-			if (typeof clusterId !== "number" || feature?.geometry.type !== "Point") return;
-			const [lng, lat] = feature.geometry.coordinates;
-			const clusters = gl.getSource(sourceId) as ClusterSource | undefined;
-			clusters?.getClusterExpansionZoom(clusterId).then(
-				(zoom) => {
-					if (dead) return;
-					gl.easeTo({ center: [lng, lat], zoom, ...(prefersReducedMotion() && { duration: 0 }) });
-				},
-				(error: unknown) => {
-					if (!dead)
-						console.warn(`map-sdk: plugin "${pluginId}" could not expand a cluster`, error);
-				}
-			);
-		}
-
-		/** The hover hit for a cluster bubble of `group`, remembered for its tooltip. */
-		function clusterHover(group: string, sourceId: string, props: Record<string, unknown>) {
-			const clusterId = props.cluster_id;
-			if (typeof clusterId !== "number") return null;
-			const ref = { kind: "feature" as const, id: `cluster:${group}:${clusterId}` };
-			const refKey = encodeRef(ref);
-			const pointCount = typeof props.point_count === "number" ? props.point_count : 0;
-			const info: ClusterInfo<P> = {
-				group,
-				pointCount,
-				properties: { ...props },
-				async leaves() {
-					const clusters = dead ? undefined : (gl.getSource(sourceId) as ClusterSource | undefined);
-					if (!clusters) return [];
-					const leaves = await clusters.getClusterLeaves(clusterId, pointCount, 0);
-					return leaves.flatMap((leaf) =>
-						leaf.geometry.type === "Point"
-							? [
-									{
-										props: leaf.properties as P,
-										lngLat: leaf.geometry.coordinates.slice(0, 2) as [number, number]
-									}
-								]
-							: []
-					);
-				}
-			};
-			hoveredCluster = { refKey, info };
-			return { pluginId, ref, refKey, name: "" };
-		}
-
 		/** A group's cluster layers; they block what is beneath them and zoom in on click. */
 		function clusterLayers(scale: Scale, group: string, sourceId: string): void {
 			const args: ClusterLayerArgs = {
@@ -473,11 +373,22 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			layers.push(...added);
 			const fresh = added.filter((layerId) => !clusterLayerIds.has(layerId));
 			if (fresh.length === 0) return;
-			for (const layerId of fresh) {
-				clusterLayerIds.add(layerId);
-				ctx.on("click", layerId, (e) => zoomIntoCluster(sourceId, e));
-			}
-			ctx.blocking(fresh, (props) => clusterHover(group, sourceId, props));
+			for (const layerId of fresh) clusterLayerIds.add(layerId);
+			const isDead = () => dead;
+			ctx.blocking(
+				fresh,
+				// A hover hit only when there is content to show for it.
+				cluster?.tooltip
+					? (props) =>
+							clusterHit(
+								pluginId,
+								untrack(() => dataGeneration),
+								group,
+								props
+							)
+					: undefined,
+				(feature) => zoomIntoCluster(gl, sourceId, feature, isDead, pluginId)
+			);
 		}
 
 		/** Adds every layer for `groups` in draw order: clusters, then points, then selection. */
@@ -547,6 +458,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			}
 			for (const [group, max] of rank) groupRank.set(group, max);
 			groupByKey = byKey;
+			dataGeneration++;
 			for (const group of present) {
 				const data = groupData(collection, group);
 				const existing = sources.get(group);
@@ -607,7 +519,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		return () => {
 			dead = true;
 			providers = null;
-			hoveredCluster = null;
+			live = null;
 		};
 	}
 

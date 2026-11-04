@@ -1,8 +1,9 @@
 import { createExpression } from "@maplibre/maplibre-gl-style-spec";
 import { describe, expect, it } from "vitest";
-import { levelFor, NO_LEVEL } from "../../../src/lib/data/scale.js";
+import { levelFor, NO_LEVEL, numericValue as readingOf } from "../../../src/lib/data/scale.js";
 import {
 	colorExpression,
+	hasNumericValue,
 	levelKeyExpression,
 	NEUTRAL_COLOR_VAR,
 	opacityExpression
@@ -199,5 +200,16 @@ describe("levelKeyExpression", () => {
 		const cat = levelKeyExpression(smokeScale, "value");
 		expect(evaluate(cat, "heavy", "string")).toBe("heavy");
 		expect(evaluate(cat, "zzz", "string")).toBe("");
+	});
+});
+
+describe("hasNumericValue", () => {
+	it("agrees with numericValue on what counts as a number", () => {
+		for (const value of [12, 0, -1, "12.5", "0", "-1", "", " ", "abc", true, null, undefined]) {
+			const expected = readingOf(value as never) !== null;
+			expect(evaluate(hasNumericValue("value"), value, "boolean" as never), String(value)).toBe(
+				expected
+			);
+		}
 	});
 });

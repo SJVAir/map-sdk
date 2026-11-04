@@ -12,6 +12,16 @@ export interface LegacyLevel {
 }
 
 /**
+ * A reading as a number: a finite number, or a non-blank string that reads as one; else null.
+ * The one rule for what counts as a reading (levels, averages, tooltips).
+ */
+export function numericValue(value: number | string | null | undefined): number | null {
+	if (typeof value !== "number" && (typeof value !== "string" || value.trim() === "")) return null;
+	const n = typeof value === "number" ? value : Number(value);
+	return Number.isFinite(n) ? n : null;
+}
+
+/**
  * Find the level a value falls in. Range levels are half-open, [min, max), and a null max
  * is unbounded. Numeric strings are coerced for range scales only.
  */
@@ -25,9 +35,8 @@ export function levelFor(
 		return scale.levels.find((level) => level.value === value) ?? NO_LEVEL;
 	}
 
-	if (typeof value === "string" && value.trim() === "") return NO_LEVEL;
-	const n = typeof value === "number" ? value : Number(value);
-	if (!Number.isFinite(n)) return NO_LEVEL;
+	const n = numericValue(value);
+	if (n === null) return NO_LEVEL;
 
 	return (
 		scale.levels.find(

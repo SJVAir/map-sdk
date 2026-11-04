@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { darken, readableColor } from "color2k";
+	import { levelChip } from "../ui/level-chip.js";
 
 	// monitor-map's DataBox: a reading in a box filled with its level's color.
 
@@ -16,12 +16,10 @@
 	let { color, header, value, large, subheading }: Props = $props();
 
 	const style = $derived.by(() => {
-		if (!color) return "";
-		try {
-			return `background:${color};border-color:${darken(color, 0.1)};color:${readableColor(color)}`;
-		} catch {
-			return "";
-		}
+		const chip = levelChip(color);
+		return chip
+			? `background:${chip.background};border-color:${chip.border};color:${chip.text}`
+			: "";
 	});
 </script>
 

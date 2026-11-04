@@ -2,7 +2,7 @@
 	import type { FeatureListItem } from "../core/plugin.js";
 	import type { FormatProvider } from "../data/format.js";
 	import type { MessageProvider } from "../data/messages.js";
-	import { NO_LEVEL } from "../data/scale.js";
+	import { NO_LEVEL, numericValue } from "../data/scale.js";
 	import type { Scale } from "../data/scale-types.js";
 	import MonitorReadingBox from "./MonitorReadingBox.svelte";
 
@@ -22,9 +22,8 @@
 
 	const level = $derived(item.level !== NO_LEVEL && item.level.color ? item.level : null);
 	const reading = $derived.by(() => {
-		const n = typeof item.value === "number" ? item.value : Number(item.value);
-		if (item.value === null || item.value === "" || !Number.isFinite(n)) return null;
-		return format.number(Math.round(n));
+		const n = numericValue(item.value);
+		return n === null ? null : format.number(Math.round(n));
 	});
 	const time = $derived.by(() => {
 		if (!timestamp || Number.isNaN(Date.parse(timestamp))) return null;

@@ -117,6 +117,22 @@ describe("monitorsPlugin", () => {
 		expect(sourceData(gl, id("points:purpleair")).features).toHaveLength(3);
 	});
 
+	it("counts numbers and numeric strings toward the cluster average, as levels do", () => {
+		const { gl, id } = setUp();
+		const spec = gl.sources.get(id("points:airnow")) as GeoJSONSourceSpecification;
+		const { sumValues, countValues } = spec.clusterProperties as Record<string, unknown[]>;
+		const each = (value: unknown) => [
+			evaluate(sumValues[1], { value }, "number"),
+			evaluate(countValues[1], { value }, "number")
+		];
+		expect(each(12)).toEqual([12, 1]);
+		expect(each("12.5")).toEqual([12.5, 1]);
+		expect(each("")).toEqual([0, 0]);
+		expect(each(" ")).toEqual([0, 0]);
+		expect(each("n/a")).toEqual([0, 0]);
+		expect(each(null)).toEqual([0, 0]);
+	});
+
 	it("draws types in monitor-map's order, SJVAir PurpleAir above other PurpleAir", () => {
 		const { gl, id } = setUp();
 		const points = gl.layers.map((l) => l.id).filter((l) => l.startsWith(id("points:")));
@@ -163,9 +179,6 @@ describe("monitorsPlugin", () => {
 			originalEvent: {}
 		};
 		gl.emit("click", event);
-		// The bubble's two layers both report the click; it zooms once.
-		gl.emit("click", { ...event, features: [bubble] }, id("cluster-icon:purpleair"));
-		gl.emit("click", { ...event, features: [bubble] }, id("cluster-average:purpleair"));
 		await Promise.resolve();
 		await Promise.resolve();
 		expect(applyPick).not.toHaveBeenCalled();
@@ -178,12 +191,38 @@ describe("monitorsPlugin", () => {
 		expect(gl.getCenter()).toEqual({ lng: -119.5, lat: 36.5 });
 	});
 
+	it("picks a monitor drawn above a cluster and doesn't zoom", async () => {
+		const handler = vi.fn();
+		const { map, gl, id, expansionZoom } = setUp();
+		map.on("featureclick", handler);
+		gl.setRenderedFeatures([
+			{
+				layer: { id: id("points:airgradient") },
+				source: id("points:airgradient"),
+				properties: { refKey: "monitor:4", name: "Monitor 4" },
+				geometry: { type: "Point" as const, coordinates: [-119.5, 36.5] }
+			},
+			clusterFeature(id("cluster-icon:purpleair"), 7)
+		]);
+		gl.emit("click", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(handler).toHaveBeenCalledWith({
+			pluginId: "monitors",
+			ref: { kind: "monitor", id: "4" }
+		});
+		expect(expansionZoom).not.toHaveBeenCalled();
+		expect(gl.calls).not.toContain("easeTo");
+		// No layer-scoped click listener that could zoom anyway.
+		expect(gl.listeners.filter((l) => l.layerId !== undefined)).toEqual([]);
+	});
+
 	it("zooms into a cluster with no animation under reduced motion", async () => {
 		vi.stubGlobal("matchMedia", () => ({ matches: true }));
 		const { gl, id } = setUp();
 		const easeTo = vi.spyOn(gl, "easeTo");
-		const bubble = clusterFeature(id("cluster-icon:airnow"), 3);
-		gl.emit("click", { features: [bubble], originalEvent: {} }, id("cluster-icon:airnow"));
+		gl.setRenderedFeatures([clusterFeature(id("cluster-icon:airnow"), 3)]);
+		gl.emit("click", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
 		await Promise.resolve();
 		await Promise.resolve();
 		expect(easeTo).toHaveBeenCalledWith({ center: [-119.5, 36.5], zoom: 11, duration: 0 });
@@ -205,8 +244,33 @@ describe("monitorsPlugin", () => {
 		expect(hit.pluginId).toBe("monitors");
 		expect(hit.ref.kind).toBe("feature");
 		expect(plugin.features!().some((f) => f.refKey === hit.refKey)).toBe(false);
+		expect(hit.properties).toMatchObject({ cluster_id: 7, sumValues: 44, countValues: 2 });
 		expect(plugin.hoverTooltip!(hit)).toBeTypeOf("function");
 		expect(plugin.tooltip!(plugin.features!()[0])).toBeTypeOf("function");
+	});
+
+	it("gives no cluster content once the data the hover came from is replaced", () => {
+		const { map, gl, plugin, source, id } = setUp();
+		gl.setRenderedFeatures([clusterFeature(id("cluster-icon:purpleair"), 7)]);
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+		const stale = map.hovered!.hit;
+		expect(plugin.hoverTooltip!(stale)).toBeTypeOf("function");
+		source.features = points(MONITORS.slice(0, 3));
+		flushSync();
+		expect(plugin.hoverTooltip!(stale)).toBeUndefined();
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+		expect(map.hovered!.hit.refKey).not.toBe(stale.refKey);
+		expect(plugin.hoverTooltip!(map.hovered!.hit)).toBeTypeOf("function");
+	});
+
+	it("leaves plugin state alone on lookups over a cluster", () => {
+		const { map, gl, plugin, id } = setUp();
+		gl.setRenderedFeatures([clusterFeature(id("cluster-icon:purpleair"), 7)]);
+		expect(map.featuresAt({ x: 1, y: 2 })).toEqual([]);
+		expect(map.hovered).toBeNull();
+		// A hit made up from a lookup that never hovered still works: nothing was remembered.
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+		expect(plugin.hoverTooltip!(map.hovered!.hit)).toBeTypeOf("function");
 	});
 
 	it("draws inactive monitors in the muted-foreground color whatever their value", () => {

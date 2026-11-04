@@ -138,6 +138,38 @@ function numeric(input: ValueInput): ExpressionSpecification {
 }
 
 /**
+ * True where the input is a reading by `numericValue`'s rule: a number, or a non-blank numeric
+ * string (same blank-string test as `numeric`; "Infinity" is the same accepted gap). A string
+ * that two different `to-number` fallbacks both pass through converted.
+ */
+export function hasNumericValue(input: ValueInput): ExpressionSpecification {
+	const v = ["var", "v"];
+	const a = ["var", "a"];
+	return [
+		"let",
+		"v",
+		read(input),
+		[
+			"case",
+			["==", ["typeof", v], "number"],
+			true,
+			["==", ["typeof", v], "string"],
+			[
+				"let",
+				"a",
+				["to-number", v, -1],
+				[
+					"all",
+					["==", a, ["to-number", v, -2]],
+					["!", ["all", ["==", a, 0], ["!", ["in", "0", v]]]]
+				]
+			],
+			false
+		]
+	] as unknown as ExpressionSpecification;
+}
+
+/**
  * Half-open range lookup matching `levelFor`: a level covers [min, max), the value `max` goes
  * to the next level, and a gap or an unbounded-below input falls to `fallback`.
  */

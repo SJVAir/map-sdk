@@ -61,15 +61,59 @@ describe("MonitorTooltip", () => {
 });
 
 describe("MonitorClusterTooltip", () => {
-	function cluster(rows: MonitorFeatureProperties[], coords: Array<[number, number]>) {
+	/** A cluster whose bubble properties carry the readings' sum and count, as MapLibre's do. */
+	function cluster(
+		rows: MonitorFeatureProperties[],
+		coords: Array<[number, number]>,
+		leaves?: ClusterInfo<MonitorFeatureProperties>["leaves"]
+	) {
+		const readings = rows.flatMap((r) => (typeof r.value === "number" ? [r.value] : []));
 		const info: ClusterInfo<MonitorFeatureProperties> = {
 			group: "purpleair",
 			pointCount: rows.length,
-			properties: {},
-			leaves: async () => rows.map((props, i) => ({ props, lngLat: coords[i] }))
+			properties: {
+				point_count: rows.length,
+				sumValues: readings.reduce((a, b) => a + b, 0),
+				countValues: readings.length
+			},
+			leaves: leaves ?? (async () => rows.map((props, i) => ({ props, lngLat: coords[i] })))
 		};
 		return info;
 	}
+
+	const rows = [monitor("1", "purpleair", 10), monitor("2", "purpleair", 30)];
+	const coords: Array<[number, number]> = [
+		[-119.7, 36.7],
+		[-119.6, 36.7]
+	];
+
+	it("shows the bubble's count and average while the leaves load", async () => {
+		render(MonitorClusterTooltip, {
+			cluster: cluster(rows, coords, () => new Promise(() => {})),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			metadata
+		});
+		await expect.element(page.getByText("2 monitors", { exact: true })).toBeVisible();
+		const text = document.body.textContent!.replace(/\s+/g, " ");
+		expect(text).toContain("PM2.5 20 (cluster avg)");
+		expect(text).toContain("Moderate");
+	});
+
+	it("keeps the bubble's count and average when the leaves fail", async () => {
+		render(MonitorClusterTooltip, {
+			cluster: cluster(rows, coords, () => Promise.reject(new Error("gone"))),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			metadata
+		});
+		await expect.element(page.getByText("PurpleAir Monitors")).toBeVisible();
+		await expect.element(page.getByText("2 monitors", { exact: true })).toBeVisible();
+		expect(document.body.textContent).toContain("20");
+		expect(document.body.textContent).not.toContain("Max:");
+	});
 
 	const metadata = {
 		monitorTypeLabel: vi.fn(async () => "PurpleAir")

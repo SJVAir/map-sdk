@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { readableColor } from "color2k";
 	import { untrack } from "svelte";
 	import type { MapContext } from "../core/create-map.svelte.js";
 	import type { FeatureListItem, MapPlugin } from "../core/plugin.js";
 	import { NO_LEVEL } from "../data/scale.js";
+	import { levelChip } from "./level-chip.js";
 
 	interface Props {
 		map: MapContext;
@@ -70,7 +70,10 @@
 
 	const level = $derived(item && item.level !== NO_LEVEL && item.level.color ? item.level : null);
 	const levelLabel = $derived(level ? level.label : map.messages("mapsdk_no_level"));
-	const chipColors = $derived(level ? chipStyle(level.color) : "");
+	const chipColors = $derived.by(() => {
+		const chip = levelChip(level?.color);
+		return chip ? `background:${chip.background};color:${chip.text}` : "";
+	});
 	const valueText = $derived(
 		item?.value == null
 			? null
@@ -78,18 +81,10 @@
 				? map.format.number(item.value)
 				: item.value
 	);
-
-	/** Background and a readable text color; an unparseable color falls back to the neutral chip. */
-	function chipStyle(color: string): string {
-		try {
-			return `background:${color};color:${readableColor(color)}`;
-		} catch {
-			return "";
-		}
-	}
 </script>
 
-{#if name !== null && position}
+<!-- Only with something to show: a hit with no name, item, or content gets no empty box. -->
+{#if (name || item || custom) && position}
 	<div
 		class="mapsdk-tooltip text-sm"
 		role="tooltip"

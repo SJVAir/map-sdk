@@ -249,9 +249,9 @@ export class PluginHost {
 				if (running.dead) return;
 				running.unregisters.push(router.register(pluginId, layerIds, toHit));
 			},
-			blocking(layerIds, toHover) {
+			blocking(layerIds, toHover, onClick) {
 				if (running.dead) return;
-				running.unregisters.push(router.registerBlocking(pluginId, layerIds, toHover));
+				running.unregisters.push(router.registerBlocking(pluginId, layerIds, toHover, onClick));
 			},
 			on(type, layerId, listener) {
 				if (running.dead) return;

@@ -1,5 +1,5 @@
 import type { GlMapLike } from "./gl.js";
-import type { ClickEvent, FeatureHit } from "./plugin.js";
+import type { BlockingClick, ClickEvent, FeatureHit } from "./plugin.js";
 
 interface Registration {
 	pluginId: string;
@@ -7,6 +7,8 @@ interface Registration {
 	toHit: (props: Record<string, unknown>) => FeatureHit | null;
 	/** Hits nothing itself, and hides what is beneath it; `toHit` gives only its hover hit. */
 	blocking: boolean;
+	/** For a blocking layer: called for a click where it is topmost. */
+	onClick?: (feature: BlockingClick) => void;
 }
 
 /** What is under one point. */
@@ -16,6 +18,8 @@ interface Lookup {
 	blocked: boolean;
 	/** The blocking layer's hover hit, if it gives one. */
 	blocker: FeatureHit | null;
+	/** The blocking registration and its topmost feature. */
+	blockedBy: { registration: Registration; feature: BlockingClick } | null;
 }
 
 /** The parts of a MapLibre `MapMouseEvent` the router reads. */
@@ -75,18 +79,22 @@ export class InteractionRouter {
 
 	/**
 	 * Records layers that hide what is beneath them: when one is topmost at a point, clicks pick
-	 * nothing and the hover is `toHover`'s hit for it (or nothing). Returns an unregister function.
+	 * nothing (calling `onClick` with that feature instead) and the hover is `toHover`'s hit for
+	 * it (or nothing). `toHover` must have no side effects: lookups call it too. Returns an
+	 * unregister function.
 	 */
 	registerBlocking(
 		pluginId: string,
 		layerIds: string[],
-		toHover?: (props: Record<string, unknown>) => FeatureHit | null
+		toHover?: (props: Record<string, unknown>) => FeatureHit | null,
+		onClick?: (feature: BlockingClick) => void
 	): () => void {
 		return this.#add({
 			pluginId,
 			layerIds: [...layerIds],
 			toHit: toHover ?? (() => null),
-			blocking: true
+			blocking: true,
+			onClick
 		});
 	}
 
@@ -135,7 +143,7 @@ export class InteractionRouter {
 	}
 
 	#lookup(point: [number, number]): Lookup {
-		const none: Lookup = { hits: [], blocked: false, blocker: null };
+		const none: Lookup = { hits: [], blocked: false, blocker: null, blockedBy: null };
 		const gl = this.#gl;
 		if (!gl) return none;
 		// Locals for one lookup; nothing reads them reactively.
@@ -154,8 +162,14 @@ export class InteractionRouter {
 		const features = gl.queryRenderedFeatures(point, { layers: [...byLayer.keys()] });
 		const top = features[0] && byLayer.get(features[0].layer.id);
 		if (top?.blocking) {
-			const hit = top.toHit(features[0].properties ?? {});
-			return { hits: [], blocked: true, blocker: hit && { ...hit, pluginId: top.pluginId } };
+			const properties = features[0].properties ?? {};
+			const hit = top.toHit(properties);
+			return {
+				hits: [],
+				blocked: true,
+				blocker: hit && { ...hit, pluginId: top.pluginId },
+				blockedBy: { registration: top, feature: { properties, geometry: features[0].geometry } }
+			};
 		}
 		for (const feature of features) {
 			const registration = byLayer.get(feature.layer.id);
@@ -165,7 +179,7 @@ export class InteractionRouter {
 			seen.add(hit.refKey);
 			hits.push({ ...hit, pluginId: registration.pluginId });
 		}
-		return { hits, blocked: false, blocker: null };
+		return { hits, blocked: false, blocker: null, blockedBy: null };
 	}
 
 	/**
@@ -186,7 +200,17 @@ export class InteractionRouter {
 	#onClick = (e: PointerEventLike) => {
 		const recorded = this.#lastPointerType;
 		this.#lastPointerType = null;
-		const hits = this.hitsAt([e.point.x, e.point.y]);
+		const found = this.#lookup([e.point.x, e.point.y]);
+		if (found.blockedBy) {
+			const { registration, feature } = found.blockedBy;
+			try {
+				registration.onClick?.(feature);
+			} catch (error) {
+				console.error("map-sdk: a blocking layer's click handler failed", error);
+			}
+			return;
+		}
+		const { hits } = found;
 		if (hits.length === 0) return;
 		const o = e.originalEvent;
 		const pointerType = o?.pointerType || recorded;
