@@ -23,7 +23,7 @@ export default defineConfig({
 			use: {
 				...devices["Desktop Firefox"],
 				viewport: { width: 1280, height: 900 },
-				// CI machines have no GPU, and Firefox blocks software WebGL by default.
+				// CI machines have no GPU; let Firefox use software WebGL (CI also runs it under Xvfb).
 				launchOptions: { firefoxUserPrefs: { "webgl.force-enabled": true } }
 			}
 		},

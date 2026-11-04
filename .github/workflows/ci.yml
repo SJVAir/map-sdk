@@ -20,4 +20,5 @@ jobs:
       - run: npm test
       - run: npm run test:bundle
       - run: npm run test:licenses
-      - run: npm run test:e2e
+      # Firefox only gets WebGL through a display, so give it a virtual one.
+      - run: xvfb-run -a npm run test:e2e
