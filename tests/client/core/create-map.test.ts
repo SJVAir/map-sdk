@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushSync } from "svelte";
 import { SvelteMap } from "svelte/reactivity";
 import { createMap } from "../../../src/lib/core/create-map.svelte.js";
-import type { MapPlugin, PluginContext } from "../../../src/lib/core/plugin.js";
+import type { FeatureListItem, MapPlugin, PluginContext } from "../../../src/lib/core/plugin.js";
 import { defaultMessages } from "../../../src/lib/data/messages.js";
 import { NO_LEVEL } from "../../../src/lib/data/scale.js";
 import { rootEffect } from "../../fixtures/effects.svelte.js";
@@ -307,5 +307,144 @@ describe("createMap", () => {
 			"setup:regions"
 		]);
 		map.destroy();
+	});
+});
+
+/** A listed monitor at a point. */
+function listItem(
+	id: string,
+	lngLat: [number, number] = [-118.5, 35.25],
+	selectable = true
+): FeatureListItem {
+	return {
+		refKey: `monitor:${id}`,
+		ref: { kind: "monitor" as const, id },
+		name: `Site ${id}`,
+		value: null,
+		level: NO_LEVEL,
+		units: "",
+		lngLat,
+		selectable
+	};
+}
+
+describe("pickFromList", () => {
+	it("applies the same selection rules as a map click: additive adds, otherwise replaces", () => {
+		const map = createMap({ config });
+		const onselectionchange = vi.fn();
+		map.addPlugin(
+			plugin("monitors", [], { features: () => [listItem("1"), listItem("2"), listItem("3")] }),
+			{ selectionMode: "multiple", onselectionchange }
+		);
+		map.pickFromList("monitors", "monitor:1", true);
+		map.pickFromList("monitors", "monitor:2", true);
+		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["1", "2"] });
+		map.pickFromList("monitors", "monitor:1", true);
+		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["2"] });
+		map.pickFromList("monitors", "monitor:3", false);
+		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["3"] });
+		expect(onselectionchange.mock.calls.map((c) => c[0])).toEqual([
+			{ kind: "monitors", ids: ["1"] },
+			{ kind: "monitors", ids: ["1", "2"] },
+			{ kind: "monitors", ids: ["2"] },
+			{ kind: "monitors", ids: ["3"] }
+		]);
+	});
+
+	it("replaces in single mode even when additive", () => {
+		const map = createMap({ config });
+		map.addPlugin(plugin("monitors", [], { features: () => [listItem("1"), listItem("2")] }), {
+			selectionMode: "single",
+			selection: { kind: "monitors", ids: ["1"] }
+		});
+		map.pickFromList("monitors", "monitor:2", true);
+		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["2"] });
+	});
+
+	it("ignores items that aren't selectable, unknown refs, and plugins in none mode", () => {
+		const map = createMap({ config });
+		const onselectionchange = vi.fn();
+		map.addPlugin(
+			plugin("monitors", [], { features: () => [listItem("1", undefined, false), listItem("2")] }),
+			{ selectionMode: "multiple", onselectionchange }
+		);
+		map.addPlugin(plugin("other", [], { features: () => [listItem("2")] }), { onselectionchange });
+		map.pickFromList("monitors", "monitor:1", false);
+		map.pickFromList("monitors", "monitor:9", false);
+		map.pickFromList("other", "monitor:2", false);
+		map.pickFromList("missing", "monitor:2", false);
+		expect(onselectionchange).not.toHaveBeenCalled();
+		expect(map.getSelection("monitors")).toBeNull();
+	});
+
+	it("doesn't fire featureclick", () => {
+		const map = createMap({ config });
+		const onclick = vi.fn();
+		map.on("featureclick", onclick);
+		map.addPlugin(plugin("monitors", [], { features: () => [listItem("1")] }), {
+			selectionMode: "single"
+		});
+		map.pickFromList("monitors", "monitor:1", false);
+		expect(onclick).not.toHaveBeenCalled();
+		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["1"] });
+	});
+});
+
+describe("selection mode and focus", () => {
+	it("reads a plugin's selection mode reactively", () => {
+		const map = createMap({ config });
+		map.addPlugin(plugin("monitors"), { selectionMode: "single" });
+		const seen: string[] = [];
+		stops.push(rootEffect(() => void seen.push(map.getSelectionMode("monitors"))));
+		flushSync();
+		map.setSelectionMode("monitors", "multiple");
+		flushSync();
+		expect(seen).toEqual(["single", "multiple"]);
+		expect(map.getSelectionMode("missing")).toBe("none");
+	});
+
+	it("pans to the named plugin's item when two plugins list the same key", () => {
+		const map = createMap({ config });
+		map.addPlugin(plugin("a", [], { features: () => [listItem("1", [-118, 35])] }));
+		map.addPlugin(plugin("b", [], { features: () => [listItem("1", [-120, 37])] }));
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		map.focusFeature("monitor:1", "b");
+		expect(gl.getCenter()).toEqual({ lng: -120, lat: 37 });
+		map.focusFeature("monitor:1");
+		expect(gl.getCenter()).toEqual({ lng: -118, lat: 35 });
+	});
+
+	it("clears the focused key without moving the camera", () => {
+		const map = createMap({ config });
+		map.addPlugin(plugin("monitors", [], { features: () => [listItem("1")] }));
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		map.focusFeature("monitor:1");
+		const ease = vi.spyOn(gl, "easeTo");
+		map.focusFeature(null);
+		expect(map.focusedKey).toBeNull();
+		expect(ease).not.toHaveBeenCalled();
+	});
+
+	it("pans without animation under reduced motion, and eases otherwise", () => {
+		const map = createMap({ config });
+		map.addPlugin(plugin("monitors", [], { features: () => [listItem("1")] }));
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		const ease = vi.spyOn(gl, "easeTo");
+		let reduce = true;
+		vi.stubGlobal("matchMedia", (query: string) => ({
+			matches: reduce && query === "(prefers-reduced-motion: reduce)"
+		}));
+		try {
+			map.focusFeature("monitor:1");
+			reduce = false;
+			map.focusFeature("monitor:1");
+		} finally {
+			vi.unstubAllGlobals();
+		}
+		expect(ease.mock.calls[0][0]).toEqual({ center: [-118.5, 35.25], duration: 0 });
+		expect(ease.mock.calls[1][0]).toEqual({ center: [-118.5, 35.25] });
 	});
 });

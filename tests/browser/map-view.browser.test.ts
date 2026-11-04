@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { config as maptilerConfig } from "@maptiler/sdk";
 import { MapView, createMap } from "../../src/lib/index.js";
 import type { MapContext } from "../../src/lib/core/create-map.svelte.js";
@@ -304,6 +304,55 @@ describe("MapView tooltip", () => {
 		const types = off.mock.calls.map((c) => c[0]);
 		expect(types).toContain("move");
 		expect(types).toContain("resize");
+	});
+});
+
+describe("MapView list button", () => {
+	it("toggles the feature list panel, and Escape closes it and returns focus", async () => {
+		const map = newMap();
+		map.addPlugin(
+			{
+				id: "probe",
+				setup: () => () => {},
+				features: () => [
+					{
+						refKey: "monitor:1",
+						ref: { kind: "monitor", id: "1" },
+						name: "Probe",
+						value: 5,
+						level: NO_LEVEL,
+						units: "u",
+						lngLat: [-119.8, 36.7],
+						selectable: true
+					}
+				]
+			},
+			{ selectionMode: "single" }
+		);
+		await render(MapView, { map, class: "test-map" });
+		const button = page.getByRole("button", { name: "List" });
+		await expect.element(button).toHaveAttribute("aria-expanded", "false");
+		const panel = document.getElementById(button.element().getAttribute("aria-controls")!)!;
+		expect(panel.querySelector("[role=listbox]")).not.toBeNull();
+		expect(panel.closest("[data-mapsdk-map]")?.getAttribute("data-mapsdk-map")).toBe(map.uid);
+		await expect.element(page.getByRole("listbox")).not.toBeInTheDocument();
+
+		await button.click();
+		await expect.element(button).toHaveAttribute("aria-expanded", "true");
+		const listbox = page.getByRole("listbox", { name: "Features on the map" });
+		await expect.element(listbox).toBeVisible();
+		(listbox.element() as HTMLElement).focus();
+		await userEvent.keyboard("{Escape}");
+		await expect.element(button).toHaveAttribute("aria-expanded", "false");
+		expect(document.activeElement).toBe(button.element());
+	});
+
+	it("leaves the button out when featureList is false", async () => {
+		const map = newMap();
+		const { container } = await render(MapView, { map, class: "test-map", featureList: false });
+		const root = container.querySelector(`[data-mapsdk-map="${map.uid}"]`)!;
+		expect(root).not.toBeNull();
+		expect(root.querySelector(".mapsdk-list-button, [role=listbox]")).toBeNull();
 	});
 });
 

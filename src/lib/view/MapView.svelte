@@ -5,6 +5,7 @@
 	import { setMapContext } from "../core/context.js";
 	import type { MapContext } from "../core/create-map.svelte.js";
 	import type { GlMapLike } from "../core/gl.js";
+	import FeatureList from "../ui/FeatureList.svelte";
 	import MapTooltip from "../ui/MapTooltip.svelte";
 	import { createGlMap, watchTheme } from "./create-gl-map.js";
 
@@ -18,9 +19,30 @@
 		label?: string;
 		/** On-screen pieces drawn over the map; they get the map through `getMapContext()`. */
 		overlays?: Snippet;
+		/** `false` leaves out the List button and its feature list panel. */
+		featureList?: boolean;
 	}
 
-	let { map, active = true, class: className, label, overlays }: Props = $props();
+	let {
+		map,
+		active = true,
+		class: className,
+		label,
+		overlays,
+		featureList = true
+	}: Props = $props();
+
+	const uid = $props.id();
+	const listId = `${uid}-list`;
+	let listOpen = $state(false);
+	let listButton: HTMLButtonElement | undefined = $state();
+
+	function onListKeydown(e: KeyboardEvent) {
+		if (e.key !== "Escape") return;
+		e.preventDefault();
+		listOpen = false;
+		listButton?.focus();
+	}
 
 	// The map is fixed for the component's life, so its first value is the one to provide.
 	// svelte-ignore state_referenced_locally
@@ -84,6 +106,25 @@
 >
 	<div class="mapsdk-gl" bind:this={glContainer}></div>
 	<MapTooltip {map} {project} {width} {height} />
+	{#if featureList}
+		<div class="mapsdk-list-panel">
+			<button
+				bind:this={listButton}
+				type="button"
+				class="mapsdk-list-button"
+				aria-expanded={listOpen}
+				aria-controls={listId}
+				onclick={() => (listOpen = !listOpen)}
+			>
+				{map.messages("mapsdk_list_button")}
+			</button>
+			<!-- Escape anywhere in the panel closes it. -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div hidden={!listOpen} onkeydown={onListKeydown}>
+				<FeatureList {map} id={listId} />
+			</div>
+		</div>
+	{/if}
 	{@render overlays?.()}
 </div>
 
@@ -95,5 +136,45 @@
 	.mapsdk-gl {
 		position: absolute;
 		inset: 0;
+	}
+
+	.mapsdk-list-panel {
+		position: absolute;
+		top: 0.75rem;
+		left: 0.75rem;
+		z-index: 2;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.5rem;
+		max-height: calc(100% - 1.5rem);
+		pointer-events: none;
+	}
+
+	.mapsdk-list-panel > div {
+		display: flex;
+		min-height: 0;
+	}
+
+	.mapsdk-list-panel > div[hidden] {
+		display: none;
+	}
+
+	.mapsdk-list-button {
+		padding: 0.375rem 0.75rem;
+		border: 1px solid var(--card-border, var(--border));
+		border-radius: var(--radius-control, var(--radius));
+		background: var(--background);
+		color: var(--foreground);
+		box-shadow: var(--shadow-card, none);
+		font: inherit;
+		font-size: 0.875rem;
+		cursor: pointer;
+		pointer-events: auto;
+	}
+
+	.mapsdk-list-button:focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: 2px;
 	}
 </style>

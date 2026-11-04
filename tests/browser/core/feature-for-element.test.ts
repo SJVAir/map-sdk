@@ -23,13 +23,14 @@ function listed(id: string, items: FeatureListItem[]): MapPlugin {
 }
 
 /** A map root holding a list with one row per refKey, as MapView and FeatureList render them. */
-function mapRoot(map: MapContext, refKeys: string[]): HTMLElement {
+function mapRoot(map: MapContext, refKeys: string[], pluginId?: string): HTMLElement {
 	const root = document.createElement("div");
 	root.dataset.mapsdkMap = map.uid;
 	const list = document.createElement("ul");
 	for (const refKey of refKeys) {
 		const row = document.createElement("li");
 		row.dataset.mapsdkRef = refKey;
+		if (pluginId) row.dataset.mapsdkPlugin = pluginId;
 		row.append(document.createElement("span"));
 		list.append(row);
 	}
@@ -80,5 +81,22 @@ describe("featureForElement", () => {
 		loose.dataset.mapsdkRef = "monitor:1";
 		document.body.append(loose);
 		expect(map.featureForElement(loose)).toBeNull();
+	});
+
+	it("prefers the row's plugin when two plugins list the same refKey", () => {
+		const map = createMap({ config });
+		map.addPlugin(listed("first", [item("1", "First's site")]));
+		map.addPlugin(listed("second", [item("1", "Second's site")]));
+		const second = mapRoot(map, ["monitor:1"], "second").querySelector("[data-mapsdk-ref]")!;
+		expect(map.featureForElement(second)).toEqual({
+			pluginId: "second",
+			ref: { kind: "monitor", id: "1" },
+			refKey: "monitor:1",
+			name: "Second's site"
+		});
+		const untagged = mapRoot(map, ["monitor:1"]).querySelector("[data-mapsdk-ref]")!;
+		expect(map.featureForElement(untagged)?.pluginId).toBe("first");
+		const unknown = mapRoot(map, ["monitor:1"], "gone").querySelector("[data-mapsdk-ref]")!;
+		expect(map.featureForElement(unknown)).toBeNull();
 	});
 });

@@ -8,7 +8,7 @@ import type { FeatureRef, SelectionMode, SpatialSelection } from "../data/types.
 import { BasemapState, type BasemapConfig } from "./basemap.svelte.js";
 import type { GlMapLike } from "./gl.js";
 import { InteractionRouter, type Hovered } from "./interactions.svelte.js";
-import type { ClickEvent, FeatureHit, MapPlugin } from "./plugin.js";
+import type { ClickEvent, FeatureHit, FeatureListItem, MapPlugin } from "./plugin.js";
 import { PluginHost } from "./plugin-host.svelte.js";
 
 export interface CameraState {
@@ -75,6 +75,15 @@ export interface MapContext {
 	/** Reactive. */
 	getSelection(pluginId: string): SpatialSelection | null;
 	setSelectionMode(pluginId: string, mode: SelectionMode): void;
+	/** Reactive. `"none"` for an unknown plugin. */
+	getSelectionMode(pluginId: string): SelectionMode;
+	/**
+	 * Internal, for FeatureList: picks a listed feature with the same selection rules as a map
+	 * click (`additive` adds or toggles in `multiple` mode), calling `onselectionchange` if the
+	 * selection changes. Does nothing for an item that isn't selectable. Doesn't fire
+	 * `featureclick`, which is for clicks on the map.
+	 */
+	pickFromList(pluginId: string, refKey: string, additive: boolean): void;
 	/**
 	 * Called for every feature click (the top hit), whatever the selection mode, before the
 	 * selection changes. Returns an unsubscribe function.
@@ -84,15 +93,20 @@ export interface MapContext {
 	featuresAt(point: { x: number; y: number }): FeatureHit[];
 	/**
 	 * The hit for a feature-list element: the nearest `[data-mapsdk-ref]` ancestor (or the element
-	 * itself), looked up in the plugins' `features()`. Only rows inside this map's own root count:
+	 * itself), looked up in the plugins' `features()`: in the row's `data-mapsdk-plugin` plugin when
+	 * it names one, else the first plugin listing the refKey. Only rows inside this map's own root count:
 	 * the row's nearest `[data-mapsdk-map]` ancestor must carry this map's `uid`, which MapView
 	 * sets on its container and FeatureList on its root. `null` otherwise.
 	 */
 	featureForElement(element: Element): FeatureHit | null;
 	/** The top feature under the pointer and where it is. Reactive, for the tooltip. */
 	readonly hovered: Hovered | null;
-	/** Marks the feature focused and pans to it (no animation under reduced motion). */
-	focusFeature(refKey: string): void;
+	/**
+	 * Marks the feature focused and pans to it (no animation under reduced motion): the item in
+	 * `pluginId`'s features when given, else the first plugin listing `refKey`. `null` clears the
+	 * focus without moving the camera.
+	 */
+	focusFeature(refKey: string | null, pluginId?: string): void;
 	/** Reactive. */
 	readonly focusedKey: string | null;
 	/** For MapView only: uses `gl` from now on. */
@@ -252,6 +266,17 @@ class MapContextImpl implements MapContext {
 		return this.#selections.get(pluginId)?.selection ?? null;
 	}
 
+	getSelectionMode(pluginId: string): SelectionMode {
+		return this.#selections.get(pluginId)?.mode ?? "none";
+	}
+
+	pickFromList(pluginId: string, refKey: string, additive: boolean): void {
+		if (this.#destroyed) return;
+		const found = untrack(() => this.#findItem(refKey, pluginId));
+		if (!found?.item.selectable) return;
+		this.#applyPick(pluginId, found.item.ref, additive);
+	}
+
 	setSelectionMode(pluginId: string, mode: SelectionMode): void {
 		if (this.#destroyed) return;
 		this.#stateFor(pluginId).mode = mode;
@@ -274,27 +299,22 @@ class MapContextImpl implements MapContext {
 		if (!row || row.closest("[data-mapsdk-map]")?.getAttribute("data-mapsdk-map") !== this.uid) {
 			return null;
 		}
-		const refKey = row.getAttribute("data-mapsdk-ref");
-		return untrack(() => {
-			for (const plugin of this.plugins) {
-				const item = plugin.features?.().find((f) => f.refKey === refKey);
-				if (!item) continue;
-				return { pluginId: plugin.id, ref: item.ref, refKey: item.refKey, name: item.name };
-			}
-			return null;
-		});
+		const refKey = row.getAttribute("data-mapsdk-ref") ?? "";
+		const pluginId = row.getAttribute("data-mapsdk-plugin") ?? undefined;
+		const found = untrack(() => this.#findItem(refKey, pluginId));
+		if (!found) return null;
+		const { plugin, item } = found;
+		return { pluginId: plugin.id, ref: item.ref, refKey: item.refKey, name: item.name };
 	}
 
-	focusFeature(refKey: string): void {
+	focusFeature(refKey: string | null, pluginId?: string): void {
 		if (this.#destroyed) return;
 		this.#focusedKey = refKey;
 		const gl = this.#gl;
-		if (!gl) return;
-		const item = untrack(() =>
-			this.plugins.flatMap((p) => p.features?.() ?? []).find((f) => f.refKey === refKey)
-		);
-		if (!item) return;
-		gl.easeTo({ center: item.lngLat, ...(prefersReducedMotion() && { duration: 0 }) });
+		if (!gl || refKey === null) return;
+		const found = untrack(() => this.#findItem(refKey, pluginId));
+		if (!found) return;
+		gl.easeTo({ center: found.item.lngLat, ...(prefersReducedMotion() && { duration: 0 }) });
 	}
 
 	attach(gl: GlMapLike): void {
@@ -347,7 +367,12 @@ class MapContextImpl implements MapContext {
 				console.error("map-sdk: a featureclick handler failed", error);
 			}
 		}
-		// A handler may have removed the plugin.
+		this.#applyPick(pluginId, ref, e.additive);
+	}
+
+	/** The one place a user's pick (map click or list key) changes a plugin's selection. */
+	#applyPick(pluginId: string, ref: FeatureRef, additive: boolean): void {
+		// A featureclick handler may have removed the plugin.
 		const state = untrack(() => this.#selections.get(pluginId));
 		if (!state) return;
 		const current = untrack(() => state.selection);
@@ -355,11 +380,27 @@ class MapContextImpl implements MapContext {
 			current,
 			ref,
 			untrack(() => state.mode),
-			{ additive: e.additive }
+			{ additive }
 		);
 		if (sameSelection(current, next)) return;
 		state.selection = next;
 		state.onselectionchange?.(copySelection(next));
+	}
+
+	/**
+	 * A listed item and its plugin: in `pluginId` when given (`null` if that plugin doesn't list
+	 * it), else the first plugin listing `refKey`. Reads `features()`, so call it untracked.
+	 */
+	#findItem(
+		refKey: string,
+		pluginId?: string
+	): { plugin: MapPlugin; item: FeatureListItem } | null {
+		for (const plugin of this.plugins) {
+			if (pluginId !== undefined && plugin.id !== pluginId) continue;
+			const item = plugin.features?.().find((f) => f.refKey === refKey);
+			if (item) return { plugin, item };
+		}
+		return null;
 	}
 
 	#stateFor(pluginId: string): PluginSelection {
