@@ -95,4 +95,6 @@ export interface MapPlugin {
 	features?(): FeatureListItem[];
 	selectable?: boolean;
 	displayOptions?: Snippet;
+	/** Richer tooltip content for one of this plugin's features, below its name. */
+	tooltip?(item: FeatureListItem): Snippet;
 }

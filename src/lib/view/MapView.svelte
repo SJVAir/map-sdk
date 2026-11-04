@@ -4,6 +4,8 @@
 	import { untrack } from "svelte";
 	import { setMapContext } from "../core/context.js";
 	import type { MapContext } from "../core/create-map.svelte.js";
+	import type { GlMapLike } from "../core/gl.js";
+	import MapTooltip from "../ui/MapTooltip.svelte";
 	import { createGlMap, watchTheme } from "./create-gl-map.js";
 
 	interface Props {
@@ -26,6 +28,15 @@
 
 	let root: HTMLDivElement;
 	let glContainer: HTMLDivElement;
+	// The live GL map and a counter bumped on every camera move: the tooltip's `project` reads
+	// both, so it re-runs (and follows its feature) as the map moves.
+	let projector = $state.raw<GlMapLike | null>(null);
+	let moves = $state(0);
+
+	function project(lngLat: [number, number]) {
+		void moves;
+		return projector ? projector.project(lngLat) : null;
+	}
 
 	$effect(() => {
 		if (!active) return;
@@ -40,10 +51,15 @@
 			}
 			return gl;
 		});
+		const onMove = () => moves++;
+		gl.on("move", onMove);
+		projector = gl;
 		// Plugins bake theme colors into paint and images, so they set up again on a change.
 		const stopTheme = watchTheme(root, () => ctx.themeChanged());
 		return () => {
 			stopTheme();
+			projector = null;
+			gl.off("move", onMove);
 			try {
 				ctx.detach();
 			} finally {
@@ -61,6 +77,7 @@
 	data-mapsdk-map={map.uid}
 >
 	<div class="mapsdk-gl" bind:this={glContainer}></div>
+	<MapTooltip {map} {project} />
 	{@render overlays?.()}
 </div>
 

@@ -54,6 +54,8 @@ export interface GlMapLike {
 		bearing?: number;
 		pitch?: number;
 	}): void;
+	/** Canvas pixel for a position. */
+	project(lngLat: [number, number]): { x: number; y: number };
 	getCanvas(): HTMLCanvasElement;
 	remove(): void;
 }

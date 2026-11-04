@@ -215,6 +215,10 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 			if (o.bearing !== undefined) bearing = o.bearing;
 			if (o.pitch !== undefined) pitch = o.pitch;
 		},
+		project(lngLat) {
+			log("project");
+			return { x: lngLat[0], y: lngLat[1] };
+		},
 		getCanvas() {
 			log("getCanvas");
 			return canvas;
