@@ -109,6 +109,11 @@ export function createDefaultMetadata(): MetadataProvider {
 			}),
 		entryType: (ref, signal) =>
 			guarded(signal, async () => {
+				if (hasScales(ref.dataset)) {
+					const { scales } = await datasetScales[ref.dataset](signal);
+					const scale = Object.hasOwn(scales, ref.entryType) ? scales[ref.entryType] : undefined;
+					return scale && { label: scale.label, units: scale.units };
+				}
 				const entry = await entryMeta(ref, signal);
 				return entry && { label: entry.label, units: entry.units ?? "" };
 			}),

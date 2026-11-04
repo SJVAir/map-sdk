@@ -82,9 +82,7 @@ describe("default metadata", () => {
 		expect(await meta.scale({ dataset: "air-quality", entryType: "nope" })).toBe("unavailable");
 		expect(await meta.scale({ dataset: "air-quality", entryType: "o3" })).toBe("unavailable");
 		expect(await meta.scale({ dataset: "nope", entryType: "x" })).toBe("unavailable");
-		expect(await meta.entryType({ dataset: "hms", entryType: "smoke-density" })).toBe(
-			"unavailable"
-		);
+		expect(await meta.entryType({ dataset: "nope", entryType: "x" })).toBe("unavailable");
 	});
 
 	it.each([
@@ -107,6 +105,22 @@ describe("default metadata", () => {
 		const meta = createDefaultMetadata();
 		expect(await meta.scale({ dataset, entryType })).toBe(scale);
 		expect(await meta.scale({ dataset, entryType: "nope" })).toBe("unavailable");
+		expect(mock).toHaveBeenCalledTimes(1);
+	});
+
+	it.each([
+		["hms", "fire-frp", fireScale, getHMSMeta],
+		["calheatscore", "heat-score", heatScale, getCalHeatScoreMeta],
+		["forecasts", "aqi-forecast", pm25Scale, getForecastsMeta]
+	])("derives %s %s label and units from its scale", async (dataset, entryType, scale, mock) => {
+		mock.mockResolvedValue({ scales: { [entryType]: scale }, zones: [] });
+		const meta = createDefaultMetadata();
+		expect(await meta.entryType({ dataset, entryType })).toEqual({
+			label: scale.label,
+			units: scale.units
+		});
+		expect(await meta.entryType({ dataset, entryType: "nope" })).toBe("unavailable");
+		await meta.scale({ dataset, entryType });
 		expect(mock).toHaveBeenCalledTimes(1);
 	});
 
