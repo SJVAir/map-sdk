@@ -22,7 +22,8 @@
 		"test:client": "vitest run --project client",
 		"test:browser": "vitest run --project browser",
 		"test:bundle": "npm run build && node scripts/check-bundle.mjs",
-		"test:licenses": "npm run build && node scripts/check-licenses.mjs"
+		"test:licenses": "npm run build && node scripts/check-licenses.mjs",
+		"test:e2e": "playwright test"
 	},
 	"files": [
 		"dist"

@@ -14,9 +14,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run lint
       - run: npm run check
       - run: npm test
       - run: npm run test:bundle
       - run: npm run test:licenses
+      - run: npm run test:e2e

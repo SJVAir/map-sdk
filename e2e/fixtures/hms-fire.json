@@ -1,0 +1,49 @@
+{
+	"data": [
+		{
+			"id": "3pCEpGkpRJKcyGWxHe18Ng",
+			"date": "2026-11-03",
+			"satellite": "GOES-WEST",
+			"timestamp": "2026-11-03T18:46:00Z",
+			"frp": 47.55,
+			"ecosystem": 22,
+			"method": "NGFS",
+			"geometry": { "type": "Point", "coordinates": [-119.41612, 37.2775] }
+		},
+		{
+			"id": "vgz2CyytRF6-ZJQSLZeQ1Q",
+			"date": "2026-11-03",
+			"satellite": "GOES-WEST",
+			"timestamp": "2026-11-03T18:51:00Z",
+			"frp": 45.75,
+			"ecosystem": 22,
+			"method": "NGFS",
+			"geometry": { "type": "Point", "coordinates": [-119.416115, 37.2775] }
+		},
+		{
+			"id": "uWlC2UzSR1GKJOk1AHUvaQ",
+			"date": "2026-11-03",
+			"satellite": "GOES-EAST",
+			"timestamp": "2026-11-03T18:56:00Z",
+			"frp": 66.99,
+			"ecosystem": 22,
+			"method": "NGFS",
+			"geometry": { "type": "Point", "coordinates": [-119.43139, 37.264168] }
+		},
+		{
+			"id": "hummSsrrRkSLgWGqhTCAxg",
+			"date": "2026-11-03",
+			"satellite": "GOES-EAST",
+			"timestamp": "2026-11-03T18:56:00Z",
+			"frp": 90.35,
+			"ecosystem": 22,
+			"method": "NGFS",
+			"geometry": { "type": "Point", "coordinates": [-119.39333, 37.262501] }
+		}
+	],
+	"page": 1,
+	"count": 4,
+	"pages": 1,
+	"has_next_page": false,
+	"has_previous_page": false
+}

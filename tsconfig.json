@@ -22,6 +22,10 @@
 		"src/**/*.svelte",
 		"tests/**/*.svelte",
 		"tests/**/*.ts",
+		"demo/**/*.ts",
+		"demo/**/*.svelte",
+		"e2e/**/*.ts",
+		"playwright.config.ts",
 		"vite.config.ts",
 		"vitest.config.ts"
 	],

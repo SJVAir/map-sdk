@@ -1,0 +1,1470 @@
+{
+	"data": {
+		"default_pollutant": "o3",
+		"available_pollutants": ["o3", "pm25"],
+		"monitors": {
+			"airgradient": {
+				"label": "AirGradient",
+				"type": "airgradient",
+				"expected_interval": "1 min",
+				"entries": {
+					"humidity": {
+						"sensors": ["1", "2"],
+						"published": false,
+						"allowed_stages": ["raw", "calibrated"],
+						"default_stage": "raw",
+						"default_calibration": "AirGradientHumidity",
+						"processors": { "raw": ["AirGradientHumidity"] }
+					},
+					"particulates": {
+						"sensors": ["1", "2"],
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"pm10": {
+						"sensors": ["1", "2"],
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"pm100": {
+						"sensors": ["1", "2"],
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"pm25": {
+						"sensors": ["1", "2"],
+						"published": true,
+						"allowed_stages": ["raw", "corrected", "cleaned", "calibrated"],
+						"default_stage": "cleaned",
+						"default_calibration": "PM25_EPA_Oct2021",
+						"processors": {
+							"raw": ["PM25_LCS_Correction"],
+							"corrected": ["PM25_LCS_Cleaning"],
+							"cleaned": [
+								"PM25_EPA_Oct2021",
+								"PM25_MultivariateLinearRegression",
+								"PM25_UnivariateLinearRegression"
+							]
+						}
+					},
+					"temperature": {
+						"sensors": ["1", "2"],
+						"published": false,
+						"allowed_stages": ["raw", "calibrated"],
+						"default_stage": "raw",
+						"default_calibration": "AirGradientTemperature",
+						"processors": { "raw": ["AirGradientTemperature"] }
+					}
+				}
+			},
+			"airnow": {
+				"label": "AirNow",
+				"type": "airnow",
+				"expected_interval": "1 hour",
+				"entries": {
+					"co": {
+						"sensors": null,
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"no2": {
+						"sensors": null,
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"o3": {
+						"sensors": null,
+						"published": true,
+						"allowed_stages": ["raw", "calibrated"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"pm100": {
+						"sensors": null,
+						"published": false,
+						"allowed_stages": ["raw", "calibrated"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"pm25": {
+						"sensors": null,
+						"published": true,
+						"allowed_stages": ["raw", "cleaned", "calibrated"],
+						"default_stage": "cleaned",
+						"default_calibration": "PM25_FEM_Cleaner",
+						"processors": { "raw": ["PM25_FEM_Cleaner"] }
+					},
+					"so2": {
+						"sensors": null,
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					}
+				}
+			},
+			"aqlite": {
+				"label": "AQLite",
+				"type": "aqlite",
+				"expected_interval": "5 min",
+				"entries": {
+					"co2": {
+						"sensors": null,
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"humidity": {
+						"sensors": null,
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"o3": {
+						"sensors": null,
+						"published": true,
+						"allowed_stages": ["raw", "cleaned", "calibrated"],
+						"default_stage": "calibrated",
+						"default_calibration": "AQLiteHourlyAggregator",
+						"processors": { "raw": ["AQLiteRawCleaner"] }
+					},
+					"pressure": {
+						"sensors": null,
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"temperature": {
+						"sensors": null,
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					}
+				}
+			},
+			"aqview": {
+				"label": "AQview",
+				"type": "aqview",
+				"expected_interval": "1 hour",
+				"entries": {
+					"pm25": {
+						"sensors": null,
+						"published": true,
+						"allowed_stages": ["raw", "cleaned"],
+						"default_stage": "cleaned",
+						"default_calibration": "PM25_FEM_Cleaner",
+						"processors": { "raw": ["PM25_FEM_Cleaner"] }
+					}
+				}
+			},
+			"bam1022": {
+				"label": "BAM 1022",
+				"type": "bam1022",
+				"expected_interval": "1 hour",
+				"entries": {
+					"humidity": {
+						"sensors": null,
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"pm25": {
+						"sensors": null,
+						"published": true,
+						"allowed_stages": ["raw", "cleaned"],
+						"default_stage": "cleaned",
+						"default_calibration": "PM25_FEM_Cleaner",
+						"processors": { "raw": ["PM25_FEM_Cleaner"] }
+					},
+					"pressure": {
+						"sensors": null,
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"temperature": {
+						"sensors": null,
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					}
+				}
+			},
+			"purpleair": {
+				"label": "PurpleAir",
+				"type": "purpleair",
+				"expected_interval": "2 min",
+				"entries": {
+					"humidity": {
+						"sensors": null,
+						"published": false,
+						"allowed_stages": ["raw", "calibrated"],
+						"default_stage": "raw",
+						"default_calibration": "AirGradientHumidity",
+						"processors": { "raw": ["AirGradientHumidity"] }
+					},
+					"particulates": {
+						"sensors": ["a", "b"],
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"pm10": {
+						"sensors": ["a", "b"],
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"pm100": {
+						"sensors": ["a", "b"],
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"pm25": {
+						"sensors": ["a", "b"],
+						"published": true,
+						"allowed_stages": ["raw", "corrected", "cleaned", "calibrated"],
+						"default_stage": "cleaned",
+						"default_calibration": "PM25_EPA_Oct2021",
+						"processors": {
+							"raw": ["PM25_LCS_Correction"],
+							"corrected": ["PM25_LCS_Cleaning"],
+							"cleaned": [
+								"PM25_EPA_Oct2021",
+								"PM25_MultivariateLinearRegression",
+								"PM25_UnivariateLinearRegression"
+							]
+						}
+					},
+					"pressure": {
+						"sensors": null,
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"temperature": {
+						"sensors": null,
+						"published": false,
+						"allowed_stages": ["raw", "calibrated"],
+						"default_stage": "raw",
+						"default_calibration": "AirGradientTemperature",
+						"processors": { "raw": ["AirGradientTemperature"] }
+					}
+				}
+			},
+			"vozbox": {
+				"label": "VOZbox",
+				"type": "vozbox",
+				"expected_interval": "10 min",
+				"entries": {
+					"humidity": {
+						"sensors": ["1"],
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"o3": {
+						"sensors": ["1"],
+						"published": true,
+						"allowed_stages": ["raw", "calibrated"],
+						"default_stage": "calibrated",
+						"default_calibration": "VOZBox_QuinnCal",
+						"processors": { "raw": ["O3_VOZBox"] }
+					},
+					"pm10": {
+						"sensors": ["plantower", "sensirion"],
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"pm100": {
+						"sensors": ["plantower", "sensirion"],
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"pm25": {
+						"sensors": ["plantower", "sensirion"],
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					},
+					"temperature": {
+						"sensors": ["1"],
+						"published": false,
+						"allowed_stages": ["raw"],
+						"default_stage": "raw",
+						"default_calibration": "",
+						"processors": {}
+					}
+				}
+			}
+		},
+		"entries": {
+			"humidity": {
+				"label": "Humidity",
+				"type": "humidity",
+				"units": "%",
+				"epa_aqs_code": 62201,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"soiltemperature": {
+				"label": "Soil Temperature",
+				"type": "soiltemperature",
+				"units": "\u00b0F",
+				"epa_aqs_code": null,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"solarradiation": {
+				"label": "Solar Radiation",
+				"type": "solarradiation",
+				"units": "W/m\u00b2",
+				"epa_aqs_code": null,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"o3": {
+				"label": "Ozone",
+				"type": "o3",
+				"units": "ppb",
+				"epa_aqs_code": 44201,
+				"levels": {
+					"GOOD": {
+						"name": "good",
+						"label": "Good",
+						"color": "#00e400",
+						"range": [0.0, 124.9],
+						"guidance": null,
+						"tier": 0
+					},
+					"UNHEALTHY_SENSITIVE": {
+						"name": "unhealthy_sensitive",
+						"label": "Unhealthy for Sensitive Groups",
+						"color": "#ff7e00",
+						"range": [125, 164.9],
+						"guidance": "Sensitive groups should stay indoors and avoid outdoor activities.",
+						"tier": 2
+					},
+					"UNHEALTHY": {
+						"name": "unhealthy",
+						"label": "Unhealthy",
+						"color": "#ff0000",
+						"range": [165, 204.9],
+						"guidance": "Everyone should reduce prolonged or heavy exertion.",
+						"tier": 3
+					},
+					"VERY_UNHEALTHY": {
+						"name": "very_unhealthy",
+						"label": "Very Unhealthy",
+						"color": "#8f3f97",
+						"range": [205, 404.9],
+						"guidance": "Everyone should avoid prolonged or heavy exertion.",
+						"tier": 4
+					},
+					"HAZARDOUS": {
+						"name": "hazardous",
+						"label": "Hazardous",
+						"color": "#7e0023",
+						"range": [405, 604.9],
+						"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+						"tier": 4
+					},
+					"VERY_HAZARDOUS": {
+						"name": "very_hazardous",
+						"label": "Very Hazardous",
+						"color": "#7e0023",
+						"range": [605, 99999],
+						"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+						"tier": 4
+					}
+				},
+				"scale": {
+					"id": "o3",
+					"label": "Ozone",
+					"units": "ppb",
+					"kind": "range",
+					"source": {
+						"name": "US EPA AirNow, AQI Basics",
+						"url": "https://www.airnow.gov/aqi/aqi-basics/"
+					},
+					"levels": [
+						{
+							"key": "good",
+							"label": "Good",
+							"color": "#00e400",
+							"tier": 0,
+							"description": "Air quality is satisfactory, and air pollution poses little or no risk.",
+							"guidance": "",
+							"min": 0.0,
+							"max": 125,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "unhealthy_sensitive",
+							"label": "Unhealthy for Sensitive Groups",
+							"color": "#ff7e00",
+							"tier": 2,
+							"description": "Members of sensitive groups may experience health effects. The general public is less likely to be affected.",
+							"guidance": "Sensitive groups should stay indoors and avoid outdoor activities.",
+							"min": 125,
+							"max": 165,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "unhealthy",
+							"label": "Unhealthy",
+							"color": "#ff0000",
+							"tier": 3,
+							"description": "Some members of the general public may experience health effects; members of sensitive groups may experience more serious health effects.",
+							"guidance": "Everyone should reduce prolonged or heavy exertion.",
+							"min": 165,
+							"max": 205,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "very_unhealthy",
+							"label": "Very Unhealthy",
+							"color": "#8f3f97",
+							"tier": 4,
+							"description": "Health alert: The risk of health effects is increased for everyone.",
+							"guidance": "Everyone should avoid prolonged or heavy exertion.",
+							"min": 205,
+							"max": 405,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "hazardous",
+							"label": "Hazardous",
+							"color": "#7e0023",
+							"tier": 4,
+							"description": "Health warning of emergency conditions: everyone is more likely to be affected.",
+							"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+							"min": 405,
+							"max": 605,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "very_hazardous",
+							"label": "Very Hazardous",
+							"color": "#7e0023",
+							"tier": 4,
+							"description": "Health warning of emergency conditions: everyone is more likely to be affected.",
+							"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+							"min": 605,
+							"max": null,
+							"value": null,
+							"opacity": null
+						}
+					]
+				},
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"pressure": {
+				"label": "Atmospheric Pressure",
+				"type": "pressure",
+				"units": "mmHg",
+				"epa_aqs_code": null,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"netradiation": {
+				"label": "Net Radiation",
+				"type": "netradiation",
+				"units": "W/m\u00b2",
+				"epa_aqs_code": null,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"precipitation": {
+				"label": "Precipitation",
+				"type": "precipitation",
+				"units": "in",
+				"epa_aqs_code": null,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"pm25": {
+				"label": "PM2.5",
+				"type": "pm25",
+				"units": "\u00b5g/m\u00b3",
+				"epa_aqs_code": 88101,
+				"levels": {
+					"GOOD": {
+						"name": "good",
+						"label": "Good",
+						"color": "#00e400",
+						"range": [0.0, 9.0],
+						"guidance": null,
+						"tier": 0
+					},
+					"MODERATE": {
+						"name": "moderate",
+						"label": "Moderate",
+						"color": "#ffff00",
+						"range": [9.1, 35.4],
+						"guidance": "Highly sensitive groups should stay indoors and avoid outdoor activities.",
+						"tier": 1
+					},
+					"UNHEALTHY_SENSITIVE": {
+						"name": "unhealthy_sensitive",
+						"label": "Unhealthy for Sensitive Groups",
+						"color": "#ff7e00",
+						"range": [35.5, 55.4],
+						"guidance": "Sensitive groups should stay indoors and avoid outdoor activities.",
+						"tier": 2
+					},
+					"UNHEALTHY": {
+						"name": "unhealthy",
+						"label": "Unhealthy",
+						"color": "#ff0000",
+						"range": [55.5, 125.4],
+						"guidance": "Everyone should reduce prolonged or heavy exertion.",
+						"tier": 3
+					},
+					"VERY_UNHEALTHY": {
+						"name": "very_unhealthy",
+						"label": "Very Unhealthy",
+						"color": "#8f3f97",
+						"range": [125.5, 225.4],
+						"guidance": "Everyone should avoid prolonged or heavy exertion.",
+						"tier": 4
+					},
+					"HAZARDOUS": {
+						"name": "hazardous",
+						"label": "Hazardous",
+						"color": "#7e0023",
+						"range": [225.5, 99999],
+						"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+						"tier": 4
+					}
+				},
+				"scale": {
+					"id": "pm25",
+					"label": "PM2.5",
+					"units": "\u00b5g/m\u00b3",
+					"kind": "range",
+					"source": {
+						"name": "US EPA AirNow, AQI Basics",
+						"url": "https://www.airnow.gov/aqi/aqi-basics/"
+					},
+					"levels": [
+						{
+							"key": "good",
+							"label": "Good",
+							"color": "#00e400",
+							"tier": 0,
+							"description": "Air quality is satisfactory, and air pollution poses little or no risk.",
+							"guidance": "",
+							"min": 0.0,
+							"max": 9.1,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "moderate",
+							"label": "Moderate",
+							"color": "#ffff00",
+							"tier": 1,
+							"description": "Air quality is acceptable. However, there may be a risk for some people, particularly those who are unusually sensitive to air pollution.",
+							"guidance": "Highly sensitive groups should stay indoors and avoid outdoor activities.",
+							"min": 9.1,
+							"max": 35.5,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "unhealthy_sensitive",
+							"label": "Unhealthy for Sensitive Groups",
+							"color": "#ff7e00",
+							"tier": 2,
+							"description": "Members of sensitive groups may experience health effects. The general public is less likely to be affected.",
+							"guidance": "Sensitive groups should stay indoors and avoid outdoor activities.",
+							"min": 35.5,
+							"max": 55.5,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "unhealthy",
+							"label": "Unhealthy",
+							"color": "#ff0000",
+							"tier": 3,
+							"description": "Some members of the general public may experience health effects; members of sensitive groups may experience more serious health effects.",
+							"guidance": "Everyone should reduce prolonged or heavy exertion.",
+							"min": 55.5,
+							"max": 125.5,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "very_unhealthy",
+							"label": "Very Unhealthy",
+							"color": "#8f3f97",
+							"tier": 4,
+							"description": "Health alert: The risk of health effects is increased for everyone.",
+							"guidance": "Everyone should avoid prolonged or heavy exertion.",
+							"min": 125.5,
+							"max": 225.5,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "hazardous",
+							"label": "Hazardous",
+							"color": "#7e0023",
+							"tier": 4,
+							"description": "Health warning of emergency conditions: everyone is more likely to be affected.",
+							"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+							"min": 225.5,
+							"max": null,
+							"value": null,
+							"opacity": null
+						}
+					]
+				},
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"no2": {
+				"label": "Nitrogen Dioxide",
+				"type": "no2",
+				"units": "ppb",
+				"epa_aqs_code": 42602,
+				"levels": {
+					"GOOD": {
+						"name": "good",
+						"label": "Good",
+						"color": "#00e400",
+						"range": [0.0, 53.9],
+						"guidance": null,
+						"tier": 0
+					},
+					"MODERATE": {
+						"name": "moderate",
+						"label": "Moderate",
+						"color": "#ffff00",
+						"range": [54.0, 100.9],
+						"guidance": "Highly sensitive groups should stay indoors and avoid outdoor activities.",
+						"tier": 1
+					},
+					"UNHEALTHY_SENSITIVE": {
+						"name": "unhealthy_sensitive",
+						"label": "Unhealthy for Sensitive Groups",
+						"color": "#ff7e00",
+						"range": [101.0, 360.9],
+						"guidance": "Sensitive groups should stay indoors and avoid outdoor activities.",
+						"tier": 2
+					},
+					"UNHEALTHY": {
+						"name": "unhealthy",
+						"label": "Unhealthy",
+						"color": "#ff0000",
+						"range": [361.0, 649.9],
+						"guidance": "Everyone should reduce prolonged or heavy exertion.",
+						"tier": 3
+					},
+					"VERY_UNHEALTHY": {
+						"name": "very_unhealthy",
+						"label": "Very Unhealthy",
+						"color": "#8f3f97",
+						"range": [650.0, 1249.9],
+						"guidance": "Everyone should avoid prolonged or heavy exertion.",
+						"tier": 4
+					},
+					"HAZARDOUS": {
+						"name": "hazardous",
+						"label": "Hazardous",
+						"color": "#7e0023",
+						"range": [1250.0, 2049.9],
+						"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+						"tier": 4
+					},
+					"VERY_HAZARDOUS": {
+						"name": "very_hazardous",
+						"label": "Very Hazardous",
+						"color": "#7e0023",
+						"range": [2050.0, 99999],
+						"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+						"tier": 4
+					}
+				},
+				"scale": {
+					"id": "no2",
+					"label": "Nitrogen Dioxide",
+					"units": "ppb",
+					"kind": "range",
+					"source": {
+						"name": "US EPA AirNow, AQI Basics",
+						"url": "https://www.airnow.gov/aqi/aqi-basics/"
+					},
+					"levels": [
+						{
+							"key": "good",
+							"label": "Good",
+							"color": "#00e400",
+							"tier": 0,
+							"description": "Air quality is satisfactory, and air pollution poses little or no risk.",
+							"guidance": "",
+							"min": 0.0,
+							"max": 54.0,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "moderate",
+							"label": "Moderate",
+							"color": "#ffff00",
+							"tier": 1,
+							"description": "Air quality is acceptable. However, there may be a risk for some people, particularly those who are unusually sensitive to air pollution.",
+							"guidance": "Highly sensitive groups should stay indoors and avoid outdoor activities.",
+							"min": 54.0,
+							"max": 101.0,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "unhealthy_sensitive",
+							"label": "Unhealthy for Sensitive Groups",
+							"color": "#ff7e00",
+							"tier": 2,
+							"description": "Members of sensitive groups may experience health effects. The general public is less likely to be affected.",
+							"guidance": "Sensitive groups should stay indoors and avoid outdoor activities.",
+							"min": 101.0,
+							"max": 361.0,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "unhealthy",
+							"label": "Unhealthy",
+							"color": "#ff0000",
+							"tier": 3,
+							"description": "Some members of the general public may experience health effects; members of sensitive groups may experience more serious health effects.",
+							"guidance": "Everyone should reduce prolonged or heavy exertion.",
+							"min": 361.0,
+							"max": 650.0,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "very_unhealthy",
+							"label": "Very Unhealthy",
+							"color": "#8f3f97",
+							"tier": 4,
+							"description": "Health alert: The risk of health effects is increased for everyone.",
+							"guidance": "Everyone should avoid prolonged or heavy exertion.",
+							"min": 650.0,
+							"max": 1250.0,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "hazardous",
+							"label": "Hazardous",
+							"color": "#7e0023",
+							"tier": 4,
+							"description": "Health warning of emergency conditions: everyone is more likely to be affected.",
+							"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+							"min": 1250.0,
+							"max": 2050.0,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "very_hazardous",
+							"label": "Very Hazardous",
+							"color": "#7e0023",
+							"tier": 4,
+							"description": "Health warning of emergency conditions: everyone is more likely to be affected.",
+							"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+							"min": 2050.0,
+							"max": null,
+							"value": null,
+							"opacity": null
+						}
+					]
+				},
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"etr": {
+				"label": "Alfalfa Reference Evapotranspiration",
+				"type": "etr",
+				"units": "in",
+				"epa_aqs_code": null,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"winddirection": {
+				"label": "Wind Direction",
+				"type": "winddirection",
+				"units": "\u00b0",
+				"epa_aqs_code": null,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"particulates": {
+				"label": "Particulates",
+				"type": "particulates",
+				"units": null,
+				"epa_aqs_code": null,
+				"levels": null,
+				"scale": null,
+				"fields": [
+					"timestamp",
+					"sensor",
+					"stage",
+					"processor",
+					"particles_03um",
+					"particles_05um",
+					"particles_10um",
+					"particles_25um",
+					"particles_50um",
+					"particles_100um"
+				]
+			},
+			"co2": {
+				"label": "Carbon Dioxide",
+				"type": "co2",
+				"units": "ppm",
+				"epa_aqs_code": 42102,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"eto": {
+				"label": "Reference Evapotranspiration",
+				"type": "eto",
+				"units": "in",
+				"epa_aqs_code": null,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"temperature": {
+				"label": "Temperature",
+				"type": "temperature",
+				"units": "\u00b0F",
+				"epa_aqs_code": 62101,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"windspeed": {
+				"label": "Wind Speed",
+				"type": "windspeed",
+				"units": "mph",
+				"epa_aqs_code": null,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"so2": {
+				"label": "Sulfur Dioxide",
+				"type": "so2",
+				"units": "ppb",
+				"epa_aqs_code": 42401,
+				"levels": {
+					"GOOD": {
+						"name": "good",
+						"label": "Good",
+						"color": "#00e400",
+						"range": [0, 35.9],
+						"guidance": null,
+						"tier": 0
+					},
+					"MODERATE": {
+						"name": "moderate",
+						"label": "Moderate",
+						"color": "#ffff00",
+						"range": [36, 75.9],
+						"guidance": "Highly sensitive groups should stay indoors and avoid outdoor activities.",
+						"tier": 1
+					},
+					"UNHEALTHY_SENSITIVE": {
+						"name": "unhealthy_sensitive",
+						"label": "Unhealthy for Sensitive Groups",
+						"color": "#ff7e00",
+						"range": [76, 185.9],
+						"guidance": "Sensitive groups should stay indoors and avoid outdoor activities.",
+						"tier": 2
+					},
+					"UNHEALTHY": {
+						"name": "unhealthy",
+						"label": "Unhealthy",
+						"color": "#ff0000",
+						"range": [186, 304.9],
+						"guidance": "Everyone should reduce prolonged or heavy exertion.",
+						"tier": 3
+					},
+					"VERY_UNHEALTHY": {
+						"name": "very_unhealthy",
+						"label": "Very Unhealthy",
+						"color": "#8f3f97",
+						"range": [305, 99999],
+						"guidance": "Everyone should avoid prolonged or heavy exertion.",
+						"tier": 4
+					}
+				},
+				"scale": {
+					"id": "so2",
+					"label": "Sulfur Dioxide",
+					"units": "ppb",
+					"kind": "range",
+					"source": {
+						"name": "US EPA AirNow, AQI Basics",
+						"url": "https://www.airnow.gov/aqi/aqi-basics/"
+					},
+					"levels": [
+						{
+							"key": "good",
+							"label": "Good",
+							"color": "#00e400",
+							"tier": 0,
+							"description": "Air quality is satisfactory, and air pollution poses little or no risk.",
+							"guidance": "",
+							"min": 0,
+							"max": 36,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "moderate",
+							"label": "Moderate",
+							"color": "#ffff00",
+							"tier": 1,
+							"description": "Air quality is acceptable. However, there may be a risk for some people, particularly those who are unusually sensitive to air pollution.",
+							"guidance": "Highly sensitive groups should stay indoors and avoid outdoor activities.",
+							"min": 36,
+							"max": 76,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "unhealthy_sensitive",
+							"label": "Unhealthy for Sensitive Groups",
+							"color": "#ff7e00",
+							"tier": 2,
+							"description": "Members of sensitive groups may experience health effects. The general public is less likely to be affected.",
+							"guidance": "Sensitive groups should stay indoors and avoid outdoor activities.",
+							"min": 76,
+							"max": 186,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "unhealthy",
+							"label": "Unhealthy",
+							"color": "#ff0000",
+							"tier": 3,
+							"description": "Some members of the general public may experience health effects; members of sensitive groups may experience more serious health effects.",
+							"guidance": "Everyone should reduce prolonged or heavy exertion.",
+							"min": 186,
+							"max": 305,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "very_unhealthy",
+							"label": "Very Unhealthy",
+							"color": "#8f3f97",
+							"tier": 4,
+							"description": "Health alert: The risk of health effects is increased for everyone.",
+							"guidance": "Everyone should avoid prolonged or heavy exertion.",
+							"min": 305,
+							"max": null,
+							"value": null,
+							"opacity": null
+						}
+					]
+				},
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"pm100": {
+				"label": "PM10.0",
+				"type": "pm100",
+				"units": "\u00b5g/m\u00b3",
+				"epa_aqs_code": 81102,
+				"levels": {
+					"GOOD": {
+						"name": "good",
+						"label": "Good",
+						"color": "#00e400",
+						"range": [0, 54.9],
+						"guidance": null,
+						"tier": 0
+					},
+					"MODERATE": {
+						"name": "moderate",
+						"label": "Moderate",
+						"color": "#ffff00",
+						"range": [55, 154.9],
+						"guidance": "Highly sensitive groups should stay indoors and avoid outdoor activities.",
+						"tier": 1
+					},
+					"UNHEALTHY_SENSITIVE": {
+						"name": "unhealthy_sensitive",
+						"label": "Unhealthy for Sensitive Groups",
+						"color": "#ff7e00",
+						"range": [155, 254.9],
+						"guidance": "Sensitive groups should stay indoors and avoid outdoor activities.",
+						"tier": 2
+					},
+					"UNHEALTHY": {
+						"name": "unhealthy",
+						"label": "Unhealthy",
+						"color": "#ff0000",
+						"range": [255, 354.9],
+						"guidance": "Everyone should reduce prolonged or heavy exertion.",
+						"tier": 3
+					},
+					"VERY_UNHEALTHY": {
+						"name": "very_unhealthy",
+						"label": "Very Unhealthy",
+						"color": "#8f3f97",
+						"range": [355, 424.9],
+						"guidance": "Everyone should avoid prolonged or heavy exertion.",
+						"tier": 4
+					},
+					"HAZARDOUS": {
+						"name": "hazardous",
+						"label": "Hazardous",
+						"color": "#7e0023",
+						"range": [425, 604.9],
+						"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+						"tier": 4
+					},
+					"VERY_HAZARDOUS": {
+						"name": "very_hazardous",
+						"label": "Very Hazardous",
+						"color": "#7e0023",
+						"range": [605, 99999],
+						"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+						"tier": 4
+					}
+				},
+				"scale": {
+					"id": "pm100",
+					"label": "PM10.0",
+					"units": "\u00b5g/m\u00b3",
+					"kind": "range",
+					"source": {
+						"name": "US EPA AirNow, AQI Basics",
+						"url": "https://www.airnow.gov/aqi/aqi-basics/"
+					},
+					"levels": [
+						{
+							"key": "good",
+							"label": "Good",
+							"color": "#00e400",
+							"tier": 0,
+							"description": "Air quality is satisfactory, and air pollution poses little or no risk.",
+							"guidance": "",
+							"min": 0,
+							"max": 55,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "moderate",
+							"label": "Moderate",
+							"color": "#ffff00",
+							"tier": 1,
+							"description": "Air quality is acceptable. However, there may be a risk for some people, particularly those who are unusually sensitive to air pollution.",
+							"guidance": "Highly sensitive groups should stay indoors and avoid outdoor activities.",
+							"min": 55,
+							"max": 155,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "unhealthy_sensitive",
+							"label": "Unhealthy for Sensitive Groups",
+							"color": "#ff7e00",
+							"tier": 2,
+							"description": "Members of sensitive groups may experience health effects. The general public is less likely to be affected.",
+							"guidance": "Sensitive groups should stay indoors and avoid outdoor activities.",
+							"min": 155,
+							"max": 255,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "unhealthy",
+							"label": "Unhealthy",
+							"color": "#ff0000",
+							"tier": 3,
+							"description": "Some members of the general public may experience health effects; members of sensitive groups may experience more serious health effects.",
+							"guidance": "Everyone should reduce prolonged or heavy exertion.",
+							"min": 255,
+							"max": 355,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "very_unhealthy",
+							"label": "Very Unhealthy",
+							"color": "#8f3f97",
+							"tier": 4,
+							"description": "Health alert: The risk of health effects is increased for everyone.",
+							"guidance": "Everyone should avoid prolonged or heavy exertion.",
+							"min": 355,
+							"max": 425,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "hazardous",
+							"label": "Hazardous",
+							"color": "#7e0023",
+							"tier": 4,
+							"description": "Health warning of emergency conditions: everyone is more likely to be affected.",
+							"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+							"min": 425,
+							"max": 605,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "very_hazardous",
+							"label": "Very Hazardous",
+							"color": "#7e0023",
+							"tier": 4,
+							"description": "Health warning of emergency conditions: everyone is more likely to be affected.",
+							"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+							"min": 605,
+							"max": null,
+							"value": null,
+							"opacity": null
+						}
+					]
+				},
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"co": {
+				"label": "Carbon Monoxide",
+				"type": "co",
+				"units": "ppm",
+				"epa_aqs_code": 42101,
+				"levels": {
+					"GOOD": {
+						"name": "good",
+						"label": "Good",
+						"color": "#00e400",
+						"range": [0.0, 4.4],
+						"guidance": null,
+						"tier": 0
+					},
+					"MODERATE": {
+						"name": "moderate",
+						"label": "Moderate",
+						"color": "#ffff00",
+						"range": [4.5, 9.4],
+						"guidance": "Highly sensitive groups should stay indoors and avoid outdoor activities.",
+						"tier": 1
+					},
+					"UNHEALTHY_SENSITIVE": {
+						"name": "unhealthy_sensitive",
+						"label": "Unhealthy for Sensitive Groups",
+						"color": "#ff7e00",
+						"range": [9.5, 12.4],
+						"guidance": "Sensitive groups should stay indoors and avoid outdoor activities.",
+						"tier": 2
+					},
+					"UNHEALTHY": {
+						"name": "unhealthy",
+						"label": "Unhealthy",
+						"color": "#ff0000",
+						"range": [12.5, 15.4],
+						"guidance": "Everyone should reduce prolonged or heavy exertion.",
+						"tier": 3
+					},
+					"VERY_UNHEALTHY": {
+						"name": "very_unhealthy",
+						"label": "Very Unhealthy",
+						"color": "#8f3f97",
+						"range": [15.5, 30.4],
+						"guidance": "Everyone should avoid prolonged or heavy exertion.",
+						"tier": 4
+					},
+					"HAZARDOUS": {
+						"name": "hazardous",
+						"label": "Hazardous",
+						"color": "#7e0023",
+						"range": [30.5, 50.3],
+						"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+						"tier": 4
+					},
+					"VERY_HAZARDOUS": {
+						"name": "very_hazardous",
+						"label": "Very Hazardous",
+						"color": "#7e0023",
+						"range": [50.4, 99999],
+						"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+						"tier": 4
+					}
+				},
+				"scale": {
+					"id": "co",
+					"label": "Carbon Monoxide",
+					"units": "ppm",
+					"kind": "range",
+					"source": {
+						"name": "US EPA AirNow, AQI Basics",
+						"url": "https://www.airnow.gov/aqi/aqi-basics/"
+					},
+					"levels": [
+						{
+							"key": "good",
+							"label": "Good",
+							"color": "#00e400",
+							"tier": 0,
+							"description": "Air quality is satisfactory, and air pollution poses little or no risk.",
+							"guidance": "",
+							"min": 0.0,
+							"max": 4.5,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "moderate",
+							"label": "Moderate",
+							"color": "#ffff00",
+							"tier": 1,
+							"description": "Air quality is acceptable. However, there may be a risk for some people, particularly those who are unusually sensitive to air pollution.",
+							"guidance": "Highly sensitive groups should stay indoors and avoid outdoor activities.",
+							"min": 4.5,
+							"max": 9.5,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "unhealthy_sensitive",
+							"label": "Unhealthy for Sensitive Groups",
+							"color": "#ff7e00",
+							"tier": 2,
+							"description": "Members of sensitive groups may experience health effects. The general public is less likely to be affected.",
+							"guidance": "Sensitive groups should stay indoors and avoid outdoor activities.",
+							"min": 9.5,
+							"max": 12.5,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "unhealthy",
+							"label": "Unhealthy",
+							"color": "#ff0000",
+							"tier": 3,
+							"description": "Some members of the general public may experience health effects; members of sensitive groups may experience more serious health effects.",
+							"guidance": "Everyone should reduce prolonged or heavy exertion.",
+							"min": 12.5,
+							"max": 15.5,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "very_unhealthy",
+							"label": "Very Unhealthy",
+							"color": "#8f3f97",
+							"tier": 4,
+							"description": "Health alert: The risk of health effects is increased for everyone.",
+							"guidance": "Everyone should avoid prolonged or heavy exertion.",
+							"min": 15.5,
+							"max": 30.5,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "hazardous",
+							"label": "Hazardous",
+							"color": "#7e0023",
+							"tier": 4,
+							"description": "Health warning of emergency conditions: everyone is more likely to be affected.",
+							"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+							"min": 30.5,
+							"max": 50.4,
+							"value": null,
+							"opacity": null
+						},
+						{
+							"key": "very_hazardous",
+							"label": "Very Hazardous",
+							"color": "#7e0023",
+							"tier": 4,
+							"description": "Health warning of emergency conditions: everyone is more likely to be affected.",
+							"guidance": "Everyone should stay indoors and avoid physical outdoor activities.",
+							"min": 50.4,
+							"max": null,
+							"value": null,
+							"opacity": null
+						}
+					]
+				},
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"pm10": {
+				"label": "PM1.0",
+				"type": "pm10",
+				"units": "\u00b5g/m\u00b3",
+				"epa_aqs_code": null,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"vaporpressure": {
+				"label": "Vapor Pressure",
+				"type": "vaporpressure",
+				"units": "kPa",
+				"epa_aqs_code": null,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			},
+			"dewpoint": {
+				"label": "Dew Point",
+				"type": "dewpoint",
+				"units": "\u00b0F",
+				"epa_aqs_code": null,
+				"levels": null,
+				"scale": null,
+				"fields": ["timestamp", "sensor", "stage", "processor", "value"]
+			}
+		},
+		"stages": {
+			"raw": {
+				"key": "raw",
+				"label": "Raw",
+				"description": "The reading exactly as the monitor or its data provider reported it, before any adjustment."
+			},
+			"corrected": {
+				"key": "corrected",
+				"label": "Corrected",
+				"description": "Raw readings from a monitor's two sensors checked against each other and combined into one value."
+			},
+			"cleaned": {
+				"key": "cleaned",
+				"label": "Cleaned",
+				"description": "Readings with obvious errors removed or smoothed, such as impossible values and short spikes."
+			},
+			"calibrated": {
+				"key": "calibrated",
+				"label": "Calibrated",
+				"description": "Readings adjusted to better match reference-grade instruments, or aggregated or computed by the data provider."
+			}
+		},
+		"processors": {
+			"AQLiteRawCleaner": {
+				"key": "AQLiteRawCleaner",
+				"label": "Ozone range and warm-up check",
+				"description": "Discards impossible ozone readings and readings taken in the 20 minutes after the sensor restarts, while it warms up."
+			},
+			"AirGradientHumidity": {
+				"key": "AirGradientHumidity",
+				"label": "Humidity correction",
+				"description": "Corrects AirGradient and PurpleAir relative humidity readings using AirGradient's published equation, capped at 100 percent."
+			},
+			"AirGradientTemperature": {
+				"key": "AirGradientTemperature",
+				"label": "Temperature correction",
+				"description": "Corrects AirGradient and PurpleAir outdoor temperature readings using AirGradient's published equation; indoor monitors are skipped."
+			},
+			"O3_VOZBox": {
+				"key": "O3_VOZBox",
+				"label": "VOZBox ozone calibration",
+				"description": "Adjusts raw VOZBox ozone using a fit that accounts for temperature and humidity."
+			},
+			"PM25_EPA_Oct2021": {
+				"key": "PM25_EPA_Oct2021",
+				"label": "EPA correction (Oct 2021)",
+				"description": "Adjusts low-cost sensor PM2.5 using humidity, following the EPA's October 2021 PurpleAir correction for the Fire and Smoke Map."
+			},
+			"PM25_FEM_Cleaner": {
+				"key": "PM25_FEM_Cleaner",
+				"label": "Range check for reference monitors",
+				"description": "Discards impossible PM2.5 readings from reference-grade monitors and sets small negative values to zero."
+			},
+			"PM25_LCS_Cleaning": {
+				"key": "PM25_LCS_Cleaning",
+				"label": "Spike cleaning",
+				"description": "Replaces a sudden one-reading jump in PM2.5 with the higher of the neighboring readings when it far exceeds them."
+			},
+			"PM25_LCS_Correction": {
+				"key": "PM25_LCS_Correction",
+				"label": "Two-sensor check and blend",
+				"description": "Compares a monitor's two PM2.5 sensors, drops bad or stuck readings, and averages them when they agree (or uses the lower one when they don't)."
+			},
+			"PM25_MultivariateLinearRegression": {
+				"key": "PM25_MultivariateLinearRegression",
+				"label": "Linear calibration (with weather)",
+				"description": "Adjusts low-cost sensor PM2.5 using a fit to a reference monitor that also accounts for temperature and humidity."
+			},
+			"PM25_UnivariateLinearRegression": {
+				"key": "PM25_UnivariateLinearRegression",
+				"label": "Linear calibration (PM2.5 only)",
+				"description": "Adjusts low-cost sensor PM2.5 with a straight-line fit built by comparing nearby sensors to a reference monitor."
+			}
+		}
+	}
+}

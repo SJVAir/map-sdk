@@ -91,6 +91,15 @@ class GlMap extends MaptilerMap {
 		if (pending) pending.styleLoadedCallbackFired = true;
 		return clearStyle.apply(this, args) as this;
 	}
+
+	/**
+	 * MapTiler's telemetry timer calls this 2 s after the map is created, even when it has been
+	 * removed since (a map hidden quickly), and a removed map has no style to ask.
+	 */
+	override isGlobeProjection(): boolean {
+		if (!(this as unknown as { style?: unknown }).style) return false;
+		return super.isGlobeProjection();
+	}
 }
 
 /** The style of `ctx`'s current basemap. Throws when there is none, rather than letting MapTiler fall back to its own default style. */

@@ -223,6 +223,20 @@ describe("MapView", () => {
 		expect(probe?.closest("[data-mapsdk-map]")?.getAttribute("data-mapsdk-map")).toBe(map.uid);
 	});
 
+	it("answers MapTiler's telemetry after removal (hidden within its 2 s timer)", async () => {
+		// The SDK's telemetry timer asks every map `isGlobeProjection()` 2 s after creation,
+		// whether or not the map was removed meanwhile; a removed map has no style to ask.
+		const container = document.createElement("div");
+		container.className = "test-map";
+		document.body.append(container);
+		const gl = createGlMap(container, newMap()) as unknown as {
+			remove(): void;
+			isGlobeProjection(): boolean;
+		};
+		gl.remove();
+		expect(gl.isGlobeProjection()).toBe(false);
+	});
+
 	it("never sets MapTiler's global key", async () => {
 		const before = maptilerConfig.apiKey;
 		await render(MapView, { map: newMap(), class: "test-map" });
