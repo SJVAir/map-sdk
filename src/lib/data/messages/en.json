@@ -1,6 +1,7 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
 	"mapsdk_list_button": "List",
+	"mapsdk_list_button_label": "List of features on the map",
 	"mapsdk_list_label": "Features on the map",
 	"mapsdk_list_sort_name": "Name",
 	"mapsdk_list_sort_value": "Value",

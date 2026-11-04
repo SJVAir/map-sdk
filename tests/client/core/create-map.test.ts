@@ -377,15 +377,28 @@ describe("pickFromList", () => {
 		expect(map.getSelection("monitors")).toBeNull();
 	});
 
-	it("doesn't fire featureclick", () => {
+	it("fires featureclick like a map click, before the selection changes", () => {
 		const map = createMap({ config });
-		const onclick = vi.fn();
-		map.on("featureclick", onclick);
-		map.addPlugin(plugin("monitors", [], { features: () => [listItem("1")] }), {
-			selectionMode: "single"
+		const order: string[] = [];
+		map.on("featureclick", (e) => {
+			order.push(`click:${e.pluginId}:${JSON.stringify(e.ref)}`);
+			order.push(`selection:${JSON.stringify(map.getSelection("monitors"))}`);
 		});
+		map.addPlugin(
+			plugin("monitors", [], { features: () => [listItem("1"), listItem("2", undefined, false)] }),
+			{ selectionMode: "single" }
+		);
 		map.pickFromList("monitors", "monitor:1", false);
-		expect(onclick).not.toHaveBeenCalled();
+		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["1"] });
+		// A feature that can't be selected is still clicked, as on the map.
+		map.pickFromList("monitors", "monitor:2", false);
+		map.pickFromList("monitors", "monitor:9", false);
+		expect(order).toEqual([
+			'click:monitors:{"kind":"monitor","id":"1"}',
+			"selection:null",
+			'click:monitors:{"kind":"monitor","id":"2"}',
+			'selection:{"kind":"monitors","ids":["1"]}'
+		]);
 		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["1"] });
 	});
 });
@@ -411,8 +424,14 @@ describe("selection mode and focus", () => {
 		map.attach(gl);
 		map.focusFeature("monitor:1", "b");
 		expect(gl.getCenter()).toEqual({ lng: -120, lat: 37 });
+		expect(map.focusedPluginId).toBe("b");
 		map.focusFeature("monitor:1");
 		expect(gl.getCenter()).toEqual({ lng: -118, lat: 35 });
+		expect(map.focusedPluginId).toBeNull();
+		map.focusFeature("monitor:1", "b");
+		map.focusFeature(null);
+		expect(map.focusedKey).toBeNull();
+		expect(map.focusedPluginId).toBeNull();
 	});
 
 	it("clears the focused key without moving the camera", () => {

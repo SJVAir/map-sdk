@@ -112,6 +112,7 @@
 				bind:this={listButton}
 				type="button"
 				class="mapsdk-list-button"
+				aria-label={map.messages("mapsdk_list_button_label")}
 				aria-expanded={listOpen}
 				aria-controls={listId}
 				onclick={() => (listOpen = !listOpen)}

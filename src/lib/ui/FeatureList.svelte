@@ -108,7 +108,7 @@
 	}
 
 	function pick(row: Row, additive: boolean) {
-		if (isSelectable(row)) map.pickFromList(row.pluginId, row.refKey, additive);
+		map.pickFromList(row.pluginId, row.refKey, additive);
 	}
 
 	function pageSize(): number {

@@ -30,9 +30,9 @@
 	// something is shown, so an idle map doesn't subscribe to any plugin's data.
 	const found = $derived.by((): { item: FeatureListItem; plugin: MapPlugin } | null => {
 		if (key === null) return null;
-		// MapContext stores only the focused refKey, so the first plugin with that key wins
-		// (Ruling R17: Task 18 adds plugin ids to list rows).
-		const plugins = hit ? map.plugins.filter((p) => p.id === hit.pluginId) : map.plugins;
+		// The hovered hit's plugin, or the focused one; without either, the first plugin listing the key.
+		const pluginId = hit ? hit.pluginId : map.focusedPluginId;
+		const plugins = pluginId ? map.plugins.filter((p) => p.id === pluginId) : map.plugins;
 		for (const plugin of plugins) {
 			const item = plugin.features?.().find((f) => f.refKey === key);
 			if (item) return { item, plugin };

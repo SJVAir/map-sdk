@@ -329,8 +329,14 @@ describe("MapView list button", () => {
 			},
 			{ selectionMode: "single" }
 		);
+		const attached = trackAttach(map);
 		await render(MapView, { map, class: "test-map" });
-		const button = page.getByRole("button", { name: "List" });
+		await whenLoaded(attached[0]);
+		const button = page.getByRole("button", { name: "List of features on the map" });
+		// The next tab stop after the map canvas.
+		attached[0].getCanvas().focus();
+		await userEvent.tab();
+		expect(document.activeElement).toBe(button.element());
 		await expect.element(button).toHaveAttribute("aria-expanded", "false");
 		const panel = document.getElementById(button.element().getAttribute("aria-controls")!)!;
 		expect(panel.querySelector("[role=listbox]")).not.toBeNull();

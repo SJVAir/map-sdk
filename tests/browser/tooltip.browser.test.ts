@@ -44,6 +44,25 @@ function fakeMap(
 const project = () => ({ x: 100, y: 100 });
 
 describe("MapTooltip", () => {
+	it("shows the focused plugin's item when two plugins list the same refKey", async () => {
+		const plugin = (id: string, name: string): MapPlugin => ({
+			id,
+			setup: () => () => {},
+			features: () => [item("a", name, level("Good", "#00e400"))]
+		});
+		const map = {
+			plugins: [plugin("first", "First site"), plugin("second", "Second site")],
+			messages: defaultMessages,
+			format: createDefaultFormat(),
+			focusedKey: "a",
+			focusedPluginId: "second",
+			hovered: null
+		} as never;
+		render(MapTooltip, { map, project });
+		await expect.element(page.getByRole("tooltip")).toBeVisible();
+		expect(document.querySelector(".mapsdk-tooltip-name")!.textContent).toBe("Second site");
+	});
+
 	it("shows the focused item's name, value, and level label", async () => {
 		const map = fakeMap([item("a", "Fresno Yosemite", level("Moderate", "#ff7e00"))], {
 			focusedKey: "a"

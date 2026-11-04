@@ -78,10 +78,10 @@ export interface MapContext {
 	/** Reactive. `"none"` for an unknown plugin. */
 	getSelectionMode(pluginId: string): SelectionMode;
 	/**
-	 * Internal, for FeatureList: picks a listed feature with the same selection rules as a map
-	 * click (`additive` adds or toggles in `multiple` mode), calling `onselectionchange` if the
-	 * selection changes. Does nothing for an item that isn't selectable. Doesn't fire
-	 * `featureclick`, which is for clicks on the map.
+	 * Internal, for FeatureList: picks a listed feature exactly like a map click on it. Fires
+	 * `featureclick`, then applies the same selection rules (`additive` adds or toggles in
+	 * `multiple` mode), calling `onselectionchange` if the selection changes. An item that isn't
+	 * selectable is still clicked but not selected. Does nothing for a refKey the plugin doesn't list.
 	 */
 	pickFromList(pluginId: string, refKey: string, additive: boolean): void;
 	/**
@@ -104,11 +104,13 @@ export interface MapContext {
 	/**
 	 * Marks the feature focused and pans to it (no animation under reduced motion): the item in
 	 * `pluginId`'s features when given, else the first plugin listing `refKey`. `null` clears the
-	 * focus without moving the camera.
+	 * focus without moving the camera. Sets `focusedPluginId` to `pluginId` (or `null`).
 	 */
 	focusFeature(refKey: string | null, pluginId?: string): void;
 	/** Reactive. */
 	readonly focusedKey: string | null;
+	/** Reactive. The plugin `focusFeature` was given with `focusedKey`, or `null`. */
+	readonly focusedPluginId: string | null;
 	/** For MapView only: uses `gl` from now on. */
 	attach(gl: GlMapLike): void;
 	/** For MapView only: stops using the current GL map. */
@@ -176,6 +178,7 @@ class MapContextImpl implements MapContext {
 	#bounds = $state.raw<Bounds | null>(null);
 	#attached = $state(false);
 	#focusedKey = $state<string | null>(null);
+	#focusedPluginId = $state<string | null>(null);
 	#selections = new SvelteMap<string, PluginSelection>();
 	#featureClickHandlers = new Set<FeatureClickHandler>();
 	#router = new InteractionRouter();
@@ -222,6 +225,10 @@ class MapContextImpl implements MapContext {
 
 	get focusedKey(): string | null {
 		return this.#focusedKey;
+	}
+
+	get focusedPluginId(): string | null {
+		return this.#focusedPluginId;
 	}
 
 	get hovered(): Hovered | null {
@@ -273,8 +280,9 @@ class MapContextImpl implements MapContext {
 	pickFromList(pluginId: string, refKey: string, additive: boolean): void {
 		if (this.#destroyed) return;
 		const found = untrack(() => this.#findItem(refKey, pluginId));
-		if (!found?.item.selectable) return;
-		this.#applyPick(pluginId, found.item.ref, additive);
+		if (!found) return;
+		this.#emitClick(pluginId, found.item.ref);
+		if (found.item.selectable) this.#applyPick(pluginId, found.item.ref, additive);
 	}
 
 	setSelectionMode(pluginId: string, mode: SelectionMode): void {
@@ -310,6 +318,7 @@ class MapContextImpl implements MapContext {
 	focusFeature(refKey: string | null, pluginId?: string): void {
 		if (this.#destroyed) return;
 		this.#focusedKey = refKey;
+		this.#focusedPluginId = refKey === null ? null : (pluginId ?? null);
 		const gl = this.#gl;
 		if (!gl || refKey === null) return;
 		const found = untrack(() => this.#findItem(refKey, pluginId));
@@ -353,6 +362,7 @@ class MapContextImpl implements MapContext {
 		this.#selections.clear();
 		this.#featureClickHandlers.clear();
 		this.#focusedKey = null;
+		this.#focusedPluginId = null;
 		this.#destroyed = true;
 	}
 
@@ -360,6 +370,11 @@ class MapContextImpl implements MapContext {
 	#pick(e: ClickEvent): void {
 		if (this.#destroyed) return;
 		const [{ pluginId, ref }] = e.hits;
+		this.#emitClick(pluginId, ref);
+		this.#applyPick(pluginId, ref, e.additive);
+	}
+
+	#emitClick(pluginId: string, ref: FeatureRef): void {
 		for (const handler of [...this.#featureClickHandlers]) {
 			try {
 				handler({ pluginId, ref });
@@ -367,7 +382,6 @@ class MapContextImpl implements MapContext {
 				console.error("map-sdk: a featureclick handler failed", error);
 			}
 		}
-		this.#applyPick(pluginId, ref, e.additive);
 	}
 
 	/** The one place a user's pick (map click or list key) changes a plugin's selection. */
