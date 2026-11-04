@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy, untrack } from "svelte";
 	import type { MapContext } from "../core/create-map.svelte.js";
 	import type { GlMapLike } from "../core/gl.js";
 
@@ -26,18 +27,39 @@
 		...new Set(datasets.flatMap((d) => (fetched[d] ? [fetched[d]] : [])))
 	]);
 
+	// An unavailable attribution is tried again on a later moveend, at most once a minute.
+	const RETRY_MS = 60_000;
+	const controller = new AbortController();
+	onDestroy(() => controller.abort());
+	// Plain collections: bookkeeping, never rendered.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	const inflight = new Set<string>();
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
+	const failedAt = new Map<string, number>();
+
 	$effect(() => {
-		const controller = new AbortController();
-		for (const dataset of datasets) {
-			map.metadata.attribution(dataset, controller.signal).then(
-				(text) => {
-					if (controller.signal.aborted || text === "unavailable") return;
-					fetched = { ...fetched, [dataset]: text };
-				},
-				() => {}
-			);
-		}
-		return () => controller.abort();
+		void map.bounds;
+		const wanted = datasets;
+		untrack(() => {
+			for (const dataset of wanted) {
+				if (fetched[dataset] || inflight.has(dataset)) continue;
+				const failed = failedAt.get(dataset);
+				if (failed !== undefined && Date.now() - failed < RETRY_MS) continue;
+				inflight.add(dataset);
+				map.metadata.attribution(dataset, controller.signal).then(
+					(text) => {
+						inflight.delete(dataset);
+						if (controller.signal.aborted) return;
+						if (text === "unavailable") failedAt.set(dataset, Date.now());
+						else fetched = { ...fetched, [dataset]: text };
+					},
+					() => {
+						inflight.delete(dataset);
+						failedAt.set(dataset, Date.now());
+					}
+				);
+			}
+		});
 	});
 
 	function zoomBy(delta: number) {
@@ -60,7 +82,7 @@
 
 <div class="mapsdk-credits">
 	<a class="mapsdk-logo" href={MAPTILER_URL} target="_blank" rel="noopener">
-		<img src={MAPTILER_LOGO} alt={map.messages("mapsdk_logo_maptiler")} height="24" />
+		<img src={MAPTILER_LOGO} alt={map.messages("mapsdk_logo_maptiler")} width="80" height="24" />
 	</a>
 	<ul aria-label={map.messages("mapsdk_attribution_label")}>
 		{#each dataCredits as credit (credit)}
@@ -170,6 +192,7 @@
 
 	.mapsdk-logo img {
 		display: block;
+		object-fit: contain;
 	}
 
 	.mapsdk-credits a:focus-visible {

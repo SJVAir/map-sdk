@@ -14,6 +14,7 @@
 	"mapsdk_selection_clear": "Clear",
 	"mapsdk_selection_clear_layer": "Clear selection: {layer}",
 	"mapsdk_selected_in_layer": "{layer}: {selected}",
+	"mapsdk_selection_cleared": "Selection cleared",
 	"mapsdk_summary_one": "{count} {layer}",
 	"mapsdk_summary_other": "{count} {layer}",
 	"mapsdk_summary_level": "{count} {level}",

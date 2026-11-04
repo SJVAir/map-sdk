@@ -146,6 +146,12 @@
 		position: relative;
 	}
 
+	/* The region takes focus only from script (the selection bar's Clear), never from Tab. */
+	.mapsdk-map:focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: -2px;
+	}
+
 	.mapsdk-gl {
 		position: absolute;
 		inset: 0;

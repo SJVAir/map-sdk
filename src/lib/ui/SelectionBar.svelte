@@ -3,6 +3,8 @@
 
 	let { map }: { map: MapContext } = $props();
 
+	let bar: HTMLElement | undefined = $state();
+
 	// Every id counts, whether or not it is in the data: a host may select features that load later.
 	const entries = $derived(
 		map.plugins.flatMap((plugin) => {
@@ -10,10 +12,32 @@
 			return count > 0 ? [{ id: plugin.id, layer: plugin.label ?? plugin.id, count }] : [];
 		})
 	);
+
+	/**
+	 * Clears one plugin's selection. The button is about to go (or its row is), so focus moves
+	 * first: to another plugin's Clear button, else the List button, else the map region.
+	 */
+	function clear(id: string, button: HTMLElement) {
+		const another = [...(bar?.querySelectorAll<HTMLElement>("button") ?? [])].find(
+			(b) => b !== button
+		);
+		const region = bar?.closest<HTMLElement>("[data-mapsdk-map]");
+		const target = another ?? region?.querySelector<HTMLElement>(".mapsdk-list-button") ?? region;
+		if (target === region && region && !region.hasAttribute("tabindex")) {
+			region.setAttribute("tabindex", "-1");
+		}
+		target?.focus();
+		map.clearSelection(id);
+	}
 </script>
 
 {#if entries.length > 0}
-	<div class="mapsdk-selection" role="group" aria-label={map.messages("mapsdk_selection_label")}>
+	<div
+		bind:this={bar}
+		class="mapsdk-selection"
+		role="group"
+		aria-label={map.messages("mapsdk_selection_label")}
+	>
 		{#each entries as entry (entry.id)}
 			{@const selected = map.messages("mapsdk_selected_count", { count: entry.count })}
 			<div class="mapsdk-selection-row">
@@ -25,7 +49,7 @@
 				<button
 					type="button"
 					aria-label={map.messages("mapsdk_selection_clear_layer", { layer: entry.layer })}
-					onclick={() => map.clearSelection(entry.id)}
+					onclick={(e) => clear(entry.id, e.currentTarget)}
 				>
 					{map.messages("mapsdk_selection_clear")}
 				</button>
@@ -38,13 +62,16 @@
 	.mapsdk-selection {
 		position: absolute;
 		top: 0.75rem;
-		left: 50%;
+		/* Clear of the List button (left) and the zoom buttons (right); centered between them. */
+		right: 4rem;
+		left: 5rem;
 		z-index: 2;
 		display: flex;
 		flex-direction: column;
 		gap: 0.25rem;
-		max-width: calc(100% - 16rem);
-		transform: translateX(-50%);
+		box-sizing: border-box;
+		width: fit-content;
+		margin-inline: auto;
 		padding: 0.375rem 0.5rem 0.375rem 0.75rem;
 		border: 1px solid var(--card-border, var(--border));
 		border-radius: var(--radius-control, var(--radius));
@@ -57,12 +84,19 @@
 
 	.mapsdk-selection-row {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		justify-content: space-between;
-		gap: 0.75rem;
+		gap: 0.25rem 0.75rem;
+	}
+
+	.mapsdk-selection-row span {
+		min-width: 0;
+		overflow-wrap: anywhere;
 	}
 
 	button {
+		flex: none;
 		padding: 0.25rem 0.625rem;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-control, var(--radius));

@@ -29,4 +29,35 @@ describe("package.json", () => {
 		expect(pkg.dependencies).not.toHaveProperty("@sjvair/sdk");
 		expect(pkg.dependencies).not.toHaveProperty("svelte");
 	});
+
+	it("exports the hosts' components and helpers from the root, not internal helpers", () => {
+		const index = readFileSync(new URL("../../src/lib/index.ts", import.meta.url), "utf8");
+		const exported = [...index.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}/g)].flatMap((m) =>
+			m[1].split(",").map((name) =>
+				name
+					.trim()
+					.split(/\s+as\s+/)
+					.pop()!
+			)
+		);
+		for (const name of [
+			"MapView",
+			"Legend",
+			"MapTooltip",
+			"FeatureList",
+			"SelectionBar",
+			"ViewSummary",
+			"MapControls",
+			"legendSection",
+			"summaryText",
+			"rowLabel",
+			"pointsPlugin",
+			"shapesPlugin"
+		]) {
+			expect(exported, name).toContain(name);
+		}
+		for (const name of ["optionIdPart", "typeaheadIndex", "swatchOverBackground", "LegendBar"]) {
+			expect(exported, name).not.toContain(name);
+		}
+	});
 });
