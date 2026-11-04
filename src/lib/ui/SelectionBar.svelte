@@ -35,7 +35,7 @@
 {#if entries.length > 0}
 	<div
 		bind:this={bar}
-		class="mapsdk-selection"
+		class="mapsdk-selection text-sm"
 		role="group"
 		aria-label={map.messages("mapsdk_selection_label")}
 	>
@@ -80,7 +80,6 @@
 		background: var(--background);
 		color: var(--foreground);
 		box-shadow: var(--shadow-card, none);
-		font-size: var(--text-sm, 0.875rem);
 		pointer-events: auto;
 	}
 

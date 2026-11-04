@@ -74,7 +74,7 @@
 	<button type="button" class="mapsdk-focus mapsdk-motion" disabled={!gl} onclick={() => zoomBy(1)}>
 		<span class="mapsdk-zoom-icon" aria-hidden="true">+</span>
 		<span class="mapsdk-sr">{map.messages("mapsdk_zoom_in")}</span>
-		<span class="mapsdk-zoom-tip mapsdk-motion" aria-hidden="true"
+		<span class="mapsdk-zoom-tip mapsdk-motion text-xs" aria-hidden="true"
 			>{map.messages("mapsdk_zoom_in")}</span
 		>
 	</button>
@@ -86,13 +86,13 @@
 	>
 		<span class="mapsdk-zoom-icon" aria-hidden="true">&minus;</span>
 		<span class="mapsdk-sr">{map.messages("mapsdk_zoom_out")}</span>
-		<span class="mapsdk-zoom-tip mapsdk-motion" aria-hidden="true"
+		<span class="mapsdk-zoom-tip mapsdk-motion text-xs" aria-hidden="true"
 			>{map.messages("mapsdk_zoom_out")}</span
 		>
 	</button>
 </div>
 
-<div class="mapsdk-credits">
+<div class="mapsdk-credits text-xs">
 	<a class="mapsdk-logo mapsdk-focus" href={MAPTILER_URL} target="_blank" rel="noopener">
 		<img src={MAPTILER_LOGO} alt={map.messages("mapsdk_logo_maptiler")} width="80" height="24" />
 	</a>
@@ -152,6 +152,15 @@
 		position: relative;
 	}
 
+	/* The hover fill follows the group's rounded corners. */
+	.mapsdk-zoom button:first-child {
+		border-radius: var(--radius-control, var(--radius)) var(--radius-control, var(--radius)) 0 0;
+	}
+
+	.mapsdk-zoom button:last-child {
+		border-radius: 0 0 var(--radius-control, var(--radius)) var(--radius-control, var(--radius));
+	}
+
 	.mapsdk-zoom button:hover:not(:disabled) {
 		background: var(--accent, var(--muted));
 	}
@@ -172,7 +181,6 @@
 		background: var(--popover, var(--background));
 		color: var(--popover-foreground, var(--foreground));
 		box-shadow: var(--shadow-lifted, var(--shadow-card, none));
-		font-size: var(--text-xs, 0.75rem);
 		white-space: nowrap;
 		opacity: 0;
 		pointer-events: none;
@@ -185,7 +193,7 @@
 	}
 
 	.mapsdk-zoom-icon {
-		font-size: var(--text-lg, 1.125rem);
+		font-size: 1.25rem;
 		line-height: 1;
 	}
 
@@ -211,7 +219,6 @@
 		border-radius: var(--radius-control, var(--radius));
 		background: var(--overlay, var(--background));
 		color: var(--foreground);
-		font-size: var(--text-xs, 0.75rem);
 		pointer-events: auto;
 	}
 

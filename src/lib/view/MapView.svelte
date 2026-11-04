@@ -118,7 +118,7 @@
 			<button
 				bind:this={listButton}
 				type="button"
-				class="mapsdk-list-button mapsdk-focus mapsdk-motion"
+				class="mapsdk-list-button mapsdk-focus mapsdk-motion text-sm"
 				aria-label={map.messages("mapsdk_list_button_label")}
 				aria-expanded={listOpen}
 				aria-controls={listOpen ? listId : undefined}
@@ -179,8 +179,7 @@
 		background: var(--background);
 		color: var(--foreground);
 		box-shadow: var(--shadow-card, none);
-		font: inherit;
-		font-size: var(--text-sm, 0.875rem);
+		font-family: inherit;
 		cursor: pointer;
 		pointer-events: auto;
 	}

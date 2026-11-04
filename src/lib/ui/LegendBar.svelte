@@ -42,13 +42,13 @@
 
 {#if bar.kind === "gradient" && gradient}
 	<div class="mapsdk-legend-gradient" style:background={gradient} aria-hidden="true"></div>
-	<div class="mapsdk-legend-ticks" aria-hidden="true">
+	<div class="mapsdk-legend-ticks text-xs" aria-hidden="true">
 		{#each bar.stops as stop, i (i)}
 			<span>{stop.tick}</span>
 		{/each}
 	</div>
 {/if}
-<ul class="mapsdk-legend-items">
+<ul class="mapsdk-legend-items text-xs">
 	{#each items as item, i (i)}
 		<li>
 			<span class="mapsdk-legend-swatch" style:background={item.color}></span>
@@ -71,7 +71,6 @@
 		display: flex;
 		justify-content: space-between;
 		margin-top: 0.375rem;
-		font-size: var(--text-xs, 0.75rem);
 		font-variant-numeric: tabular-nums;
 	}
 
@@ -82,7 +81,6 @@
 		margin: 0.5rem 0 0;
 		padding: 0;
 		list-style: none;
-		font-size: var(--text-xs, 0.75rem);
 	}
 
 	/* Visually hidden, read after the label. */

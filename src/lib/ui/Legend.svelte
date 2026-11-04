@@ -49,10 +49,10 @@
 >
 	{#each sections as section (section.pluginId)}
 		<div class="mapsdk-legend-section">
-			<h3>
+			<h3 class="text-sm">
 				{section.title}
 				{#if section.units}
-					<span>({section.units})</span>
+					<span class="text-xs">({section.units})</span>
 				{/if}
 			</h3>
 			{#if background !== null}
@@ -86,12 +86,10 @@
 	h3 {
 		margin: 0 0 0.5rem;
 		text-align: center;
-		font-size: var(--text-sm, 0.875rem);
 		font-weight: 600;
 	}
 
 	h3 span {
-		font-size: var(--text-xs, 0.75rem);
 		font-weight: 400;
 		color: var(--muted-foreground);
 	}

@@ -278,7 +278,7 @@
 	});
 </script>
 
-<div class={["mapsdk-list", className]} {id} data-mapsdk-map={map.uid}>
+<div class={["mapsdk-list text-sm", className]} {id} data-mapsdk-map={map.uid}>
 	<div class="mapsdk-list-sort">
 		<button
 			type="button"
@@ -356,7 +356,7 @@
 					<span class="mapsdk-list-value">
 						{formatValue(row)}{#if row.units && row.value !== null}&nbsp;{row.units}{/if}
 					</span>
-					<span class="mapsdk-list-level">
+					<span class="mapsdk-list-level text-xs">
 						<span class="mapsdk-list-swatch" class:neutral={!level} style:background={level?.color}
 						></span>
 						{level ? level.label : map.messages("mapsdk_no_level")}
@@ -385,7 +385,6 @@
 		background: var(--background);
 		color: var(--foreground);
 		box-shadow: var(--shadow-lifted, var(--shadow-card, none));
-		font-size: var(--text-sm, 0.875rem);
 		pointer-events: auto;
 	}
 
@@ -452,6 +451,14 @@
 		box-shadow: inset 0 0 0 2px var(--highlight, var(--primary));
 	}
 
+	/* Selected and active: the selection ring outside the focus halo; more specific than the
+	   shared rule, so the order of the stylesheets doesn't matter. */
+	.mapsdk-list-box:focus-visible .mapsdk-list-row.selected.mapsdk-active-option {
+		box-shadow:
+			inset 0 0 0 4px var(--ring-edge, var(--background)),
+			inset 0 0 0 6px var(--highlight, var(--primary));
+	}
+
 	.mapsdk-list-name {
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -466,7 +473,6 @@
 		align-items: center;
 		gap: 0.375rem;
 		color: var(--muted-foreground);
-		font-size: var(--text-xs, 0.75rem);
 	}
 
 	.mapsdk-list-swatch {

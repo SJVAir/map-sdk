@@ -4,15 +4,17 @@
  * Focus ring, only on :focus-visible: a 2px --ring outline with a --ring-edge halo, so the ring
  * reads against any background. A host without --ring-edge gets the page background.
  */
-.mapsdk-focus:focus-visible {
+/* Doubled classes raise specificity above any component rule that sets box-shadow (a card
+   shadow, a selected row's ring), so the result never depends on bundle order. */
+.mapsdk-focus.mapsdk-focus:focus-visible {
 	outline: 2px solid var(--ring);
 	outline-offset: 1px;
 	box-shadow: 0 0 0 4px var(--ring-edge, var(--background));
 }
 
 /* For controls and rows inside a container that clips: the ring is drawn inside. */
-.mapsdk-focus-inset:focus-visible,
-.mapsdk-focus-inset-active:focus-visible .mapsdk-active-option {
+.mapsdk-focus-inset.mapsdk-focus-inset:focus-visible,
+.mapsdk-focus-inset-active:focus-visible .mapsdk-active-option.mapsdk-active-option {
 	outline: 2px solid var(--ring);
 	outline-offset: -3px;
 	box-shadow: inset 0 0 0 4px var(--ring-edge, var(--background));

@@ -81,7 +81,7 @@
 
 {#if name !== null && position}
 	<div
-		class="mapsdk-tooltip"
+		class="mapsdk-tooltip text-sm"
 		role="tooltip"
 		bind:offsetWidth={tipWidth}
 		bind:offsetHeight={tipHeight}
@@ -97,7 +97,7 @@
 					{valueText}{#if item.units}&nbsp;{item.units}{/if}
 				</div>
 			{/if}
-			<span class="mapsdk-tooltip-chip" class:neutral={!chipColors} style={chipColors}>
+			<span class="mapsdk-tooltip-chip text-xs" class:neutral={!chipColors} style={chipColors}>
 				{levelLabel}
 			</span>
 		{/if}
@@ -120,7 +120,6 @@
 		background: var(--popover, var(--background));
 		color: var(--popover-foreground, var(--foreground));
 		box-shadow: var(--shadow-lifted, var(--shadow-card, none));
-		font-size: var(--text-sm, 0.875rem);
 		pointer-events: none;
 	}
 
@@ -133,7 +132,6 @@
 		border: var(--swatch-outline-width, 1px) solid
 			var(--swatch-outline-color, color-mix(in srgb, var(--foreground) 75%, var(--background)));
 		border-radius: 999px;
-		font-size: var(--text-xs, 0.75rem);
 	}
 
 	.mapsdk-tooltip-chip.neutral {
