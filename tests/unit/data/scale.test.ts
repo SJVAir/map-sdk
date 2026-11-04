@@ -21,7 +21,7 @@ describe("levelFor", () => {
 	it("puts a value equal to a level's max in the next level", () => {
 		expect(keyOf(9.1)).toBe("moderate");
 		expect(keyOf(35.5)).toBe("unhealthy_sensitive");
-		expect(keyOf(10, fireScale)).toBe("10-49");
+		expect(keyOf(10, fireScale)).toBe("md");
 	});
 
 	it("uses the top level for large values", () => {

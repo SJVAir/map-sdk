@@ -80,7 +80,7 @@ function category(
 
 export const smokeScale: Scale = {
 	id: "smoke-density",
-	label: "Smoke density",
+	label: "Smoke Density",
 	units: "",
 	kind: "category",
 	levels: [
@@ -92,15 +92,15 @@ export const smokeScale: Scale = {
 
 export const fireScale: Scale = {
 	id: "fire-frp",
-	label: "Fire radiative power",
+	label: "Fire Radiative Power",
 	units: "MW",
 	kind: "range",
 	levels: [
-		range("lt10", "<10", "#FFD700", 0, 10, null),
-		range("10-49", "10–49", "#FF8C00", 10, 50, null),
-		range("50-149", "50–149", "#FF4500", 50, 150, null),
-		range("150-349", "150–349", "#DC143C", 150, 350, null),
-		range("gte350", "≥350", "#8B0000", 350, null, null)
+		range("sm", "<10", "#FFD700", 0, 10, null),
+		range("md", "10–49", "#FF8C00", 10, 50, null),
+		range("lg", "50–149", "#FF4500", 50, 150, null),
+		range("xl", "150–349", "#DC143C", 150, 350, null),
+		range("xxl", "≥350", "#8B0000", 350, null, null)
 	]
 };
 

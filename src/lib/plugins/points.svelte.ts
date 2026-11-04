@@ -60,8 +60,11 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	selectable?: boolean;
 	icon?: {
 		category(props: P): string;
-		/** An SVG `size` pixels square, filled with `color`; `theme` for outlines. */
-		draw(category: string, color: string, theme: ThemeColors): string;
+		/**
+		 * An SVG `size` pixels square, filled with `color`; `theme` for outlines. `levelIndex` is the
+		 * level's position in the scale, or -1 for the neutral image.
+		 */
+		draw(category: string, color: string, theme: ThemeColors, levelIndex?: number): string;
 		size: number;
 		/** Draws in `--muted-foreground` whatever the value (e.g. an inactive monitor). */
 		muted?(props: P): boolean;
@@ -240,11 +243,11 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			if (!icon) return;
 			for (const category of categories) {
 				// Every level of the scale, plus the neutral image for values no level covers.
-				for (const level of [...scale.levels, null]) {
+				for (const [index, level] of [...scale.levels, null].entries()) {
 					const local = `${iconPrefix()}${category}:${level?.key ?? ""}`;
 					if (images.has(local)) continue;
 					const color = level?.color || theme.neutral;
-					loadImage(local, icon.draw(category, color, theme), icon.size);
+					loadImage(local, icon.draw(category, color, theme, level ? index : -1), icon.size);
 				}
 				const muted = `${iconPrefix()}${category}:${MUTED_IMAGE}`;
 				if (icon.muted && !images.has(muted)) {

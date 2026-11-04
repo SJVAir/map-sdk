@@ -57,7 +57,10 @@ describe("package.json", () => {
 			"monitorShape",
 			"regionsPlugin",
 			"calHeatScorePlugin",
-			"forecastZonesPlugin"
+			"forecastZonesPlugin",
+			"hmsSmokePlugin",
+			"hmsFirePlugin",
+			"groupFires"
 		]) {
 			expect(exported, name).toContain(name);
 		}
