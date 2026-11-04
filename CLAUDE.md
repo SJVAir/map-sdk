@@ -2,6 +2,32 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Where this fits
+
+map-sdk is part of the SJVAir Dashboard project. **Its plan and direction live in
+data-dashboard's docs, not here** (`/home/alex/workspace/sjvair/data-dashboard`):
+
+- `TODO.md` → "Start here" (which sessions run where) and "Release 1, step 5" (map-sdk's status
+  and what's next).
+- `ROADMAP.md` item 5, and `ARCHITECTURE.md` → "Map SDK".
+- `DEFERRED.md` → "Map plugins" and "Map & selection" (milestone 2, deferred features).
+
+Read those before starting new work. This repo holds each milestone's own spec and plan
+(`docs/superpowers/specs/` and `plans/`); milestone 1 (both dated 2026-11-03) is built and merged
+(#1). Milestone 2 (monitor-map parity) starts with the monitor-map 5.0 rebuild and gets its own
+spec.
+
+Rules that cross repos:
+
+- Don't modify monitor-map, mobile, or the dashboard; read them freely. sjvair.com builds
+  monitor-map `main` unpinned, and mobile depends on it.
+- When map-sdk needs something `@sjvair/sdk` lacks, change the SDK, not a workaround here. If
+  another session owns sdk-js, message it (ListAgents / SendMessage) instead of editing it.
+- Record every deferral in data-dashboard's `DEFERRED.md`, with why and a revisit trigger, and
+  keep map-sdk's status in `TODO.md` current. Edit data-dashboard docs only in your own
+  worktree (`.worktrees/docs-<track>` from `origin/main`), never its main checkout. Docs-only
+  commits go straight to its `main` (fetch and rebase first).
+
 ## Commands
 
 ```bash
