@@ -10,6 +10,7 @@ import {
 	defaultBasemaps,
 	maptilerKeyTransform
 } from "../../src/lib/view/create-gl-map.js";
+import { NO_LEVEL } from "../../src/lib/data/scale.js";
 import MapViewWithOverlay from "../fixtures/MapViewWithOverlay.svelte";
 
 /** Inline styles, so no style document, key, or network is needed. */
@@ -264,6 +265,45 @@ describe("defaultBasemaps", () => {
 			"Food",
 			"Transport"
 		]);
+	});
+});
+
+describe("MapView tooltip", () => {
+	it("follows the camera and stops listening on unmount", async () => {
+		const map = newMap();
+		map.addPlugin({
+			id: "probe",
+			setup: () => () => {},
+			features: () => [
+				{
+					refKey: "p:1",
+					ref: { type: "monitor", id: "1" } as never,
+					name: "Probe",
+					value: 5,
+					level: NO_LEVEL,
+					units: "u",
+					lngLat: [-119.8, 36.7],
+					selectable: true
+				}
+			]
+		});
+		const attached = trackAttach(map);
+		const { unmount } = await render(MapView, { map, class: "test-map" });
+		const gl = attached[0];
+		await whenLoaded(gl);
+		map.focusFeature("p:1");
+		const tip = page.getByRole("tooltip");
+		await expect.element(tip).toBeVisible();
+		const left = () => (tip.element() as HTMLElement).style.left;
+		const before = left();
+		gl.jumpTo({ center: [-119.7, 36.7], zoom: 12 });
+		await vi.waitFor(() => expect(left()).not.toBe(before));
+
+		const off = vi.spyOn(gl, "off");
+		await unmount();
+		const types = off.mock.calls.map((c) => c[0]);
+		expect(types).toContain("move");
+		expect(types).toContain("resize");
 	});
 });
 

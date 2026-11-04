@@ -28,10 +28,12 @@
 
 	let root: HTMLDivElement;
 	let glContainer: HTMLDivElement;
-	// The live GL map and a counter bumped on every camera move: the tooltip's `project` reads
+	// The live GL map and a counter bumped on every camera move or resize: the tooltip's `project` reads
 	// both, so it re-runs (and follows its feature) as the map moves.
 	let projector = $state.raw<GlMapLike | null>(null);
 	let moves = $state(0);
+	let width = $state(0);
+	let height = $state(0);
 
 	function project(lngLat: [number, number]) {
 		void moves;
@@ -53,6 +55,7 @@
 		});
 		const onMove = () => moves++;
 		gl.on("move", onMove);
+		gl.on("resize", onMove);
 		projector = gl;
 		// Plugins bake theme colors into paint and images, so they set up again on a change.
 		const stopTheme = watchTheme(root, () => ctx.themeChanged());
@@ -60,6 +63,7 @@
 			stopTheme();
 			projector = null;
 			gl.off("move", onMove);
+			gl.off("resize", onMove);
 			try {
 				ctx.detach();
 			} finally {
@@ -71,13 +75,15 @@
 
 <div
 	bind:this={root}
+	bind:clientWidth={width}
+	bind:clientHeight={height}
 	class={["mapsdk-map", className]}
 	role="region"
 	aria-label={label ?? map.messages("mapsdk_map_label")}
 	data-mapsdk-map={map.uid}
 >
 	<div class="mapsdk-gl" bind:this={glContainer}></div>
-	<MapTooltip {map} {project} />
+	<MapTooltip {map} {project} {width} {height} />
 	{@render overlays?.()}
 </div>
 

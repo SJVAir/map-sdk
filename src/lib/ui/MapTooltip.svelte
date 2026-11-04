@@ -11,9 +11,16 @@
 		 * read something that changes when the camera moves, so the tooltip follows the map.
 		 */
 		project: (lngLat: [number, number]) => { x: number; y: number } | null;
+		/** The map container's size; the tooltip stays inside it. Unset: no clamping. */
+		width?: number;
+		height?: number;
 	}
 
-	let { map, project }: Props = $props();
+	let { map, project, width, height }: Props = $props();
+
+	let tipWidth = $state(0);
+	let tipHeight = $state(0);
+	const GAP = 12;
 
 	// The keyboard-focused list item wins over the pointer.
 	const key = $derived(map.focusedKey ?? map.hovered?.hit.refKey ?? null);
@@ -23,6 +30,8 @@
 	// something is shown, so an idle map doesn't subscribe to any plugin's data.
 	const found = $derived.by((): { item: FeatureListItem; plugin: MapPlugin } | null => {
 		if (key === null) return null;
+		// MapContext stores only the focused refKey, so the first plugin with that key wins
+		// (Ruling R17: Task 18 adds plugin ids to list rows).
 		const plugins = hit ? map.plugins.filter((p) => p.id === hit.pluginId) : map.plugins;
 		for (const plugin of plugins) {
 			const item = plugin.features?.().find((f) => f.refKey === key);
@@ -35,7 +44,18 @@
 	const name = $derived(item?.name ?? hit?.name ?? null);
 	// A found item anchors the tooltip at its point (stable while the pointer moves over it).
 	const anchor = $derived(item?.lngLat ?? map.hovered?.lngLat ?? null);
-	const position = $derived(anchor ? project(anchor) : null);
+	const projected = $derived(anchor ? project(anchor) : null);
+	// Centered above the point; flipped below it near the top edge; inside the container.
+	const position = $derived.by(() => {
+		if (!projected) return null;
+		let { x, y } = projected;
+		if (width)
+			x = Math.min(Math.max(x, tipWidth / 2), Math.max(width - tipWidth / 2, tipWidth / 2));
+		let top = y - tipHeight - GAP;
+		if (top < 0) top = y + GAP;
+		if (height) top = Math.min(top, Math.max(height - tipHeight, 0));
+		return { left: x - tipWidth / 2, top: Math.max(top, 0) };
+	});
 	const custom = $derived(found ? found.plugin.tooltip?.(found.item) : undefined);
 
 	const level = $derived(item && item.level !== NO_LEVEL && item.level.color ? item.level : null);
@@ -60,7 +80,14 @@
 </script>
 
 {#if name !== null && position}
-	<div class="mapsdk-tooltip" role="tooltip" style:left="{position.x}px" style:top="{position.y}px">
+	<div
+		class="mapsdk-tooltip"
+		role="tooltip"
+		bind:offsetWidth={tipWidth}
+		bind:offsetHeight={tipHeight}
+		style:left="{position.left}px"
+		style:top="{position.top}px"
+	>
 		<div class="mapsdk-tooltip-name">{name}</div>
 		{#if custom}
 			{@render custom()}
@@ -81,7 +108,6 @@
 	.mapsdk-tooltip {
 		position: absolute;
 		z-index: 1;
-		transform: translate(-50%, calc(-100% - 0.75rem));
 		display: flex;
 		flex-direction: column;
 		align-items: flex-start;

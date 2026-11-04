@@ -1,3 +1,4 @@
+import { createRawSnippet } from "svelte";
 import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page } from "vitest/browser";
@@ -88,5 +89,64 @@ describe("MapTooltip", () => {
 		const map = fakeMap([item("a", "A", NO_LEVEL)]);
 		render(MapTooltip, { map, project });
 		expect(page.getByRole("tooltip").elements()).toHaveLength(0);
+	});
+
+	it("prefers the focused item over the hovered hit", async () => {
+		const hit = { pluginId: "points", ref: { type: "monitor", id: "b" }, refKey: "b", name: "B" };
+		const map = fakeMap([item("a", "Focused", NO_LEVEL), item("b", "Hovered", NO_LEVEL)], {
+			focusedKey: "a",
+			hovered: { hit, lngLat: [0, 0] }
+		});
+		render(MapTooltip, { map, project });
+		await expect
+			.element(page.getByRole("tooltip"))
+			.toHaveTextContent("Focused 12.34 µg/m³ No level");
+	});
+
+	it("shows value and chip for a hovered hit whose item is found", async () => {
+		const hit = { pluginId: "points", ref: { type: "monitor", id: "a" }, refKey: "a", name: "A" };
+		const map = fakeMap([item("a", "Found", level("Good", "#00e400"))], {
+			hovered: { hit, lngLat: [0, 0] }
+		});
+		render(MapTooltip, { map, project });
+		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Found 12.34 µg/m³ Good");
+	});
+
+	it("lets a plugin's tooltip snippet replace the value and chip", async () => {
+		const map = fakeMap([item("a", "Custom", level("Good", "#00e400"))], { focusedKey: "a" });
+		(map.plugins[0] as { tooltip?: unknown }).tooltip = () =>
+			createRawSnippet(() => ({ render: () => "<p>Extra</p>" }));
+		render(MapTooltip, { map, project });
+		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Custom Extra");
+	});
+
+	it("uses a neutral chip for an unparseable color", async () => {
+		const map = fakeMap([item("a", "Odd", level("Weird", "not-a-color"))], { focusedKey: "a" });
+		render(MapTooltip, { map, project });
+		const chip = page.getByText("Weird").element() as HTMLElement;
+		expect(chip.classList.contains("neutral")).toBe(true);
+	});
+
+	it("handles null and string values", async () => {
+		const nullItem = { ...item("a", "Null", NO_LEVEL), value: null };
+		render(MapTooltip, { map: fakeMap([nullItem], { focusedKey: "a" }), project });
+		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Null No level");
+	});
+
+	it("shows a string value as given", async () => {
+		const str = { ...item("a", "Str", NO_LEVEL), value: "high" };
+		render(MapTooltip, { map: fakeMap([str], { focusedKey: "a" }), project });
+		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Str high µg/m³ No level");
+	});
+
+	it("stays inside the container", async () => {
+		const map = fakeMap([item("a", "Edge", NO_LEVEL)], { focusedKey: "a" });
+		render(MapTooltip, { map, project: () => ({ x: 2, y: 2 }), width: 300, height: 200 });
+		await expect.element(page.getByRole("tooltip")).toBeVisible();
+		const r = (page.getByRole("tooltip").element() as HTMLElement).getBoundingClientRect();
+		const host = (page.getByRole("tooltip").element() as HTMLElement).offsetParent;
+		const h = host?.getBoundingClientRect() ?? { left: 0, top: 0 };
+		expect(r.left).toBeGreaterThanOrEqual(h.left - 0.5);
+		expect(r.top).toBeGreaterThanOrEqual(h.top - 0.5);
 	});
 });
