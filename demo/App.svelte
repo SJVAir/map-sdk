@@ -19,6 +19,7 @@
 		SelectionMode,
 		SpatialSelection
 	} from "../src/lib/data/index.js";
+	import { createMonitorsStore } from "../src/lib/stores/index.js";
 	import {
 		createDateRangeSource,
 		type DateRangeSource,
@@ -27,10 +28,11 @@
 
 	const maptilerKey = import.meta.env.VITE_MAPTILER_KEY ?? "";
 
-	// Left: fed like the dashboard, from date-range sources. Right: the live monitors store
-	// (createMonitorsStore, not built yet). Both use the default providers.
+	// Left: fed like the dashboard, from date-range sources. Right: the live monitors store.
+	// Both use the default providers.
 	const left = createMap({ config: { maptilerKey } });
 	const right = createMap({ config: { maptilerKey } });
+	const live = createMonitorsStore();
 
 	interface Preset {
 		kind: SourceKind;
@@ -205,11 +207,33 @@
 		`zoom ${left.camera.zoom.toFixed(2)} · ${left.camera.center[1].toFixed(4)}, ${left.camera.center[0].toFixed(4)}`
 	);
 
+	/** The live source's status for the panel. */
+	const liveStatus = $derived.by(() => {
+		const status = live.dataSource.status;
+		if (status.state === "ready")
+			return `${live.dataSource.features?.features.length ?? 0} features`;
+		if (status.state === "unavailable") return status.reason;
+		return status.state;
+	});
+
 	onMount(() => {
 		for (const preset of presets) if (enabled[preset.kind]) enable(preset);
+		right.addPlugin(
+			monitorsPlugin({
+				source: live.dataSource,
+				layerLabel: "Monitors",
+				id: "monitors",
+				selectable: true
+			}),
+			{ selectionMode: "multiple" }
+		);
+		// PM2.5 like the left map. A failure shows as the source's error status (with a retry in
+		// the legend), so the rejection needs no handling here.
+		live.init("pm25").catch(() => {});
 	});
 
 	onDestroy(() => {
+		live.dispose();
 		left.destroy();
 		right.destroy();
 		for (const source of sources.values()) source.destroy();
@@ -287,10 +311,23 @@
 
 	<section class="demo-panel" aria-labelledby="right-title">
 		<h2 id="right-title" class="text-base">Live monitors</h2>
-		<p class="demo-controls demo-muted text-sm">
-			This map will show the live <code>createMonitorsStore()</code> once it exists; for now it has no
-			layers.
-		</p>
+		<div class="demo-controls text-sm">
+			<fieldset>
+				<legend>Store</legend>
+				<label for="live-entry-type">Pollutant</label>
+				<select
+					id="live-entry-type"
+					value={live.entryType ?? ""}
+					disabled={!live.initialized}
+					onchange={(e) => live.entryTypeFor(e.currentTarget.value)}
+				>
+					{#each live.availableEntryTypes as entryType (entryType)}
+						<option value={entryType}>{entryType}</option>
+					{/each}
+				</select>
+				<output data-testid="live-status" class="demo-muted">{liveStatus}</output>
+			</fieldset>
+		</div>
 		<MapView map={right} label="Live map" class="demo-map" />
 		<Legend map={right} />
 	</section>

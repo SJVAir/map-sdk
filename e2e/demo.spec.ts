@@ -70,6 +70,7 @@ async function load(page: Page) {
 	// The monitors have loaded once the list shows them.
 	const list = await openList(leftMap(page));
 	await expect(list.getByRole("option", { name: /Fixture Alpha/ })).toBeVisible();
+	await expect(page.getByTestId("live-status")).toHaveText("5 features");
 }
 
 test.beforeEach(async ({ page }) => {
@@ -89,6 +90,13 @@ test("both maps render a canvas", async ({ page }) => {
 	await expect(rightMap(page).locator("canvas")).toBeVisible();
 });
 
+test("the live map shows the same monitors from the live store", async ({ page }) => {
+	const list = await openList(rightMap(page));
+	await expect(list.getByRole("option", { name: /Fixture Alpha/ })).toBeVisible();
+	await expect(list.getByRole("option", { name: /Fixture Bravo/ })).toBeVisible();
+	await expect(page.getByRole("combobox", { name: "Pollutant" })).toHaveValue("pm25");
+});
+
 test("picking a monitor in the left list updates the editor and leaves the right map alone", async ({
 	page
 }) => {
@@ -102,9 +110,13 @@ test("picking a monitor in the left list updates the editor and leaves the right
 		kind: "monitors",
 		ids: [ALPHA]
 	});
-	const right = rightMap(page);
-	await expect(right.locator('[aria-selected="true"]')).toHaveCount(0);
-	await expect(right.getByRole("button", { name: /^Clear/ })).toHaveCount(0);
+	const rightList = await openList(rightMap(page));
+	await expect(rightList.getByRole("option", { name: /Fixture Alpha/ })).toHaveAttribute(
+		"aria-selected",
+		"false"
+	);
+	await expect(rightMap(page).locator('[aria-selected="true"]')).toHaveCount(0);
+	await expect(rightMap(page).getByRole("button", { name: /^Clear/ })).toHaveCount(0);
 });
 
 test("editing the selection JSON selects on the map", async ({ page }) => {
