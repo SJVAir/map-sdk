@@ -258,6 +258,29 @@ describe("PluginHost", () => {
 		expect(host.plugins).toHaveLength(1);
 	});
 
+	it("refuses a plugin object that is set up on another map, and allows it once released", () => {
+		const a = makeHost();
+		const b = makeHost();
+		const plugin = resourcePlugin("p");
+		a.host.add(plugin);
+		a.host.attach(createFakeGl({ styleLoaded: true }));
+		b.host.attach(createFakeGl({ styleLoaded: true }));
+		const message =
+			'map-sdk: plugin "p" is already set up on another map; create one plugin per map';
+		expect(() => b.host.add(plugin)).toThrow(message);
+		expect(b.host.plugins).toEqual([]);
+
+		a.host.detach();
+		b.host.add(plugin);
+		expect(b.host.plugins).toEqual([plugin]);
+		// Map A going live again doesn't take it over: it reports and skips it.
+		a.host.attach(createFakeGl({ styleLoaded: true }));
+		expect(errorSpy).toHaveBeenCalledWith(new Error(message));
+		b.host.remove("p");
+		a.host.restyle();
+		expect(errorSpy).toHaveBeenCalledTimes(1);
+	});
+
 	it("unregisters interactive layers on teardown", () => {
 		const { host, router } = makeHost();
 		const unregister = vi.fn();

@@ -18,8 +18,28 @@ type Listener = (e: any) => void;
 /** Setup runs on whichever of these fires first. */
 const STYLE_READY_EVENTS = ["style.load", "idle"] as const;
 
+/**
+ * Marks a plugin object with the host it is set up on, while it is. A plugin object keeps
+ * per-map state (its source and layer ids, its features), so it belongs to one map at a time.
+ * A property on the plugin, not a registry: nothing here is shared between maps.
+ */
+const OWNER = Symbol("map-sdk plugin host");
+type Owned = MapPlugin & { [OWNER]?: PluginHost };
+
+function ownedElsewhere(plugin: MapPlugin, host: PluginHost): boolean {
+	const owner = (plugin as Owned)[OWNER];
+	return owner !== undefined && owner !== host;
+}
+
+function ownershipError(plugin: MapPlugin): Error {
+	return new Error(
+		`map-sdk: plugin "${plugin.id}" is already set up on another map; create one plugin per map`
+	);
+}
+
 /** Everything one running plugin added through its context, so the host can remove it. */
 interface Running {
+	plugin: MapPlugin;
 	gl: GlMapLike;
 	dead: boolean;
 	teardown: (() => void) | null;
@@ -71,11 +91,15 @@ export class PluginHost {
 		return untrack(() => this.#plugins);
 	}
 
-	/** Adds `plugin` on top, or just below the plugin `before` names. */
+	/**
+	 * Adds `plugin` on top, or just below the plugin `before` names. Throws when the same plugin
+	 * object is set up on another map at the moment (one plugin object per map).
+	 */
 	add(plugin: MapPlugin, before?: string): void {
 		if (this.#list.some((p) => p.id === plugin.id)) {
 			throw new Error(`map-sdk: a plugin with id "${plugin.id}" is already added`);
 		}
+		if (ownedElsewhere(plugin, this)) throw ownershipError(plugin);
 		this.#plugins = this.#inserted(this.#list, plugin, before);
 		if (this.#live) this.#setup(plugin);
 	}
@@ -202,6 +226,11 @@ export class PluginHost {
 			// A plugin's setup may add, remove, or detach; follow the host's current state.
 			if (this.#gl !== gl || !this.#live) return;
 			if (!this.#list.includes(plugin) || this.#running.has(plugin.id)) continue;
+			// Another map set this plugin object up after it was added here.
+			if (ownedElsewhere(plugin, this)) {
+				console.error(ownershipError(plugin));
+				continue;
+			}
 			this.#setup(plugin);
 		}
 	}
@@ -214,6 +243,7 @@ export class PluginHost {
 	#setup(plugin: MapPlugin): void {
 		const gl = this.#gl!;
 		const running: Running = {
+			plugin,
 			gl,
 			dead: false,
 			teardown: null,
@@ -225,6 +255,7 @@ export class PluginHost {
 			unregisters: []
 		};
 		this.#running.set(plugin.id, running);
+		if (Object.isExtensible(plugin)) (plugin as Owned)[OWNER] = this;
 		const ctx = this.#context(plugin.id, running);
 		let teardown: () => void;
 		try {
@@ -252,6 +283,8 @@ export class PluginHost {
 		if (!running) return;
 		this.#running.delete(pluginId);
 		running.dead = true;
+		const owned = running.plugin as Owned;
+		if (owned[OWNER] === this) delete owned[OWNER];
 		const { gl } = running;
 		const attempt = (what: string, fn: () => void) => {
 			try {

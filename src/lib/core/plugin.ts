@@ -109,6 +109,10 @@ export interface PluginContext {
 	effect(fn: () => void | (() => void)): void;
 }
 
+/**
+ * A layer of data on a map. A plugin object keeps per-map state, so it belongs to one map: create
+ * one plugin per map (adding an object that is set up on another map throws).
+ */
 export interface MapPlugin {
 	id: string;
 	/** Already-translated layer name, for the selection bar and view summary. */

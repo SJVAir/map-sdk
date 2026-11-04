@@ -73,7 +73,8 @@ export interface MapContext {
 	readonly attached: boolean;
 	/**
 	 * Adds a plugin on top, or below `options.before`. Throws if a plugin with the same id is
-	 * already added, if `before` names no added plugin, or after `destroy()`.
+	 * already added, if `before` names no added plugin, if the same plugin object is set up on
+	 * another map (create one plugin per map), or after `destroy()`.
 	 */
 	addPlugin(plugin: MapPlugin, options?: PluginOptions): void;
 	/**
