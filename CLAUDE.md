@@ -115,3 +115,9 @@ one release does not carry forward to the next, even later in the same session o
 next step of a task already in progress (e.g. bumping a dependency and then "finishing" by
 releasing it). Always stop and ask first, and wait for an explicit yes. The same goes for pushing
 and tagging.
+
+The workflow publishes with npm trusted publishing (OIDC, `--provenance`, no token secret), like
+monitor-map. Before the first publish, the user must configure the trusted publisher for
+`@sjvair/map-sdk` on npmjs.com (repository `SJVAir/map-sdk`, workflow `release.yml`); until then
+the publish step fails. The release tag must be the package version (`v0.1.0` or `0.1.0`), and a
+prerelease version (one with `-`) publishes to the `next` dist-tag.

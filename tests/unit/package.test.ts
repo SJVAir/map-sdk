@@ -28,6 +28,12 @@ describe("package.json", () => {
 		expect(pkg.peerDependencies).toHaveProperty("svelte");
 		expect(pkg.dependencies).not.toHaveProperty("@sjvair/sdk");
 		expect(pkg.dependencies).not.toHaveProperty("svelte");
+		// Nothing uses UI primitives, so there's no bits-ui peer to install.
+		expect(Object.keys(pkg.peerDependencies).sort()).toEqual(["@sjvair/sdk", "svelte"]);
+	});
+
+	it("runs on Node 26 and later", () => {
+		expect(pkg.engines.node).toBe(">=26");
 	});
 
 	it("exports the hosts' components and helpers from the root, not internal helpers", () => {
@@ -91,5 +97,18 @@ describe("package.json", () => {
 		]) {
 			expect(exported, name).not.toContain(name);
 		}
+	});
+
+	it("publishes through npm trusted publishing, prereleases to the next tag", () => {
+		const release = readFileSync(
+			new URL("../../.github/workflows/release.yml", import.meta.url),
+			"utf8"
+		);
+		expect(release).toContain("id-token: write");
+		expect(release).toContain("npm install -g npm@latest");
+		expect(release).toContain("npm publish --access public --provenance --tag next");
+		expect(release).not.toContain("NPM_TOKEN");
+		expect(release).not.toContain("NODE_AUTH_TOKEN");
+		expect(release).toContain("github.event.release.tag_name");
 	});
 });

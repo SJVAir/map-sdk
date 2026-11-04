@@ -15,7 +15,7 @@ Once published:
 npm install @sjvair/map-sdk
 ```
 
-Peer dependencies: `svelte` (^5.57), `bits-ui` (^2.19), and `@sjvair/sdk`, which is published to
+Peer dependencies: `svelte` (^5.57) and `@sjvair/sdk`, which is published to
 JSR and installed through npm's JSR registry as an alias:
 
 ```json
