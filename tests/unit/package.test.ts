@@ -52,7 +52,9 @@ describe("package.json", () => {
 			"summaryText",
 			"rowLabel",
 			"pointsPlugin",
-			"shapesPlugin"
+			"shapesPlugin",
+			"monitorsPlugin",
+			"monitorShape"
 		]) {
 			expect(exported, name).toContain(name);
 		}

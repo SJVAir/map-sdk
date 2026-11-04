@@ -1,5 +1,5 @@
 import { createRawSnippet } from "svelte";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page } from "vitest/browser";
 import type { MapContext } from "../../src/lib/core/create-map.svelte.js";
@@ -137,6 +137,22 @@ describe("MapTooltip", () => {
 			createRawSnippet(() => ({ render: () => "<p>Extra</p>" }));
 		render(MapTooltip, { map, project });
 		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Custom Extra");
+	});
+
+	it("shows a plugin's hover content for a hit it doesn't list, without an empty name", async () => {
+		const hit = {
+			pluginId: "points",
+			ref: { kind: "feature", id: "cluster:7" },
+			refKey: "feature:cluster:7",
+			name: ""
+		};
+		const map = fakeMap([], { hovered: { hit, lngLat: [0, 0] } });
+		const hoverTooltip = vi.fn(() => createRawSnippet(() => ({ render: () => "<p>Cluster</p>" })));
+		(map.plugins[0] as { hoverTooltip?: unknown }).hoverTooltip = hoverTooltip;
+		render(MapTooltip, { map, project });
+		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Cluster");
+		expect(hoverTooltip).toHaveBeenCalledWith(hit);
+		expect(document.querySelector(".mapsdk-tooltip-name")).toBeNull();
 	});
 
 	it("uses a neutral chip for an unparseable color", async () => {

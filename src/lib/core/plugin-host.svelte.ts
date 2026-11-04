@@ -249,6 +249,10 @@ export class PluginHost {
 				if (running.dead) return;
 				running.unregisters.push(router.register(pluginId, layerIds, toHit));
 			},
+			blocking(layerIds, toHover) {
+				if (running.dead) return;
+				running.unregisters.push(router.registerBlocking(pluginId, layerIds, toHover));
+			},
 			on(type, layerId, listener) {
 				if (running.dead) return;
 				gl.on(type, layerId, listener);

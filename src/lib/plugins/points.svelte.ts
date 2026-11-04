@@ -4,14 +4,16 @@ import type {
 	GeoJSONSourceSpecification
 } from "@maptiler/sdk";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
-import { untrack } from "svelte";
+import { untrack, type Snippet } from "svelte";
 import type {
+	FeatureHit,
 	FeatureListItem,
 	LayerSpecWithoutId,
 	MapPlugin,
-	PluginContext
+	PluginContext,
+	Providers
 } from "../core/plugin.js";
-import { decodeRef, selectionId } from "../data/refs.js";
+import { decodeRef, encodeRef, selectionId } from "../data/refs.js";
 import { levelFor, NO_LEVEL } from "../data/scale.js";
 import type { Scale } from "../data/scale-types.js";
 import type { DataSource, MapFeatureProperties } from "../data/types.js";
@@ -31,6 +33,37 @@ import {
 	type ThemeColors
 } from "./style.js";
 
+/** What tooltip content gets: the map's providers and the plugin's resolved scale. */
+export interface PointsTooltipEnv extends Providers {
+	/** Null while it resolves or when unavailable. */
+	scale: Scale | null;
+}
+
+/** A hovered cluster bubble. */
+export interface ClusterInfo<P extends MapFeatureProperties> {
+	group: string;
+	pointCount: number;
+	/** The cluster feature's properties, including `cluster.properties` aggregates. */
+	properties: Record<string, unknown>;
+	/** Every point in the cluster; empty once the plugin is torn down. */
+	leaves(): Promise<Array<{ props: P; lngLat: [number, number] }>>;
+}
+
+/** What custom cluster layers are built from. */
+export interface ClusterLayerArgs {
+	group: string;
+	sourceId: string;
+	scale: Scale;
+	theme: ThemeColors;
+	/**
+	 * The `icon-image` for the plugin's icon of `category` at the level `levelKey` evaluates to
+	 * (use `levelKeyExpression`); registers that category's images.
+	 */
+	iconImage(category: string, levelKey: ExpressionSpecification): ExpressionSpecification;
+	/** The `icon-size` that shows an icon at its `size` (images are drawn larger for HiDPI). */
+	iconSizeScale: number;
+}
+
 export interface PointsOptions<P extends MapFeatureProperties> {
 	id: string;
 	source: DataSource<P>;
@@ -39,29 +72,95 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	selectable?: boolean;
 	icon?: {
 		category(props: P): string;
-		/** An SVG `size` pixels square, filled with `color`. */
-		draw(category: string, color: string): string;
+		/** An SVG `size` pixels square, filled with `color`; `theme` for outlines. */
+		draw(category: string, color: string, theme: ThemeColors): string;
 		size: number;
+		/** Draws the neutral image whatever the value (e.g. an inactive monitor). */
+		muted?(props: P): boolean;
 	};
 	/** Used when there is no `icon`. */
 	circle?: { radius: number };
-	/** One clustered source per group. */
-	cluster?: { radius: number; maxZoom: number; groupBy?(props: P): string };
-	/** Higher draws on top. */
+	/**
+	 * One clustered source per group. Cluster bubbles hide what is beneath them from clicks and
+	 * hovers; clicking one zooms in to expand it.
+	 */
+	cluster?: {
+		radius: number;
+		maxZoom: number;
+		groupBy?(props: P): string;
+		/** MapLibre `clusterProperties`: aggregates the layers and tooltip can read. */
+		properties?: GeoJSONSourceSpecification["clusterProperties"];
+		/** Replaces the neutral count bubbles. Local ids get the group appended. */
+		layers?(args: ClusterLayerArgs): Array<{ local: string; spec: LayerSpecWithoutId }>;
+		/** Tooltip content for a hovered cluster. */
+		tooltip?(cluster: ClusterInfo<P>, env: PointsTooltipEnv): Snippet | undefined;
+	};
+	/** Higher draws on top (and, clustered, a group with a higher key draws above the others). */
 	sortKey?(props: P): number;
 	/** Whether `features()` lists this plugin's features. Default true. */
 	listed?: boolean;
+	/** Tooltip content for a feature, below its name; `props` are its source properties. */
+	tooltip?(item: FeatureListItem, props: P, env: PointsTooltipEnv): Snippet | undefined;
 }
 
 /** Properties the plugin adds to each feature it hands MapLibre. */
 const CATEGORY_PROP = "mapsdk:category";
 const SORT_KEY_PROP = "mapsdk:sortKey";
+const MUTED_PROP = "mapsdk:muted";
 
 /** Marker images are drawn at this multiple of their size and scaled down, for sharp HiDPI. */
 const IMAGE_RATIO = 2;
 const DEFAULT_RADIUS = 6;
 const UNCLUSTERED: FilterSpecification = ["!", ["has", "point_count"]];
 const CLUSTERED: FilterSpecification = ["has", "point_count"];
+
+function prefersReducedMotion(): boolean {
+	return globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
+/** The part of MapLibre's `GeoJSONSource` clusters use. */
+interface ClusterSource {
+	getClusterExpansionZoom(clusterId: number): Promise<number>;
+	getClusterLeaves(clusterId: number, limit: number, offset: number): Promise<Feature[]>;
+}
+
+/** Cluster bubbles: a neutral circle with the count. */
+function defaultClusterLayers({
+	sourceId,
+	theme
+}: ClusterLayerArgs): Array<{ local: string; spec: LayerSpecWithoutId }> {
+	return [
+		{
+			local: "clusters",
+			spec: {
+				type: "circle",
+				source: sourceId,
+				filter: CLUSTERED,
+				paint: {
+					"circle-radius": ["step", ["get", "point_count"], 12, 10, 16, 25, 20],
+					"circle-color": theme.neutral,
+					"circle-stroke-color": theme.foreground,
+					"circle-stroke-width": 1
+				}
+			}
+		},
+		{
+			local: "cluster-count",
+			spec: {
+				type: "symbol",
+				source: sourceId,
+				filter: CLUSTERED,
+				layout: {
+					"text-field": ["get", "point_count_abbreviated"],
+					"text-size": 12,
+					"text-allow-overlap": true
+				},
+				paint: { "text-color": theme.foreground }
+			}
+		}
+	];
+}
+
 /**
  * Points with value-based color: anything with coordinates. Draws circles, or icons by
  * category (one image per category and level color), optionally clustered per group, with a
@@ -75,6 +174,33 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 	const scales = createScaleResolver(pluginId, layerLabel, source);
 	const currentScale = scales.current;
 	const legend = scales.legend;
+
+	/** The providers of the running setup, for tooltips; null while not set up. */
+	let providers: Providers | null = null;
+	/** The cluster under the pointer, by its hover hit's refKey. */
+	let hoveredCluster: { refKey: string; info: ClusterInfo<P> } | null = null;
+
+	function tooltipEnv(): PointsTooltipEnv | null {
+		if (!providers) return null;
+		const resolved = currentScale();
+		const scale = resolved === null || resolved === "unavailable" ? null : resolved;
+		return { ...providers, scale };
+	}
+
+	function featureTooltip(item: FeatureListItem): Snippet | undefined {
+		const env = tooltipEnv();
+		const props = source.features?.features.find(
+			(f) => f.properties?.refKey === item.refKey
+		)?.properties;
+		if (!env || !props) return undefined;
+		return options.tooltip?.(item, props, env);
+	}
+
+	function clusterTooltip(hit: FeatureHit): Snippet | undefined {
+		const env = tooltipEnv();
+		if (!env || hoveredCluster?.refKey !== hit.refKey) return undefined;
+		return cluster?.tooltip?.(hoveredCluster.info, env);
+	}
 
 	function features(): FeatureListItem[] {
 		const collection = source.features;
@@ -106,6 +232,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 	function setup(ctx: PluginContext): () => void {
 		let dead = false;
 		const { gl } = ctx;
+		providers = { metadata: ctx.metadata, messages: ctx.messages, format: ctx.format };
 		const container = gl.getCanvas().closest?.("[data-mapsdk-map]") ?? null;
 		const theme: ThemeColors = themeColors(container);
 		const grouped = cluster?.groupBy !== undefined;
@@ -119,7 +246,10 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		/** Namespaced ids of the layers currently on the map, in draw order. */
 		let layers: string[] = [];
 		const interactiveLayers = new Set<string>();
+		const clusterLayerIds = new Set<string>();
 		const images = new Set<string>();
+		/** Group → highest sort key seen, for drawing groups in order. */
+		const groupRank = new Map<string, number>();
 		/** Source id → refKeys whose `selected` state is set there. */
 		const applied = new Map<string, Set<string>>();
 		/** refKey → group, from the latest data. */
@@ -147,7 +277,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			return `icon:${scaleGeneration}:`;
 		}
 
-		function ensureIcons(scale: Scale, categories: Set<string>): void {
+		function ensureIcons(scale: Scale, categories: Iterable<string>): void {
 			if (!icon) return;
 			for (const category of categories) {
 				// Every level of the scale, plus the neutral image for values no level covers.
@@ -155,9 +285,13 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 					const local = `${iconPrefix()}${category}:${level?.key ?? ""}`;
 					if (images.has(local)) continue;
 					const color = level?.color || theme.neutral;
-					loadImage(local, icon.draw(category, color), icon.size);
+					loadImage(local, icon.draw(category, color, theme), icon.size);
 				}
 			}
+		}
+
+		function iconImage(category: string | ExpressionSpecification, levelKey: unknown) {
+			return ["concat", ctx.id(iconPrefix()), category, ":", levelKey] as ExpressionSpecification;
 		}
 
 		/** The plain feature collection for one group, with the properties layers read. */
@@ -171,6 +305,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				if (!props || groupOf(props) !== group) continue;
 				const extra: Record<string, unknown> = {};
 				if (icon) extra[CATEGORY_PROP] = icon.category(props);
+				if (icon?.muted) extra[MUTED_PROP] = icon.muted(props);
 				if (options.sortKey) extra[SORT_KEY_PROP] = options.sortKey(props);
 				out.push({
 					type: "Feature",
@@ -187,6 +322,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				spec.cluster = true;
 				spec.clusterRadius = cluster.radius;
 				spec.clusterMaxZoom = cluster.maxZoom;
+				if (cluster.properties) spec.clusterProperties = cluster.properties;
 			}
 			return spec;
 		}
@@ -203,18 +339,16 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			const filter = cluster ? { filter: UNCLUSTERED } : {};
 			const sortKey = options.sortKey ? ["get", SORT_KEY_PROP] : undefined;
 			if (icon) {
+				const levelKey = levelKeyExpression(scale, "value");
 				return {
 					type: "symbol",
 					source: sourceId,
 					...filter,
 					layout: {
-						"icon-image": [
-							"concat",
-							ctx.id(iconPrefix()),
+						"icon-image": iconImage(
 							["get", CATEGORY_PROP],
-							":",
-							levelKeyExpression(scale, "value")
-						] as ExpressionSpecification,
+							icon.muted ? ["case", ["==", ["get", MUTED_PROP], true], "", levelKey] : levelKey
+						),
 						"icon-size": 1 / IMAGE_RATIO,
 						"icon-allow-overlap": true,
 						"icon-ignore-placement": true,
@@ -254,38 +388,94 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			};
 		}
 
-		/** Cluster bubbles: a neutral circle with the count. Presets restyle them. */
-		function clusterLayers(group: string, sourceId: string): void {
-			layers.push(
-				ctx.addLayer(layerLocal("clusters", group), {
-					type: "circle",
-					source: sourceId,
-					filter: CLUSTERED,
-					paint: {
-						"circle-radius": ["step", ["get", "point_count"], 12, 10, 16, 25, 20],
-						"circle-color": theme.neutral,
-						"circle-stroke-color": theme.foreground,
-						"circle-stroke-width": 1
-					}
-				}),
-				ctx.addLayer(layerLocal("cluster-count", group), {
-					type: "symbol",
-					source: sourceId,
-					filter: CLUSTERED,
-					layout: {
-						"text-field": ["get", "point_count_abbreviated"],
-						"text-size": 12,
-						"text-allow-overlap": true
-					},
-					paint: { "text-color": theme.foreground }
-				})
+		/** The last click a cluster zoomed for: one click can hit several of a bubble's layers. */
+		let lastZoomClick: unknown = null;
+
+		function zoomIntoCluster(
+			sourceId: string,
+			e: { features?: Feature[]; originalEvent?: unknown }
+		) {
+			if (e.originalEvent !== undefined && e.originalEvent === lastZoomClick) return;
+			lastZoomClick = e.originalEvent;
+			const feature = e.features?.[0];
+			const clusterId = feature?.properties?.cluster_id;
+			if (typeof clusterId !== "number" || feature?.geometry.type !== "Point") return;
+			const [lng, lat] = feature.geometry.coordinates;
+			const clusters = gl.getSource(sourceId) as ClusterSource | undefined;
+			clusters?.getClusterExpansionZoom(clusterId).then(
+				(zoom) => {
+					if (dead) return;
+					gl.easeTo({ center: [lng, lat], zoom, ...(prefersReducedMotion() && { duration: 0 }) });
+				},
+				(error: unknown) => {
+					if (!dead)
+						console.warn(`map-sdk: plugin "${pluginId}" could not expand a cluster`, error);
+				}
 			);
+		}
+
+		/** The hover hit for a cluster bubble of `group`, remembered for its tooltip. */
+		function clusterHover(group: string, sourceId: string, props: Record<string, unknown>) {
+			const clusterId = props.cluster_id;
+			if (typeof clusterId !== "number") return null;
+			const ref = { kind: "feature" as const, id: `cluster:${group}:${clusterId}` };
+			const refKey = encodeRef(ref);
+			const pointCount = typeof props.point_count === "number" ? props.point_count : 0;
+			const info: ClusterInfo<P> = {
+				group,
+				pointCount,
+				properties: { ...props },
+				async leaves() {
+					const clusters = dead ? undefined : (gl.getSource(sourceId) as ClusterSource | undefined);
+					if (!clusters) return [];
+					const leaves = await clusters.getClusterLeaves(clusterId, pointCount, 0);
+					return leaves.flatMap((leaf) =>
+						leaf.geometry.type === "Point"
+							? [
+									{
+										props: leaf.properties as P,
+										lngLat: leaf.geometry.coordinates.slice(0, 2) as [number, number]
+									}
+								]
+							: []
+					);
+				}
+			};
+			hoveredCluster = { refKey, info };
+			return { pluginId, ref, refKey, name: "" };
+		}
+
+		/** A group's cluster layers; they block what is beneath them and zoom in on click. */
+		function clusterLayers(scale: Scale, group: string, sourceId: string): void {
+			const args: ClusterLayerArgs = {
+				group,
+				sourceId,
+				scale,
+				theme,
+				iconSizeScale: 1 / IMAGE_RATIO,
+				iconImage(category, levelKey) {
+					ensureIcons(scale, [category]);
+					return iconImage(category, levelKey);
+				}
+			};
+			const added: string[] = [];
+			for (const { local, spec } of (cluster?.layers ?? defaultClusterLayers)(args)) {
+				added.push(ctx.addLayer(layerLocal(local, group), spec));
+			}
+			layers.push(...added);
+			const fresh = added.filter((layerId) => !clusterLayerIds.has(layerId));
+			if (fresh.length === 0) return;
+			for (const layerId of fresh) {
+				clusterLayerIds.add(layerId);
+				ctx.on("click", layerId, (e) => zoomIntoCluster(sourceId, e));
+			}
+			ctx.blocking(fresh, (props) => clusterHover(group, sourceId, props));
 		}
 
 		/** Adds every layer for `groups` in draw order: clusters, then points, then selection. */
 		function buildLayers(scale: Scale, groups: string[]): void {
 			removeLayers();
-			if (cluster) for (const group of groups) clusterLayers(group, sources.get(group)!);
+			if (cluster) for (const group of groups) clusterLayers(scale, group, sources.get(group)!);
 			const pointIds: string[] = [];
 			for (const group of groups) {
 				const layerId = ctx.addLayer(
@@ -334,6 +524,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			const present = new Set<string>(grouped ? [] : [""]);
 			const categories = new Set<string>();
 			const byKey = new Map<string, string>();
+			const rank = new Map<string, number>();
 			/* eslint-enable svelte/prefer-svelte-reactivity */
 			for (const feature of collection?.features ?? []) {
 				const props = feature.properties;
@@ -342,7 +533,11 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				present.add(group);
 				byKey.set(props.refKey, group);
 				if (icon) categories.add(icon.category(props));
+				if (options.sortKey) {
+					rank.set(group, Math.max(rank.get(group) ?? -Infinity, options.sortKey(props)));
+				}
 			}
+			for (const [group, max] of rank) groupRank.set(group, max);
 			groupByKey = byKey;
 			for (const group of present) {
 				const data = groupData(collection, group);
@@ -371,12 +566,11 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 					scaleGeneration++;
 				}
 				ensureIcons(scale, categories);
-				const groups = [...sources.keys()];
-				if (
-					!built ||
-					built.scaleKey !== key ||
-					groups.some((group) => !built!.groups.includes(group))
-				) {
+				// Lowest rank first, so the group with the highest sort key draws on top.
+				const groups = [...sources.keys()].sort(
+					(a, b) => (groupRank.get(a) ?? -Infinity) - (groupRank.get(b) ?? -Infinity)
+				);
+				if (!built || built.scaleKey !== key || built.groups.join("\n") !== groups.join("\n")) {
 					buildLayers(scale, groups);
 				}
 			}
@@ -404,6 +598,8 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 
 		return () => {
 			dead = true;
+			providers = null;
+			hoveredCluster = null;
 		};
 	}
 
@@ -418,5 +614,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		selectable
 	};
 	if (options.listed ?? true) plugin.features = features;
+	if (options.tooltip) plugin.tooltip = featureTooltip;
+	if (cluster?.tooltip) plugin.hoverTooltip = clusterTooltip;
 	return plugin;
 }

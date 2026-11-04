@@ -358,3 +358,102 @@ describe("hover", () => {
 		expect(map.hovered).toBeNull();
 	});
 });
+
+describe("blocking layers", () => {
+	/** A plugin with a blocking `bubbles` layer; hovering a bubble yields `toHover`'s hit. */
+	function bubbles(id: string, hover: boolean): MapPlugin {
+		return {
+			id,
+			setup(ctx) {
+				const source = ctx.addSource("src", {
+					type: "geojson",
+					data: { type: "FeatureCollection", features: [] }
+				});
+				const layer = ctx.addLayer("bubbles", { type: "circle", source });
+				ctx.blocking(
+					[layer],
+					hover
+						? (props) => ({
+								pluginId: id,
+								ref: { kind: "feature", id: `cluster:${String(props.cluster_id)}` },
+								refKey: `feature:cluster:${String(props.cluster_id)}`,
+								name: ""
+							})
+						: undefined
+				);
+				return () => {};
+			}
+		};
+	}
+
+	function bubble(map: MapContext, pluginId: string, clusterId: number) {
+		return {
+			layer: { id: `${map.uid}:${pluginId}:bubbles` },
+			source: `${map.uid}:${pluginId}:src`,
+			properties: { cluster_id: clusterId },
+			geometry: { type: "Point" as const, coordinates: [-119, 36] }
+		};
+	}
+
+	function blockingSetUp(hover = true) {
+		const map = createMap({ config });
+		const onselectionchange = vi.fn();
+		map.addPlugin(points("regions", "region"), { selectionMode: "single", onselectionchange });
+		map.addPlugin(bubbles("clusters", hover));
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		return { map, gl, onselectionchange };
+	}
+
+	it("picks nothing beneath a blocking layer that is topmost", () => {
+		const { map, gl, onselectionchange } = blockingSetUp();
+		const handler = vi.fn();
+		map.on("featureclick", handler);
+		gl.setRenderedFeatures([bubble(map, "clusters", 7), rendered(map, "regions", "019", "Fresno")]);
+		click(gl);
+		expect(handler).not.toHaveBeenCalled();
+		expect(onselectionchange).not.toHaveBeenCalled();
+		expect(map.featuresAt({ x: 1, y: 2 })).toEqual([]);
+	});
+
+	it("picks a feature drawn above a blocking layer", () => {
+		const { map, gl } = blockingSetUp();
+		const handler = vi.fn();
+		map.on("featureclick", handler);
+		gl.setRenderedFeatures([rendered(map, "regions", "019", "Fresno"), bubble(map, "clusters", 7)]);
+		click(gl);
+		expect(handler).toHaveBeenCalledWith({
+			pluginId: "regions",
+			ref: { kind: "region", type: "county", code: "019" }
+		});
+	});
+
+	it("hovers the blocking layer's own hit instead of the feature beneath", () => {
+		const { map, gl } = blockingSetUp();
+		gl.setRenderedFeatures([bubble(map, "clusters", 7), rendered(map, "regions", "019", "Fresno")]);
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+		expect(map.hovered).toEqual({
+			hit: {
+				pluginId: "clusters",
+				ref: { kind: "feature", id: "cluster:7" },
+				refKey: "feature:cluster:7",
+				name: ""
+			},
+			lngLat: [-119.5, 36.5]
+		});
+	});
+
+	it("hovers nothing over a blocking layer without a hover hit", () => {
+		const { map, gl } = blockingSetUp(false);
+		gl.setRenderedFeatures([bubble(map, "clusters", 7), rendered(map, "regions", "019", "Fresno")]);
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+		expect(map.hovered).toBeNull();
+	});
+
+	it("stops blocking once the plugin is removed", () => {
+		const { map, gl } = blockingSetUp();
+		gl.setRenderedFeatures([bubble(map, "clusters", 7), rendered(map, "regions", "019", "Fresno")]);
+		map.removePlugin("clusters");
+		expect(map.featuresAt({ x: 1, y: 2 }).map((h) => h.refKey)).toEqual(["region:county:019"]);
+	});
+});

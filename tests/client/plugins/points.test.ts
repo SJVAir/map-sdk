@@ -279,8 +279,12 @@ describe("pointsPlugin", () => {
 				levelKeyExpression(pm25Scale, "value")
 			]);
 			// One image per level of the category, plus the neutral one.
-			expect(draw).toHaveBeenCalledWith("purple", "#00e400");
-			expect(draw).toHaveBeenCalledWith("purple", FALLBACK_THEME_COLORS.neutral);
+			expect(draw).toHaveBeenCalledWith("purple", "#00e400", FALLBACK_THEME_COLORS);
+			expect(draw).toHaveBeenCalledWith(
+				"purple",
+				FALLBACK_THEME_COLORS.neutral,
+				FALLBACK_THEME_COLORS
+			);
 			expect(draw).toHaveBeenCalledTimes(pm25Scale.levels.length + 1);
 			await settle();
 			expect(gl.images.has("m1:pts:icon:0:purple:good")).toBe(true);
@@ -357,8 +361,8 @@ describe("pointsPlugin", () => {
 			const draw = vi.fn(() => "<svg/>");
 			setup({ source, circle: undefined, icon: { category: () => "burn", draw, size: 16 } });
 			expect(draw.mock.calls).toEqual([
-				["burn", FALLBACK_THEME_COLORS.neutral],
-				["burn", FALLBACK_THEME_COLORS.neutral]
+				["burn", FALLBACK_THEME_COLORS.neutral, FALLBACK_THEME_COLORS],
+				["burn", FALLBACK_THEME_COLORS.neutral, FALLBACK_THEME_COLORS]
 			]);
 		} finally {
 			vi.unstubAllGlobals();

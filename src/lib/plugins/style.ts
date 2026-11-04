@@ -85,8 +85,20 @@ function toRgba(color: string, fallback: string): string {
 
 type Output = string | number;
 
+/**
+ * What a lookup reads: the feature's `value` property, or an expression computing a value (e.g. a
+ * cluster's average). An expression that may have no value must be numeric and give
+ * `MISSING_VALUE` then (MapLibre won't mix null into a number expression).
+ */
+export type ValueInput = "value" | ExpressionSpecification;
+
 /** Breakpoint input for null and non-numeric values: below every real level. */
-const MISSING = -1;
+export const MISSING_VALUE = -1;
+const MISSING = MISSING_VALUE;
+
+function read(input: ValueInput): ExpressionSpecification {
+	return typeof input === "string" ? ["get", input] : input;
+}
 
 /**
  * The value as a number for a range lookup, like `levelFor`: a number, or a non-blank numeric
@@ -98,13 +110,13 @@ const MISSING = -1;
  * Accepted gap: "Infinity" and "1e999" convert to Infinity and step to the top level, while
  * `levelFor` says NO_LEVEL (expressions have no clean finiteness check).
  */
-function numeric(property: string): ExpressionSpecification {
+function numeric(input: ValueInput): ExpressionSpecification {
 	const v = ["var", "v"];
 	const n = ["var", "n"];
 	return [
 		"let",
 		"v",
-		["get", property],
+		read(input),
 		[
 			"case",
 			["==", ["typeof", v], "number"],
@@ -127,7 +139,7 @@ function numeric(property: string): ExpressionSpecification {
  */
 function rangeStep(
 	scale: Scale,
-	property: string,
+	input: ValueInput,
 	fallback: Output,
 	pick: (level: Level) => Output | null
 ): ExpressionSpecification {
@@ -146,12 +158,12 @@ function rangeStep(
 	}
 	if (last !== null) stops.push(last, fallback);
 	if (stops.length === 0) return ["literal", fallback] as unknown as ExpressionSpecification;
-	return ["step", numeric(property), fallback, ...stops] as unknown as ExpressionSpecification;
+	return ["step", numeric(input), fallback, ...stops] as unknown as ExpressionSpecification;
 }
 
 function categoryMatch(
 	scale: Scale,
-	property: string,
+	input: ValueInput,
 	fallback: Output,
 	pick: (level: Level) => Output | null
 ): ExpressionSpecification {
@@ -161,18 +173,19 @@ function categoryMatch(
 		arms.push(level.value, pick(level) ?? fallback);
 	}
 	if (arms.length === 0) return ["literal", fallback] as unknown as ExpressionSpecification;
-	return ["match", ["get", property], ...arms, fallback] as unknown as ExpressionSpecification;
+	return ["match", read(input), ...arms, fallback] as unknown as ExpressionSpecification;
 }
 
-function lookup(
+/** Per-level output for the level `input` falls in; `fallback` where no level applies. */
+export function levelLookup(
 	scale: Scale,
-	property: string,
+	input: ValueInput,
 	fallback: Output,
 	pick: (level: Level) => Output | null
 ): ExpressionSpecification {
 	return scale.kind === "range"
-		? rangeStep(scale, property, fallback, pick)
-		: categoryMatch(scale, property, fallback, pick);
+		? rangeStep(scale, input, fallback, pick)
+		: categoryMatch(scale, input, fallback, pick);
 }
 
 /** Fill color per level; unmatched values and levels with an empty color use `neutral`. */
@@ -181,7 +194,7 @@ export function colorExpression(
 	property: "value",
 	neutral: string
 ): ExpressionSpecification {
-	return lookup(scale, property, neutral, (level) => level.color || null);
+	return levelLookup(scale, property, neutral, (level) => level.color || null);
 }
 
 /** Opacity per level, or the plain `fallback` number when no level sets one. */
@@ -191,10 +204,10 @@ export function opacityExpression(
 	fallback: number
 ): ExpressionSpecification | number {
 	if (!scale.levels.some((level) => level.opacity !== null)) return fallback;
-	return lookup(scale, property, fallback, (level) => level.opacity);
+	return levelLookup(scale, property, fallback, (level) => level.opacity);
 }
 
 /** Level key per value ("" where no level applies), for filters and icon ids. */
-export function levelKeyExpression(scale: Scale, property: "value"): ExpressionSpecification {
-	return lookup(scale, property, "", (level) => level.key);
+export function levelKeyExpression(scale: Scale, input: ValueInput): ExpressionSpecification {
+	return levelLookup(scale, input, "", (level) => level.key);
 }

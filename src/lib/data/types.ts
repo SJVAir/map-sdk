@@ -16,6 +16,17 @@ export interface MapFeatureProperties {
 	value: number | string | null;
 }
 
+/** A monitor on the map: what the monitors preset draws and its tooltips show. */
+export interface MonitorFeatureProperties extends MapFeatureProperties {
+	/** The server's monitor type (e.g. "purpleair", "airnow"); picks the marker shape. */
+	type: string;
+	isActive: boolean;
+	isSjvair: boolean;
+	location: "inside" | "outside";
+	/** When the reading was taken (ISO 8601), for the tooltip. */
+	timestamp?: string | null;
+}
+
 export type DataStatus =
 	| { state: "loading" }
 	| { state: "ready" }

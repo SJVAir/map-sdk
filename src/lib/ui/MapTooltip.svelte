@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { readableColor } from "color2k";
+	import { untrack } from "svelte";
 	import type { MapContext } from "../core/create-map.svelte.js";
 	import type { FeatureListItem, MapPlugin } from "../core/plugin.js";
 	import { NO_LEVEL } from "../data/scale.js";
@@ -24,14 +25,16 @@
 
 	// The keyboard-focused list item wins over the pointer.
 	const key = $derived(map.focusedKey ?? map.hovered?.hit.refKey ?? null);
-	const hit = $derived(map.focusedKey ? null : (map.hovered?.hit ?? null));
+	// Primitives, so moving the pointer within one feature doesn't recompute the content.
+	const hitPluginId = $derived(map.focusedKey ? null : (map.hovered?.hit.pluginId ?? null));
+	const hitName = $derived(map.focusedKey ? null : (map.hovered?.hit.name ?? null));
 
 	// Reads only the shown feature's plugin (or all plugins for a focused key), and only while
 	// something is shown, so an idle map doesn't subscribe to any plugin's data.
 	const found = $derived.by((): { item: FeatureListItem; plugin: MapPlugin } | null => {
 		if (key === null) return null;
 		// The hovered hit's plugin, or the focused one; without either, the first plugin listing the key.
-		const pluginId = hit ? hit.pluginId : map.focusedPluginId;
+		const pluginId = hitPluginId ?? map.focusedPluginId;
 		const plugins = pluginId ? map.plugins.filter((p) => p.id === pluginId) : map.plugins;
 		for (const plugin of plugins) {
 			const item = plugin.features?.().find((f) => f.refKey === key);
@@ -41,7 +44,7 @@
 	});
 
 	const item = $derived(found?.item ?? null);
-	const name = $derived(item?.name ?? hit?.name ?? null);
+	const name = $derived(item?.name ?? hitName);
 	// A found item anchors the tooltip at its point (stable while the pointer moves over it).
 	const anchor = $derived(item?.lngLat ?? map.hovered?.lngLat ?? null);
 	const projected = $derived(anchor ? project(anchor) : null);
@@ -56,7 +59,14 @@
 		if (height) top = Math.min(top, Math.max(height - tipHeight, 0));
 		return { left: x - tipWidth / 2, top: Math.max(top, 0) };
 	});
-	const custom = $derived(found ? found.plugin.tooltip?.(found.item) : undefined);
+	const custom = $derived.by(() => {
+		if (found) return found.plugin.tooltip?.(found.item);
+		// A hovered hit no plugin lists (e.g. a cluster bubble): its plugin's hover content.
+		if (key === null || hitPluginId === null) return undefined;
+		const plugin = map.plugins.find((p) => p.id === hitPluginId);
+		const hit = untrack(() => map.hovered?.hit);
+		return hit && plugin?.hoverTooltip?.(hit);
+	});
 
 	const level = $derived(item && item.level !== NO_LEVEL && item.level.color ? item.level : null);
 	const levelLabel = $derived(level ? level.label : map.messages("mapsdk_no_level"));
@@ -88,7 +98,9 @@
 		style:left="{position.left}px"
 		style:top="{position.top}px"
 	>
-		<div class="mapsdk-tooltip-name">{name}</div>
+		{#if name}
+			<div class="mapsdk-tooltip-name">{name}</div>
+		{/if}
 		{#if custom}
 			{@render custom()}
 		{:else if item}

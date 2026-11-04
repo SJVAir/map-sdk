@@ -78,6 +78,14 @@ export interface PluginContext {
 		layerIds: string[],
 		toHit: (props: Record<string, unknown>) => FeatureHit | null
 	): void;
+	/**
+	 * Layers that hide what is beneath them (e.g. cluster bubbles): where one is topmost, a click
+	 * picks nothing and the hover is `toHover`'s hit for it (for its tooltip), or nothing.
+	 */
+	blocking(
+		layerIds: string[],
+		toHover?: (props: Record<string, unknown>) => FeatureHit | null
+	): void;
 	/** A layer event listener (e.g. a cluster click), removed on teardown. */
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- MapLibre's event payloads vary
 	on(type: string, layerId: string, listener: (e: any) => void): void;
@@ -100,5 +108,10 @@ export interface MapPlugin {
 	selectable?: boolean;
 	displayOptions?: Snippet;
 	/** Richer tooltip content for one of this plugin's features, below its name. */
-	tooltip?(item: FeatureListItem): Snippet;
+	tooltip?(item: FeatureListItem): Snippet | undefined;
+	/**
+	 * Tooltip content for a hovered hit that isn't a listed feature (e.g. a cluster bubble's hover
+	 * hit from `PluginContext.blocking`).
+	 */
+	hoverTooltip?(hit: FeatureHit): Snippet | undefined;
 }

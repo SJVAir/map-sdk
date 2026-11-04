@@ -34,5 +34,16 @@
 	"mapsdk_credit_maptiler": "© MapTiler",
 	"mapsdk_credit_osm": "© OpenStreetMap contributors",
 	"mapsdk_logo_maptiler": "MapTiler logo, opens maptiler.com",
-	"mapsdk_selection_label": "Selection"
+	"mapsdk_selection_label": "Selection",
+	"mapsdk_no_reading": "No reading",
+	"mapsdk_time_with_zone": "{time} {zone}",
+	"mapsdk_monitor_cluster_average": "(cluster avg)",
+	"mapsdk_monitor_cluster_title": "{type} Monitors",
+	"mapsdk_monitor_cluster_title_sjvair": "SJVAir {type} Monitors",
+	"mapsdk_monitor_cluster_count_one": "{count} monitor",
+	"mapsdk_monitor_cluster_count_other": "{count} monitors",
+	"mapsdk_monitor_cluster_coverage_one": "{count} monitor covering {area} mi²",
+	"mapsdk_monitor_cluster_coverage_other": "{count} monitors covering {area} mi²",
+	"mapsdk_monitor_cluster_max": "Max: {value} {units}",
+	"mapsdk_monitor_cluster_min": "Min: {value} {units}"
 }

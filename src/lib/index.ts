@@ -17,9 +17,16 @@ export type { LegendBar as LegendBarData, LegendSection } from "./ui/legend-data
 export { rowLabel } from "./ui/feature-list.js";
 export type { SortBy } from "./ui/feature-list.js";
 export { pointsPlugin } from "./plugins/points.svelte.js";
-export type { PointsOptions } from "./plugins/points.svelte.js";
+export type {
+	ClusterInfo,
+	ClusterLayerArgs,
+	PointsOptions,
+	PointsTooltipEnv
+} from "./plugins/points.svelte.js";
 export { shapesPlugin } from "./plugins/shapes.svelte.js";
 export type { ShapesOptions } from "./plugins/shapes.svelte.js";
+export { monitorShape, monitorsPlugin } from "./presets/monitors.js";
+export type { MonitorShape, MonitorsPluginOptions } from "./presets/monitors.js";
 export { summaryText } from "./ui/view-summary.js";
 export { getMapContext } from "./core/context.js";
 export type { BasemapConfig } from "./core/basemap.svelte.js";

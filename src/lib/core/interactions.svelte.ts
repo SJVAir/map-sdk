@@ -5,6 +5,17 @@ interface Registration {
 	pluginId: string;
 	layerIds: string[];
 	toHit: (props: Record<string, unknown>) => FeatureHit | null;
+	/** Hits nothing itself, and hides what is beneath it; `toHit` gives only its hover hit. */
+	blocking: boolean;
+}
+
+/** What is under one point. */
+interface Lookup {
+	hits: FeatureHit[];
+	/** True when the topmost feature is on a blocking layer: nothing beneath is hit. */
+	blocked: boolean;
+	/** The blocking layer's hover hit, if it gives one. */
+	blocker: FeatureHit | null;
 }
 
 /** The parts of a MapLibre `MapMouseEvent` the router reads. */
@@ -30,7 +41,8 @@ export interface Hovered {
  *
  * Listens on the map itself (`click`, `mousemove`, `mouseout`) and queries only the registered
  * layers, so registrations can come and go without re-binding listeners. Layers nobody registered
- * (e.g. cluster bubbles, which zoom instead) are never hit.
+ * are never hit. A blocking layer (e.g. a cluster bubble, which zooms instead) is never hit either,
+ * but when it is topmost at a point nothing beneath it is hit or hovered.
  */
 export class InteractionRouter {
 	// Bookkeeping only; nothing reads these reactively.
@@ -58,7 +70,28 @@ export class InteractionRouter {
 		layerIds: string[],
 		toHit: (props: Record<string, unknown>) => FeatureHit | null
 	): () => void {
-		const registration: Registration = { pluginId, layerIds: [...layerIds], toHit };
+		return this.#add({ pluginId, layerIds: [...layerIds], toHit, blocking: false });
+	}
+
+	/**
+	 * Records layers that hide what is beneath them: when one is topmost at a point, clicks pick
+	 * nothing and the hover is `toHover`'s hit for it (or nothing). Returns an unregister function.
+	 */
+	registerBlocking(
+		pluginId: string,
+		layerIds: string[],
+		toHover?: (props: Record<string, unknown>) => FeatureHit | null
+	): () => void {
+		return this.#add({
+			pluginId,
+			layerIds: [...layerIds],
+			toHit: toHover ?? (() => null),
+			blocking: true
+		});
+	}
+
+	#add(registration: Registration): () => void {
+		const { pluginId } = registration;
 		this.#registrations.add(registration);
 		return () => {
 			if (!this.#registrations.delete(registration)) return;
@@ -92,10 +125,19 @@ export class InteractionRouter {
 		this.#hovered = null;
 	}
 
-	/** Hits under a canvas point, topmost first, de-duplicated by `refKey`. `[]` when detached. */
+	/**
+	 * Hits under a canvas point, topmost first, de-duplicated by `refKey`. `[]` when detached or
+	 * when a blocking layer is topmost.
+	 */
 	hitsAt(point: [number, number]): FeatureHit[] {
+		const found = this.#lookup(point);
+		return found.blocked ? [] : found.hits;
+	}
+
+	#lookup(point: [number, number]): Lookup {
+		const none: Lookup = { hits: [], blocked: false, blocker: null };
 		const gl = this.#gl;
-		if (!gl) return [];
+		if (!gl) return none;
 		// Locals for one lookup; nothing reads them reactively.
 		/* eslint-disable svelte/prefer-svelte-reactivity */
 		const byLayer = new Map<string, Registration>();
@@ -105,18 +147,25 @@ export class InteractionRouter {
 				if (!byLayer.has(id) && gl.getLayer(id)) byLayer.set(id, registration);
 			}
 		}
-		if (byLayer.size === 0) return [];
+		if (byLayer.size === 0) return none;
 		const hits: FeatureHit[] = [];
 		const seen = new Set<string>();
 		/* eslint-enable svelte/prefer-svelte-reactivity */
-		for (const feature of gl.queryRenderedFeatures(point, { layers: [...byLayer.keys()] })) {
+		const features = gl.queryRenderedFeatures(point, { layers: [...byLayer.keys()] });
+		const top = features[0] && byLayer.get(features[0].layer.id);
+		if (top?.blocking) {
+			const hit = top.toHit(features[0].properties ?? {});
+			return { hits: [], blocked: true, blocker: hit && { ...hit, pluginId: top.pluginId } };
+		}
+		for (const feature of features) {
 			const registration = byLayer.get(feature.layer.id);
-			const hit = registration?.toHit(feature.properties ?? {});
-			if (!registration || !hit || seen.has(hit.refKey)) continue;
+			if (!registration || registration.blocking) continue;
+			const hit = registration.toHit(feature.properties ?? {});
+			if (!hit || seen.has(hit.refKey)) continue;
 			seen.add(hit.refKey);
 			hits.push({ ...hit, pluginId: registration.pluginId });
 		}
-		return hits;
+		return { hits, blocked: false, blocker: null };
 	}
 
 	/**
@@ -156,7 +205,8 @@ export class InteractionRouter {
 	};
 
 	#onMove = (e: PointerEventLike) => {
-		const hit = this.hitsAt([e.point.x, e.point.y])[0];
+		const found = this.#lookup([e.point.x, e.point.y]);
+		const hit = found.blocked ? found.blocker : found.hits[0];
 		this.#hovered = hit ? { hit, lngLat: [e.lngLat.lng, e.lngLat.lat] } : null;
 	};
 
