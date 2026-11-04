@@ -144,6 +144,16 @@ export class PluginHost {
 		this.#whenStyleLoaded();
 	}
 
+	/**
+	 * Tears every plugin down and stops waiting for a style, before the map's style is replaced:
+	 * nothing may touch a style on its way out. `restyle` sets them up again.
+	 */
+	suspend(): void {
+		if (!this.#gl) return;
+		this.#cancelStyleWait();
+		this.#teardownAll();
+	}
+
 	/** Tears down and sets up every plugin again (after a basemap change), once the style loads. */
 	restyle(): void {
 		if (!this.#gl) return;

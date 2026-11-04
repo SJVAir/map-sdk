@@ -3,8 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import { BasemapState, type BasemapConfig } from "../../../src/lib/core/basemap.svelte.js";
 import { createMap } from "../../../src/lib/core/create-map.svelte.js";
 import type { MapPlugin } from "../../../src/lib/core/plugin.js";
+import type { MapFeatureProperties } from "../../../src/lib/data/types.js";
+import { shapesPlugin } from "../../../src/lib/plugins/shapes.svelte.js";
 import { rootEffect } from "../../fixtures/effects.svelte.js";
 import { createFakeGl } from "../../fixtures/fake-gl.js";
+import { smokeScale } from "../../fixtures/scales.js";
+import { TestSource } from "../../fixtures/sources.svelte.js";
 
 const url = (id: string) => `https://tiles.test/maps/${id}/style.json`;
 const config: BasemapConfig = {
@@ -41,7 +45,7 @@ describe("BasemapState", () => {
 		basemap.select("dark");
 		expect(basemap.current).toBe("dark");
 		expect(setStyle).toHaveBeenCalledTimes(1);
-		expect(setStyle).toHaveBeenCalledWith(url("dark"));
+		expect(setStyle).toHaveBeenCalledWith(url("dark"), { diff: false });
 		expect(ready).not.toHaveBeenCalled();
 		gl.fireStyleLoad();
 		expect(ready).toHaveBeenCalledTimes(1);
@@ -60,7 +64,7 @@ describe("BasemapState", () => {
 		const { gl, basemap, setStyle, ready } = setup();
 		basemap.select("dark");
 		basemap.select("pastel");
-		expect(setStyle.mock.calls).toEqual([[url("dark")], [url("pastel")]]);
+		expect(setStyle.mock.calls.map(([style]) => style)).toEqual([url("dark"), url("pastel")]);
 		// The superseded style failing is not heard.
 		gl.emit("error", failure("dark"));
 		expect(setStyle).toHaveBeenCalledTimes(2);
@@ -75,7 +79,7 @@ describe("BasemapState", () => {
 		gl.fireStyleLoad();
 		basemap.select("pastel");
 		gl.emit("error", failure("pastel"));
-		expect(setStyle).toHaveBeenLastCalledWith(url("dark"));
+		expect(setStyle).toHaveBeenLastCalledWith(url("dark"), { diff: false });
 		expect(basemap.current).toBe("dark");
 		expect(ready).toHaveBeenCalledTimes(1);
 		gl.fireStyleLoad();
@@ -87,7 +91,7 @@ describe("BasemapState", () => {
 		basemap.select("dark");
 		gl.emit("error", failure("dark"));
 		gl.emit("error", failure("streets"));
-		expect(setStyle.mock.calls).toEqual([[url("dark")], [url("streets")]]);
+		expect(setStyle.mock.calls.map(([style]) => style)).toEqual([url("dark"), url("streets")]);
 		expect(gl.listeners.filter((l) => l.type === "error")).toEqual([]);
 		expect(ready).not.toHaveBeenCalled();
 		basemap.select("streets");
@@ -198,6 +202,65 @@ describe("BasemapState with the plugin host", () => {
 		map.basemap.select("dark");
 		gl.fireStyleLoad();
 		expect(setupFn).toHaveBeenCalledTimes(2);
+		map.destroy();
+	});
+
+	it("tears plugins down before the new style loads, so data and selection changes wait", async () => {
+		type Props = MapFeatureProperties;
+		const square = (x: number): number[][] => [
+			[x, 0],
+			[x + 1, 0],
+			[x + 1, 1],
+			[x, 0]
+		];
+		const shapes = (keys: string[]) => ({
+			type: "FeatureCollection" as const,
+			features: keys.map((k, i) => ({
+				type: "Feature" as const,
+				geometry: { type: "Polygon" as const, coordinates: [square(i * 2)] },
+				properties: { refKey: `region:${k}`, name: k, value: 1 } as Props
+			}))
+		});
+		const source = new TestSource<Props>({ features: shapes(["a", "b"]), scale: smokeScale });
+		const map = createMap({ config: { maptilerKey: "k", basemaps: config } });
+		map.addPlugin(
+			shapesPlugin<Props>({
+				id: "shp",
+				source,
+				layerLabel: "Smoke",
+				mode: "choropleth",
+				selectable: true
+			}),
+			{ selectionMode: "single" }
+		);
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		const settle = async () => {
+			await Promise.resolve();
+			await Promise.resolve();
+			flushSync();
+		};
+		await settle();
+		map.setSelection("shp", { kind: "regions", ids: ["b"] });
+		flushSync();
+		expect(gl.featureStates.get(`${map.uid}:shp:shapes/region:b`)).toEqual({ selected: true });
+
+		map.basemap.select("dark");
+		const from = gl.calls.length;
+		source.features = shapes(["a", "b", "c"]);
+		map.setSelection("shp", { kind: "regions", ids: ["a"] });
+		await settle();
+		const touched = gl.calls
+			.slice(from)
+			.filter((c) => /^(getSource|setData|setFeatureState|removeFeatureState|addLayer)/.test(c));
+		expect(touched).toEqual([]);
+
+		gl.fireStyleLoad();
+		await settle();
+		expect(gl.layers.map((l) => l.id)).toContain(`${map.uid}:shp:fill`);
+		const data = gl.sources.get(`${map.uid}:shp:shapes`) as { data: { features: unknown[] } };
+		expect(data.data.features).toHaveLength(3);
+		expect(gl.featureStates.get(`${map.uid}:shp:shapes/region:a`)).toEqual({ selected: true });
 		map.destroy();
 	});
 });

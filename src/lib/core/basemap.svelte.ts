@@ -17,15 +17,17 @@ const STYLE_READY_EVENTS = ["style.load", "idle"] as const;
  * calls `setStyle` for nothing. Later `select` calls load the new style. A newer `select`
  * supersedes one still loading. If the style document fails, the map goes back to the last style
  * that loaded and `current` reverts; if that fails too, the map stays unstyled until the next
- * `select`. After each successful `select` load, `excludedLayers` are removed and `onStyleReady`
- * is called (it re-runs the plugins). The map's first style is not announced: the plugin host
- * already waits for it.
+ * `select`. Right before each `setStyle`, `onStyleChange` is called (it tears the plugins down,
+ * so nothing touches the old style while the new one loads). After each successful load,
+ * `excludedLayers` are removed and `onStyleReady` is called (it sets the plugins up again). The
+ * map's first style is not announced: the plugin host already waits for it.
  */
 export class BasemapState {
 	#current = $state("");
 	#config: BasemapConfig | undefined;
 	#gl: GlMapLike | null = null;
 	#onStyleReady: (() => void) | null = null;
+	#onStyleChange: (() => void) | null = null;
 	/** The id last handed to `setStyle` (loaded or loading); null once a load failed with no fallback. */
 	#applied: string | null = null;
 	/** The id the map last finished loading, which a failed change falls back to. */
@@ -51,14 +53,17 @@ export class BasemapState {
 	}
 
 	/**
-	 * Uses `gl` from now on, which must already show (or be loading) the style of `current`.
-	 * Reads `current` untracked, so calling this in an effect doesn't make it depend on it.
+	 * For MapView only (through the map context's `attach`): uses `gl` from now on, which must
+	 * already show (or be loading) the style of `current`. `onStyleChange` runs right before each
+	 * `setStyle`, `onStyleReady` once that style has loaded. Reads `current` untracked, so calling
+	 * this in an effect doesn't make it depend on it.
 	 */
-	attach(gl: GlMapLike, onStyleReady: () => void): void {
+	attach(gl: GlMapLike, onStyleReady: () => void, onStyleChange?: () => void): void {
 		if (this.#gl === gl) return;
 		if (this.#gl) this.detach();
 		this.#gl = gl;
 		this.#onStyleReady = onStyleReady;
+		this.#onStyleChange = onStyleChange ?? null;
 		const id = untrack(() => this.#current);
 		this.#applied = id;
 		this.#loaded = id;
@@ -66,10 +71,12 @@ export class BasemapState {
 		this.#whenReady(gl, () => this.#removeExcluded(gl));
 	}
 
+	/** For MapView only (through the map context's `detach`): stops using the GL map. */
 	detach(): void {
 		this.#stopWaiting?.();
 		this.#gl = null;
 		this.#onStyleReady = null;
+		this.#onStyleChange = null;
 	}
 
 	#entry(id: string) {
@@ -136,7 +143,9 @@ export class BasemapState {
 		this.#stopWaiting = stop;
 		gl.on("style.load", onLoad);
 		gl.on("error", onError);
-		gl.setStyle(entry.style);
+		this.#onStyleChange?.();
+		// No diffing: a diff keeps the plugins' sources and layers in some cases and not others.
+		gl.setStyle(entry.style, { diff: false });
 	}
 
 	/**

@@ -371,7 +371,11 @@ class MapContextImpl implements MapContext {
 		this.#gl = gl;
 		this.#host.attach(gl);
 		this.#router.attach(gl);
-		this.basemap.attach(gl, () => this.#host.restyle());
+		this.basemap.attach(
+			gl,
+			() => this.#host.restyle(),
+			() => this.#host.suspend()
+		);
 		this.#attached = true;
 	}
 

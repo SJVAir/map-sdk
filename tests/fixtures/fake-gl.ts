@@ -167,8 +167,8 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 			log("isStyleLoaded");
 			return gl.styleLoaded;
 		},
-		setStyle() {
-			log("setStyle");
+		setStyle(_style, options) {
+			log("setStyle", options?.diff === false ? "nodiff" : "diff");
 			// A new style drops every source, layer, and image.
 			sources.clear();
 			layers.length = 0;

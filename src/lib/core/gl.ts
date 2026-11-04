@@ -37,7 +37,7 @@ export interface GlMapLike {
 		geometry: Geometry;
 	}>;
 	isStyleLoaded(): boolean | void;
-	setStyle(style: unknown): void;
+	setStyle(style: unknown, options?: { diff?: boolean }): void;
 	/* eslint-disable @typescript-eslint/no-explicit-any -- MapLibre's event payloads vary by type */
 	on(type: string, listener: (e: any) => void): void;
 	on(type: string, layerId: string, listener: (e: any) => void): void;
