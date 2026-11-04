@@ -925,6 +925,7 @@ describe("store.dataSource", () => {
 		expect(status).toMatchObject({ state: "error", error: failure });
 		if (status.state !== "error") throw new Error("expected an error");
 		status.retry();
+		expect(store.dataSource.status).toEqual({ state: "loading" });
 		await flush();
 
 		expect(store.dataSource.status).toEqual({ state: "ready" });

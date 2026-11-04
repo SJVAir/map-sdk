@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import axe from "axe-core";
 import type { MapContext } from "../../src/lib/core/create-map.svelte.js";
 import type { MapPlugin } from "../../src/lib/core/plugin.js";
@@ -9,7 +9,7 @@ import { defaultMessages } from "../../src/lib/data/messages.js";
 import Legend from "../../src/lib/ui/Legend.svelte";
 import { pm25Scale, smokeScale } from "../fixtures/scales.js";
 
-function fakeMap(plugins: Array<Pick<MapPlugin, "id" | "legend">>): MapContext {
+function fakeMap(plugins: Array<Pick<MapPlugin, "id" | "legend" | "label">>): MapContext {
 	return { plugins, messages: defaultMessages, format: createDefaultFormat() } as never;
 }
 
@@ -22,7 +22,11 @@ const map = fakeMap([
 		id: "shapes",
 		legend: () => ({ pluginId: "shapes", title: "Smoke", units: "", scale: smokeScale })
 	},
-	{ id: "loading", legend: () => ({ pluginId: "loading", status: { state: "loading" } }) }
+	{
+		id: "loading",
+		label: "Wildfires",
+		legend: () => ({ pluginId: "loading", status: { state: "loading" } })
+	}
 ]);
 
 const THEMES = {
@@ -146,5 +150,70 @@ describe("Legend", () => {
 		await expect.element(page.getByRole("region", { name: "Legend" })).toBeVisible();
 		const result = await axe.run(document.querySelector(".mapsdk-legend")!);
 		expect(result.violations).toEqual([]);
+	});
+
+	it("shows a loading line under the layer's name while a plugin loads", async () => {
+		applyTheme("light");
+		render(Legend, { map });
+		const status = page.getByRole("status").filter({ hasText: "Wildfires" });
+		await expect.element(status).toBeVisible();
+		await expect.element(status.getByText("Loading", { exact: true })).toBeVisible();
+	});
+
+	it("says a layer isn't available right now", async () => {
+		applyTheme("light");
+		render(Legend, {
+			map: fakeMap([
+				{
+					id: "smoke",
+					label: "Smoke",
+					legend: () => ({
+						pluginId: "smoke",
+						status: { state: "unavailable", reason: "scale" }
+					})
+				}
+			])
+		});
+		await expect.element(page.getByText("Smoke isn't available right now")).toBeVisible();
+		expect(page.getByRole("button").elements()).toHaveLength(0);
+		expect(document.querySelector(".mapsdk-legend")!.hasAttribute("hidden")).toBe(false);
+	});
+
+	it("offers Try again on an error, which calls the status's retry", async () => {
+		applyTheme("light");
+		document.documentElement.style.setProperty("--ring", "rgb(0, 150, 255)");
+		document.documentElement.style.setProperty("--ring-edge", "rgb(0, 0, 128)");
+		const retry = vi.fn();
+		render(Legend, {
+			map: fakeMap([
+				{
+					id: "fires",
+					label: "Fires",
+					legend: () => ({
+						pluginId: "fires",
+						status: { state: "error", error: new Error("down"), retry }
+					})
+				}
+			])
+		});
+		await expect.element(page.getByText("Fires isn't available right now")).toBeVisible();
+		const button = page.getByRole("button", { name: "Try again" });
+		await userEvent.keyboard("{Tab}");
+		expect(document.activeElement).toBe(button.element());
+		const style = getComputedStyle(button.element());
+		expect(style.outlineWidth).toBe("2px");
+		expect(style.outlineColor).toBe("rgb(0, 150, 255)");
+		expect(style.boxShadow).toBe("rgb(0, 0, 128) 0px 0px 0px 4px");
+		await button.click();
+		expect(retry).toHaveBeenCalledTimes(1);
+		const result = await axe.run(document.querySelector(".mapsdk-legend")!);
+		expect(result.violations).toEqual([]);
+	});
+
+	it("shows nothing for a ready status", () => {
+		render(Legend, {
+			map: fakeMap([{ id: "x", legend: () => ({ pluginId: "x", status: { state: "ready" } }) }])
+		});
+		expect(document.querySelector(".mapsdk-legend")!.hasAttribute("hidden")).toBe(true);
 	});
 });

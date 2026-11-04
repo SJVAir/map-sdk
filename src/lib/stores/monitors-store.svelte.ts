@@ -432,7 +432,14 @@ class LiveMonitorsStore implements MonitorsStore {
 			// With readings still shown, a failed refresh keeps them (polling tries again); with
 			// none (after an entry type change), the source reports the failure.
 			if (this.#blank) {
-				this.#status = { state: "error", error, retry: () => this.#refresh() };
+				this.#status = {
+					state: "error",
+					error,
+					retry: () => {
+						this.#status = { state: "loading" };
+						this.#refresh();
+					}
+				};
 			}
 			throw error;
 		} finally {

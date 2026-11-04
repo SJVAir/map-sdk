@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from "svelte";
+	import "./controls.css";
 	import type { MapContext } from "../core/create-map.svelte.js";
+	import type { DataStatus } from "../data/types.js";
 	import { watchTheme } from "../view/create-gl-map.js";
 	import LegendBar from "./LegendBar.svelte";
 	import { legendSection } from "./legend-data.js";
@@ -12,11 +14,22 @@
 	// element exists (the bars wait for it), so no color is assumed before.
 	let background = $state<string | null>(null);
 
-	const sections = $derived(
-		map.plugins.flatMap((plugin) => {
+	type Entry =
+		| { kind: "scale"; section: NonNullable<ReturnType<typeof legendSection>> }
+		| { kind: "status"; pluginId: string; layer: string; status: DataStatus };
+
+	/** A section per plugin with a scale, and a status line per plugin still loading or failing. */
+	const entries = $derived(
+		map.plugins.flatMap((plugin): Entry[] => {
 			const data = plugin.legend?.();
-			const section = data ? legendSection(data, map.format) : null;
-			return section ? [section] : [];
+			if (!data) return [];
+			if ("status" in data) {
+				if (data.status.state === "ready") return [];
+				const layer = plugin.label ?? plugin.id;
+				return [{ kind: "status", pluginId: data.pluginId, layer, status: data.status }];
+			}
+			const section = legendSection(data, map.format);
+			return section ? [{ kind: "scale", section }] : [];
 		})
 	);
 
@@ -45,20 +58,42 @@
 	bind:this={root}
 	class="mapsdk-legend"
 	aria-label={map.messages("mapsdk_legend_label")}
-	hidden={sections.length === 0}
+	hidden={entries.length === 0}
 >
-	{#each sections as section (section.pluginId)}
-		<div class="mapsdk-legend-section">
-			<h3 class="text-sm">
-				{section.title}
-				{#if section.units}
-					<span class="text-xs">({section.units})</span>
+	{#each entries as entry (entry.kind === "scale" ? entry.section.pluginId : entry.pluginId)}
+		{#if entry.kind === "scale"}
+			{@const section = entry.section}
+			<div class="mapsdk-legend-section">
+				<h3 class="text-sm">
+					{section.title}
+					{#if section.units}
+						<span class="text-xs">({section.units})</span>
+					{/if}
+				</h3>
+				{#if background !== null}
+					<LegendBar bar={section.bar} {background} messages={map.messages} />
 				{/if}
-			</h3>
-			{#if background !== null}
-				<LegendBar bar={section.bar} {background} messages={map.messages} />
-			{/if}
-		</div>
+			</div>
+		{:else}
+			{@const status = entry.status}
+			<div class="mapsdk-legend-status text-sm" role="status">
+				{#if status.state === "loading"}
+					<h3 class="text-sm">{entry.layer}</h3>
+					<p>{map.messages("mapsdk_loading")}</p>
+				{:else}
+					<p>{map.messages("mapsdk_unavailable", { layer: entry.layer })}</p>
+					{#if status.state === "error"}
+						<button
+							type="button"
+							class="mapsdk-retry mapsdk-focus mapsdk-motion text-sm"
+							onclick={() => status.retry()}
+						>
+							{map.messages("mapsdk_error_retry")}
+						</button>
+					{/if}
+				{/if}
+			</div>
+		{/if}
 	{/each}
 </section>
 
@@ -87,6 +122,37 @@
 		margin: 0 0 0.5rem;
 		text-align: center;
 		font-weight: 600;
+	}
+
+	.mapsdk-legend-status {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.5rem;
+		text-align: center;
+	}
+
+	.mapsdk-legend-status h3 {
+		margin: 0;
+	}
+
+	.mapsdk-legend-status p {
+		margin: 0;
+		color: var(--muted-foreground);
+	}
+
+	.mapsdk-retry {
+		padding: 0.25rem 0.75rem;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-control, var(--radius));
+		background: var(--background);
+		color: var(--foreground);
+		font: inherit;
+		cursor: pointer;
+	}
+
+	.mapsdk-retry:hover {
+		background: var(--accent, var(--muted));
 	}
 
 	h3 span {
