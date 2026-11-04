@@ -1,0 +1,117 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+npm run dev            # Demo page (demo/) on the Vite dev server; /api/ proxies to localhost:8000
+npm run build          # svelte-package: src/lib -> dist/
+npm run check          # svelte-check (also type-checks the README examples spec)
+npm run lint           # Prettier check + ESLint
+npm run format         # Auto-format with Prettier
+npm test               # All Vitest projects (specs in tests/**)
+npm run test:unit      # Server-compiled specs, node
+npm run test:client    # Client-compiled specs (runes' $effects run), no DOM
+npm run test:browser   # Component specs in real Chromium
+npm run test:bundle    # build, then check the light entries stay off the map engine
+npm run test:licenses  # build, then check bundled dependencies' licenses
+npm run test:e2e       # Playwright against the demo (Chromium, Firefox, WebKit)
+```
+
+Run `npm run test:bundle` before committing any change under `src/lib`.
+
+WebKit e2e runs in CI only: locally it needs system libraries installed with sudo, so run the
+`chromium` and `firefox` projects (`npx playwright test --project chromium --project firefox`).
+The e2e web server uses a placeholder MapTiler key, never `.env`.
+
+## Architecture Overview
+
+A Svelte 5 library (`@sjvair/map-sdk`, built with `svelte-package`) of map components for SJVAir
+air-quality data on the MapTiler SDK. The demo page in `demo/` is the dev server's root and is
+not shipped. Specs live in top-level `tests/`, never in `src/lib`.
+
+- **Core** (`src/lib/core/`): `createMap()` returns a `MapContext` (`create-map.svelte.ts`): reactive
+  camera, bounds, basemap, plugin list, selection per plugin, `featureclick`, `featuresAt`,
+  `featureForElement`. It has no GL map of its own; `MapView` attaches one. `plugin.ts` defines
+  `MapPlugin` and `PluginContext`; `plugin-host.svelte.ts` runs plugins' `setup` when the style is
+  ready and tears them down on detach or restyle (draw order = registry order); `interactions.svelte.ts`
+  routes clicks, hovers, and blocking layers (cluster bubbles); `basemap.svelte.ts` switches and
+  falls back between styles. Nothing is module-global: two maps on a page never share state, and
+  every source/layer id is namespaced `${mapUid}:${pluginId}:${local}`.
+- **Data** (`src/lib/data/`, entry `./data`): types (`DataSource`, `FeatureRef`,
+  `SpatialSelection`), `Scale` helpers (`levelFor`, `NO_LEVEL`), refs, selection rules, `staticSource`,
+  and the three providers (`metadata`, `messages`, `format`) with defaults. `messages/en.json` holds
+  every `mapsdk_*` UI string.
+- **Stores** (`src/lib/stores/`, entry `./stores`): `createMonitorsStore()`, the live monitors list
+  and readings with polling, which exposes a `dataSource`.
+- **Plugins** (`src/lib/plugins/`): the general `pointsPlugin` (icons, clusters) and `shapesPlugin`
+  (fill/outline/check overlay), plus shared style expressions and scale resolution.
+- **Presets** (`src/lib/presets/`): `monitorsPlugin`, `regionsPlugin`, `calHeatScorePlugin`,
+  `forecastZonesPlugin`, `hmsSmokePlugin`, `hmsFirePlugin`, and `groupFires`. Presets never fetch.
+- **View** (`src/lib/view/`): `MapView.svelte` creates the GL map (`create-gl-map.ts`: per-map key
+  through `transformRequest`, theme watching, `active` releases WebGL).
+- **UI** (`src/lib/ui/`): Legend, FeatureList, MapTooltip, SelectionBar, ViewSummary, MapControls
+  (basemap, zoom, credits). `controls.css` holds the focus ring and motion classes.
+- **Entries**: `.` (everything, reaches the map engine), `./data` and `./stores` (must not reach
+  maplibre or MapTiler; `test:bundle` enforces it), `./messages/en.json`, `./theme.css`.
+  `theme.css` maps the family tokens to Tailwind utilities with fallbacks.
+
+### Rules that bind new code
+
+- Components use only theme tokens (shadcn names plus family tokens with fallbacks, listed in
+  README.md). `--highlight` is never for text. Never assume a `.dark` class. Type sizes are
+  Tailwind `text-*` classes, so hosts add the `@source` line.
+- No hardcoded labels, units, breakpoints, colors, or scales: they come from a `Scale` or the
+  metadata provider. Every UI string is a `mapsdk_*` message key in `en.json`; no concatenated
+  sentences. Dates and times are formatted in America/Los_Angeles through the `format` provider.
+- Color never carries meaning alone: levels are shown with labels, swatches have an outline,
+  selection is a `--highlight` ring plus a check mark. Respect `prefers-reduced-motion`.
+- Bundled dependencies may only be MIT, BSD, Apache-2.0, ISC, MPL-2.0 (unmodified), or OFL-1.1
+  (fonts). Never add `@maptiler/weather`. `@maptiler/sdk` is pinned `~4.2.0` because `GlMap`
+  depends on its internals.
+- Keep the README token list, examples, and `tests/unit/readme-examples.test.ts` in step with the
+  public API.
+
+### Test projects
+
+`vitest.config.ts` defines three projects. `unit` (`tests/unit/**`) compiles Svelte in server mode
+in node, so `$effect`s do not run. `client` (`tests/client/**`) uses `tests/client/environment.ts`
+to compile for the client with no DOM, so rune modules' effects run. `browser` (`tests/browser/**`)
+mounts components in headless Chromium. Fixtures are in `tests/fixtures/`. e2e (`e2e/`) runs the demo
+with MapTiler requests routed to a local style.
+
+### Local stack
+
+The demo needs the sjvair.com stack on `localhost:8000` (Vite proxies `/api/`) and
+`VITE_MAPTILER_KEY` in `.env` (copy `.env.example`; never print or commit it). A fresh database
+needs `podman exec sjvaircom_web_1 python manage.py loaddata default-calibrations.yaml`.
+
+## Code Style
+
+- **Tabs** for indentation (not spaces)
+- **Double quotes** for strings
+- No trailing commas
+- Print width: 100 characters
+- Prettier + ESLint (flat config); run `npm run format` before committing
+- Svelte 5 runes only; Tailwind CSS v4 utility classes in markup
+- Never give a component and a `.svelte.ts` module the same base name in one folder
+  (`Foo.svelte` + `foo.svelte.ts`); import rune modules with their full extension
+  (`./foo.svelte.js`)
+
+## Commits, pull requests, and docs
+
+Never include Claude or AI attribution in anything produced in this repository: no
+`Co-Authored-By: Claude ...` (or similar) trailers in commits, no AI attribution in pull request
+descriptions, comments, issue text, documentation, or any other generated content. Write and
+commit as if solely authored by the user.
+
+## Releases and publishing — standing restriction
+
+Publishing to npm happens via `.github/workflows/release.yml`, triggered by a GitHub Release being
+published. NEVER create a GitHub release, run `npm publish`, or otherwise trigger this workflow
+without the user's explicit permission for that specific release — every single time. Approval for
+one release does not carry forward to the next, even later in the same session or as the natural
+next step of a task already in progress (e.g. bumping a dependency and then "finishing" by
+releasing it). Always stop and ask first, and wait for an explicit yes. The same goes for pushing
+and tagging.
