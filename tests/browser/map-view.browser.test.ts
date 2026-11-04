@@ -52,7 +52,8 @@ function whenLoaded(gl: GlMapLike): Promise<void> {
 }
 
 const sized = document.createElement("style");
-sized.textContent = ".test-map { width: 320px; height: 240px; }";
+sized.textContent =
+	".test-map { width: 320px; height: 240px; } .wide-map { width: 600px; height: 400px; }";
 
 /** Every request made, which must stay empty: the tests run offline, with no key. */
 const requests: string[] = [];
@@ -375,6 +376,45 @@ describe("MapView list button", () => {
 		await userEvent.keyboard("{Escape}");
 		await expect.element(button).toHaveAttribute("aria-expanded", "false");
 		expect(document.activeElement).toBe(button.element());
+	});
+
+	it("pans a focused feature clear of the open list panel", async () => {
+		const map = newMap();
+		// West of the start center, so it starts under the panel.
+		const lngLat: [number, number] = [-120.0, 36.7];
+		map.addPlugin({
+			id: "probe",
+			setup: () => () => {},
+			features: () => [
+				{
+					refKey: "monitor:1",
+					ref: { kind: "monitor", id: "1" },
+					name: "Probe",
+					value: 5,
+					level: NO_LEVEL,
+					units: "u",
+					lngLat,
+					selectable: true
+				}
+			]
+		});
+		const attached = trackAttach(map);
+		await render(MapView, { map, class: "wide-map" });
+		const gl = attached[0];
+		await whenLoaded(gl);
+		await page.getByRole("button", { name: "List of features on the map" }).click();
+		const listbox = page.getByRole("listbox", { name: "Features on the map" });
+		await expect.element(listbox).toBeVisible();
+		const mapBox = gl.getCanvas().getBoundingClientRect();
+		const panelRight = listbox.element().getBoundingClientRect().right - mapBox.left;
+
+		expect(gl.project(lngLat).x).toBeLessThan(panelRight);
+		map.focusFeature("monitor:1", "probe");
+		await vi.waitFor(() => {
+			const { x } = gl.project(lngLat);
+			expect(x).toBeGreaterThan(panelRight);
+			expect(x).toBeLessThan(mapBox.width);
+		});
 	});
 
 	it("leaves the button out when featureList is false", async () => {

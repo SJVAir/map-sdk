@@ -49,7 +49,13 @@ export interface GlMapLike {
 	getZoom(): number;
 	getBearing(): number;
 	getPitch(): number;
-	easeTo(options: { center?: [number, number]; zoom?: number; duration?: number }): void;
+	easeTo(options: {
+		center?: [number, number];
+		zoom?: number;
+		duration?: number;
+		/** Pixels at each edge the center is kept clear of; MapLibre keeps it for later moves. */
+		padding?: { top: number; right: number; bottom: number; left: number };
+	}): void;
 	jumpTo(options: {
 		center?: [number, number];
 		zoom?: number;

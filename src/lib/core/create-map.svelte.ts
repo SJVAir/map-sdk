@@ -130,7 +130,8 @@ export interface MapContext {
 	/**
 	 * Marks the feature focused and pans to it (no animation under reduced motion): the item in
 	 * `pluginId`'s features when given, else the first plugin listing `refKey`. `null` clears the
-	 * focus without moving the camera. Sets `focusedPluginId` to `pluginId` (or `null`).
+	 * focus without moving the camera. Sets `focusedPluginId` to `pluginId` (or `null`). The pan
+	 * centers the feature in the part of the map the feature list panel leaves clear.
 	 */
 	focusFeature(refKey: string | null, pluginId?: string): void;
 	/** Reactive. */
@@ -141,6 +142,11 @@ export interface MapContext {
 	attach(gl: GlMapLike): void;
 	/** For MapView only: stops using the current GL map. */
 	detach(): void;
+	/**
+	 * For MapView only: how many pixels at the map's left the open feature list panel covers (0
+	 * when closed), which `focusFeature` pans clear of.
+	 */
+	setListInset(left: number): void;
 	/** For MapView only: records the camera and bounds after a move. */
 	updateView(camera: CameraState, bounds: Bounds): void;
 	/**
@@ -211,6 +217,7 @@ class MapContextImpl implements MapContext {
 	#host: PluginHost;
 	#gl: GlMapLike | null = null;
 	#destroyed = false;
+	#listInset = 0;
 
 	constructor(options: CreateMapOptions) {
 		const initialView = copyView(options.config.initialView ?? DEFAULT_VIEW);
@@ -362,7 +369,12 @@ class MapContextImpl implements MapContext {
 		if (!gl || refKey === null) return;
 		const found = untrack(() => this.#findItem(refKey, pluginId));
 		if (!found) return;
-		gl.easeTo({ center: found.item.lngLat, ...(prefersReducedMotion() && { duration: 0 }) });
+		gl.easeTo({
+			center: found.item.lngLat,
+			// Always given: MapLibre keeps padding, so a closed panel must set it back to 0.
+			padding: { top: 0, right: 0, bottom: 0, left: this.#listInset },
+			...(prefersReducedMotion() && { duration: 0 })
+		});
 	}
 
 	attach(gl: GlMapLike): void {
@@ -391,6 +403,10 @@ class MapContextImpl implements MapContext {
 
 	themeChanged(): void {
 		if (this.#gl) this.#host.restyle();
+	}
+
+	setListInset(left: number): void {
+		this.#listInset = Math.max(0, left);
 	}
 
 	updateView(camera: CameraState, bounds: Bounds): void {

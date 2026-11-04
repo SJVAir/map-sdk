@@ -43,6 +43,19 @@
 	// Kept here: the list is unmounted while closed, so it doesn't sort every feature on each move.
 	let listSort = $state<SortBy>("name");
 	let listButton: HTMLButtonElement | undefined = $state();
+	let listBox: HTMLDivElement | undefined = $state();
+	let listWidth = $state(0);
+
+	// The open panel's right edge, so focusing a feature pans it clear of the list.
+	$effect(() => {
+		const box = listOpen ? listBox : undefined;
+		void listWidth;
+		if (!box) {
+			map.setListInset(0);
+			return;
+		}
+		map.setListInset(box.getBoundingClientRect().right - root.getBoundingClientRect().left);
+	});
 
 	function onListKeydown(e: KeyboardEvent) {
 		if (e.key !== "Escape") return;
@@ -129,7 +142,7 @@
 			<!-- Escape anywhere in the panel closes it. -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			{#if listOpen}
-				<div onkeydown={onListKeydown}>
+				<div bind:this={listBox} bind:clientWidth={listWidth} onkeydown={onListKeydown}>
 					<FeatureList {map} id={listId} bind:sortBy={listSort} />
 				</div>
 			{/if}
