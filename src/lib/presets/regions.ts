@@ -16,11 +16,12 @@ export interface RegionsPluginOptions {
  * Region polygons (counties, cities, and other server regions) filled by a pollutant's level.
  *
  * The source's `scale` is expected to be the ScaleRef
- * `{ dataset: "air-quality", entryType: <pollutant> }, e.g. `pm25``.
+ * `{ dataset: "air-quality", entryType: <pollutant> }` (e.g. `pm25`).
  *
  * This preset does not fetch. The host's data source supplies the features, and each feature's
- * `refKey` must already be `region:<type>:<external_id>`: a region of any type, e.g. `region:county:fresno`. Use the region's `external_id`
- * (its code), never the server's `id` (a sqid), which is not a ref. A picked feature selects
+ * `refKey` must already be `region:<type>:<external_id>`: a region of any type, e.g.
+ * `region:county:fresno`. Use the region's `external_id` (its code), never the server's `id` (a
+ * sqid), which is not a ref. A picked feature selects
  * `{ kind: "regions", ids: ["<type>:<code>"] }`.
  */
 export function regionsPlugin(options: RegionsPluginOptions): MapPlugin {

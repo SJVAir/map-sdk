@@ -19,9 +19,10 @@ export interface CalHeatScorePluginOptions {
  * `{ dataset: "calheatscore", entryType: "heat-score" }`.
  *
  * This preset does not fetch. The host's data source supplies the features, and each feature's
- * `refKey` must already be `region:<type>:<external_id>`: a ZIP, `region:zipcode:<zip>`, e.g. `region:zipcode:93721` (`zipcode` is the server's region type name). Use the region's `external_id`
- * (its code), never the server's `id` (a sqid), which is not a ref. A picked feature selects
- * `{ kind: "regions", ids: ["<type>:<code>"] }`.
+ * `refKey` must already be `region:<type>:<external_id>`: a ZIP, `region:zipcode:<zip>`, e.g.
+ * `region:zipcode:93721` (`zipcode` is the server's region type name). Use the region's
+ * `external_id` (its code), never the server's `id` (a sqid), which is not a ref. A picked
+ * feature selects `{ kind: "regions", ids: ["<type>:<code>"] }`.
  */
 export function calHeatScorePlugin(options: CalHeatScorePluginOptions): MapPlugin {
 	return shapesPlugin({
