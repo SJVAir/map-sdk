@@ -9,15 +9,15 @@ import type {
 	FeatureHit,
 	FeatureListItem,
 	LayerSpecWithoutId,
-	LegendData,
 	MapPlugin,
 	PluginContext
 } from "../core/plugin.js";
 import { decodeRef, selectionId } from "../data/refs.js";
 import { levelFor, NO_LEVEL } from "../data/scale.js";
-import type { Scale, ScaleRef } from "../data/scale-types.js";
-import type { DataSource, DataStatus, MapFeatureProperties } from "../data/types.js";
+import type { Scale } from "../data/scale-types.js";
+import type { DataSource, MapFeatureProperties } from "../data/types.js";
 import { asDataURI, SELECTED_OVERLAY_PADDING, selectedOverlay } from "./icons.js";
+import { createScaleResolver, scaleKey, type Resolved } from "./scale-resolution.svelte.js";
 import {
 	colorExpression,
 	levelKeyExpression,
@@ -63,27 +63,6 @@ const SELECTED_OPACITY: ExpressionSpecification = [
 	1,
 	0
 ];
-/** For a `null` source scale: points still draw, all neutral, with no legend. */
-const NO_SCALE: Scale = { id: "", label: "", units: "", kind: "category", levels: [] };
-
-type ScaleInput = ScaleRef | Scale | null;
-type Resolved = Scale | "unavailable";
-
-/** Equal for scales equal by value. */
-function scaleKey(scale: Scale): string {
-	return JSON.stringify(scale);
-}
-
-function isScale(input: ScaleInput): input is Scale {
-	return input !== null && "levels" in input;
-}
-
-/** The scale for `input` when it is available synchronously. */
-function immediate(input: ScaleInput): Resolved | null {
-	if (input === null) return NO_SCALE;
-	return isScale(input) ? input : null;
-}
-
 /**
  * Points with value-based color: anything with coordinates. Draws circles, or icons by
  * category (one image per category and level color), optionally clustered per group, with a
@@ -94,31 +73,9 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 	const selectable = options.selectable ?? false;
 	const groupOf = cluster?.groupBy ?? (() => "");
 
-	/** The scale resolved for a source scale input, from the latest setup. */
-	let resolution = $state.raw<{ input: ScaleInput; scale: Resolved } | null>(null);
-
-	/** The scale for the source's current input, or null while it resolves. */
-	function currentScale(): Resolved | null {
-		const input = source.scale;
-		const now = immediate(input);
-		if (now) return now;
-		return resolution?.input === input ? resolution.scale : null;
-	}
-
-	function legend(): LegendData | null {
-		const status = source.status;
-		if (status.state === "error" || status.state === "unavailable") {
-			return { pluginId, status };
-		}
-		const scale = currentScale();
-		if (scale === null) return { pluginId, status: { state: "loading" } };
-		if (scale === "unavailable") {
-			const unavailable: DataStatus = { state: "unavailable", reason: "scale" };
-			return { pluginId, status: unavailable };
-		}
-		if (scale === NO_SCALE) return null;
-		return { pluginId, title: layerLabel, units: scale.units, scale };
-	}
+	const scales = createScaleResolver(pluginId, layerLabel, source);
+	const currentScale = scales.current;
+	const legend = scales.legend;
 
 	function features(): FeatureListItem[] {
 		const collection = source.features;
@@ -439,26 +396,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			markerSize + 2 * SELECTED_OVERLAY_PADDING
 		);
 
-		// Resolve a ScaleRef through the metadata provider, again whenever the input changes.
-		ctx.effect(() => {
-			const input = source.scale;
-			if (input === null || isScale(input)) return;
-			// Already resolved by an earlier setup; an "unavailable" result is retried.
-			const known = untrack(() => resolution);
-			if (known?.input === input && known.scale !== "unavailable") return;
-			const controller = new AbortController();
-			ctx.metadata.scale(input, controller.signal).then(
-				(scale) => {
-					if (!dead && !controller.signal.aborted) resolution = { input, scale };
-				},
-				(error: unknown) => {
-					if (dead || controller.signal.aborted) return;
-					console.warn(`map-sdk: plugin "${pluginId}" could not resolve its scale`, error);
-					resolution = { input, scale: "unavailable" };
-				}
-			);
-			return () => controller.abort();
-		});
+		scales.track(ctx, () => dead);
 
 		ctx.effect(() => {
 			const collection = source.features;

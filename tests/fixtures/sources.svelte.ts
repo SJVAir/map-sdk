@@ -1,4 +1,4 @@
-import type { FeatureCollection, Point } from "geojson";
+import type { FeatureCollection, Geometry, Point } from "geojson";
 import type { DataSource, DataStatus, MapFeatureProperties } from "../../src/lib/data/types.js";
 import type { Scale, ScaleRef } from "../../src/lib/data/scale-types.js";
 
@@ -7,11 +7,11 @@ export class TestSource<
 	P extends MapFeatureProperties = MapFeatureProperties
 > implements DataSource<P> {
 	status = $state.raw<DataStatus>({ state: "ready" });
-	features = $state.raw<FeatureCollection<Point, P> | null>(null);
+	features = $state.raw<FeatureCollection<Geometry, P> | null>(null);
 	scale = $state.raw<ScaleRef | Scale | null>(null);
 
 	constructor(init: {
-		features?: FeatureCollection<Point, P> | null;
+		features?: FeatureCollection<Geometry, P> | null;
 		scale?: ScaleRef | Scale | null;
 	}) {
 		this.features = init.features ?? null;
