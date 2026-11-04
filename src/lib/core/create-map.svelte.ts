@@ -371,8 +371,9 @@ class MapContextImpl implements MapContext {
 		if (!found) return;
 		gl.easeTo({
 			center: found.item.lngLat,
-			// Always given: MapLibre keeps padding, so a closed panel must set it back to 0.
-			padding: { top: 0, right: 0, bottom: 0, left: this.#listInset },
+			// The middle of the part the panel leaves clear. An offset, not padding: MapLibre keeps
+			// padding for later moves (zooms, the reported center), an offset applies to this one.
+			...(this.#listInset > 0 && { offset: [this.#listInset / 2, 0] as [number, number] }),
 			...(prefersReducedMotion() && { duration: 0 })
 		});
 	}

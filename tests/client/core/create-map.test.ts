@@ -220,18 +220,15 @@ describe("createMap", () => {
 		expect(map.focusedKey).toBe("monitor:5");
 		expect(gl.getCenter()).toEqual({ lng: -118.5, lat: 35.25 });
 
-		// The open list panel's width is kept clear, and set back to 0 once it closes.
+		// Beside the open list panel, the feature lands in the middle of the part left clear.
 		const easeTo = vi.spyOn(gl, "easeTo");
 		map.setListInset(240);
 		map.focusFeature("monitor:5");
-		expect(easeTo).toHaveBeenLastCalledWith(
-			expect.objectContaining({ padding: { top: 0, right: 0, bottom: 0, left: 240 } })
-		);
+		expect(easeTo).toHaveBeenLastCalledWith(expect.objectContaining({ offset: [120, 0] }));
+		expect(easeTo.mock.lastCall![0]).not.toHaveProperty("padding");
 		map.setListInset(0);
 		map.focusFeature("monitor:5");
-		expect(easeTo).toHaveBeenLastCalledWith(
-			expect.objectContaining({ padding: { top: 0, right: 0, bottom: 0, left: 0 } })
-		);
+		expect(easeTo.mock.lastCall![0]).not.toHaveProperty("offset");
 	});
 
 	it("destroy detaches, clears plugins, and refuses new plugins", () => {
@@ -502,8 +499,7 @@ describe("selection mode and focus", () => {
 		} finally {
 			vi.unstubAllGlobals();
 		}
-		const padding = { top: 0, right: 0, bottom: 0, left: 0 };
-		expect(ease.mock.calls[0][0]).toEqual({ center: [-118.5, 35.25], padding, duration: 0 });
-		expect(ease.mock.calls[1][0]).toEqual({ center: [-118.5, 35.25], padding });
+		expect(ease.mock.calls[0][0]).toEqual({ center: [-118.5, 35.25], duration: 0 });
+		expect(ease.mock.calls[1][0]).toEqual({ center: [-118.5, 35.25] });
 	});
 });

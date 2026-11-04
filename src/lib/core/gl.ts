@@ -53,8 +53,8 @@ export interface GlMapLike {
 		center?: [number, number];
 		zoom?: number;
 		duration?: number;
-		/** Pixels at each edge the center is kept clear of; MapLibre keeps it for later moves. */
-		padding?: { top: number; right: number; bottom: number; left: number };
+		/** Where `center` ends up, in pixels from the container's center (positive x is right). */
+		offset?: [number, number];
 	}): void;
 	jumpTo(options: {
 		center?: [number, number];

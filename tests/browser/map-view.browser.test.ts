@@ -436,6 +436,50 @@ describe("MapView list button", () => {
 		});
 	});
 
+	it("leaves no padding behind once the list closes", async () => {
+		const map = newMap();
+		const lngLat: [number, number] = [-120.0, 36.7];
+		map.addPlugin({
+			id: "probe",
+			setup: () => () => {},
+			features: () => [
+				{
+					refKey: "monitor:1",
+					ref: { kind: "monitor", id: "1" },
+					name: "Probe",
+					value: 5,
+					level: NO_LEVEL,
+					units: "u",
+					lngLat,
+					selectable: true
+				}
+			]
+		});
+		const attached = trackAttach(map);
+		await render(MapView, { map, class: "wide-map" });
+		const gl = attached[0] as GlMapLike & {
+			getPadding(): { top: number; right: number; bottom: number; left: number };
+			unproject(point: [number, number]): { lng: number; lat: number };
+			isMoving(): boolean;
+		};
+		await whenLoaded(gl);
+		const button = page.getByRole("button", { name: "List of features on the map" });
+		await button.click();
+		const listbox = page.getByRole("listbox", { name: "Features on the map" });
+		await expect.element(listbox).toBeVisible();
+		await page.getByRole("option", { name: /Probe/ }).click();
+		await vi.waitFor(() => expect(gl.isMoving()).toBe(false));
+		await button.click();
+		await expect.element(listbox).not.toBeInTheDocument();
+
+		expect(gl.getPadding()).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+		const { width, height } = gl.getCanvas().getBoundingClientRect();
+		const visual = gl.unproject([width / 2, height / 2]);
+		const center = gl.getCenter();
+		expect(center.lng).toBeCloseTo(visual.lng, 6);
+		expect(center.lat).toBeCloseTo(visual.lat, 6);
+	});
+
 	it("leaves the button out when featureList is false", async () => {
 		const map = newMap();
 		const { container } = await render(MapView, { map, class: "test-map", featureList: false });
