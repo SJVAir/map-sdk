@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { AxeBuilder } from "@axe-core/playwright";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type ConsoleMessage, type Locator, type Page } from "@playwright/test";
 
 /**
  * The demo page against stubbed responses: `/api/` answers from `e2e/fixtures/*.json` and
@@ -21,6 +21,8 @@ function fixtureName(url: URL): string {
 /** API paths without a fixture and uncaught page errors; both must stay empty. */
 let missing: string[] = [];
 let pageErrors: Error[] = [];
+/** MapLibre's expression-evaluation warnings, from the page and its workers (tile parsing). */
+let expressionWarnings: string[] = [];
 
 async function stubNetwork(page: Page) {
 	await page.route("**/api/**", async (route) => {
@@ -76,13 +78,28 @@ async function load(page: Page) {
 test.beforeEach(async ({ page }) => {
 	missing = [];
 	pageErrors = [];
+	expressionWarnings = [];
 	page.on("pageerror", (error) => pageErrors.push(error));
+	const onConsole = (message: ConsoleMessage) => {
+		if (/^Expected value to be of type/.test(message.text())) {
+			expressionWarnings.push(message.text());
+		}
+	};
+	page.on("console", onConsole);
+	page.on("worker", (worker) => worker.on("console", onConsole));
 	await load(page);
 });
 
 test.afterEach(() => {
 	expect(missing).toEqual([]);
 	expect(pageErrors).toEqual([]);
+});
+
+test("the plugin layers evaluate without expression warnings", async ({ page }) => {
+	// The stubbed basemap has no layers, so any warning comes from the plugins' expressions.
+	// Tile parsing runs in workers shortly after the data arrives.
+	await page.waitForTimeout(1000);
+	expect(expressionWarnings).toEqual([]);
 });
 
 test("both maps render a canvas", async ({ page }) => {

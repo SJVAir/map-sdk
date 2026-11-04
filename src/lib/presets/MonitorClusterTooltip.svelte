@@ -84,16 +84,21 @@
 		return squareMeters > 0 ? convertArea(squareMeters, "meters", "miles").toFixed(3) : null;
 	}
 
-	/** The bubble's own average (its readings' sum over their count), as the bubble shows it. */
-	const average = $derived.by(() => {
+	/**
+	 * The bubble's own average (its readings' sum over their count), unrounded: the level comes
+	 * from it, as the bubble's color does. Only the number shown is rounded.
+	 */
+	const mean = $derived.by(() => {
 		const sum = cluster.properties.sumValues;
 		const count = cluster.properties.countValues;
 		if (typeof sum !== "number" || typeof count !== "number" || count <= 0) return null;
-		return Math.round(sum / count);
+		return sum / count;
 	});
+	/** As the bubble shows it. */
+	const average = $derived(mean === null ? null : Math.round(mean));
 	const level = $derived.by(() => {
-		if (average === null || !scale) return null;
-		const found = levelFor(average, scale);
+		if (mean === null || !scale) return null;
+		const found = levelFor(mean, scale);
 		return found !== NO_LEVEL && found.color ? found : null;
 	});
 	const units = $derived(scale?.units ?? "");

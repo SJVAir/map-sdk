@@ -1,4 +1,8 @@
-import { createExpression } from "@maplibre/maplibre-gl-style-spec";
+import {
+	createExpression,
+	createPropertyExpression,
+	latest
+} from "@maplibre/maplibre-gl-style-spec";
 import type { GeoJSONSourceSpecification, LayerSpecification } from "@maptiler/sdk";
 import { darken } from "color2k";
 import { flushSync } from "svelte";
@@ -103,6 +107,12 @@ describe("monitorsPlugin", () => {
 		expect(monitorsPlugin({ id: "other", source, layerLabel: "x" }).id).toBe("other");
 	});
 
+	it("is selectable by default, unless turned off", () => {
+		const source = new TestSource<MonitorFeatureProperties>({ features: points(MONITORS) });
+		expect(monitorsPlugin({ source, layerLabel: "x" }).selectable).toBe(true);
+		expect(monitorsPlugin({ source, layerLabel: "x", selectable: false }).selectable).toBe(false);
+	});
+
 	it("adds one clustered source per monitor type, radius 40 up to zoom 9, summing values", () => {
 		const { gl, id } = setUp();
 		const clustered = [...gl.sources.keys()].filter((key) => key.startsWith(id("points:")));
@@ -133,6 +143,54 @@ describe("monitorsPlugin", () => {
 		expect(each(null)).toEqual([0, 0]);
 	});
 
+	it("evaluates every layer without expression warnings for null readings and empty clusters", () => {
+		const { gl } = setUp([
+			monitor("1", "purpleair", null),
+			monitor("2", "airnow", null, { isActive: false }),
+			monitor("3", "purpleair", "", { location: "inside" }),
+			monitor("4", "airgradient", 12)
+		]);
+		const features: Array<Record<string, unknown>> = [];
+		for (const spec of gl.sources.values()) {
+			const data = (spec as GeoJSONSourceSpecification).data as GeoJSON.FeatureCollection;
+			for (const f of data.features ?? []) features.push(f.properties ?? {});
+		}
+		// What MapLibre gives a cluster: its count and the reduced cluster properties.
+		features.push(
+			{ cluster: true, cluster_id: 1, point_count: 2, sumValues: 0, countValues: 0 },
+			{ cluster: true, cluster_id: 2, point_count: 30, sumValues: 31, countValues: 3 }
+		);
+		// MapLibre warns (once per expression) instead of throwing when evaluation fails.
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+		const specs = latest as unknown as Record<string, Record<string, unknown>>;
+		let evaluated = 0;
+		for (const layer of gl.layers) {
+			const filter = "filter" in layer && layer.filter ? layer.filter : true;
+			const passes = createExpression(filter, { type: "boolean" } as never);
+			if (passes.result !== "success") throw new Error(JSON.stringify(passes.value));
+			for (const group of ["layout", "paint"] as const) {
+				const props = (layer as Record<string, unknown>)[group] as Record<string, unknown>;
+				for (const [key, value] of Object.entries(props ?? {})) {
+					if (!Array.isArray(value)) continue;
+					const expr = createPropertyExpression(
+						value,
+						specs[`${group}_${layer.type}`][key] as never
+					);
+					if (expr.result !== "success") throw new Error(JSON.stringify(expr.value));
+					for (const properties of features) {
+						const feature = { type: 1, properties } as never;
+						if (!passes.value.evaluate({ zoom: 7 }, feature)) continue;
+						expr.value.evaluate({ zoom: 7 }, feature);
+						evaluated++;
+					}
+				}
+			}
+		}
+		expect(evaluated).toBeGreaterThan(20);
+		expect(warn).not.toHaveBeenCalled();
+		warn.mockRestore();
+	});
+
 	it("draws types in monitor-map's order, SJVAir PurpleAir above other PurpleAir", () => {
 		const { gl, id } = setUp();
 		const points = gl.layers.map((l) => l.id).filter((l) => l.startsWith(id("points:")));
@@ -153,6 +211,12 @@ describe("monitorsPlugin", () => {
 			`${id("icon:0:")}triangle:outside:moderate`
 		);
 		expect(evaluate(text.layout!["text-field"], cluster)).toBe("10");
+		// The unrounded average picks the level: 9.12 shows as 9 but is Moderate (from 9.1).
+		const boundary = { point_count: 2, sumValues: 18.24, countValues: 2 };
+		expect(evaluate(icons.layout!["icon-image"], boundary)).toBe(
+			`${id("icon:0:")}triangle:outside:moderate`
+		);
+		expect(evaluate(text.layout!["text-field"], boundary)).toBe("9");
 		// No numeric values: the neutral image and no number.
 		const empty = { point_count: 2, sumValues: 0, countValues: 0 };
 		expect(evaluate(icons.layout!["icon-image"], empty)).toBe(`${id("icon:0:")}triangle:outside:`);

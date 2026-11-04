@@ -101,6 +101,23 @@ describe("MonitorClusterTooltip", () => {
 		expect(text).toContain("Moderate");
 	});
 
+	it("takes the level from the unrounded average, as the bubble does", async () => {
+		// 9.12 rounds to 9 (Good), but is Moderate (from 9.1) like the bubble's color.
+		const near = [monitor("1", "purpleair", 9.1), monitor("2", "purpleair", 9.14)];
+		render(MonitorClusterTooltip, {
+			cluster: cluster(near, coords, () => new Promise(() => {})),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			metadata
+		});
+		await expect.element(page.getByText("2 monitors", { exact: true })).toBeVisible();
+		const text = document.body.textContent!.replace(/\s+/g, " ");
+		expect(text).toContain("PM2.5 9 (cluster avg)");
+		expect(text).toContain("Moderate");
+		expect(text).not.toContain("Good");
+	});
+
 	it("keeps the bubble's count and average when the leaves fail", async () => {
 		render(MonitorClusterTooltip, {
 			cluster: cluster(rows, coords, () => Promise.reject(new Error("gone"))),

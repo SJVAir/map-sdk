@@ -24,6 +24,7 @@ export interface MonitorsPluginOptions {
 	source: DataSource<MonitorFeatureProperties>;
 	/** Already-translated layer name for the list and summary. */
 	layerLabel: string;
+	/** Default true, like the shape presets. */
 	selectable?: boolean;
 	/** Cluster each monitor type below zoom 9. Default true. */
 	clustered?: boolean;
@@ -183,7 +184,7 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 		id: options.id ?? "monitors",
 		source: options.source,
 		layerLabel: options.layerLabel,
-		selectable: options.selectable,
+		selectable: options.selectable ?? true,
 		icon: {
 			category,
 			draw(cat, color, theme) {
