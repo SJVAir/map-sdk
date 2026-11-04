@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { area } from "@turf/area";
 	import { convertArea } from "@turf/helpers";
-	import { darken, readableColor } from "color2k";
 	import type { FormatProvider } from "../data/format.js";
 	import type { MessageProvider } from "../data/messages.js";
 	import type { MetadataProvider } from "../data/metadata.js";
@@ -9,6 +8,7 @@
 	import type { Scale } from "../data/scale-types.js";
 	import type { MonitorFeatureProperties } from "../data/types.js";
 	import type { ClusterInfo } from "../plugins/points.svelte.js";
+	import MonitorReadingBox from "./MonitorReadingBox.svelte";
 
 	// Ported from monitor-map's MonitorClusterTooltip: the cluster's average in a level-colored
 	// box beside its monitor type, count, covered area, and highest and lowest readings.
@@ -74,31 +74,20 @@
 		const found = levelFor(average, scale);
 		return found !== NO_LEVEL && found.color ? found : null;
 	});
-	const box = $derived(level ? boxStyle(level.color) : "");
 	const units = $derived(scale?.units ?? "");
 	const max = $derived(summary?.values.length ? Math.max(...summary.values) : null);
 	const min = $derived(summary?.values.length ? Math.min(...summary.values) : null);
-
-	function boxStyle(color: string): string {
-		try {
-			return `background:${color};border-color:${darken(color, 0.1)};color:${readableColor(color)}`;
-		} catch {
-			return "";
-		}
-	}
 </script>
 
 {#if summary}
 	<div class="mapsdk-monitor-tip">
-		<div class="mapsdk-monitor-box" class:neutral={!box} style={box}>
-			{#if scale?.label}
-				<span class="text-base">{scale.label}</span>
-			{/if}
-			<span class="mapsdk-monitor-value" class:text-3xl={average !== null}>
-				{average === null ? messages("mapsdk_no_reading") : format.number(average)}
-			</span>
-			<span>{messages("mapsdk_monitor_cluster_average")}</span>
-		</div>
+		<MonitorReadingBox
+			color={level?.color ?? null}
+			header={scale?.label ?? ""}
+			value={average === null ? messages("mapsdk_no_reading") : format.number(average)}
+			large={average !== null}
+			subheading={messages("mapsdk_monitor_cluster_average")}
+		/>
 		<div class="mapsdk-monitor-detail">
 			<span class="mapsdk-monitor-title text-lg">
 				{messages(
@@ -133,25 +122,6 @@
 		gap: 0.5rem;
 	}
 
-	.mapsdk-monitor-box {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		padding: 0.25rem;
-		border: 4px solid;
-		border-radius: calc(var(--radius-control, var(--radius)) / 2);
-		text-align: center;
-		white-space: nowrap;
-	}
-
-	.mapsdk-monitor-box.neutral {
-		border-color: var(--border);
-		background: var(--muted);
-		color: var(--muted-foreground);
-	}
-
-	.mapsdk-monitor-value,
 	.mapsdk-monitor-title {
 		font-weight: 700;
 	}

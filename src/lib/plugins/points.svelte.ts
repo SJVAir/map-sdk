@@ -75,7 +75,7 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 		/** An SVG `size` pixels square, filled with `color`; `theme` for outlines. */
 		draw(category: string, color: string, theme: ThemeColors): string;
 		size: number;
-		/** Draws the neutral image whatever the value (e.g. an inactive monitor). */
+		/** Draws in `--muted-foreground` whatever the value (e.g. an inactive monitor). */
 		muted?(props: P): boolean;
 	};
 	/** Used when there is no `icon`. */
@@ -107,6 +107,8 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 const CATEGORY_PROP = "mapsdk:category";
 const SORT_KEY_PROP = "mapsdk:sortKey";
 const MUTED_PROP = "mapsdk:muted";
+/** The icon image suffix for muted features; no scale level key starts with "mapsdk:". */
+const MUTED_IMAGE = "mapsdk:muted";
 
 /** Marker images are drawn at this multiple of their size and scaled down, for sharp HiDPI. */
 const IMAGE_RATIO = 2;
@@ -287,6 +289,10 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 					const color = level?.color || theme.neutral;
 					loadImage(local, icon.draw(category, color, theme), icon.size);
 				}
+				const muted = `${iconPrefix()}${category}:${MUTED_IMAGE}`;
+				if (icon.muted && !images.has(muted)) {
+					loadImage(muted, icon.draw(category, theme.mutedForeground, theme), icon.size);
+				}
 			}
 		}
 
@@ -347,7 +353,9 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 					layout: {
 						"icon-image": iconImage(
 							["get", CATEGORY_PROP],
-							icon.muted ? ["case", ["==", ["get", MUTED_PROP], true], "", levelKey] : levelKey
+							icon.muted
+								? ["case", ["==", ["get", MUTED_PROP], true], MUTED_IMAGE, levelKey]
+								: levelKey
 						),
 						"icon-size": 1 / IMAGE_RATIO,
 						"icon-allow-overlap": true,

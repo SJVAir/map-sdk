@@ -209,14 +209,26 @@ describe("monitorsPlugin", () => {
 		expect(plugin.tooltip!(plugin.features!()[0])).toBeTypeOf("function");
 	});
 
-	it("draws inactive monitors with the neutral image whatever their value", () => {
+	it("draws inactive monitors in the muted-foreground color whatever their value", () => {
+		const svgs: string[] = [];
+		class FakeImage {
+			onload: (() => void) | null = null;
+			set src(v: string) {
+				svgs.push(decodeURIComponent(v.replace(/^data:image\/svg\+xml;utf8,/, "")));
+			}
+		}
+		vi.stubGlobal("Image", FakeImage);
 		const { gl, id } = setUp();
 		const icons = layer(gl, id("points:airgradient")) as Symbol;
 		const [inactive] = sourceData(gl, id("points:airgradient")).features;
 		expect(inactive.properties!.isActive).toBe(false);
 		expect(evaluate(icons.layout!["icon-image"], inactive.properties!)).toBe(
-			`${id("icon:0:")}circle:outside:`
+			`${id("icon:0:")}circle:outside:mapsdk:muted`
 		);
+		expect(FALLBACK_THEME_COLORS.mutedForeground).not.toBe(FALLBACK_THEME_COLORS.neutral);
+		expect(
+			svgs.some((svg) => svg.includes(`fill="${FALLBACK_THEME_COLORS.mutedForeground}"`))
+		).toBe(true);
 		const active = sourceData(gl, id("points:purpleair")).features[1];
 		expect(evaluate(icons.layout!["icon-image"], active.properties!)).toBe(
 			`${id("icon:0:")}circle:outside:unhealthy_sensitive`

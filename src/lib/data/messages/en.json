@@ -26,7 +26,6 @@
 	"mapsdk_unavailable": "{layer} isn't available right now",
 	"mapsdk_loading": "Loading",
 	"mapsdk_error_retry": "Try again",
-	"mapsdk_cluster_tooltip": "{count} monitors, average {value} {units}",
 	"mapsdk_legend_label": "Legend",
 	"mapsdk_legend_threshold": "from {value}",
 	"mapsdk_controls_label": "Map controls",
@@ -45,5 +44,6 @@
 	"mapsdk_monitor_cluster_coverage_one": "{count} monitor covering {area} mi²",
 	"mapsdk_monitor_cluster_coverage_other": "{count} monitors covering {area} mi²",
 	"mapsdk_monitor_cluster_max": "Max: {value} {units}",
-	"mapsdk_monitor_cluster_min": "Min: {value} {units}"
+	"mapsdk_monitor_cluster_min": "Min: {value} {units}",
+	"mapsdk_monitor_updated": "Last updated {when}"
 }

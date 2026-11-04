@@ -7,7 +7,9 @@ import { bundleFiles, root } from "./fixture-build.mjs";
 
 const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 
-const HEAVY = /maplibre|maptiler/i;
+// A module of the map engine, by its resolved path (not chunk text: a string such as a
+// "© MapTiler" message is not the engine).
+const HEAVY = /[\\/]node_modules[\\/](maplibre-gl|@maptiler[\\/])/;
 const failures = [];
 
 // Every exports target file must exist in dist/.
@@ -54,7 +56,7 @@ for (const subpath of ["./stores", "./data"]) {
 	const eager = await eagerChunks(file);
 	const kb = (eager.reduce((total, chunk) => total + chunk.code.length, 0) / 1024).toFixed(0);
 	console.log(`${subpath.padEnd(9)} eager ${kb} KB`);
-	if (eager.some((chunk) => HEAVY.test(chunk.code))) {
+	if (eager.some((chunk) => chunk.moduleIds.some((id) => HEAVY.test(id)))) {
 		failures.push(`"${subpath}" pulls the map dependency into the startup bundle`);
 	}
 }

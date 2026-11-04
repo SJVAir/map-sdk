@@ -14,6 +14,8 @@ export interface ThemeColors {
 	highlightForeground: string;
 	/** Marker and cluster outlines and cluster counts: `--foreground`. */
 	foreground: string;
+	/** Markers drawn muted whatever their value (e.g. inactive monitors): `--muted-foreground`. */
+	mutedForeground: string;
 }
 
 /**
@@ -24,14 +26,16 @@ export const FALLBACK_THEME_COLORS: Readonly<ThemeColors> = {
 	neutral: "#9ca3af",
 	highlight: "#2563eb",
 	highlightForeground: "#ffffff",
-	foreground: "#111827"
+	foreground: "#111827",
+	mutedForeground: "#6b7280"
 };
 
 const THEME_TOKENS: Record<keyof ThemeColors, string[]> = {
 	neutral: [NEUTRAL_COLOR_VAR],
 	highlight: ["--highlight", "--primary"],
 	highlightForeground: ["--highlight-foreground", "--primary-foreground"],
-	foreground: ["--foreground"]
+	foreground: ["--foreground"],
+	mutedForeground: ["--muted-foreground"]
 };
 
 /**

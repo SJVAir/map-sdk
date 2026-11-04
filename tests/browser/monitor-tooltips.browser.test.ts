@@ -41,6 +41,7 @@ describe("MonitorTooltip", () => {
 		expect(text).toContain("PM2.5 13");
 		expect(text).toContain("Nov 3, 2026, 1:00 PM");
 		expect(text).toContain("Moderate");
+		expect(text).toMatch(/Last updated \d+ (minutes|hours|days?) ago/);
 		const box = page.getByText("13").element().parentElement!;
 		expect(getComputedStyle(box).backgroundColor).toBe("rgb(255, 255, 0)");
 		expect(getComputedStyle(box).color).toBe("rgb(0, 0, 0)");
