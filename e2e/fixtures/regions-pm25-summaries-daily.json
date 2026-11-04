@@ -1,0 +1,75 @@
+{
+	"data": [
+		{
+			"id": "r6phe",
+			"name": "Fresno County",
+			"slug": "fresno",
+			"type": "county",
+			"summaries": [
+				{
+					"timestamp": "2026-11-02T00:00:00-08:00",
+					"entry_type": "pm25",
+					"resolution": "day",
+					"count": 100,
+					"expected_count": 100,
+					"minimum": 1,
+					"maximum": 40,
+					"stddev": 4,
+					"p25": 6,
+					"p75": 14,
+					"station_count": 12,
+					"mean": 8.2
+				}
+			]
+		},
+		{
+			"id": "ecxum",
+			"name": "Kings County",
+			"slug": "kings",
+			"type": "county",
+			"summaries": [
+				{
+					"timestamp": "2026-11-02T00:00:00-08:00",
+					"entry_type": "pm25",
+					"resolution": "day",
+					"count": 100,
+					"expected_count": 100,
+					"minimum": 1,
+					"maximum": 40,
+					"stddev": 4,
+					"p25": 6,
+					"p75": 14,
+					"station_count": 12,
+					"mean": 14.6
+				}
+			]
+		},
+		{
+			"id": "4fjmg",
+			"name": "Madera County",
+			"slug": "madera",
+			"type": "county",
+			"summaries": [
+				{
+					"timestamp": "2026-11-02T00:00:00-08:00",
+					"entry_type": "pm25",
+					"resolution": "day",
+					"count": 100,
+					"expected_count": 100,
+					"minimum": 1,
+					"maximum": 40,
+					"stddev": 4,
+					"p25": 6,
+					"p75": 14,
+					"station_count": 12,
+					"mean": 41.0
+				}
+			]
+		}
+	],
+	"page": 1,
+	"count": 3,
+	"pages": 1,
+	"has_next_page": false,
+	"has_previous_page": false
+}

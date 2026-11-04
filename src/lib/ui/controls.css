@@ -1,0 +1,40 @@
+/*
+ * Shared by map-sdk's controls (plain CSS, not scoped: the classes are set by several components).
+ *
+ * Focus ring, only on :focus-visible: a 2px --ring outline with a --ring-edge halo, so the ring
+ * reads against any background. A host without --ring-edge gets the page background.
+ */
+/* Doubled classes raise specificity above any component rule that sets box-shadow (a card
+   shadow, a selected row's ring), so the result never depends on bundle order. */
+.mapsdk-focus.mapsdk-focus:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: 1px;
+	box-shadow: 0 0 0 4px var(--ring-edge, var(--background));
+}
+
+/* For controls and rows inside a container that clips: the ring is drawn inside. */
+.mapsdk-focus-inset.mapsdk-focus-inset:focus-visible,
+.mapsdk-focus-inset-active:focus-visible .mapsdk-active-option.mapsdk-active-option {
+	outline: 2px solid var(--ring);
+	outline-offset: -3px;
+	box-shadow: inset 0 0 0 4px var(--ring-edge, var(--background));
+}
+
+/* Elements only script focuses (tabindex="-1"): the outline alone. */
+.mapsdk-focus-outline:focus-visible {
+	outline: 2px solid var(--ring);
+	outline-offset: -2px;
+}
+
+/* Motion goes through the host's tokens; the fallbacks apply when it defines none. */
+.mapsdk-motion {
+	transition-property: background-color, border-color, color, opacity;
+	transition-duration: var(--motion-duration-fast, 120ms);
+	transition-timing-function: var(--motion-ease-standard, ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.mapsdk-motion {
+		transition-duration: 0s;
+	}
+}

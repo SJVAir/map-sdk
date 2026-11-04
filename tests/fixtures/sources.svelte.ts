@@ -1,0 +1,34 @@
+import type { FeatureCollection, Geometry, Point } from "geojson";
+import type { DataSource, DataStatus, MapFeatureProperties } from "../../src/lib/data/types.js";
+import type { Scale, ScaleRef } from "../../src/lib/data/scale-types.js";
+
+/** A writable, reactive `DataSource` for tests. */
+export class TestSource<
+	P extends MapFeatureProperties = MapFeatureProperties
+> implements DataSource<P> {
+	status = $state.raw<DataStatus>({ state: "ready" });
+	features = $state.raw<FeatureCollection<Geometry, P> | null>(null);
+	scale = $state.raw<ScaleRef | Scale | null>(null);
+
+	constructor(init: {
+		features?: FeatureCollection<Geometry, P> | null;
+		scale?: ScaleRef | Scale | null;
+	}) {
+		this.features = init.features ?? null;
+		this.scale = init.scale ?? null;
+	}
+}
+
+/** A point feature collection, one feature per property row (with an optional `lngLat`). */
+export function points<P extends MapFeatureProperties>(
+	rows: Array<P & { lngLat?: [number, number] }>
+): FeatureCollection<Point, P> {
+	return {
+		type: "FeatureCollection",
+		features: rows.map(({ lngLat, ...props }, i) => ({
+			type: "Feature",
+			geometry: { type: "Point", coordinates: lngLat ?? [-119 - i * 0.01, 36.5] },
+			properties: props as unknown as P
+		}))
+	};
+}

@@ -1,0 +1,31 @@
+{
+	"data": [
+		{
+			"id": "fixture-smoke-1",
+			"date": "2026-11-03",
+			"satellite": "GOES-WEST",
+			"density": "medium",
+			"start": "2026-11-03T12:00:00Z",
+			"end": "2026-11-03T15:00:00Z",
+			"geometry": {
+				"type": "MultiPolygon",
+				"coordinates": [
+					[
+						[
+							[-120.6, 37.3],
+							[-119.9, 37.5],
+							[-119.4, 37.1],
+							[-119.9, 36.9],
+							[-120.6, 37.3]
+						]
+					]
+				]
+			}
+		}
+	],
+	"page": 1,
+	"count": 1,
+	"pages": 1,
+	"has_next_page": false,
+	"has_previous_page": false
+}

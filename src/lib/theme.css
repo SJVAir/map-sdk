@@ -1,0 +1,34 @@
+/*
+ * map-sdk's theme: import after Tailwind, e.g. `@import "@sjvair/map-sdk/theme.css";`.
+ *
+ * The components use the host's shadcn tokens (--background, --card, --primary, --border, …)
+ * and these family tokens. A host that defines a family token gets it; one that doesn't falls
+ * back to a standard shadcn token. Inline, so each utility reads the token where it is used and
+ * follows the host's dark mode.
+ */
+@theme inline {
+	--color-highlight: var(--highlight, var(--primary));
+	--color-highlight-subtle: var(--highlight-subtle, var(--muted));
+	--color-highlight-foreground: var(--highlight-foreground, var(--primary-foreground));
+	--color-card-border: var(--card-border, var(--border));
+	--color-overlay: var(--overlay, var(--background));
+	--color-link: var(--link, var(--primary));
+	--color-ring-edge: var(--ring-edge, var(--background));
+}
+
+/* Utilities, not theme keys: a theme key named like the host token would emit a self-referencing
+   `--shadow-card: var(--shadow-card, …)` in the theme layer, overriding the host's value. */
+@utility shadow-card {
+	box-shadow: var(--shadow-card, none);
+}
+
+@utility rounded-control {
+	border-radius: var(--radius-control, var(--radius));
+}
+
+@utility shadow-lifted {
+	box-shadow: var(--shadow-lifted, var(--shadow-card, none));
+}
+
+/* The motion, swatch-outline, and --ring-edge tokens are read with fallbacks where used (see
+   ui/controls.css and the components); they are never declared here. */

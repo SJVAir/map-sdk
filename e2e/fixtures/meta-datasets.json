@@ -1,0 +1,561 @@
+{
+	"data": {
+		"datasets": [
+			{
+				"id": "air-quality",
+				"label": "Air Quality",
+				"description": "Air quality measurements from SJVAir sensors and partner monitoring networks.",
+				"source": "SJVAir sensors, AirNow, AQview, AQLite",
+				"license": "",
+				"geographies": ["monitor", "region"],
+				"meta_url": "/api/2.0/monitors/meta/",
+				"entry_types": [
+					{
+						"id": "co",
+						"label": "Carbon Monoxide",
+						"kind": "pollutant",
+						"units": "ppm",
+						"resolutions": ["raw", "hour", "day", "month", "quarter", "season", "year"],
+						"display": { "precision": 1, "chart": "line", "y_min": 0 },
+						"retired": null,
+						"available": false
+					},
+					{
+						"id": "co2",
+						"label": "Carbon Dioxide",
+						"kind": "pollutant",
+						"units": "ppm",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": 0 },
+						"retired": null,
+						"available": false
+					},
+					{
+						"id": "humidity",
+						"label": "Humidity",
+						"kind": "meteorological",
+						"units": "%",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "no2",
+						"label": "Nitrogen Dioxide",
+						"kind": "pollutant",
+						"units": "ppb",
+						"resolutions": ["raw", "hour", "day", "month", "quarter", "season", "year"],
+						"display": { "precision": 1, "chart": "line", "y_min": 0 },
+						"retired": null,
+						"available": false
+					},
+					{
+						"id": "o3",
+						"label": "Ozone",
+						"kind": "pollutant",
+						"units": "ppb",
+						"resolutions": ["raw", "hour", "day", "month", "quarter", "season", "year"],
+						"display": { "precision": 1, "chart": "line", "y_min": 0 },
+						"retired": null,
+						"available": true
+					},
+					{
+						"id": "particulates",
+						"label": "Particulates",
+						"kind": "other",
+						"units": "",
+						"resolutions": ["raw"],
+						"display": { "precision": 0, "chart": "line", "y_min": 0 },
+						"retired": null
+					},
+					{
+						"id": "pm10",
+						"label": "PM1.0",
+						"kind": "pollutant",
+						"units": "\u00b5g/m\u00b3",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": 0 },
+						"retired": null,
+						"available": false
+					},
+					{
+						"id": "pm100",
+						"label": "PM10.0",
+						"kind": "pollutant",
+						"units": "\u00b5g/m\u00b3",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": 0 },
+						"retired": null,
+						"available": false
+					},
+					{
+						"id": "pm25",
+						"label": "PM2.5",
+						"kind": "pollutant",
+						"units": "\u00b5g/m\u00b3",
+						"resolutions": ["raw", "hour", "day", "month", "quarter", "season", "year"],
+						"display": { "precision": 1, "chart": "line", "y_min": 0 },
+						"retired": null,
+						"available": true
+					},
+					{
+						"id": "pressure",
+						"label": "Atmospheric Pressure",
+						"kind": "meteorological",
+						"units": "mmHg",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "so2",
+						"label": "Sulfur Dioxide",
+						"kind": "pollutant",
+						"units": "ppb",
+						"resolutions": ["raw", "hour", "day", "month", "quarter", "season", "year"],
+						"display": { "precision": 1, "chart": "line", "y_min": 0 },
+						"retired": null,
+						"available": false
+					},
+					{
+						"id": "temperature",
+						"label": "Temperature",
+						"kind": "meteorological",
+						"units": "\u00b0F",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					}
+				],
+				"retired": null
+			},
+			{
+				"id": "weather",
+				"label": "Weather",
+				"description": "Hourly weather observations from agricultural weather stations.",
+				"source": "California Irrigation Management Information System (CIMIS)",
+				"license": "",
+				"geographies": ["monitor"],
+				"meta_url": "/api/2.0/monitors/meta/",
+				"entry_types": [
+					{
+						"id": "dewpoint",
+						"label": "Dew Point",
+						"kind": "meteorological",
+						"units": "\u00b0F",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "eto",
+						"label": "Reference Evapotranspiration",
+						"kind": "meteorological",
+						"units": "in",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "etr",
+						"label": "Alfalfa Reference Evapotranspiration",
+						"kind": "meteorological",
+						"units": "in",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "humidity",
+						"label": "Humidity",
+						"kind": "meteorological",
+						"units": "%",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "netradiation",
+						"label": "Net Radiation",
+						"kind": "meteorological",
+						"units": "W/m\u00b2",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "precipitation",
+						"label": "Precipitation",
+						"kind": "meteorological",
+						"units": "in",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "soiltemperature",
+						"label": "Soil Temperature",
+						"kind": "meteorological",
+						"units": "\u00b0F",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "solarradiation",
+						"label": "Solar Radiation",
+						"kind": "meteorological",
+						"units": "W/m\u00b2",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "temperature",
+						"label": "Temperature",
+						"kind": "meteorological",
+						"units": "\u00b0F",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "vaporpressure",
+						"label": "Vapor Pressure",
+						"kind": "meteorological",
+						"units": "kPa",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "winddirection",
+						"label": "Wind Direction",
+						"kind": "meteorological",
+						"units": "\u00b0",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "windspeed",
+						"label": "Wind Speed",
+						"kind": "meteorological",
+						"units": "mph",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": null },
+						"retired": null
+					}
+				],
+				"retired": null
+			},
+			{
+				"id": "hms-smoke",
+				"label": "Wildfire Smoke",
+				"description": "Daily smoke plume outlines and density from satellite imagery.",
+				"source": "NOAA Hazard Mapping System",
+				"license": "Public domain",
+				"geographies": ["polygon"],
+				"meta_url": "/api/2.0/hms/meta/",
+				"entry_types": [
+					{
+						"id": "smoke-density",
+						"label": "Smoke Density",
+						"kind": "other",
+						"units": "",
+						"resolutions": ["day"],
+						"display": { "precision": null, "chart": null, "y_min": null },
+						"retired": null
+					}
+				],
+				"retired": null
+			},
+			{
+				"id": "hms-fire",
+				"label": "Fire Detections",
+				"description": "Satellite-detected active fire points with fire radiative power.",
+				"source": "NOAA Hazard Mapping System",
+				"license": "Public domain",
+				"geographies": ["point"],
+				"meta_url": "/api/2.0/hms/meta/",
+				"entry_types": [
+					{
+						"id": "fire-frp",
+						"label": "Fire Radiative Power",
+						"kind": "other",
+						"units": "MW",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "bar", "y_min": 0 },
+						"retired": null
+					}
+				],
+				"retired": null
+			},
+			{
+				"id": "pesticide-use",
+				"label": "Pesticide Use",
+				"description": "Reported agricultural pesticide applications, summed by region.",
+				"source": "California DPR Pesticide Use Reporting (PUR)",
+				"license": "",
+				"geographies": ["region"],
+				"meta_url": "",
+				"entry_types": [
+					{
+						"id": "pounds-applied",
+						"label": "Pounds Applied",
+						"kind": "other",
+						"units": "lbs",
+						"resolutions": ["month", "year"],
+						"display": { "precision": 0, "chart": "bar", "y_min": 0 },
+						"retired": null
+					},
+					{
+						"id": "acres-treated",
+						"label": "Acres Treated",
+						"kind": "other",
+						"units": "acres",
+						"resolutions": ["month", "year"],
+						"display": { "precision": 0, "chart": "bar", "y_min": 0 },
+						"retired": null
+					}
+				],
+				"retired": null
+			},
+			{
+				"id": "pesticide-notices",
+				"label": "Pesticide Spray Notices",
+				"description": "Advance notices of planned restricted-use pesticide applications.",
+				"source": "SprayDays (California DPR)",
+				"license": "",
+				"geographies": ["point"],
+				"meta_url": "",
+				"entry_types": [
+					{
+						"id": "spray-notice",
+						"label": "Spray Notices",
+						"kind": "other",
+						"units": "",
+						"resolutions": ["day"],
+						"display": { "precision": 0, "chart": "bar", "y_min": 0 },
+						"retired": null
+					}
+				],
+				"retired": null
+			},
+			{
+				"id": "forecasts",
+				"label": "Air Quality Forecasts",
+				"description": "Daily air quality index forecasts for each forecast zone.",
+				"source": "San Joaquin Valley Air Pollution Control District",
+				"license": "",
+				"geographies": ["zone"],
+				"meta_url": "/api/2.0/forecasts/meta/",
+				"entry_types": [
+					{
+						"id": "aqi-forecast",
+						"label": "AQI Forecast",
+						"kind": "other",
+						"units": "AQI",
+						"resolutions": ["day"],
+						"display": { "precision": 0, "chart": "bar", "y_min": 0 },
+						"retired": null
+					},
+					{
+						"id": "burn-status",
+						"label": "Burn Status",
+						"kind": "other",
+						"units": "",
+						"resolutions": ["day"],
+						"display": { "precision": null, "chart": null, "y_min": null },
+						"retired": null
+					}
+				],
+				"retired": null
+			},
+			{
+				"id": "calheatscore",
+				"label": "CalHeatScore",
+				"description": "Daily heat health risk score by ZIP code.",
+				"source": "OEHHA CalHeatScore",
+				"license": "",
+				"geographies": ["zip"],
+				"meta_url": "/api/2.0/calheatscore/meta/",
+				"entry_types": [
+					{
+						"id": "heat-score",
+						"label": "Heat Score",
+						"kind": "other",
+						"units": "",
+						"resolutions": ["day"],
+						"display": { "precision": 0, "chart": "bar", "y_min": 0 },
+						"retired": null
+					}
+				],
+				"retired": null
+			},
+			{
+				"id": "calenviroscreen",
+				"label": "CalEnviroScreen",
+				"description": "Cumulative pollution burden and vulnerability percentile by census tract.",
+				"source": "OEHHA CalEnviroScreen",
+				"license": "",
+				"geographies": ["tract"],
+				"meta_url": "",
+				"entry_types": [
+					{
+						"id": "ces-score",
+						"label": "CalEnviroScreen Score",
+						"kind": "other",
+						"units": "percentile",
+						"resolutions": [],
+						"display": { "precision": 1, "chart": "bar", "y_min": 0 },
+						"retired": null
+					}
+				],
+				"retired": null
+			},
+			{
+				"id": "emissions",
+				"label": "Emissions",
+				"description": "Annual facility emissions of criteria pollutants and ammonia, and satellite-detected methane source rates.",
+				"source": "CARB CEIDARS facility inventory, Carbon Mapper",
+				"license": "",
+				"geographies": ["point", "region"],
+				"meta_url": "",
+				"entry_types": [
+					{
+						"id": "facility-nox",
+						"label": "NOx (facilities)",
+						"kind": "other",
+						"units": "tons/yr",
+						"resolutions": ["year"],
+						"display": { "precision": 1, "chart": "bar", "y_min": 0 },
+						"retired": null
+					},
+					{
+						"id": "facility-rog",
+						"label": "ROG (facilities)",
+						"kind": "other",
+						"units": "tons/yr",
+						"resolutions": ["year"],
+						"display": { "precision": 1, "chart": "bar", "y_min": 0 },
+						"retired": null
+					},
+					{
+						"id": "facility-pm",
+						"label": "Total PM (facilities)",
+						"kind": "other",
+						"units": "tons/yr",
+						"resolutions": ["year"],
+						"display": { "precision": 1, "chart": "bar", "y_min": 0 },
+						"retired": null
+					},
+					{
+						"id": "facility-pm10",
+						"label": "PM10 (facilities)",
+						"kind": "other",
+						"units": "tons/yr",
+						"resolutions": ["year"],
+						"display": { "precision": 1, "chart": "bar", "y_min": 0 },
+						"retired": null
+					},
+					{
+						"id": "facility-sox",
+						"label": "SOx (facilities)",
+						"kind": "other",
+						"units": "tons/yr",
+						"resolutions": ["year"],
+						"display": { "precision": 1, "chart": "bar", "y_min": 0 },
+						"retired": null
+					},
+					{
+						"id": "facility-co",
+						"label": "CO (facilities)",
+						"kind": "other",
+						"units": "tons/yr",
+						"resolutions": ["year"],
+						"display": { "precision": 1, "chart": "bar", "y_min": 0 },
+						"retired": null
+					},
+					{
+						"id": "facility-tog",
+						"label": "TOG (facilities)",
+						"kind": "other",
+						"units": "tons/yr",
+						"resolutions": ["year"],
+						"display": { "precision": 1, "chart": "bar", "y_min": 0 },
+						"retired": null
+					},
+					{
+						"id": "facility-nh3",
+						"label": "NH3 (facilities)",
+						"kind": "other",
+						"units": "tons/yr",
+						"resolutions": ["year"],
+						"display": { "precision": 1, "chart": "bar", "y_min": 0 },
+						"retired": null
+					},
+					{
+						"id": "methane-emission-rate",
+						"label": "Methane Emission Rate",
+						"kind": "other",
+						"units": "kg/h",
+						"resolutions": ["raw"],
+						"display": { "precision": 1, "chart": "line", "y_min": 0 },
+						"retired": null
+					}
+				],
+				"retired": null
+			},
+			{
+				"id": "tempo",
+				"label": "NASA TEMPO Satellite",
+				"description": "Hourly satellite column measurements over the San Joaquin Valley.",
+				"source": "NASA TEMPO",
+				"license": "Public domain",
+				"geographies": ["point", "region"],
+				"meta_url": "",
+				"entry_types": [
+					{
+						"id": "no2",
+						"label": "Nitrogen Dioxide",
+						"kind": "pollutant",
+						"units": "molecules/cm\u00b2",
+						"resolutions": ["hour"],
+						"display": { "precision": null, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "o3tot",
+						"label": "Total Ozone",
+						"kind": "other",
+						"units": "molecules/cm\u00b2",
+						"resolutions": ["hour"],
+						"display": { "precision": null, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "hcho",
+						"label": "Formaldehyde",
+						"kind": "pollutant",
+						"units": "molecules/cm\u00b2",
+						"resolutions": ["hour"],
+						"display": { "precision": null, "chart": "line", "y_min": null },
+						"retired": null
+					},
+					{
+						"id": "cldo4",
+						"label": "Cloud Fraction",
+						"kind": "other",
+						"units": "fraction",
+						"resolutions": ["hour"],
+						"display": { "precision": null, "chart": "line", "y_min": null },
+						"retired": null
+					}
+				],
+				"retired": null
+			}
+		],
+		"summary_rules": { "complete_after_period_end": ["month", "quarter", "season", "year"] }
+	}
+}

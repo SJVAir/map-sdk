@@ -28,3 +28,13 @@ vite.config.ts.timestamp-*
 
 # Local worktrees
 .worktrees/
+
+# Plan execution scratch
+.superpowers/
+
+# Vitest browser-mode failure screenshots
+/.vitest
+
+# Playwright
+/test-results
+/playwright-report

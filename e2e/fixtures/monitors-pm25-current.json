@@ -1,0 +1,236 @@
+{
+	"data": [
+		{
+			"id": "AIHbqnQjQ0WkZi1a5_gEug",
+			"name": "Fixture Alpha",
+			"type": "purpleair",
+			"device": "PA-II",
+			"grade": "lcs",
+			"is_active": true,
+			"is_sjvair": false,
+			"position": {
+				"type": "Point",
+				"coordinates": [
+					-119.74726,
+					36.874092
+				]
+			},
+			"last_active_limit": 3600,
+			"location": "outside",
+			"county": "",
+			"data_source": {
+				"name": "PurpleAir",
+				"url": "https://www2.purpleair.com/"
+			},
+			"data_providers": [
+				{
+					"name": "PurpleAir",
+					"url": "https://www2.purpleair.com/"
+				}
+			],
+			"sensor_id": 124099,
+			"purple_id": 124099,
+			"health": {
+				"hour": "2026-11-03T23:00:00Z",
+				"score": 0,
+				"rpd_pairwise": 2.0,
+				"correlation": null,
+				"channel_a_sanity": false,
+				"channel_b_sanity": false,
+				"grade": "F"
+			},
+			"latest": {
+				"sensor": "a",
+				"timestamp": "2026-11-03T10:00:00-08:00",
+				"stage": "calibrated",
+				"processor": "PM25_EPA_Oct2021",
+				"entry_type": "pm25",
+				"value": "6.2"
+			}
+		},
+		{
+			"id": "B2_v7UeGR1iInmEDYv25dg",
+			"name": "Fixture Bravo",
+			"type": "purpleair",
+			"device": "PA-II",
+			"grade": "lcs",
+			"is_active": true,
+			"is_sjvair": false,
+			"position": {
+				"type": "Point",
+				"coordinates": [
+					-120.09814,
+					36.96527
+				]
+			},
+			"last_active_limit": 3600,
+			"location": "outside",
+			"county": "",
+			"data_source": {
+				"name": "PurpleAir",
+				"url": "https://www2.purpleair.com/"
+			},
+			"data_providers": [
+				{
+					"name": "PurpleAir",
+					"url": "https://www2.purpleair.com/"
+				}
+			],
+			"sensor_id": 87625,
+			"purple_id": 87625,
+			"health": {
+				"hour": "2026-11-03T23:00:00Z",
+				"score": 0,
+				"rpd_pairwise": 0.13040421047627856,
+				"correlation": 0.31449548625686874,
+				"channel_a_sanity": false,
+				"channel_b_sanity": false,
+				"grade": "F"
+			},
+			"latest": {
+				"sensor": "a",
+				"timestamp": "2026-11-03T10:00:00-08:00",
+				"stage": "calibrated",
+				"processor": "PM25_EPA_Oct2021",
+				"entry_type": "pm25",
+				"value": "8.9"
+			}
+		},
+		{
+			"id": "GwrpLUSURciM_QlxIL6dJA",
+			"name": "Fixture Charlie",
+			"type": "purpleair",
+			"device": "PA-II",
+			"grade": "lcs",
+			"is_active": true,
+			"is_sjvair": false,
+			"position": {
+				"type": "Point",
+				"coordinates": [
+					-119.59677,
+					36.656445
+				]
+			},
+			"last_active_limit": 3600,
+			"location": "inside",
+			"county": "",
+			"data_source": {
+				"name": "PurpleAir",
+				"url": "https://www2.purpleair.com/"
+			},
+			"data_providers": [
+				{
+					"name": "PurpleAir",
+					"url": "https://www2.purpleair.com/"
+				}
+			],
+			"sensor_id": 8918,
+			"purple_id": 8918,
+			"health": {
+				"hour": "2026-11-03T23:00:00Z",
+				"score": 0,
+				"rpd_pairwise": 0.15181702589562446,
+				"correlation": 0.22377644263929977,
+				"channel_a_sanity": false,
+				"channel_b_sanity": false,
+				"grade": "F"
+			},
+			"latest": {
+				"sensor": "a",
+				"timestamp": "2026-11-03T10:00:00-08:00",
+				"stage": "calibrated",
+				"processor": "PM25_EPA_Oct2021",
+				"entry_type": "pm25",
+				"value": "5.4"
+			}
+		},
+		{
+			"id": "IWfuyb1fRU6yY-D1xEa2Vw",
+			"name": "Fixture Delta",
+			"type": "airnow",
+			"device": "BAM 1022",
+			"grade": "fem",
+			"is_active": true,
+			"is_sjvair": false,
+			"position": {
+				"type": "Point",
+				"coordinates": [
+					-119.77743,
+					36.71088
+				]
+			},
+			"last_active_limit": 10800,
+			"location": "outside",
+			"county": "Fresno",
+			"data_source": {
+				"name": "AirNow.gov",
+				"url": "https://www.airnow.gov/"
+			},
+			"data_providers": [
+				{
+					"name": "AirNow Partners",
+					"url": "https://www.airnow.gov/partners/"
+				},
+				{
+					"name": "San Joaquin Valley Unified APCD"
+				}
+			],
+			"latest": {
+				"sensor": "",
+				"timestamp": "2026-11-03T10:00:00-08:00",
+				"stage": "raw",
+				"processor": "",
+				"entry_type": "pm25",
+				"value": "12.0"
+			}
+		},
+		{
+			"id": "HJnwLgNKStOlFh7OtzIl-g",
+			"name": "Fixture Echo",
+			"type": "purpleair",
+			"device": "PA-II",
+			"grade": "lcs",
+			"is_active": false,
+			"is_sjvair": false,
+			"position": {
+				"type": "Point",
+				"coordinates": [
+					-119.76121,
+					36.82034
+				]
+			},
+			"last_active_limit": 3600,
+			"location": "outside",
+			"county": "",
+			"data_source": {
+				"name": "PurpleAir",
+				"url": "https://www2.purpleair.com/"
+			},
+			"data_providers": [
+				{
+					"name": "PurpleAir",
+					"url": "https://www2.purpleair.com/"
+				}
+			],
+			"sensor_id": 67603,
+			"purple_id": 67603,
+			"health": {
+				"hour": "2026-11-03T23:00:00Z",
+				"score": 0,
+				"rpd_pairwise": 0.7538324592146143,
+				"correlation": 0.4444628780302245,
+				"channel_a_sanity": false,
+				"channel_b_sanity": false,
+				"grade": "F"
+			},
+			"latest": {
+				"sensor": "a",
+				"timestamp": "2026-11-03T10:00:00-08:00",
+				"stage": "calibrated",
+				"processor": "PM25_EPA_Oct2021",
+				"entry_type": "pm25",
+				"value": ""
+			}
+		}
+	]
+}

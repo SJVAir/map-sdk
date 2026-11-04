@@ -1,0 +1,4 @@
+package-lock.json
+docs/
+dist/
+e2e/fixtures/
