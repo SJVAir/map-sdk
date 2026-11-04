@@ -1,18 +1,29 @@
 <script lang="ts">
-	import { onDestroy, tick } from "svelte";
-	import type { MapContext } from "../core/create-map.svelte.js";
+	import { onDestroy, tick, untrack } from "svelte";
+	import type { Bounds, MapContext } from "../core/create-map.svelte.js";
 	import type { FeatureListItem } from "../core/plugin.js";
 	import { selectionKeys } from "../data/selection.js";
-	import { inView, rowLabel, shownLevel, sortItems, typeaheadIndex } from "./feature-list.js";
+	import {
+		MENU_EVENT_WINDOW_MS,
+		inView,
+		optionIdPart,
+		rowLabel,
+		shownLevel,
+		sortItems,
+		typeaheadIndex,
+		type SortBy
+	} from "./feature-list.js";
 
 	interface Props {
 		map: MapContext;
 		class?: string;
 		/** The root element's id, e.g. for a button's `aria-controls`. */
 		id?: string;
+		/** The sort order; bind it to keep it while the list is unmounted. */
+		sortBy?: SortBy;
 	}
 
-	let { map, class: className, id }: Props = $props();
+	let { map, class: className, id, sortBy = $bindable("name") }: Props = $props();
 
 	const baseId = $props.id();
 	/** Rows rendered above and below the visible ones. */
@@ -21,7 +32,6 @@
 
 	type Row = FeatureListItem & { pluginId: string; key: string };
 
-	let sortBy = $state<"name" | "value">("name");
 	let listbox: HTMLElement | undefined = $state();
 	let scroller: HTMLElement | undefined = $state();
 	let scrollTop = $state(0);
@@ -38,18 +48,24 @@
 	let menuSentTimer: ReturnType<typeof setTimeout> | undefined;
 	// Focus from a pointer: the click picks the row, so focusing doesn't activate the first one.
 	let pointerFocus = false;
+	// While the listbox has focus it filters by the bounds from when focus arrived: each key press
+	// pans the map, and re-filtering on that pan's moveend would reshuffle the rows under the user.
+	let frozen = $state.raw<{ bounds: Bounds | null } | null>(null);
 
 	// Every plugin's features in view, re-computed when the view settles (bounds change on
-	// moveend) or a plugin's data changes.
+	// moveend; not while focused, see `frozen`) or a plugin's data changes. A refKey a plugin
+	// repeats is listed once, its first item.
 	const rows = $derived.by((): Row[] => {
-		const bounds = map.bounds;
+		const bounds = frozen ? frozen.bounds : map.bounds;
 		const all = map.plugins.flatMap((plugin) => {
 			const items = plugin.features?.() ?? [];
-			return (bounds ? inView(items, bounds) : items).map((item) => ({
-				...item,
-				pluginId: plugin.id,
-				key: `${plugin.id}\u0000${item.refKey}`
-			}));
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local to one computation
+			const seen = new Set<string>();
+			return (bounds ? inView(items, bounds) : items).flatMap((item) => {
+				if (seen.has(item.refKey)) return [];
+				seen.add(item.refKey);
+				return [{ ...item, pluginId: plugin.id, key: optionIdPart(plugin.id, item.refKey) }];
+			});
 		});
 		return sortItems(all, sortBy) as Row[];
 	});
@@ -79,8 +95,28 @@
 	});
 	const windowRows = $derived(rows.slice(range.start, range.end));
 
-	function optionId(index: number): string {
-		return `${baseId}-option-${index}`;
+	// Whatever moved the active row (keys, a data change, a re-filter), keep it in view.
+	$effect(() => {
+		const index = activeIndex;
+		const h = rowHeight;
+		const el = scroller;
+		if (index < 0 || !h || !el) return;
+		untrack(() => {
+			const top = index * h;
+			if (top < el.scrollTop) el.scrollTop = top;
+			else if (top + h > el.scrollTop + el.clientHeight) el.scrollTop = top + h - el.clientHeight;
+			scrollTop = el.scrollTop;
+		});
+	});
+
+	/** Stable per row, so a row keeps its id when the list re-sorts or re-filters. */
+	function optionId(row: Row): string {
+		return `${baseId}-${row.key}`;
+	}
+
+	function setSort(by: SortBy) {
+		sortBy = by;
+		if (frozen) frozen = { bounds: map.bounds };
 	}
 
 	function isSelectable(row: Row): boolean {
@@ -91,19 +127,11 @@
 		return selected.get(row.pluginId)?.has(row.refKey) ?? false;
 	}
 
-	/** Makes row `index` active: scrolls it into view and focuses (and pans to) its feature. */
+	/** Makes row `index` active and focuses (and pans to) its feature. */
 	function activate(index: number) {
 		const row = rows[index];
 		if (!row) return;
 		activeKey = row.key;
-		if (scroller && rowHeight) {
-			const top = index * rowHeight;
-			if (top < scroller.scrollTop) scroller.scrollTop = top;
-			else if (top + rowHeight > scroller.scrollTop + scroller.clientHeight) {
-				scroller.scrollTop = top + rowHeight - scroller.clientHeight;
-			}
-			scrollTop = scroller.scrollTop;
-		}
 		map.focusFeature(row.refKey, row.pluginId);
 	}
 
@@ -116,9 +144,10 @@
 	}
 
 	async function openMenu() {
-		if (activeIndex < 0) return;
+		const row = rows[activeIndex];
+		if (!row) return;
 		await tick();
-		const el = document.getElementById(optionId(activeIndex));
+		const el = document.getElementById(optionId(row));
 		if (!el) return;
 		const box = el.getBoundingClientRect();
 		el.dispatchEvent(
@@ -140,7 +169,7 @@
 			if (activeIndex < 0) return;
 			menuSent = true;
 			clearTimeout(menuSentTimer);
-			menuSentTimer = setTimeout(() => (menuSent = false), 1000);
+			menuSentTimer = setTimeout(() => (menuSent = false), MENU_EVENT_WINDOW_MS);
 			void openMenu();
 			return;
 		}
@@ -193,9 +222,14 @@
 	}
 
 	function onfocus() {
+		frozen = { bounds: map.bounds };
 		const byPointer = pointerFocus;
 		pointerFocus = false;
-		if (!byPointer && activeIndex < 0 && rows.length > 0) {
+		if (byPointer || rows.length === 0) return;
+		if (activeIndex >= 0) {
+			const row = rows[activeIndex];
+			map.focusFeature(row.refKey, row.pluginId);
+		} else {
 			const first = rows.findIndex(isSelected);
 			activate(first >= 0 ? first : 0);
 		}
@@ -203,7 +237,11 @@
 
 	function onblur() {
 		pointerFocus = false;
-		map.focusFeature(null);
+		const row = rows[activeIndex];
+		if (row && map.focusedKey === row.refKey && map.focusedPluginId === row.pluginId) {
+			map.focusFeature(null);
+		}
+		frozen = null;
 	}
 
 	function oncontextmenu(e: MouseEvent) {
@@ -234,10 +272,10 @@
 
 <div class={["mapsdk-list", className]} {id} data-mapsdk-map={map.uid}>
 	<div class="mapsdk-list-sort">
-		<button type="button" aria-pressed={sortBy === "name"} onclick={() => (sortBy = "name")}>
+		<button type="button" aria-pressed={sortBy === "name"} onclick={() => setSort("name")}>
 			{map.messages("mapsdk_list_sort_name")}
 		</button>
-		<button type="button" aria-pressed={sortBy === "value"} onclick={() => (sortBy = "value")}>
+		<button type="button" aria-pressed={sortBy === "value"} onclick={() => setSort("value")}>
 			{map.messages("mapsdk_list_sort_value")}
 		</button>
 	</div>
@@ -259,7 +297,7 @@
 			tabindex="0"
 			aria-label={map.messages("mapsdk_list_label")}
 			aria-multiselectable={multiselectable || undefined}
-			aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
+			aria-activedescendant={activeIndex >= 0 ? optionId(rows[activeIndex]) : undefined}
 			style:padding-top="{range.start * rowHeight}px"
 			style:padding-bottom="{(rows.length - range.end) * rowHeight}px"
 			{onkeydown}
@@ -275,7 +313,7 @@
 				<!-- Options aren't focused: the listbox holds focus and handles keys (aria-activedescendant). -->
 				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_interactive_supports_focus -->
 				<div
-					id={optionId(index)}
+					id={optionId(row)}
 					class="mapsdk-list-row"
 					class:active={index === activeIndex}
 					class:selected={isOn}

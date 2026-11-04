@@ -338,15 +338,25 @@ describe("MapView list button", () => {
 		await userEvent.tab();
 		expect(document.activeElement).toBe(button.element());
 		await expect.element(button).toHaveAttribute("aria-expanded", "false");
-		const panel = document.getElementById(button.element().getAttribute("aria-controls")!)!;
-		expect(panel.querySelector("[role=listbox]")).not.toBeNull();
-		expect(panel.closest("[data-mapsdk-map]")?.getAttribute("data-mapsdk-map")).toBe(map.uid);
-		await expect.element(page.getByRole("listbox")).not.toBeInTheDocument();
+		// Closed, the list isn't mounted (and doesn't sort features on every move).
+		expect(button.element().hasAttribute("aria-controls")).toBe(false);
+		expect(document.querySelector("[role=listbox]")).toBeNull();
 
 		await button.click();
 		await expect.element(button).toHaveAttribute("aria-expanded", "true");
 		const listbox = page.getByRole("listbox", { name: "Features on the map" });
 		await expect.element(listbox).toBeVisible();
+		const panel = document.getElementById(button.element().getAttribute("aria-controls")!)!;
+		expect(panel.contains(listbox.element())).toBe(true);
+		expect(panel.closest("[data-mapsdk-map]")?.getAttribute("data-mapsdk-map")).toBe(map.uid);
+
+		// The sort order survives closing and opening.
+		await page.getByRole("button", { name: "Value" }).click();
+		await button.click();
+		await button.click();
+		await expect
+			.element(page.getByRole("button", { name: "Value" }))
+			.toHaveAttribute("aria-pressed", "true");
 		(listbox.element() as HTMLElement).focus();
 		await userEvent.keyboard("{Escape}");
 		await expect.element(button).toHaveAttribute("aria-expanded", "false");

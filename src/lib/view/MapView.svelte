@@ -6,6 +6,7 @@
 	import type { MapContext } from "../core/create-map.svelte.js";
 	import type { GlMapLike } from "../core/gl.js";
 	import FeatureList from "../ui/FeatureList.svelte";
+	import type { SortBy } from "../ui/feature-list.js";
 	import MapTooltip from "../ui/MapTooltip.svelte";
 	import { createGlMap, watchTheme } from "./create-gl-map.js";
 
@@ -35,6 +36,8 @@
 	const uid = $props.id();
 	const listId = `${uid}-list`;
 	let listOpen = $state(false);
+	// Kept here: the list is unmounted while closed, so it doesn't sort every feature on each move.
+	let listSort = $state<SortBy>("name");
 	let listButton: HTMLButtonElement | undefined = $state();
 
 	function onListKeydown(e: KeyboardEvent) {
@@ -114,16 +117,18 @@
 				class="mapsdk-list-button"
 				aria-label={map.messages("mapsdk_list_button_label")}
 				aria-expanded={listOpen}
-				aria-controls={listId}
+				aria-controls={listOpen ? listId : undefined}
 				onclick={() => (listOpen = !listOpen)}
 			>
 				{map.messages("mapsdk_list_button")}
 			</button>
 			<!-- Escape anywhere in the panel closes it. -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div hidden={!listOpen} onkeydown={onListKeydown}>
-				<FeatureList {map} id={listId} />
-			</div>
+			{#if listOpen}
+				<div onkeydown={onListKeydown}>
+					<FeatureList {map} id={listId} bind:sortBy={listSort} />
+				</div>
+			{/if}
 		</div>
 	{/if}
 	{@render overlays?.()}
@@ -155,10 +160,6 @@
 	.mapsdk-list-panel > div {
 		display: flex;
 		min-height: 0;
-	}
-
-	.mapsdk-list-panel > div[hidden] {
-		display: none;
 	}
 
 	.mapsdk-list-button {

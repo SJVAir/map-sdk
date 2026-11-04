@@ -8,6 +8,22 @@ import type { Level } from "../data/scale-types.js";
 export type { Bounds };
 export type SortBy = "name" | "value";
 
+/**
+ * How long after Shift+F10 or the Menu key the browser's own keyboard `contextmenu` event (sent on
+ * keydown or keyup, depending on the platform) is treated as a duplicate of the one sent to the row.
+ */
+export const MENU_EVENT_WINDOW_MS = 1000;
+
+/**
+ * A valid, stable id fragment for a row, from its plugin and refKey: anything but letters, digits,
+ * and `-` is escaped as `_<hex>_` (`_` included), so different rows never share one.
+ */
+export function optionIdPart(pluginId: string, refKey: string): string {
+	const escape = (text: string) =>
+		text.replace(/[^A-Za-z0-9-]/g, (c) => `_${c.codePointAt(0)!.toString(16)}_`);
+	return `${escape(pluginId)}--${escape(refKey)}`;
+}
+
 /** Items whose point is inside `bounds`, edges included. No antimeridian handling (the Valley). */
 export function inView(items: FeatureListItem[], bounds: Bounds): FeatureListItem[] {
 	return items.filter(({ lngLat: [lng, lat] }) => {
@@ -64,12 +80,11 @@ export function rowLabel(
 ): string {
 	if (item.value === null) return messages("mapsdk_list_row_no_value", { name: item.name });
 	const level = shownLevel(item);
-	const label = messages("mapsdk_list_row", {
+	const params = {
 		name: item.name,
 		value: typeof item.value === "number" ? format.number(item.value) : item.value,
 		units: item.units,
 		level: level ? level.label : messages("mapsdk_no_level")
-	});
-	// Empty units leave "value , level".
-	return label.replace(/ +,/g, ",").replace(/ {2,}/g, " ");
+	};
+	return messages(item.units ? "mapsdk_list_row" : "mapsdk_list_row_no_units", params);
 }

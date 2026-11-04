@@ -4,7 +4,13 @@ import { createDefaultFormat } from "../../../src/lib/data/format.js";
 import { defaultMessages } from "../../../src/lib/data/messages.js";
 import { NO_LEVEL } from "../../../src/lib/data/scale.js";
 import type { Level } from "../../../src/lib/data/scale-types.js";
-import { inView, rowLabel, sortItems, typeaheadIndex } from "../../../src/lib/ui/feature-list.js";
+import {
+	inView,
+	optionIdPart,
+	rowLabel,
+	sortItems,
+	typeaheadIndex
+} from "../../../src/lib/ui/feature-list.js";
 
 function level(label: string, tier: number, color = "#00e400"): Level {
 	return { key: label, label, color, opacity: null, tier, description: "", guidance: "" };
@@ -126,9 +132,20 @@ describe("rowLabel", () => {
 		).toBe("B, 5 µg/m³, No level");
 	});
 
-	it("drops the gap left by empty units", () => {
+	it("uses the no-units message when units are empty", () => {
 		expect(
 			rowLabel(item("1", "Fire", { value: "heavy", units: "" }), defaultMessages, format)
 		).toBe("Fire, heavy, Good");
+	});
+});
+
+describe("optionIdPart", () => {
+	it("is a valid id fragment, stable, and different for different keys", () => {
+		const a = optionIdPart("monitors", "monitor:1");
+		expect(a).toMatch(/^[A-Za-z0-9_-]+$/);
+		expect(optionIdPart("monitors", "monitor:1")).toBe(a);
+		expect(optionIdPart("monitors", "monitor:2")).not.toBe(a);
+		expect(optionIdPart("monitors:monitor", "1")).not.toBe(optionIdPart("monitors", "monitor:1"));
+		expect(optionIdPart("a_3a_", "b")).not.toBe(optionIdPart("a:", "b"));
 	});
 });

@@ -8,6 +8,8 @@ import type { SelectionMode } from "../../src/lib/data/types.js";
 import { NO_LEVEL } from "../../src/lib/data/scale.js";
 import type { Level } from "../../src/lib/data/scale-types.js";
 import FeatureList from "../../src/lib/ui/FeatureList.svelte";
+import { MENU_EVENT_WINDOW_MS } from "../../src/lib/ui/feature-list.js";
+import { SvelteMap } from "svelte/reactivity";
 
 const good: Level = {
 	key: "good",
@@ -208,17 +210,21 @@ describe("FeatureList", () => {
 		try {
 			await focusList();
 			await userEvent.keyboard("{ArrowDown}");
+			vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 			await userEvent.keyboard("{Shift>}{F10}{/Shift}");
 			await vi.waitFor(() => expect(seen.length).toBeGreaterThan(0));
-			// Give a browser-sent keyboard menu event time to arrive; it must not add a second one.
-			await new Promise((r) => setTimeout(r, 50));
-			// One the browser sends to the focused listbox (e.g. on keyup) goes to the active row.
-			await new Promise((r) => setTimeout(r, 1000));
+			// A frame for any browser-sent keyboard menu event: it must not add a second one.
+			await new Promise((r) => requestAnimationFrame(r));
+			expect(seen).toHaveLength(1);
+			// Once the window for the browser's own event has passed, one sent to the focused
+			// listbox (e.g. on keyup) goes to the active row.
+			vi.advanceTimersByTime(MENU_EVENT_WINDOW_MS);
 			listbox()
 				.element()
 				.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
 			await vi.waitFor(() => expect(seen).toHaveLength(2));
 		} finally {
+			vi.useRealTimers();
 			document.removeEventListener("contextmenu", listener);
 		}
 		const bakersfield = {
@@ -228,6 +234,97 @@ describe("FeatureList", () => {
 			name: "Bakersfield"
 		};
 		expect(seen).toEqual([bakersfield, bakersfield]);
+	});
+
+	it("keeps the list still while focused, and re-filters on blur", async () => {
+		const sites = Array.from({ length: 40 }, (_, i) =>
+			item(String(i), `Site ${String(i).padStart(2, "0")}`, { lngLat: [-119.5, 36 + i * 0.01] })
+		);
+		const { map } = newMap("single", sites);
+		const camera = { center: [-119.5, 36.2] as [number, number], zoom: 9, bearing: 0, pitch: 0 };
+		map.updateView(camera, { west: -120, south: 35, east: -119, north: 37 });
+		render(FeatureList, { map });
+		await focusList();
+		await userEvent.keyboard("{End}");
+		await userEvent.keyboard("{ArrowUp}");
+		const box = listbox().element();
+		const active = () => document.getElementById(box.getAttribute("aria-activedescendant")!)!;
+		expect(active().textContent).toContain("Site 38");
+		const before = active().id;
+
+		// The pan to the active row settles with bounds that would drop the first 30 rows.
+		map.updateView(camera, { west: -120, south: 36.3, east: -119, north: 37 });
+		await new Promise((r) => requestAnimationFrame(r));
+		expect(options()[options().length - 1].getAttribute("aria-setsize")).toBe("40");
+		expect(active().id).toBe(before);
+		const scroller = box.parentElement!.getBoundingClientRect();
+		const row = active().getBoundingClientRect();
+		expect(row.top).toBeGreaterThanOrEqual(scroller.top);
+		expect(row.bottom).toBeLessThanOrEqual(scroller.bottom);
+
+		(box as HTMLElement).blur();
+		await vi.waitFor(() => expect(options()).toHaveLength(10));
+	});
+
+	it("keeps the active row in view when a data change moves it", async () => {
+		const names = new SvelteMap(
+			Array.from({ length: 40 }, (_, i) => [String(i), `Site ${String(i).padStart(2, "0")}`])
+		);
+		const map = createMap({ config: { maptilerKey: "test-key" } });
+		map.addPlugin(
+			{
+				id: "monitors",
+				setup: () => () => {},
+				features: () => [...names].map(([id, name]) => item(id, name))
+			},
+			{ selectionMode: "single" }
+		);
+		render(FeatureList, { map });
+		await focusList();
+		const box = listbox().element();
+		const active = () => document.getElementById(box.getAttribute("aria-activedescendant")!)!;
+		await vi.waitFor(() => expect(active().textContent).toContain("Site 00"));
+		const id = active().id;
+		// Renamed to sort last: same row, same id, scrolled into view.
+		names.set("0", "Zzz");
+		await vi.waitFor(() => expect(active().textContent).toContain("Zzz"));
+		expect(active().id).toBe(id);
+		expect(active().getAttribute("aria-posinset")).toBe("40");
+		const scroller = box.parentElement!.getBoundingClientRect();
+		const row = active().getBoundingClientRect();
+		expect(row.top).toBeGreaterThanOrEqual(scroller.top);
+		expect(row.bottom).toBeLessThanOrEqual(scroller.bottom);
+	});
+
+	it("restores the map's focus on refocus, and blur leaves another feature's focus alone", async () => {
+		const { map } = newMap("single");
+		render(FeatureList, { map });
+		await focusList();
+		await userEvent.keyboard("{ArrowDown}");
+		const box = listbox().element() as HTMLElement;
+		box.blur();
+		expect(map.focusedKey).toBeNull();
+		box.focus();
+		expect(map.focusedKey).toBe("monitor:2");
+		expect(map.focusedPluginId).toBe("monitors");
+		// Something else focused another feature meanwhile.
+		map.focusFeature("monitor:3", "monitors");
+		box.blur();
+		expect(map.focusedKey).toBe("monitor:3");
+	});
+
+	it("lists a refKey a plugin repeats only once", async () => {
+		const { map } = newMap("single", [
+			item("1", "Arvin"),
+			item("1", "Arvin again"),
+			item("2", "B")
+		]);
+		render(FeatureList, { map });
+		await expect.element(listbox()).toBeVisible();
+		expect(options().map((o) => o.querySelector(".mapsdk-list-name")!.textContent)).toEqual([
+			"Arvin",
+			"B"
+		]);
 	});
 
 	it("lists only features in view, re-computed when the view changes", async () => {
@@ -279,6 +376,8 @@ describe("FeatureList", () => {
 		let result = await axe.run(document.querySelector(".mapsdk-list")!);
 		expect(result.violations).toEqual([]);
 
+		// Blurred, so the list follows the view.
+		(listbox().element() as HTMLElement).blur();
 		map.updateView(map.camera, { west: 0, south: 0, east: 1, north: 1 });
 		await expect.element(page.getByText("Nothing on the map in this view")).toBeVisible();
 		result = await axe.run(document.querySelector(".mapsdk-list")!);
