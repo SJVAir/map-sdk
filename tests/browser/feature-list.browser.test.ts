@@ -84,6 +84,23 @@ describe("FeatureList", () => {
 		);
 	});
 
+	it("shows an empty-color level's label next to a neutral swatch, No level only for none", async () => {
+		const unknown: Level = { ...good, key: "unknown", label: "Unknown", color: "" };
+		const { map } = newMap("single", [
+			item("1", "Arvin", { level: unknown }),
+			item("2", "Bakersfield", { level: NO_LEVEL })
+		]);
+		render(FeatureList, { map });
+		await expect
+			.element(page.getByRole("option", { name: "Arvin, 5 µg/m³, Unknown" }))
+			.toBeInTheDocument();
+		await expect
+			.element(page.getByRole("option", { name: "Bakersfield, 5 µg/m³, No level" }))
+			.toBeInTheDocument();
+		expect(option("Arvin").querySelector(".mapsdk-list-swatch.neutral")).not.toBeNull();
+		expect(option("Arvin").querySelector(".mapsdk-list-level")!.textContent).toContain("Unknown");
+	});
+
 	it("holds under 100 rows in the DOM with 5,000 features, and follows the scroll", async () => {
 		const many = Array.from({ length: 5000 }, (_, i) =>
 			item(String(i), `Site ${String(i).padStart(4, "0")}`)

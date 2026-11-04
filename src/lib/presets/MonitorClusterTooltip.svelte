@@ -99,7 +99,7 @@
 	const level = $derived.by(() => {
 		if (mean === null || !scale) return null;
 		const found = levelFor(mean, scale);
-		return found !== NO_LEVEL && found.color ? found : null;
+		return found !== NO_LEVEL ? found : null;
 	});
 	const units = $derived(scale?.units ?? "");
 	const max = $derived(leaves?.values.length ? Math.max(...leaves.values) : null);
@@ -108,7 +108,7 @@
 
 <div class="mapsdk-monitor-tip">
 	<MonitorReadingBox
-		color={level?.color ?? null}
+		color={level?.color || null}
 		header={scale?.label ?? ""}
 		value={average === null ? messages("mapsdk_no_reading") : format.number(average)}
 		large={average !== null}

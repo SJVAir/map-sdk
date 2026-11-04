@@ -60,6 +60,23 @@ describe("MonitorTooltip", () => {
 	});
 });
 
+describe("MonitorTooltip with an empty-color level", () => {
+	it("shows the level's label in a neutral box", async () => {
+		const unknown = { ...pm25Scale.levels[1], label: "Unknown", color: "" };
+		render(MonitorTooltip, {
+			item: { ...item(12.6), level: unknown },
+			timestamp: null,
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format
+		});
+		await expect.element(page.getByText("Unknown")).toBeVisible();
+		expect(page.getByText("No level").elements()).toHaveLength(0);
+		const box = page.getByText("13").element().parentElement!;
+		expect(getComputedStyle(box).backgroundColor).not.toBe("rgb(255, 255, 0)");
+	});
+});
+
 describe("MonitorClusterTooltip", () => {
 	/** A cluster whose bubble properties carry the readings' sum and count, as MapLibre's do. */
 	function cluster(

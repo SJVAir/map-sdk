@@ -134,13 +134,17 @@ describe("rowLabel", () => {
 		expect(label).toBe("Fresno, no reading");
 	});
 
-	it("says No level for a value without one, or a level with no color", () => {
+	it("says No level for a value without one, and an empty-color level's own label", () => {
 		expect(rowLabel(item("1", "A", { value: -3, level: NO_LEVEL }), defaultMessages, format)).toBe(
 			"A, -3 µg/m³, No level"
 		);
 		expect(
-			rowLabel(item("1", "B", { value: 5, level: level("Broken", 0, "") }), defaultMessages, format)
-		).toBe("B, 5 µg/m³, No level");
+			rowLabel(
+				item("1", "B", { value: 5, level: level("Unknown", 0, "") }),
+				defaultMessages,
+				format
+			)
+		).toBe("B, 5 µg/m³, Unknown");
 	});
 
 	it("uses the no-units message when units are empty", () => {

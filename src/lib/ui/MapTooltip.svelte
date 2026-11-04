@@ -68,7 +68,8 @@
 		return hit && plugin?.hoverTooltip?.(hit);
 	});
 
-	const level = $derived(item && item.level !== NO_LEVEL && item.level.color ? item.level : null);
+	// A level with an empty color shows its label on the neutral chip.
+	const level = $derived(item && item.level !== NO_LEVEL ? item.level : null);
 	const levelLabel = $derived(level ? level.label : map.messages("mapsdk_no_level"));
 	const chipColors = $derived.by(() => {
 		const chip = levelChip(level?.color);

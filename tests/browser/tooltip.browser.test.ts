@@ -91,10 +91,11 @@ describe("MapTooltip", () => {
 		expect(getComputedStyle(chip).color).toBe("rgb(0, 0, 0)");
 	});
 
-	it("shows No level for an empty-color level without throwing", async () => {
-		const map = fakeMap([item("a", "Gray", level("Broken", ""))], { focusedKey: "a" });
+	it("shows an empty-color level's label on a neutral chip without throwing", async () => {
+		const map = fakeMap([item("a", "Gray", level("Unknown", ""))], { focusedKey: "a" });
 		render(MapTooltip, { map, project });
-		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Gray 12.34 µg/m³ No level");
+		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Gray 12.34 µg/m³ Unknown");
+		expect(page.getByText("Unknown").element().classList.contains("neutral")).toBe(true);
 	});
 
 	it("shows No level for NO_LEVEL", async () => {

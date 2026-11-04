@@ -357,7 +357,10 @@
 						{formatValue(row)}{#if row.units && row.value !== null}&nbsp;{row.units}{/if}
 					</span>
 					<span class="mapsdk-list-level text-xs">
-						<span class="mapsdk-list-swatch" class:neutral={!level} style:background={level?.color}
+						<span
+							class="mapsdk-list-swatch"
+							class:neutral={!level?.color}
+							style:background={level?.color || undefined}
 						></span>
 						{level ? level.label : map.messages("mapsdk_no_level")}
 					</span>

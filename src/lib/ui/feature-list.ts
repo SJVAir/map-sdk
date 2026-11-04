@@ -32,9 +32,12 @@ export function inView(items: FeatureListItem[], bounds: Bounds): FeatureListIte
 	});
 }
 
-/** The item's level if it has one to show: a level with an empty color reads as no level. */
+/**
+ * The item's level, or null for `NO_LEVEL`. A level with an empty color is still shown, by its
+ * label on a neutral swatch.
+ */
 export function shownLevel(item: FeatureListItem): Level | null {
-	return item.level !== NO_LEVEL && item.level.color ? item.level : null;
+	return item.level !== NO_LEVEL ? item.level : null;
 }
 
 const collator = new Intl.Collator("en-US");

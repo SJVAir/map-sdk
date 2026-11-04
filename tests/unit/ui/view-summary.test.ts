@@ -45,6 +45,15 @@ describe("summaryText", () => {
 		);
 	});
 
+	it("counts an empty-color level under its own label", () => {
+		const unknown: Level = { ...good, key: "unknown", label: "Unknown", color: "" };
+		const scale = { ...pm25Scale, levels: [...pm25Scale.levels, unknown] };
+		const items = [...many(2, unknown), ...many(1, good, 5), ...many(1, NO_LEVEL, 9)];
+		expect(summaryText("monitors", items, scale, defaultMessages)).toBe(
+			"monitors: 1 Good, 2 Unknown, 1 No level"
+		);
+	});
+
 	it("gives only the count when there is no scale or nothing is listed", () => {
 		expect(summaryText("monitors", many(4, good), null, defaultMessages)).toBe("4 monitors");
 		expect(summaryText("monitors", [], pm25Scale, defaultMessages)).toBe("0 monitors");

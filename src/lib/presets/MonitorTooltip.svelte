@@ -20,7 +20,8 @@
 
 	let { item, timestamp, scale, messages, format }: Props = $props();
 
-	const level = $derived(item.level !== NO_LEVEL && item.level.color ? item.level : null);
+	// A level with an empty color shows its label in the neutral box.
+	const level = $derived(item.level !== NO_LEVEL ? item.level : null);
 	const reading = $derived.by(() => {
 		const n = numericValue(item.value);
 		return n === null ? null : format.number(Math.round(n));
@@ -38,7 +39,7 @@
 
 <div class="mapsdk-monitor-tip">
 	<MonitorReadingBox
-		color={level?.color ?? null}
+		color={level?.color || null}
 		header={scale?.label ?? ""}
 		value={reading ?? messages("mapsdk_no_reading")}
 		large={reading !== null}
