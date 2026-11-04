@@ -217,8 +217,9 @@
 		max-width: calc(100% - 1.5rem);
 		padding: 0.25rem 0.5rem;
 		border-radius: var(--radius-control, var(--radius));
-		background: var(--overlay, var(--background));
-		color: var(--foreground);
+		/* Opaque, so text and links keep 4.5:1 whatever the basemap draws beneath. */
+		background: var(--card);
+		color: var(--card-foreground);
 		pointer-events: auto;
 	}
 
