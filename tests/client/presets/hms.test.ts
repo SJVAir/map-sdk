@@ -52,14 +52,14 @@ afterEach(() => {
 });
 
 describe("hmsSmokePlugin", () => {
-	const ref = { dataset: "hms", entryType: "smoke-density" };
+	const ref = { dataset: "hms-smoke", entryType: "smoke-density" };
 
 	it("has defaults, is not selectable, and lists its plumes with their level", () => {
 		const source = new TestSource<Props>({ features: SMOKE, scale: ref });
 		const plugin = hmsSmokePlugin({ source, layerLabel: "Smoke" });
 		expect(plugin.id).toBe("hms-smoke");
 		expect(plugin.label).toBe("Smoke");
-		expect(plugin.dataset).toBe("hms");
+		expect(plugin.dataset).toBe("hms-smoke");
 		expect(plugin.selectable).toBe(false);
 		source.scale = smokeScale;
 		const items = plugin.features!();
@@ -96,7 +96,7 @@ describe("hmsSmokePlugin", () => {
 });
 
 describe("hmsFirePlugin", () => {
-	const ref = { dataset: "hms", entryType: "fire-frp" };
+	const ref = { dataset: "hms-fire", entryType: "fire-frp" };
 
 	it("has defaults, is not selectable, and lists its fires", () => {
 		const source = new TestSource<Props>({
@@ -106,7 +106,7 @@ describe("hmsFirePlugin", () => {
 		const plugin = hmsFirePlugin({ source, layerLabel: "Fire" });
 		expect(plugin.id).toBe("hms-fire");
 		expect(plugin.label).toBe("Fire");
-		expect(plugin.dataset).toBe("hms");
+		expect(plugin.dataset).toBe("hms-fire");
 		expect(plugin.selectable).toBe(false);
 		expect(plugin.features).toBeTypeOf("function");
 		expect(hmsFirePlugin({ id: "x", source, layerLabel: "F" }).id).toBe("x");

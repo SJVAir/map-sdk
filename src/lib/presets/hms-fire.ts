@@ -27,7 +27,7 @@ function drawFire(color: string, levelIndex = -1): string {
  * its level. Not selectable; listed.
  *
  * The source's `scale` is expected to be the ScaleRef
- * `{ dataset: "hms", entryType: "fire-frp" }`, and each feature's `value` its FRP. Pass groups
+ * `{ dataset: "hms-fire", entryType: "fire-frp" }`, and each feature's `value` its FRP. Pass groups
  * from `groupFires` (value = `avgFrp`) to merge nearby detections. This preset does not fetch.
  */
 export function hmsFirePlugin(options: HmsFirePluginOptions): MapPlugin {

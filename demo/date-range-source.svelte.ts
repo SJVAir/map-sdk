@@ -230,9 +230,9 @@ function scaleFor(kind: SourceKind, entryType: string): ScaleRef {
 		case "forecast-zones":
 			return { dataset: "forecasts", entryType: "aqi-forecast" };
 		case "hms-smoke":
-			return { dataset: "hms", entryType: "smoke-density" };
+			return { dataset: "hms-smoke", entryType: "smoke-density" };
 		case "hms-fire":
-			return { dataset: "hms", entryType: "fire-frp" };
+			return { dataset: "hms-fire", entryType: "fire-frp" };
 	}
 }
 

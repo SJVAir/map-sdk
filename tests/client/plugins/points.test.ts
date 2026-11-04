@@ -403,7 +403,7 @@ describe("pointsPlugin", () => {
 		const source = new TestSource<Props>({ features: points(ROWS), scale: PM25_REF });
 		const { gl, plugin } = setup({ source }, meta);
 		await settle();
-		source.scale = { dataset: "hms", entryType: "fire-frp" };
+		source.scale = { dataset: "hms-fire", entryType: "fire-frp" };
 		flushSync();
 		await settle();
 		expect(layerIds(gl)).toEqual(["m1:pts:points", "m1:pts:selected"]);

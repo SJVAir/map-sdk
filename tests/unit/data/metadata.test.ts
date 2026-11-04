@@ -86,8 +86,8 @@ describe("default metadata", () => {
 	});
 
 	it.each([
-		["hms", "smoke-density", smokeScale, getHMSMeta],
-		["hms", "fire-frp", fireScale, getHMSMeta],
+		["hms-smoke", "smoke-density", smokeScale, getHMSMeta],
+		["hms-fire", "fire-frp", fireScale, getHMSMeta],
 		["calheatscore", "heat-score", heatScale, getCalHeatScoreMeta],
 		["forecasts", "burn-status", burnScale, getForecastsMeta],
 		["forecasts", "aqi-forecast", pm25Scale, getForecastsMeta]
@@ -109,7 +109,7 @@ describe("default metadata", () => {
 	});
 
 	it.each([
-		["hms", "fire-frp", fireScale, getHMSMeta],
+		["hms-fire", "fire-frp", fireScale, getHMSMeta],
 		["calheatscore", "heat-score", heatScale, getCalHeatScoreMeta],
 		["forecasts", "aqi-forecast", pm25Scale, getForecastsMeta]
 	])("derives %s %s label and units from its scale", async (dataset, entryType, scale, mock) => {
@@ -125,12 +125,23 @@ describe("default metadata", () => {
 		expect(mock).toHaveBeenCalledTimes(1);
 	});
 
+	it("serves hms-smoke and hms-fire from one HMS meta fetch", async () => {
+		getHMSMeta.mockResolvedValue({
+			scales: { "smoke-density": smokeScale, "fire-frp": fireScale }
+		});
+		const meta = createDefaultMetadata();
+		expect(await meta.scale({ dataset: "hms-smoke", entryType: "smoke-density" })).toBe(smokeScale);
+		expect(await meta.scale({ dataset: "hms-fire", entryType: "fire-frp" })).toBe(fireScale);
+		expect(await meta.scale({ dataset: "hms", entryType: "fire-frp" })).toBe("unavailable");
+		expect(getHMSMeta).toHaveBeenCalledTimes(1);
+	});
+
 	it("is unavailable when a dataset meta fails, and retries", async () => {
 		getHMSMeta
 			.mockRejectedValueOnce(new Error("down"))
 			.mockResolvedValue({ scales: { "fire-frp": fireScale } });
 		const meta = createDefaultMetadata();
-		const ref = { dataset: "hms", entryType: "fire-frp" };
+		const ref = { dataset: "hms-fire", entryType: "fire-frp" };
 		expect(await meta.scale(ref)).toBe("unavailable");
 		expect(await meta.scale(ref)).toBe(fireScale);
 	});
@@ -146,7 +157,7 @@ describe("default metadata", () => {
 		});
 	});
 
-	it("gives the catalog's display precision, searching split datasets", async () => {
+	it("gives the catalog's display precision", async () => {
 		getMonitorsMeta.mockResolvedValue(legacyMeta());
 		getHMSMeta.mockResolvedValue({ scales: { "fire-frp": fireScale } });
 		const entry = (id: string, precision: number | null) => ({ id, display: { precision } });
@@ -161,7 +172,7 @@ describe("default metadata", () => {
 		expect(await meta.entryType({ dataset: "air-quality", entryType: "o3" })).toMatchObject({
 			precision: null
 		});
-		expect(await meta.entryType({ dataset: "hms", entryType: "fire-frp" })).toMatchObject({
+		expect(await meta.entryType({ dataset: "hms-fire", entryType: "fire-frp" })).toMatchObject({
 			precision: 2
 		});
 	});
@@ -209,12 +220,14 @@ describe("default metadata", () => {
 		getDatasetCatalog.mockResolvedValue({
 			datasets: [
 				{ id: "air-quality", source: "SJVAir" },
-				{ id: "hms", source: "" }
+				{ id: "hms-fire", source: "NOAA HMS" },
+				{ id: "hms-smoke", source: "" }
 			]
 		});
 		const meta = createDefaultMetadata();
 		expect(await meta.attribution("air-quality")).toBe("SJVAir");
-		expect(await meta.attribution("hms")).toBe("unavailable");
+		expect(await meta.attribution("hms-fire")).toBe("NOAA HMS");
+		expect(await meta.attribution("hms-smoke")).toBe("unavailable");
 		expect(await meta.attribution("other")).toBe("unavailable");
 		expect(getDatasetCatalog).toHaveBeenCalledTimes(1);
 	});

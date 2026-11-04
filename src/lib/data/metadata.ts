@@ -28,7 +28,7 @@ export interface MetadataProvider {
 const AIR_QUALITY = "air-quality";
 
 /** Datasets whose meta carries `scales` keyed by entry-type id. */
-const SCALE_DATASETS = ["hms", "calheatscore", "forecasts"] as const;
+const SCALE_DATASETS = ["hms-smoke", "hms-fire", "calheatscore", "forecasts"] as const;
 type ScaleDataset = (typeof SCALE_DATASETS)[number];
 
 function hasScales(dataset: string): dataset is ScaleDataset {
@@ -71,11 +71,14 @@ function memoize<T>(fetch: () => Promise<T>): (signal?: AbortSignal) => Promise<
 export function createDefaultMetadata(): MetadataProvider {
 	const monitorsMeta = memoize(() => getMonitorsMeta());
 	const catalog = memoize(() => getDatasetCatalog());
+	// The catalog splits HMS into two datasets; one meta carries both scales.
+	const hmsMeta = memoize(() => getHMSMeta());
 	const datasetScales: Record<
 		ScaleDataset,
 		ReturnType<typeof memoize<{ scales: Record<string, Scale> }>>
 	> = {
-		hms: memoize(() => getHMSMeta()),
+		"hms-smoke": hmsMeta,
+		"hms-fire": hmsMeta,
 		calheatscore: memoize(() => getCalHeatScoreMeta()),
 		forecasts: memoize(() => getForecastsMeta())
 	};
@@ -93,18 +96,13 @@ export function createDefaultMetadata(): MetadataProvider {
 		}
 	}
 
-	/**
-	 * The catalog's display precision for an entry type, or null. The catalog splits some datasets
-	 * (`hms` into `hms-smoke` and `hms-fire`), so `${dataset}-…` datasets are searched too. Only
-	 * the caller's abort rejects.
-	 */
+	/** The catalog's display precision for an entry type, or null. Only the caller's abort rejects. */
 	async function precisionOf(ref: ScaleRef, signal?: AbortSignal): Promise<number | null> {
 		try {
 			const { datasets } = await catalog(signal);
 			const entry = datasets
-				.filter((d) => d.id === ref.dataset || d.id.startsWith(`${ref.dataset}-`))
-				.flatMap((d) => d.entry_types)
-				.find((e) => e.id === ref.entryType);
+				.find((d) => d.id === ref.dataset)
+				?.entry_types.find((e) => e.id === ref.entryType);
 			const precision = entry?.display?.precision;
 			return typeof precision === "number" ? precision : null;
 		} catch (error) {
