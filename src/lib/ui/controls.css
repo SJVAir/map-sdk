@@ -38,3 +38,8 @@
 		transition-duration: 0s;
 	}
 }
+
+/* The engine's credits keep its colors; links get an underline so color isn't the only cue. */
+.mapsdk-map .maplibregl-ctrl-attrib a {
+	text-decoration: underline;
+}

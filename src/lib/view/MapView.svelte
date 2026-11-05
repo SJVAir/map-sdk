@@ -13,7 +13,8 @@
 	import MapTooltip from "../ui/MapTooltip.svelte";
 	import SelectionBar from "../ui/SelectionBar.svelte";
 	import ViewSummary from "../ui/ViewSummary.svelte";
-	import { createGlMap, watchTheme } from "./create-gl-map.js";
+	import { createDataCredits } from "../ui/data-credits.svelte.js";
+	import { createGlMap, setDataCredits, watchTheme } from "./create-gl-map.js";
 
 	interface Props {
 		/** The map to show. Fixed for the component's life. */
@@ -79,6 +80,13 @@
 			}
 		});
 	}
+
+	const dataCredits = createDataCredits(firstMap);
+	// The dataset credits go in the engine's attribution control; it is replaced when they change.
+	$effect(() => {
+		const credits = dataCredits.list;
+		if (projector) untrack(() => setDataCredits(projector!, credits));
+	});
 
 	let root: HTMLDivElement;
 	let glContainer: HTMLDivElement;

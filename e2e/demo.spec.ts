@@ -107,6 +107,16 @@ test("both maps render a canvas", async ({ page }) => {
 	await expect(rightMap(page).locator("canvas")).toBeVisible();
 });
 
+test("credits line is present", async ({ page }) => {
+	for (const map of [leftMap(page), rightMap(page)]) {
+		const credits = map.locator(".maplibregl-ctrl-attrib");
+		await expect(credits).toHaveCount(1);
+		await expect(credits).toContainText("© MapTiler");
+		await expect(credits).toContainText("© OpenStreetMap contributors");
+	}
+	await expect(page.locator("img[src*='logo.svg']")).toHaveCount(0);
+});
+
 test("the live map shows the same monitors from the live store", async ({ page }) => {
 	const list = await openList(rightMap(page));
 	await expect(list.getByRole("option", { name: /Fixture Alpha/ })).toBeVisible();
@@ -240,9 +250,9 @@ test("keyboard only: Tab reaches the map, the List button, and the list; Space s
 	}
 
 	await tabUntil(left.locator("canvas"));
-	await page.keyboard.press(tab);
+	// The credits' links sit between the canvas and the List button.
 	const button = left.getByRole("button", { name: "List of features on the map" });
-	await expect(button).toBeFocused();
+	await tabUntil(button, 5);
 	await page.keyboard.press("Enter");
 	const list = left.getByRole("listbox", { name: "Features on the map" });
 	await expect(list.getByRole("option", { name: /Fixture Alpha/ })).toBeVisible();
