@@ -28,6 +28,13 @@
 		overlays?: Snippet;
 		/** `false` leaves out the List button and its feature list panel. */
 		featureList?: boolean;
+		/** `false` leaves out the selection bar. */
+		selectionBar?: boolean;
+		/**
+		 * The zoom controls: `"mapsdk"` (default) draws map-sdk's zoom buttons, `"engine"` the
+		 * engine's zoom, compass, and locate-me buttons, `"none"` none. The credits always show.
+		 */
+		controls?: "mapsdk" | "engine" | "none";
 	}
 
 	let {
@@ -36,7 +43,9 @@
 		class: className,
 		label,
 		overlays,
-		featureList = true
+		featureList = true,
+		selectionBar = true,
+		controls = "mapsdk"
 	}: Props = $props();
 
 	const uid = $props.id();
@@ -105,8 +114,9 @@
 	$effect(() => {
 		if (!active) return;
 		const ctx = map;
+		const engine = controls === "engine";
 		const gl = untrack(() => {
-			const gl = createGlMap(glContainer, ctx);
+			const gl = createGlMap(glContainer, ctx, engine);
 			try {
 				ctx.attach(gl);
 			} catch (error) {
@@ -189,9 +199,13 @@
 		</div>
 	{/if}
 	<!-- After the list, so Tab reaches the List button first. -->
-	<SelectionBar {map} />
+	{#if selectionBar}
+		<SelectionBar {map} />
+	{/if}
 	<ViewSummary {map} />
-	<MapControls {map} gl={projector} />
+	{#if controls === "mapsdk"}
+		<MapControls {map} gl={projector} />
+	{/if}
 	{@render overlays?.()}
 </div>
 

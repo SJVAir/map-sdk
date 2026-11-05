@@ -3,7 +3,7 @@
 Svelte 5 map components for SJVAir air-quality data, built on the MapTiler SDK. A map is a
 `createMap()` context, shown with `<MapView>`, with data drawn by plugins (monitors, region fills,
 CalHeatScore, forecast zones, HMS smoke and fire, or your own GeoJSON). It ships a legend, a
-feature list, a selection bar, tooltips, and basemap controls, all themed from the host's tokens.
+feature list, a selection bar, tooltips, and zoom controls, all themed from the host's tokens.
 
 Supported browsers: Chrome/Edge 111+, Safari 16.4+, Firefox 128+. MIT licensed.
 
@@ -112,8 +112,11 @@ Standard (no fallback, must exist): `--background`, `--foreground`, `--card`, `-
 
 `createMap(options)` returns the map's state and services (`MapContext`) with no GL map yet;
 `MapView` creates the GL map when it mounts. `MapView` draws the tooltip, selection bar, view
-summary, basemap/zoom controls, credits, and the List button with its feature list
-(`featureList={false}` leaves them out). Anything else goes in the `overlays` snippet, where
+summary, zoom buttons, and the List button with its feature list, and the engine draws the
+credits. `featureList={false}` leaves out the List button and its panel, and `selectionBar={false}`
+the selection bar. `controls` picks the zoom controls: `"mapsdk"` (default) draws map-sdk's zoom
+buttons, `"engine"` the engine's zoom, compass, and locate-me buttons (top right), and `"none"`
+none; the credits show in every case. Anything else goes in the `overlays` snippet, where
 `getMapContext()` returns the map. `config.basemaps` replaces the default MapTiler Streets v4
 variants; `config.initialView` and `config.cooperativeGestures` set the camera and gesture handling.
 `config.projection` (`"mercator"` by default, or `"globe"`) and `config.space` (`false` by default, or
