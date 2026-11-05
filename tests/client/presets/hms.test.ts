@@ -95,6 +95,24 @@ describe("hmsSmokePlugin", () => {
 	});
 });
 
+describe("hmsSmokePlugin outline", () => {
+	it("hmsSmokePlugin uses level outline", () => {
+		const source = new TestSource<Props>({ features: SMOKE, scale: smokeScale });
+		const map = createMap({ config: { maptilerKey: "test-key" } });
+		map.addPlugin(hmsSmokePlugin({ source, layerLabel: "Smoke" }));
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		flushSync();
+		const outline = gl.layers.find((l) => l.id.endsWith(":outline")) as Extract<
+			LayerSpecification,
+			{ type: "line" }
+		>;
+		expect(evaluate(outline.paint!["line-color"], { value: "heavy" })).toBe("#333634");
+		expect(evaluate(outline.paint!["line-color"], { value: "light" })).toBe("#bfc8c3");
+		expect(evaluate(outline.paint!["line-opacity"], { value: "medium" }, "number")).toBe(0.3);
+	});
+});
+
 describe("hmsFirePlugin", () => {
 	const ref = { dataset: "hms-fire", entryType: "fire-frp" };
 

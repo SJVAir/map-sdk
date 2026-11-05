@@ -11,7 +11,7 @@ export interface HmsSmokePluginOptions {
 }
 
 /**
- * NOAA HMS smoke plumes: polygons filled and outlined by density, using each level's opacity.
+ * NOAA HMS smoke plumes: polygons filled and outlined (`outline: "level"`) by density, using each level's opacity.
  * Not selectable; listed (each plume a row with its density level), so plumes can be reached
  * without a mouse.
  *
@@ -25,6 +25,7 @@ export function hmsSmokePlugin(options: HmsSmokePluginOptions): MapPlugin {
 		source: options.source,
 		layerLabel: options.layerLabel,
 		mode: "choropleth",
-		selectable: false
+		selectable: false,
+		outline: "level"
 	});
 }
