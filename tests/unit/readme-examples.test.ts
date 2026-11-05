@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createMap, monitorsPlugin, regionsPlugin, shapesPlugin } from "../../src/lib/index.js";
+import {
+	createMap,
+	maptilerMap,
+	monitorsPlugin,
+	regionsPlugin,
+	shapesPlugin
+} from "../../src/lib/index.js";
 import type { FeatureListItem, MapContext, MapPlugin, PluginContext } from "../../src/lib/index.js";
 import {
 	decodeRef,
@@ -31,6 +37,13 @@ describe("README examples", () => {
 		expect(map.plugins.map((p) => p.id)).toEqual(["monitors"]);
 		map.destroy();
 		store.dispose();
+	});
+
+	it("maptilerMap is null while detached", () => {
+		const map = createMap({ config: { maptilerKey: "your-maptiler-key" } });
+		expect(map.ready).toBe(false);
+		expect(maptilerMap(map)).toBeNull();
+		map.destroy();
 	});
 
 	it("static GeoJSON through shapesPlugin and staticSource", () => {

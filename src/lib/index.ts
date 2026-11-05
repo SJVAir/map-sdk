@@ -64,6 +64,14 @@ export type {
 } from "./core/create-map.svelte.js";
 
 /**
+ * The attached MapTiler `Map`, or `null` while detached: an escape hatch for markers and popups
+ * only. The host must never add sources or layers through it; plugins own those.
+ */
+export function maptilerMap(map: MapContext): import("@maptiler/sdk").Map | null {
+	return map.gl as unknown as import("@maptiler/sdk").Map | null;
+}
+
+/**
  * Creates a map's state and services; show it with `<MapView map={…} />`. Without
  * `config.basemaps`, the basemaps are MapTiler Streets v4 and its variants, as on today's map.
  */

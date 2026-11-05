@@ -265,6 +265,22 @@ map.flyTo({ center: [-119.7, 36.7], zoom: 16 });
 map.easeTo({ center: monitor.lngLat, minZoom: 12 });
 ```
 
+## Ready, and reaching the GL map
+
+`map.ready` is reactive: true once the attached map's style has loaded and the map has gone idle
+for the first time, false again on detach and while a basemap switch reloads the style. Show a load
+screen until it is true. `map.gl` is the attached GL map (or `null`), reactive.
+
+`maptilerMap(map)` returns it as a MapTiler `Map` (or `null` while detached). It is an escape hatch
+for markers and popups only: never add sources or layers through it, because plugins own those.
+
+```ts
+import { maptilerMap } from "@sjvair/map-sdk";
+
+const gl = maptilerMap(map);
+if (gl) new Marker().setLngLat(lngLat).addTo(gl);
+```
+
 ## Providers
 
 `createMap` takes three optional providers, so a host controls where its labels and metadata come

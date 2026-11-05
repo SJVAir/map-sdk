@@ -85,6 +85,19 @@ export interface MapContext {
 	/** Reactive. */
 	readonly attached: boolean;
 	/**
+	 * Reactive. True once the attached map's style has loaded and the map has gone idle for the
+	 * first time; false again on `detach()` and while a basemap switch reloads the style. A load
+	 * screen can wait for it.
+	 */
+	readonly ready: boolean;
+	/**
+	 * Reactive. The attached GL map, or `null`. For markers and popups only (see `maptilerMap`);
+	 * never add sources or layers through it.
+	 */
+	readonly gl: GlMapLike | null;
+	/** For `MapView`: marks the attached map ready. Does nothing while detached. */
+	markReady(): void;
+	/**
 	 * Adds a plugin on top, or below `options.before`. Throws if a plugin with the same id is
 	 * already added, if `before` names no added plugin, if the same plugin object is set up on
 	 * another map (create one plugin per map), or after `destroy()`.
@@ -228,6 +241,8 @@ class MapContextImpl implements MapContext {
 	#camera = $state.raw<CameraState>(DEFAULT_VIEW);
 	#bounds = $state.raw<Bounds | null>(null);
 	#attached = $state(false);
+	#ready = $state(false);
+	#glState = $state.raw<GlMapLike | null>(null);
 	#focusedKey = $state<string | null>(null);
 	#focusedPluginId = $state<string | null>(null);
 	#selections = new SvelteMap<string, PluginSelection>();
@@ -273,6 +288,18 @@ class MapContextImpl implements MapContext {
 
 	get attached(): boolean {
 		return this.#attached;
+	}
+
+	get ready(): boolean {
+		return this.#ready;
+	}
+
+	get gl(): GlMapLike | null {
+		return this.#glState;
+	}
+
+	markReady(): void {
+		if (this.#gl) this.#ready = true;
 	}
 
 	get focusedKey(): string | null {
@@ -439,12 +466,16 @@ class MapContextImpl implements MapContext {
 		if (this.#gl === gl) return;
 		if (this.#gl) this.detach();
 		this.#gl = gl;
+		this.#glState = gl;
 		this.#host.attach(gl);
 		this.#router.attach(gl);
 		this.basemap.attach(
 			gl,
 			() => this.#host.restyle(),
-			() => this.#host.suspend()
+			() => {
+				this.#ready = false;
+				this.#host.suspend();
+			}
 		);
 		this.#attached = true;
 	}
@@ -455,7 +486,9 @@ class MapContextImpl implements MapContext {
 		this.basemap.detach();
 		this.#host.detach();
 		this.#gl = null;
+		this.#glState = null;
 		this.#attached = false;
+		this.#ready = false;
 	}
 
 	themeChanged(): void {

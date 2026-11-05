@@ -111,10 +111,30 @@
 		gl.on("move", onMove);
 		gl.on("resize", onMove);
 		projector = gl;
+		// Ready is the first idle after each style load (the first style, and every basemap switch).
+		// A wait still pending when the style is replaced or the map detached is dropped, so a stale
+		// idle never marks the context ready.
+		let stopWaiting: (() => void) | null = null;
+		const waitForIdle = () => {
+			stopWaiting?.();
+			const onIdle = () => {
+				stopWaiting?.();
+				if (ctx.gl === gl) ctx.markReady();
+			};
+			stopWaiting = () => {
+				gl.off("idle", onIdle);
+				stopWaiting = null;
+			};
+			gl.on("idle", onIdle);
+		};
+		gl.on("style.load", waitForIdle);
+		waitForIdle();
 		// Plugins bake theme colors into paint and images, so they set up again on a change.
 		const stopTheme = watchTheme(root, () => ctx.themeChanged());
 		return () => {
 			stopTheme();
+			gl.off("style.load", waitForIdle);
+			stopWaiting?.();
 			projector = null;
 			gl.off("move", onMove);
 			gl.off("resize", onMove);

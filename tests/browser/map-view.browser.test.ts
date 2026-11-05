@@ -131,6 +131,25 @@ describe("MapView", () => {
 		expect(container.querySelector("canvas")).toBeNull();
 	});
 
+	it("sets ready after the first idle", async () => {
+		const map = newMap();
+		const attached = trackAttach(map);
+		expect(map.ready).toBe(false);
+		await render(MapView, { map, class: "test-map" });
+		await vi.waitFor(() => expect(map.ready).toBe(true));
+		expect(map.gl).toBe(attached[0]);
+	});
+
+	it("goes back to not ready when unmounted before the first idle", async () => {
+		const map = newMap();
+		const { unmount } = await render(MapView, { map, class: "test-map" });
+		unmount();
+		expect(map.ready).toBe(false);
+		expect(map.gl).toBeNull();
+		await new Promise((r) => setTimeout(r, 300));
+		expect(map.ready).toBe(false);
+	});
+
 	it("marks its container with the map's uid", async () => {
 		const map = newMap();
 		const { container } = await render(MapView, { map, class: "test-map" });
