@@ -55,6 +55,7 @@ export type { BasemapConfig } from "./core/basemap.svelte.js";
 export type {
 	Bounds,
 	CameraState,
+	CameraTarget,
 	CreateMapOptions,
 	FeatureClickHandler,
 	MapConfig,

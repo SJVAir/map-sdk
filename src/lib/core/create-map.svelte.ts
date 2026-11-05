@@ -50,7 +50,20 @@ export interface PluginOptions {
 	onselectionchange?(sel: SpatialSelection | null): void;
 }
 
-export type FeatureClickHandler = (e: { pluginId: string; ref: FeatureRef }) => void;
+export type FeatureClickHandler = (e: {
+	pluginId: string;
+	ref: FeatureRef;
+	/** The click point; for a pick in the feature list, the item's position. */
+	lngLat: [number, number];
+}) => void;
+
+/** Where a camera move ends up. `zoom` wins over `minZoom`. */
+export interface CameraTarget {
+	center: [number, number];
+	zoom?: number;
+	/** Zoom to at least this: the move's zoom is `max(current zoom, minZoom)`. */
+	minZoom?: number;
+}
 
 /** A map's state and services, independent of whether a GL map currently exists. */
 export interface MapContext {
@@ -134,6 +147,12 @@ export interface MapContext {
 	 * centers the feature in the part of the map the feature list panel leaves clear.
 	 */
 	focusFeature(refKey: string | null, pluginId?: string): void;
+	/** Eases the camera to `target` (no animation under reduced motion). Does nothing while detached. */
+	easeTo(target: CameraTarget): void;
+	/** Like `easeTo`, with a flying animation. */
+	flyTo(target: CameraTarget): void;
+	/** Fits the camera to `bounds` (no animation under reduced motion). Does nothing while detached. */
+	fitBounds(bounds: Bounds, options?: { padding?: number; maxZoom?: number }): void;
 	/** Reactive. */
 	readonly focusedKey: string | null;
 	/** Reactive. The plugin `focusFeature` was given with `focusedKey`, or `null`. */
@@ -319,7 +338,7 @@ class MapContextImpl implements MapContext {
 		if (this.#destroyed) return;
 		const found = untrack(() => this.#findItem(refKey, pluginId));
 		if (!found) return;
-		this.#emitClick(pluginId, found.item.ref);
+		this.#emitClick(pluginId, found.item.ref, found.item.lngLat);
 		if (found.item.selectable) this.#applyPick(pluginId, found.item.ref, additive);
 	}
 
@@ -378,6 +397,43 @@ class MapContextImpl implements MapContext {
 		});
 	}
 
+	#cameraOptions(target: CameraTarget, gl: GlMapLike) {
+		const zoom =
+			target.zoom ??
+			(target.minZoom === undefined ? undefined : Math.max(gl.getZoom(), target.minZoom));
+		return {
+			center: target.center,
+			...(zoom !== undefined && { zoom }),
+			...(prefersReducedMotion() && { duration: 0 })
+		};
+	}
+
+	easeTo(target: CameraTarget): void {
+		const gl = this.#destroyed ? null : this.#gl;
+		if (gl) gl.easeTo(this.#cameraOptions(target, gl));
+	}
+
+	flyTo(target: CameraTarget): void {
+		const gl = this.#destroyed ? null : this.#gl;
+		if (gl) gl.flyTo(this.#cameraOptions(target, gl));
+	}
+
+	fitBounds(bounds: Bounds, options: { padding?: number; maxZoom?: number } = {}): void {
+		const gl = this.#destroyed ? null : this.#gl;
+		if (!gl) return;
+		gl.fitBounds(
+			[
+				[bounds.west, bounds.south],
+				[bounds.east, bounds.north]
+			],
+			{
+				...(options.padding !== undefined && { padding: options.padding }),
+				...(options.maxZoom !== undefined && { maxZoom: options.maxZoom }),
+				...(prefersReducedMotion() && { duration: 0 })
+			}
+		);
+	}
+
 	attach(gl: GlMapLike): void {
 		this.#assertAlive();
 		if (this.#gl === gl) return;
@@ -430,14 +486,14 @@ class MapContextImpl implements MapContext {
 	#pick(e: ClickEvent): void {
 		if (this.#destroyed) return;
 		const [{ pluginId, ref }] = e.hits;
-		this.#emitClick(pluginId, ref);
+		this.#emitClick(pluginId, ref, e.lngLat);
 		this.#applyPick(pluginId, ref, e.additive);
 	}
 
-	#emitClick(pluginId: string, ref: FeatureRef): void {
+	#emitClick(pluginId: string, ref: FeatureRef, lngLat: [number, number]): void {
 		for (const handler of [...this.#featureClickHandlers]) {
 			try {
-				handler({ pluginId, ref });
+				handler({ pluginId, ref, lngLat });
 			} catch (error) {
 				console.error("map-sdk: a featureclick handler failed", error);
 			}

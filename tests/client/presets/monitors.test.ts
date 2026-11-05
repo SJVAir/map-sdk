@@ -273,7 +273,8 @@ describe("monitorsPlugin", () => {
 		await Promise.resolve();
 		expect(handler).toHaveBeenCalledWith({
 			pluginId: "monitors",
-			ref: { kind: "monitor", id: "4" }
+			ref: { kind: "monitor", id: "4" },
+			lngLat: [-119.5, 36.5]
 		});
 		expect(expansionZoom).not.toHaveBeenCalled();
 		expect(gl.calls).not.toContain("easeTo");

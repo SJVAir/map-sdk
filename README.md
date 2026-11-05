@@ -245,12 +245,25 @@ map.addPlugin(plugin, {
 in the selection bar, and a feature that appears later shows as selected. `map.getSelection(id)`
 and `getSelectionMode(id)` are reactive.
 
-`map.on("featureclick", ({ pluginId, ref }) => …)` fires for every click on a feature, whatever the
-mode, and also for a pick in the feature list, so keyboard users get the same event; it returns an
-unsubscribe function. For your own context menu, `map.featuresAt({ x, y })` returns the hits under
+`map.on("featureclick", ({ pluginId, ref, lngLat }) => …)` fires for every click on a feature,
+whatever the mode, and also for a pick in the feature list, so keyboard users get the same event;
+`lngLat` is the click point (the item's position for a list pick). It returns an unsubscribe
+function. For your own context menu, `map.featuresAt({ x, y })` returns the hits under
 a canvas point, topmost first, and `map.featureForElement(element)` returns the hit for a row of
 the feature list (an element with `data-mapsdk-ref`). Both return nothing while the map is
 detached.
+
+## Camera
+
+`map.easeTo({ center, zoom?, minZoom? })` and `map.flyTo(...)` move the camera; `minZoom` means "zoom
+in to at least this" (`max(current zoom, minZoom)`), and `zoom` wins when both are given.
+`map.fitBounds({ west, south, east, north }, { padding?, maxZoom? })` fits a box. All three do
+nothing while the map is detached or destroyed, and use no animation under `prefers-reduced-motion`.
+
+```ts
+map.flyTo({ center: [-119.7, 36.7], zoom: 16 });
+map.easeTo({ center: monitor.lngLat, minZoom: 12 });
+```
 
 ## Providers
 

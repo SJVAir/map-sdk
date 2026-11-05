@@ -16,6 +16,8 @@ export interface FakeGl extends GlMapLike {
 	readonly listeners: Array<{ type: string; layerId?: string; listener: Listener }>;
 	/** Every GlMapLike call, as `method:firstArg`. */
 	readonly calls: string[];
+	/** Every `easeTo`, `flyTo`, and `fitBounds`, with its options. */
+	readonly moves: Array<{ method: "easeTo" | "flyTo" | "fitBounds"; options: any }>;
 	/** The one canvas `getCanvas()` returns: a real `EventTarget`, so DOM listeners work. */
 	readonly canvas: HTMLCanvasElement;
 	/** Calls listeners for `type` (with `layerId`, only those registered on that layer). */
@@ -38,6 +40,7 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 	const featureStates = new Map<string, Record<string, unknown>>();
 	const listeners: FakeGl["listeners"] = [];
 	const calls: string[] = [];
+	const moves: FakeGl["moves"] = [];
 	let rendered: Rendered[] = [];
 	let center = { lng: -119.7, lat: 36.7 };
 	let zoom = 7;
@@ -63,6 +66,7 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 		featureStates,
 		listeners,
 		calls,
+		moves,
 		canvas,
 
 		addSource(id, source) {
@@ -218,8 +222,19 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 		},
 		easeTo(o) {
 			log("easeTo");
+			moves.push({ method: "easeTo", options: o });
 			if (o.center) center = { lng: o.center[0], lat: o.center[1] };
 			if (o.zoom !== undefined) zoom = o.zoom;
+		},
+		flyTo(o) {
+			log("flyTo");
+			moves.push({ method: "flyTo", options: o });
+			if (o.center) center = { lng: o.center[0], lat: o.center[1] };
+			if (o.zoom !== undefined) zoom = o.zoom;
+		},
+		fitBounds(b, o) {
+			log("fitBounds");
+			moves.push({ method: "fitBounds", options: { bounds: b, ...o } });
 		},
 		jumpTo(o) {
 			log("jumpTo");

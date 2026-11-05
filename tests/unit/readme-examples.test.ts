@@ -127,6 +127,8 @@ describe("README examples", () => {
 			return [hits, row];
 		};
 		expect(onContextMenu).toBeTypeOf("function");
+		map.flyTo({ center: [-119.7, 36.7], zoom: 16 });
+		map.easeTo({ center: [-119.7, 36.7], minZoom: 12 });
 		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["abc"] });
 		expect(decodeRef("monitor:abc")).toEqual({ kind: "monitor", id: "abc" });
 		off();

@@ -82,7 +82,8 @@ describe("picking", () => {
 		click(gl);
 		expect(handler).toHaveBeenCalledExactlyOnceWith({
 			pluginId: "monitors",
-			ref: { kind: "monitor", id: "7" }
+			ref: { kind: "monitor", id: "7" },
+			lngLat: [-119, 36]
 		});
 		expect(map.getSelection("monitors")).toBeNull();
 	});
@@ -431,7 +432,8 @@ describe("blocking layers", () => {
 		click(gl);
 		expect(handler).toHaveBeenCalledWith({
 			pluginId: "regions",
-			ref: { kind: "region", type: "county", code: "019" }
+			ref: { kind: "region", type: "county", code: "019" },
+			lngLat: [-119, 36]
 		});
 		expect(bubbleClicks).toEqual([]);
 	});

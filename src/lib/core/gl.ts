@@ -56,6 +56,11 @@ export interface GlMapLike {
 		/** Where `center` ends up, in pixels from the container's center (positive x is right). */
 		offset?: [number, number];
 	}): void;
+	flyTo(options: { center?: [number, number]; zoom?: number; duration?: number }): void;
+	fitBounds(
+		bounds: [[number, number], [number, number]],
+		options?: { padding?: number; maxZoom?: number; duration?: number }
+	): void;
 	jumpTo(options: {
 		center?: [number, number];
 		zoom?: number;
