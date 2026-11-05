@@ -31,6 +31,8 @@ export interface MonitorsPluginOptions {
 	layerLabel: string;
 	/** Default true, like the shape presets. */
 	selectable?: boolean;
+	/** "ring" (default): ring and check mark. "enlarge": the selected icon draws at 1.3x. */
+	selectedStyle?: "ring" | "enlarge";
 	/** Cluster each monitor type below zoom 9. Default true. */
 	clustered?: boolean;
 }
@@ -190,6 +192,7 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 		source: options.source,
 		layerLabel: options.layerLabel,
 		selectable: options.selectable ?? true,
+		selectedStyle: options.selectedStyle,
 		icon: {
 			category,
 			draw(cat, color) {

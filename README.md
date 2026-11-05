@@ -141,6 +141,10 @@ presets are `monitorsPlugin`, `regionsPlugin`, `calHeatScorePlugin`, `forecastZo
 are built on. Presets don't fetch: the host supplies a `DataSource`. `monitorsPlugin` is
 selectable by default, like the shape presets.
 
+Selected points show a highlight ring and check mark by default. `selectedStyle: "enlarge"` on
+`pointsPlugin` or `monitorsPlugin` instead draws the selected icon at 1.3x with no ring (icon
+points only), as sjvair.com's map does today.
+
 ## Data sources
 
 A `DataSource` is `{ status, features, scale }`: a load status (`loading`, `ready`, `error` with

@@ -60,6 +60,11 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	/** Already-translated layer name for the list and summary. */
 	layerLabel: string;
 	selectable?: boolean;
+	/**
+	 * How a selected feature shows. "ring" (default): a highlight ring and check mark over it.
+	 * "enlarge": the icon draws at 1.3x with no ring (icons only; circles are unchanged).
+	 */
+	selectedStyle?: "ring" | "enlarge";
 	icon?: {
 		category(props: P): string;
 		/**
@@ -107,6 +112,8 @@ const MUTED_IMAGE = "mapsdk:muted";
 
 /** Marker images are drawn at this multiple of their size and scaled down, for sharp HiDPI. */
 const IMAGE_RATIO = 2;
+/** The icon scale of a selected feature with `selectedStyle: "enlarge"`. */
+const ENLARGE = 1.3;
 const DEFAULT_RADIUS = 6;
 const UNCLUSTERED: FilterSpecification = ["!", ["has", "point_count"]];
 /**
@@ -117,6 +124,7 @@ const UNCLUSTERED: FilterSpecification = ["!", ["has", "point_count"]];
 export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOptions<P>): MapPlugin {
 	const { id: pluginId, source, layerLabel, icon, cluster } = options;
 	const selectable = options.selectable ?? false;
+	const enlarge = options.selectedStyle === "enlarge";
 	const groupOf = cluster?.groupBy ?? (() => "");
 
 	const scales = createScaleResolver(pluginId, layerLabel, source);
@@ -213,6 +221,8 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		const sources = new Map<string, string>();
 		/** Namespaced ids of the layers currently on the map, in draw order. */
 		let layers: string[] = [];
+		/** The subset of `layers` that draw the points themselves. */
+		let pointLayerIds: string[] = [];
 		const interactiveLayers = new Set<string>();
 		const clusterLayerIds = new Set<string>();
 		const images = new Set<string>();
@@ -308,6 +318,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				if (gl.getLayer(layerId)) gl.removeLayer(layerId);
 			}
 			layers = [];
+			pointLayerIds = [];
 			built = null;
 		}
 
@@ -417,8 +428,13 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				layers.push(layerId);
 				pointIds.push(layerId);
 			}
-			for (const group of groups) {
-				layers.push(ctx.addLayer(layerLocal("selected", group), overlayLayer(sources.get(group)!)));
+			pointLayerIds = pointIds;
+			if (!enlarge) {
+				for (const group of groups) {
+					layers.push(
+						ctx.addLayer(layerLocal("selected", group), overlayLayer(sources.get(group)!))
+					);
+				}
 			}
 			const fresh = pointIds.filter((layerId) => !interactiveLayers.has(layerId));
 			if (fresh.length) {
@@ -446,6 +462,21 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				}
 				applied.set(sourceId, want);
 			}
+			if (enlarge && icon) enlargeSelected(keys);
+		}
+
+		/** Sizes the selected keys' icons up. `icon-size` is a layout property: no feature-state. */
+		function enlargeSelected(keys: ReadonlySet<string>): void {
+			const size =
+				keys.size === 0
+					? 1 / IMAGE_RATIO
+					: [
+							"case",
+							["in", ["get", "refKey"], ["literal", [...keys]]],
+							ENLARGE / IMAGE_RATIO,
+							1 / IMAGE_RATIO
+						];
+			for (const layerId of pointLayerIds) gl.setLayoutProperty(layerId, "icon-size", size);
 		}
 
 		function render(reactive: FeatureCollection<Geometry, P> | null, scale: Resolved | null): void {
@@ -510,11 +541,13 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			applySelection(untrack(() => ctx.selectedKeys));
 		}
 
-		loadImage(
-			"selected",
-			selectedOverlay(theme.highlight, theme.highlightForeground, markerSize),
-			markerSize + 2 * SELECTED_OVERLAY_PADDING
-		);
+		if (!enlarge) {
+			loadImage(
+				"selected",
+				selectedOverlay(theme.highlight, theme.highlightForeground, markerSize),
+				markerSize + 2 * SELECTED_OVERLAY_PADDING
+			);
+		}
 
 		scales.track(ctx, () => dead);
 

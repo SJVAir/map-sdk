@@ -25,6 +25,7 @@ export interface GlMapLike {
 		target: { source: string; id: string | number },
 		state: Record<string, unknown>
 	): void;
+	setLayoutProperty(layerId: string, name: string, value: unknown): void;
 	removeFeatureState(target: { source: string; id?: string | number }, key?: string): void;
 	queryRenderedFeatures(
 		point: [number, number] | [[number, number], [number, number]],

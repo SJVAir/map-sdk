@@ -148,6 +148,13 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 			const key = stateKey(target.source, target.id);
 			featureStates.set(key, { ...featureStates.get(key), ...state });
 		},
+		setLayoutProperty(layerId, name, value) {
+			log("setLayoutProperty", layerId);
+			const layer = layers.find((l) => l.id === layerId);
+			if (!layer) throw new Error(`fake-gl: no layer ${layerId}`);
+			const spec = layer as { layout?: Record<string, unknown> };
+			spec.layout = { ...spec.layout, [name]: value };
+		},
 		removeFeatureState(target, key) {
 			log("removeFeatureState", target.source);
 			for (const k of [...featureStates.keys()]) {
