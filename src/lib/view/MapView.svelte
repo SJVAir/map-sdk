@@ -15,6 +15,12 @@
 	import ViewSummary from "../ui/ViewSummary.svelte";
 	import { createDataCredits } from "../ui/data-credits.svelte.js";
 	import { createGlMap, setDataCredits, watchTheme } from "./create-gl-map.js";
+	import {
+		cornerSides,
+		resolveFeatureList,
+		type FeatureListOptions,
+		type ListPosition
+	} from "./list-placement.js";
 
 	interface Props {
 		/** The map to show. Fixed for the component's life. */
@@ -26,8 +32,15 @@
 		label?: string;
 		/** On-screen pieces drawn over the map; they get the map through `getMapContext()`. */
 		overlays?: Snippet;
-		/** `false` leaves out the List button and its feature list panel. */
-		featureList?: boolean;
+		/**
+		 * The List button and its feature list panel: `false` leaves them out; `true` (default) or
+		 * options place them. `position` picks the corner (default `"top-left"`); the button stacks
+		 * below (or, in a bottom corner, above) the controls in that corner, and the open panel stops
+		 * short of the controls and credits at the far end of its side. `reveal: "focus"` shows the
+		 * button only while it or its open panel has keyboard focus (and the whole time the panel is
+		 * open); otherwise it's visually hidden but stays in the Tab order, like a skip link.
+		 */
+		featureList?: boolean | FeatureListOptions;
 		/** `false` leaves out the selection bar. */
 		selectionBar?: boolean;
 		/**
@@ -57,6 +70,9 @@
 		tooltip = "pinned"
 	}: Props = $props();
 
+	const list = $derived(resolveFeatureList(featureList));
+	const sides = $derived(list ? cornerSides(list.position) : null);
+
 	const uid = $props.id();
 	const listId = `${uid}-list`;
 	let listOpen = $state(false);
@@ -74,8 +90,60 @@
 			map.setListInset(0);
 			return;
 		}
-		map.setListInset(box.getBoundingClientRect().right - root.getBoundingClientRect().left);
+		const panel = box.getBoundingClientRect();
+		const mapBox = root.getBoundingClientRect();
+		if (sides?.horizontal === "right") map.setListInset(mapBox.right - panel.left, "right");
+		else map.setListInset(panel.right - mapBox.left, "left");
 	});
+
+	// How far the controls in the button's corner, and in the other corner on its side, reach in
+	// from the map's top or bottom edge (px, 0 when there are none), so the button stacks clear of
+	// the first and the open panel stops short of the second. Measured, since the engine's
+	// controls change size (the credits switch between compact and full; MapTiler's logo).
+	let nearExtent = $state(0);
+	let farExtent = $state(0);
+
+	function extent(corner: ListPosition): number {
+		const mapBox = root.getBoundingClientRect();
+		const top = corner.startsWith("top");
+		const sources: Element[] = [];
+		const engine = glContainer.querySelector(`.maplibregl-ctrl-${corner}`);
+		if (engine) sources.push(engine);
+		if (corner === "top-right" && controls === "mapsdk") {
+			const zoom = root.querySelector(".mapsdk-zoom");
+			if (zoom) sources.push(zoom);
+		}
+		let reach = 0;
+		for (const el of sources) {
+			const r = el.getBoundingClientRect();
+			if (r.height === 0) continue;
+			reach = Math.max(reach, top ? r.bottom - mapBox.top : mapBox.bottom - r.top);
+		}
+		return Math.max(0, reach);
+	}
+
+	$effect(() => {
+		const s = sides;
+		void projector;
+		void controls;
+		if (!s) return;
+		const measure = () => {
+			nearExtent = extent(`${s.vertical}-${s.horizontal}`);
+			farExtent = extent(s.far);
+		};
+		const observer = new ResizeObserver(measure);
+		observer.observe(root);
+		const corners = [`${s.vertical}-${s.horizontal}`, s.far].map((c) =>
+			glContainer.querySelector(`.maplibregl-ctrl-${c}`)
+		);
+		for (const el of [...corners, root.querySelector(".mapsdk-zoom")]) {
+			if (el) observer.observe(el);
+		}
+		measure();
+		return () => observer.disconnect();
+	});
+
+	const inset = (reach: number) => (reach > 0 ? `calc(${reach}px + 0.5rem)` : undefined);
 
 	function onListKeydown(e: KeyboardEvent) {
 		if (e.key !== "Escape") return;
@@ -185,8 +253,15 @@
 >
 	<div class="mapsdk-gl" bind:this={glContainer}></div>
 	<MapTooltip {map} {project} {width} {height} mode={tooltip} gl={projector} />
-	{#if featureList}
-		<div class="mapsdk-list-panel">
+	{#if list && sides}
+		<div
+			class="mapsdk-list-panel"
+			data-position={list.position}
+			data-reveal={list.reveal}
+			data-open={listOpen}
+			style:--mapsdk-list-near={inset(nearExtent)}
+			style:--mapsdk-list-far={inset(farExtent)}
+		>
 			<button
 				bind:this={listButton}
 				type="button"
@@ -209,7 +284,7 @@
 	{/if}
 	<!-- After the list, so Tab reaches the List button first. -->
 	{#if selectionBar}
-		<SelectionBar {map} />
+		<SelectionBar {map} clearRight={list?.position === "top-right" && controls === "none"} />
 	{/if}
 	<ViewSummary {map} />
 	{#if controls === "mapsdk"}
@@ -230,17 +305,35 @@
 		inset: 0;
 	}
 
+	/* In its corner: 0.75rem from the edges, or 0.5rem past the controls already there. The open
+	   panel also stops 0.5rem short of the controls at the far end of the side. */
 	.mapsdk-list-panel {
 		position: absolute;
-		top: 0.75rem;
-		left: 0.75rem;
 		z-index: 2;
 		display: flex;
 		flex-direction: column;
 		align-items: flex-start;
 		gap: 0.5rem;
-		max-height: calc(100% - 1.5rem);
+		max-height: calc(100% - var(--mapsdk-list-near, 0.75rem) - var(--mapsdk-list-far, 0.75rem));
 		pointer-events: none;
+	}
+
+	.mapsdk-list-panel[data-position^="top"] {
+		top: var(--mapsdk-list-near, 0.75rem);
+	}
+
+	.mapsdk-list-panel[data-position^="bottom"] {
+		bottom: var(--mapsdk-list-near, 0.75rem);
+		flex-direction: column-reverse;
+	}
+
+	.mapsdk-list-panel[data-position$="left"] {
+		left: 0.75rem;
+	}
+
+	.mapsdk-list-panel[data-position$="right"] {
+		right: 0.75rem;
+		align-items: flex-end;
 	}
 
 	.mapsdk-list-panel > div {

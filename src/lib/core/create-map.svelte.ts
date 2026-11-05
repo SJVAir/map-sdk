@@ -436,12 +436,7 @@ class MapContextImpl implements MapContext {
 			center: found.item.lngLat,
 			// The middle of the part the panel leaves clear. An offset, not padding: MapLibre keeps
 			// padding for later moves (zooms, the reported center), an offset applies to this one.
-			...(this.#listInset > 0 && {
-				offset: [((this.#listInsetSide === "left" ? 1 : -1) * this.#listInset) / 2, 0] as [
-					number,
-					number
-				]
-			}),
+			...(this.#listInset > 0 && { offset: [this.#listOffsetX(), 0] as [number, number] }),
 			...(prefersReducedMotion() && { duration: 0 })
 		});
 	}
@@ -515,6 +510,11 @@ class MapContextImpl implements MapContext {
 
 	themeChanged(): void {
 		if (this.#gl) this.#host.restyle();
+	}
+
+	/** Half the panel's width, toward the part of the map it leaves clear. */
+	#listOffsetX(): number {
+		return ((this.#listInsetSide === "left" ? 1 : -1) * this.#listInset) / 2;
 	}
 
 	setListInset(width: number, side: "left" | "right" = "left"): void {
