@@ -9,7 +9,7 @@
 
 	// Ported from monitor-map's CollocationTooltip: the reference monitor's reading beside its
 	// details, then the collocated monitor's with the box on the other side. Readings are whole
-	// numbers, as monitor-map's. The reference monitor's name is shown here, not above.
+	// numbers cut off, not rounded, as monitor-map's. The reference monitor's name is shown here, not above.
 
 	interface Props {
 		site: CollocationFeatureProperties;
@@ -41,7 +41,7 @@
 			role,
 			color: level?.color || null,
 			level: level ? level.label : messages("mapsdk_no_level"),
-			reading: n === null ? null : formatValue(n, 0, format),
+			reading: n === null ? null : formatValue(Math.trunc(n), 0, format),
 			subheading: interval ? messages("mapsdk_collocation_interval_avg", { interval }) : undefined,
 			at:
 				formatted && zone

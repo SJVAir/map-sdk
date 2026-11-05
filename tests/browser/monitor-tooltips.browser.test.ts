@@ -33,7 +33,7 @@ function item(value: FeatureListItem["value"]): FeatureListItem {
 }
 
 describe("MonitorTooltip", () => {
-	it("shows the rounded reading in a box with the scale's label, the time, and the level", async () => {
+	it("shows the whole-number reading in a box with the scale's label, the time, and the level", async () => {
 		render(MonitorTooltip, {
 			item: item(12.6),
 			timestamp: "2026-11-03T21:00:00Z",
@@ -43,12 +43,12 @@ describe("MonitorTooltip", () => {
 			interval: null
 		});
 		const text = document.body.textContent!.replace(/\s+/g, " ");
-		expect(text).toContain("PM2.5 13");
+		expect(text).toContain("PM2.5 12");
 		expect(text).toContain("Fresno Garland");
 		expect(text).toContain("Nov 3, 2026, 1:00 PM");
 		expect(text).toContain("Moderate");
 		expect(text).toMatch(/Last updated \d+ (minutes|hours|days?) ago/);
-		const box = page.getByText("13").element().parentElement!;
+		const box = page.getByText("12").element().parentElement!;
 		expect(getComputedStyle(box).backgroundColor).toBe("rgb(255, 255, 0)");
 		expect(getComputedStyle(box).color).toBe("rgb(0, 0, 0)");
 	});
@@ -62,8 +62,23 @@ describe("MonitorTooltip", () => {
 			format,
 			interval: null
 		});
-		expect(document.body.textContent!.replace(/\s+/g, " ")).toContain("PM2.5 13");
+		expect(document.body.textContent!.replace(/\s+/g, " ")).toContain("PM2.5 12");
 		expect(document.body.textContent).not.toContain("12.6");
+	});
+
+	it("cuts the reading off like monitor-map: 9.3 shows 9 in Moderate's color and label", async () => {
+		render(MonitorTooltip, {
+			item: { ...item(9.3), level: pm25Scale.levels[1] },
+			timestamp: null,
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			interval: null
+		});
+		expect(document.body.textContent!.replace(/\s+/g, " ")).toContain("PM2.5 9");
+		expect(document.body.textContent).toContain("Moderate");
+		const box = page.getByText("9", { exact: true }).element().parentElement!;
+		expect(getComputedStyle(box).backgroundColor).toBe("rgb(255, 255, 0)");
 	});
 
 	it("lays out the box left; time, bold underlined name, level, then the age on the right", async () => {
@@ -143,7 +158,7 @@ describe("MonitorTooltip with an empty-color level", () => {
 		});
 		await expect.element(page.getByText("Unknown")).toBeVisible();
 		expect(page.getByText("No level").elements()).toHaveLength(0);
-		const box = page.getByText("13").element().parentElement!;
+		const box = page.getByText("12").element().parentElement!;
 		expect(getComputedStyle(box).backgroundColor).not.toBe("rgb(255, 255, 0)");
 	});
 });
@@ -318,7 +333,7 @@ describe("CollocationTooltip", () => {
 			colocatedInterval: "2 min"
 		});
 		const text = document.body.textContent!.replace(/\s+/g, " ");
-		expect(text).toContain("PM2.5 13 (1 hour avg)");
+		expect(text).toContain("PM2.5 12 (1 hour avg)");
 		expect(text).toContain("PM2.5 40 (2 min avg)");
 		expect(text).toContain("Nov 3, 2026, 1:00 PM");
 		expect(text).toContain("Nov 3, 2026, 1:02 PM");
@@ -329,7 +344,7 @@ describe("CollocationTooltip", () => {
 		expect(text).toContain("Moderate");
 		expect(text).toContain("Unhealthy for Sensitive Groups");
 		expect(text.match(/Last updated \d+ (minutes|hours|days?) ago/g)).toHaveLength(2);
-		const reference = page.getByText("13").element().parentElement!;
+		const reference = page.getByText("12").element().parentElement!;
 		expect(getComputedStyle(reference).backgroundColor).toBe("rgb(255, 255, 0)");
 		const colocated = page.getByText("40").element().parentElement!;
 		expect(getComputedStyle(colocated).backgroundColor).toBe("rgb(255, 126, 0)");
