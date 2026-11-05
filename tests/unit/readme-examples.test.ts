@@ -205,7 +205,9 @@ describe("README examples", () => {
 		const fires = createHmsFireStore();
 		const map = createMap({ config: { maptilerKey: "your-maptiler-key" } });
 		map.addPlugin(hmsSmokePlugin({ source: smoke.dataSource, layerLabel: "Smoke" }));
-		map.addPlugin(hmsFirePlugin({ source: fires.groups, layerLabel: "Fires" }));
+		map.addPlugin(
+			hmsFirePlugin({ source: fires.groups, hotspots: fires.hotspots, layerLabel: "Fires" })
+		);
 		expect(map.plugins.map((p) => p.id)).toEqual(["hms-smoke", "hms-fire"]);
 		smoke.dispose();
 		fires.dispose();

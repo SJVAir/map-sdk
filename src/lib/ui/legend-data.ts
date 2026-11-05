@@ -18,35 +18,6 @@ export type LegendEntry =
 	| { kind: "scale"; section: LegendSection }
 	| { kind: "status"; pluginId: string; layer: string; status: DataStatus };
 
-/** Equal for entries that would read the same: same title, units and bar; or layer and status. */
-function entryKey(entry: LegendEntry): string {
-	if (entry.kind === "scale") {
-		const { title, units, bar } = entry.section;
-		return JSON.stringify(["scale", title, units, bar]);
-	}
-	const { status } = entry;
-	return JSON.stringify([
-		"status",
-		entry.layer,
-		status.state,
-		status.state === "unavailable" ? status.reason : ""
-	]);
-}
-
-/**
- * Drops an entry identical to an earlier one (two plugins reporting the same legend, such as fire
- * groups and hotspots), keeping the first.
- */
-export function dropDuplicateEntries(entries: LegendEntry[]): LegendEntry[] {
-	const seen = new Set<string>();
-	return entries.filter((entry) => {
-		const key = entryKey(entry);
-		if (seen.has(key)) return false;
-		seen.add(key);
-		return true;
-	});
-}
-
 /** One legend section from a plugin's legend data; null for status-only data or no levels. */
 export function legendSection(data: LegendData, format: FormatProvider): LegendSection | null {
 	if (!("scale" in data)) return null;

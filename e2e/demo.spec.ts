@@ -143,7 +143,7 @@ test("the monitor-map setup map renders its layers, engine controls and legend",
 	const list = await openList(map);
 	await expect(list.getByRole("option", { name: /Fixture Alpha/ })).toBeVisible();
 	await expect(list.getByRole("option", { name: /Fixture Collocation Site/ })).toBeVisible();
-	// Legend: top-first (pollutant, then fire once, then smoke).
+	// Legend: top-first (pollutant, then the one fire section, then smoke).
 	const headings = todayPanel(page).getByRole("heading", { level: 3 });
 	await expect(headings.filter({ hasText: /^Fires/ })).toHaveCount(1);
 	const texts = await headings.allTextContents();

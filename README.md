@@ -153,11 +153,12 @@ in each level's color at the fill's opacity; choropleth only), or `"none"` (no o
 
 `zoomRange: { min?, max? }` on `pointsPlugin` limits every layer it draws (points, clusters,
 selection) to zooms from `min` (inclusive) up to `max` (exclusive), switching live while zooming.
-`hmsFirePlugin` takes `zoomRange` and `listed` (default true; false keeps its fires out of the
-keyboard list). To show fire groups below zoom 10 and single hotspots from it, add two plugins:
-`hmsFirePlugin({ id: "hms-fire-groups", zoomRange: { max: 10 }, ... })` fed by `groupFires`, and
-`hmsFirePlugin({ id: "hms-fire-hotspots", zoomRange: { min: 10 }, listed: false, ... })` fed by
-`cleanFires` (both also from `@sjvair/map-sdk/stores`).
+
+`hmsFirePlugin({ id?, source, hotspots?, layerLabel })` draws fires as flame icons sized and
+colored by FRP. With `hotspots`, it switches by itself while zooming, as sjvair.com's map does:
+`source` (the fire store's `groups`) below zoom 10 and `hotspots` from zoom 10. It stays one
+layer: one legend section, one feature list (the groups, so keyboard users reach every fire;
+hotspots aren't listed), and tooltips for both.
 
 `legendDisplay: "gradient" | "blocks"` on `pointsPlugin` sets how the legend draws a range scale
 (default a gradient; `hmsFirePlugin` uses `"blocks"`, labeled with the levels' own labels). A blocks
@@ -166,8 +167,7 @@ each level's label under its segment; long labels wrap. `legendTitle: "layer" | 
 the legend section's title: `layerLabel` (default) or the entry type's label from the metadata
 provider (`monitorsPlugin` uses the latter, so its section reads "PM2.5"; `layerLabel` still names
 the layer in the list, selection bar and summary). `Legend` takes `order` (`"bottom-first"`,
-default, or `"top-first"`), and shows a section identical to one already shown (same title, units
-and bar, as with the two fire plugins) only once.
+default, or `"top-first"`).
 
 `collocationSitesPlugin({ id?, source, layerLabel })` draws collocation sites as sjvair.com does:
 each at its reference monitor, in that monitor's shape and level color (inactive gray, inside
@@ -206,15 +206,17 @@ today's NOAA HMS smoke and fire once, with no polling. Each has `status`, `init(
 A day with no data is `ready` with an empty collection, so the legend still shows. The smoke store
 has one `dataSource` for `hmsSmokePlugin` (scale `hms-smoke` / `smoke-density`, value the density).
 The fire store has `groups` (nearby detections merged by `groupFires`, value the mean FRP) and
-`hotspots` (each detection after `cleanFires`, value its FRP), both for `hmsFirePlugin` (scale
-`hms-fire` / `fire-frp`). Pass `{ messages }` to name the features with your own provider.
+`hotspots` (each detection after `cleanFires`, value its FRP), for `hmsFirePlugin`'s `source` and
+`hotspots` (scale `hms-fire` / `fire-frp`). Pass `{ messages }` to name the features with your own provider.
 
 ```ts
 const smoke = createHmsSmokeStore();
 const fires = createHmsFireStore();
 await Promise.all([smoke.init(), fires.init()]);
 map.addPlugin(hmsSmokePlugin({ source: smoke.dataSource, layerLabel: "Smoke" }));
-map.addPlugin(hmsFirePlugin({ source: fires.groups, layerLabel: "Fires" }));
+map.addPlugin(
+	hmsFirePlugin({ source: fires.groups, hotspots: fires.hotspots, layerLabel: "Fires" })
+);
 ```
 
 `createCollocationSitesStore({ monitors })` (also from `@sjvair/map-sdk/stores`) loads the

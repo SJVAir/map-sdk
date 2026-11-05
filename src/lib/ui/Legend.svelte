@@ -4,7 +4,7 @@
 	import type { MapContext } from "../core/create-map.svelte.js";
 	import { watchTheme } from "../view/create-gl-map.js";
 	import LegendBar from "./LegendBar.svelte";
-	import { dropDuplicateEntries, legendSection, type LegendEntry } from "./legend-data.js";
+	import { legendSection, type LegendEntry } from "./legend-data.js";
 
 	let {
 		map,
@@ -22,23 +22,21 @@
 
 	/**
 	 * A section per plugin with a scale, and a status line per plugin still loading or failing, in
-	 * `order`; an entry identical to an earlier one is dropped.
+	 * `order`.
 	 */
 	const entries = $derived(
-		dropDuplicateEntries(
-			(order === "top-first" ? [...map.plugins].reverse() : map.plugins).flatMap(
-				(plugin): LegendEntry[] => {
-					const data = plugin.legend?.();
-					if (!data) return [];
-					if ("status" in data) {
-						if (data.status.state === "ready") return [];
-						const layer = plugin.label ?? plugin.id;
-						return [{ kind: "status", pluginId: data.pluginId, layer, status: data.status }];
-					}
-					const section = legendSection(data, map.format);
-					return section ? [{ kind: "scale", section }] : [];
+		(order === "top-first" ? [...map.plugins].reverse() : map.plugins).flatMap(
+			(plugin): LegendEntry[] => {
+				const data = plugin.legend?.();
+				if (!data) return [];
+				if ("status" in data) {
+					if (data.status.state === "ready") return [];
+					const layer = plugin.label ?? plugin.id;
+					return [{ kind: "status", pluginId: data.pluginId, layer, status: data.status }];
 				}
-			)
+				const section = legendSection(data, map.format);
+				return section ? [{ kind: "scale", section }] : [];
+			}
 		)
 	);
 

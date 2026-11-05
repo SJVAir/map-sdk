@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDefaultFormat } from "../../../src/lib/data/format.js";
-import {
-	dropDuplicateEntries,
-	legendSection,
-	type LegendEntry,
-	swatchOverBackground
-} from "../../../src/lib/ui/legend-data.js";
+import { legendSection, swatchOverBackground } from "../../../src/lib/ui/legend-data.js";
 import { burnScale, pm25Scale, smokeScale } from "../../fixtures/scales.js";
 
 const format = createDefaultFormat();
@@ -82,39 +77,5 @@ describe("swatchOverBackground", () => {
 			format
 		);
 		expect(section?.bar.kind).toBe("gradient");
-	});
-});
-
-describe("dropDuplicateEntries", () => {
-	const scaleEntry = (pluginId: string, scale = pm25Scale, title = "PM2.5"): LegendEntry => ({
-		kind: "scale",
-		section: legendSection({ pluginId, title, units: scale.units, scale }, format)!
-	});
-	const statusEntry = (pluginId: string, state: "loading" | "unavailable"): LegendEntry => ({
-		kind: "status",
-		pluginId,
-		layer: "Fires",
-		status: state === "loading" ? { state } : { state, reason: "scale" }
-	});
-
-	it("keeps the first of identical scale sections", () => {
-		const out = dropDuplicateEntries([scaleEntry("a"), scaleEntry("b")]);
-		expect(out.map((e) => (e.kind === "scale" ? e.section.pluginId : ""))).toEqual(["a"]);
-	});
-
-	it("keeps sections with different scales or titles", () => {
-		expect(dropDuplicateEntries([scaleEntry("a"), scaleEntry("b", smokeScale)])).toHaveLength(2);
-		expect(
-			dropDuplicateEntries([scaleEntry("a"), scaleEntry("b", pm25Scale, "Other")])
-		).toHaveLength(2);
-	});
-
-	it("drops identical status entries only", () => {
-		const out = dropDuplicateEntries([
-			statusEntry("a", "loading"),
-			statusEntry("b", "loading"),
-			statusEntry("c", "unavailable")
-		]);
-		expect(out.map((e) => (e.kind === "status" ? e.pluginId : ""))).toEqual(["a", "c"]);
 	});
 });

@@ -271,26 +271,17 @@
 	});
 
 	onMount(() => {
-		// Bottom to top, as monitor-map draws: smoke, fire (groups, then hotspots by zoom),
-		// collocation sites, monitors.
+		// Bottom to top, as monitor-map draws: smoke, fire (groups below zoom 10, hotspots from
+		// it), collocation sites, monitors.
 		today.addPlugin(
 			hmsSmokePlugin({ source: todaySmoke.dataSource, layerLabel: "Smoke", id: "hms-smoke" })
 		);
 		today.addPlugin(
 			hmsFirePlugin({
 				source: todayFire.groups,
+				hotspots: todayFire.hotspots,
 				layerLabel: "Fires",
-				id: "hms-fire-groups",
-				zoomRange: { max: 10 }
-			})
-		);
-		today.addPlugin(
-			hmsFirePlugin({
-				source: todayFire.hotspots,
-				layerLabel: "Fires",
-				id: "hms-fire-hotspots",
-				zoomRange: { min: 10 },
-				listed: false
+				id: "hms-fire"
 			})
 		);
 		today.addPlugin(

@@ -279,26 +279,4 @@ describe("Legend", () => {
 		await expect.element(page.getByRole("heading", { name: "Top" })).toBeVisible();
 		expect(headings()).toEqual(["Bottom", "Middle", "Top"]);
 	});
-
-	it("shows one section for plugins with the same legend data", async () => {
-		applyTheme("light");
-		const same = (id: string) => ({
-			id,
-			legend: () => ({ pluginId: id, title: "Fires", units: "MW", scale: pm25Scale })
-		});
-		render(Legend, { map: fakeMap([same("groups"), same("hotspots")]) });
-		await expect.element(page.getByRole("heading", { name: "Fires (MW)" })).toBeVisible();
-		expect(document.querySelectorAll(".mapsdk-legend-section")).toHaveLength(1);
-	});
-
-	it("shows both sections when the scales differ", async () => {
-		applyTheme("light");
-		const plugin = (id: string, scale: typeof pm25Scale) => ({
-			id,
-			legend: () => ({ pluginId: id, title: "Fires", units: "MW", scale })
-		});
-		render(Legend, { map: fakeMap([plugin("a", pm25Scale), plugin("b", smokeScale)]) });
-		await expect.element(page.getByRole("heading", { name: "Fires (MW)" }).first()).toBeVisible();
-		expect(document.querySelectorAll(".mapsdk-legend-section")).toHaveLength(2);
-	});
 });
