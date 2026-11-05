@@ -42,5 +42,8 @@
 	"mapsdk_monitor_cluster_max": "Max: {value} {units}",
 	"mapsdk_monitor_cluster_min": "Min: {value} {units}",
 	"mapsdk_monitor_interval_avg": "({interval} avg)",
-	"mapsdk_monitor_updated": "Last updated {when}"
+	"mapsdk_monitor_updated": "Last updated {when}",
+	"mapsdk_hms_smoke_name": "Smoke",
+	"mapsdk_hms_fire_detection": "Fire detection",
+	"mapsdk_hms_fire_detections": "{count} fire detections"
 }

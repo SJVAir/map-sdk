@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
 	createMap,
+	hmsFirePlugin,
+	hmsSmokePlugin,
 	maptilerMap,
 	monitorsPlugin,
 	regionsPlugin,
@@ -23,7 +25,11 @@ import {
 	type MessageProvider,
 	type SpatialSelection
 } from "../../src/lib/data/index.js";
-import { createMonitorsStore } from "../../src/lib/stores/index.js";
+import {
+	createHmsFireStore,
+	createHmsSmokeStore,
+	createMonitorsStore
+} from "../../src/lib/stores/index.js";
 import type { FeatureCollection, Point } from "geojson";
 
 // The README's examples, compiled by `npm run check` (they are type-checked against the real
@@ -187,5 +193,16 @@ describe("README examples", () => {
 		const map = createMap({ config: { maptilerKey: "" }, messages });
 		expect(map.messages("mapsdk_list_button")).toBe("Lista");
 		map.destroy();
+	});
+
+	it("HMS stores feed the HMS plugins", () => {
+		const smoke = createHmsSmokeStore();
+		const fires = createHmsFireStore();
+		const map = createMap({ config: { maptilerKey: "your-maptiler-key" } });
+		map.addPlugin(hmsSmokePlugin({ source: smoke.dataSource, layerLabel: "Smoke" }));
+		map.addPlugin(hmsFirePlugin({ source: fires.groups, layerLabel: "Fires" }));
+		expect(map.plugins.map((p) => p.id)).toEqual(["hms-smoke", "hms-fire"]);
+		smoke.dispose();
+		fires.dispose();
 	});
 });

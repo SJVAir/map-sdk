@@ -181,6 +181,24 @@ for an entry type, polls every two minutes, and exposes `dataSource`. `init()`, 
 dashboard that has its own date-range data builds a `DataSource` itself instead.
 `meta` is the read-only monitors meta (the SDK's `MonitorsMeta`), null until `init()` resolves.
 
+`createHmsSmokeStore()` and `createHmsFireStore()` (also from `@sjvair/map-sdk/stores`) load
+today's NOAA HMS smoke and fire once, with no polling. Each has `status`, `init({ signal })`, and
+`dispose()`; overlapping `init()` calls share one request, a failed load reports `error` with
+`retry()` (on `status` and on every source), and a caller's abort rejects only that caller.
+A day with no data is `ready` with an empty collection, so the legend still shows. The smoke store
+has one `dataSource` for `hmsSmokePlugin` (scale `hms-smoke` / `smoke-density`, value the density).
+The fire store has `groups` (nearby detections merged by `groupFires`, value the mean FRP) and
+`hotspots` (each detection after `cleanFires`, value its FRP), both for `hmsFirePlugin` (scale
+`hms-fire` / `fire-frp`). Pass `{ messages }` to name the features with your own provider.
+
+```ts
+const smoke = createHmsSmokeStore();
+const fires = createHmsFireStore();
+await Promise.all([smoke.init(), fires.init()]);
+map.addPlugin(hmsSmokePlugin({ source: smoke.dataSource, layerLabel: "Smoke" }));
+map.addPlugin(hmsFirePlugin({ source: fires.groups, layerLabel: "Fires" }));
+```
+
 ### Plain GeoJSON: `staticSource`
 
 ```ts
