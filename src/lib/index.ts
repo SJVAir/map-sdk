@@ -84,5 +84,5 @@ export { hmsSmokePlugin } from "./presets/hms-smoke.js";
 export type { HmsSmokePluginOptions } from "./presets/hms-smoke.js";
 export { hmsFirePlugin } from "./presets/hms-fire.js";
 export type { HmsFirePluginOptions } from "./presets/hms-fire.js";
-export { groupFires } from "./presets/fire-groups.js";
+export { cleanFires, groupFires } from "./presets/fire-groups.js";
 export type { FireDetection, FireGroup } from "./presets/fire-groups.js";

@@ -130,6 +130,14 @@ describe("hmsFirePlugin", () => {
 		expect(hmsFirePlugin({ id: "x", source, layerLabel: "F" }).id).toBe("x");
 	});
 
+	it("listed: false keeps its fires out of the feature list", () => {
+		const source = new TestSource<Props>({ features: points([]), scale: ref });
+		expect(hmsFirePlugin({ source, layerLabel: "F", listed: false }).features).toBeUndefined();
+		expect(hmsFirePlugin({ source, layerLabel: "F", listed: true }).features).toBeTypeOf(
+			"function"
+		);
+	});
+
 	it("picks the icon of the level for FRP 9.9 and 10 and sizes it by level", async () => {
 		const sources: string[] = [];
 		class FakeImage {

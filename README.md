@@ -151,6 +151,14 @@ points only), as sjvair.com's map does today.
 in each level's color at the fill's opacity; choropleth only), or `"none"` (no outline layer).
 `hmsSmokePlugin` uses `"level"`.
 
+`zoomRange: { min?, max? }` on `pointsPlugin` limits every layer it draws (points, clusters,
+selection) to zooms from `min` (inclusive) up to `max` (exclusive), switching live while zooming.
+`hmsFirePlugin` takes `zoomRange` and `listed` (default true; false keeps its fires out of the
+keyboard list). To show fire groups below zoom 10 and single hotspots from it, add two plugins:
+`hmsFirePlugin({ id: "hms-fire-groups", zoomRange: { max: 10 }, ... })` fed by `groupFires`, and
+`hmsFirePlugin({ id: "hms-fire-hotspots", zoomRange: { min: 10 }, listed: false, ... })` fed by
+`cleanFires` (both also from `@sjvair/map-sdk/stores`).
+
 ## Data sources
 
 A `DataSource` is `{ status, features, scale }`: a load status (`loading`, `ready`, `error` with

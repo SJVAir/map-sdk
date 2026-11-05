@@ -9,6 +9,10 @@ export interface HmsFirePluginOptions {
 	source: DataSource;
 	/** Already-translated layer name for the list and summary. */
 	layerLabel: string;
+	/** Shows the fires only from `min` (inclusive) up to `max` (exclusive) zoom. Default: always. */
+	zoomRange?: { min?: number; max?: number };
+	/** Whether the keyboard feature list includes these fires. Default true. */
+	listed?: boolean;
 }
 
 /** Icon size in pixels by level index, smallest to largest (presentation). */
@@ -24,7 +28,7 @@ function drawFire(color: string, levelIndex = -1): string {
 
 /**
  * NOAA HMS fire detections as flame icons colored by fire radiative power (MW) and growing with
- * its level. Not selectable; listed.
+ * its level. Not selectable; listed unless `listed: false`.
  *
  * The source's `scale` is expected to be the ScaleRef
  * `{ dataset: "hms-fire", entryType: "fire-frp" }`, and each feature's `value` its FRP. Pass groups
@@ -36,6 +40,8 @@ export function hmsFirePlugin(options: HmsFirePluginOptions): MapPlugin {
 		source: options.source,
 		layerLabel: options.layerLabel,
 		selectable: false,
+		zoomRange: options.zoomRange,
+		listed: options.listed,
 		icon: {
 			category: () => "fire",
 			draw: (_category, color, _theme, levelIndex) => drawFire(color, levelIndex),

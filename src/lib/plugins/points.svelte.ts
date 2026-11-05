@@ -97,6 +97,12 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	};
 	/** Higher draws on top (and, clustered, a group with a higher key draws above the others). */
 	sortKey?(props: P): number;
+	/**
+	 * Limits every layer the plugin draws (points, clusters, selection) to a zoom range: visible
+	 * from `min` (inclusive) up to `max` (exclusive). Set on the layers, so it switches live while
+	 * zooming. Default: all zooms.
+	 */
+	zoomRange?: { min?: number; max?: number };
 	/** Whether `features()` lists this plugin's features. Default true. */
 	listed?: boolean;
 	/** Tooltip content for a feature, below its name; `props` are its source properties. */
@@ -313,6 +319,16 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			return spec;
 		}
 
+		/** The spec limited to the plugin's zoom range. */
+		function zoomed(spec: LayerSpecWithoutId): LayerSpecWithoutId {
+			const { min, max } = options.zoomRange ?? {};
+			return {
+				...spec,
+				...(min !== undefined ? { minzoom: min } : {}),
+				...(max !== undefined ? { maxzoom: max } : {})
+			} as LayerSpecWithoutId;
+		}
+
 		function removeLayers(): void {
 			for (const layerId of layers.toReversed()) {
 				if (gl.getLayer(layerId)) gl.removeLayer(layerId);
@@ -392,7 +408,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			};
 			const added: string[] = [];
 			for (const { local, spec } of (cluster?.layers ?? defaultClusterLayers)(args)) {
-				added.push(ctx.addLayer(layerLocal(local, group), spec));
+				added.push(ctx.addLayer(layerLocal(local, group), zoomed(spec)));
 			}
 			layers.push(...added);
 			const fresh = added.filter((layerId) => !clusterLayerIds.has(layerId));
@@ -423,7 +439,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			for (const group of groups) {
 				const layerId = ctx.addLayer(
 					layerLocal("points", group),
-					pointLayer(scale, sources.get(group)!)
+					zoomed(pointLayer(scale, sources.get(group)!))
 				);
 				layers.push(layerId);
 				pointIds.push(layerId);
@@ -432,7 +448,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			if (!enlarge) {
 				for (const group of groups) {
 					layers.push(
-						ctx.addLayer(layerLocal("selected", group), overlayLayer(sources.get(group)!))
+						ctx.addLayer(layerLocal("selected", group), zoomed(overlayLayer(sources.get(group)!)))
 					);
 				}
 			}

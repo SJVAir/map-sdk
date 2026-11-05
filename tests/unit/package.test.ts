@@ -67,6 +67,7 @@ describe("package.json", () => {
 			"hmsSmokePlugin",
 			"hmsFirePlugin",
 			"groupFires",
+			"cleanFires",
 			"levelKeyExpression",
 			"colorExpression",
 			"opacityExpression",

@@ -242,6 +242,38 @@ describe("pointsPlugin", () => {
 		expect(plugin.features!()[0].precision).toBe(1);
 	});
 
+	it("zoomRange sets minzoom and maxzoom on every layer", () => {
+		const source = new TestSource<Props>({
+			features: points([
+				{ refKey: "monitor:a", name: "A", value: 1 },
+				{ refKey: "monitor:b", name: "B", value: 2 }
+			]),
+			scale: pm25Scale
+		});
+		const { gl } = setup({
+			source,
+			cluster: { radius: 40, maxZoom: 9 },
+			zoomRange: { min: 4, max: 10 }
+		});
+		expect(gl.layers.length).toBeGreaterThan(2);
+		for (const l of gl.layers) expect(l).toMatchObject({ minzoom: 4, maxzoom: 10 });
+	});
+
+	it("zoomRange with one end sets only that end; none sets neither", () => {
+		const make = (zoomRange?: { min?: number; max?: number }) => {
+			const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
+			return setup({ source, zoomRange }).gl.layers;
+		};
+		for (const l of make({ max: 10 })) {
+			expect(l).toMatchObject({ maxzoom: 10 });
+			expect(l).not.toHaveProperty("minzoom");
+		}
+		for (const l of make()) {
+			expect(l).not.toHaveProperty("minzoom");
+			expect(l).not.toHaveProperty("maxzoom");
+		}
+	});
+
 	it("creates one clustered source per group", () => {
 		const source = new TestSource<Props>({
 			features: points([
