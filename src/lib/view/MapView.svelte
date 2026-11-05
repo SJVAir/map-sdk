@@ -336,6 +336,20 @@
 		align-items: flex-end;
 	}
 
+	/* reveal: "focus": hidden like a skip link (still in the Tab order and the accessibility tree)
+	   until it or its panel has focus, and shown the whole time the panel is open. No transition. */
+	.mapsdk-list-panel[data-reveal="focus"][data-open="false"]:not(:focus-within)
+		.mapsdk-list-button {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		border: 0;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
 	.mapsdk-list-panel > div {
 		display: flex;
 		min-height: 0;

@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { config as maptilerConfig } from "@maptiler/sdk";
 import { MapView, createMap } from "../../src/lib/index.js";
 import type { FeatureListOptions, ListPosition } from "../../src/lib/index.js";
@@ -322,5 +322,86 @@ describe("featureList position", () => {
 		const bar = document.querySelector<HTMLElement>(".mapsdk-selection")!;
 		expect(getComputedStyle(bar).right).toBe("64px");
 		expect(getComputedStyle(bar).left).toBe("80px");
+	});
+});
+
+describe("featureList reveal: focus", () => {
+	const options: FeatureListOptions = { position: "top-right", reveal: "focus" };
+	const shown = () => {
+		const r = rectOf(button());
+		return r.width > 1 && r.height > 1;
+	};
+
+	/** Tabs from the map canvas until the List button has focus. */
+	async function tabToButton(gl: GlMapLike) {
+		gl.getCanvas().focus();
+		for (let i = 0; i < 10 && document.activeElement !== button(); i++) await userEvent.tab();
+		expect(document.activeElement).toBe(button());
+	}
+
+	it("is hidden, but named and in the Tab order", async () => {
+		await show(options);
+		const style = getComputedStyle(button());
+		expect(shown()).toBe(false);
+		expect(style.display).not.toBe("none");
+		expect(style.visibility).toBe("visible");
+		expect(style.opacity).toBe("1");
+		expect(button().hasAttribute("aria-hidden")).toBe(false);
+		expect(button().tabIndex).toBe(0);
+		await expect
+			.element(page.getByRole("button", { name: "List of features on the map" }))
+			.toBeInTheDocument();
+	});
+
+	it("appears in place, with the focus ring, when Tab reaches it", async () => {
+		document.documentElement.style.setProperty("--ring", "rgb(0, 150, 255)");
+		const { attached } = await show(options);
+		await tabToButton(attached[0]);
+		expect(shown()).toBe(true);
+		const gap = rectOf(button()).top - cornerEdge("top-right");
+		expect(gap).toBeGreaterThanOrEqual(0);
+		expect(gap).toBeLessThanOrEqual(9);
+		expect(getComputedStyle(button()).outlineWidth).toBe("2px");
+		expect(getComputedStyle(button()).outlineColor).toBe("rgb(0, 150, 255)");
+		document.documentElement.style.removeProperty("--ring");
+	});
+
+	it("stays visible while the panel is open and focus is on the map", async () => {
+		const { attached } = await show(options);
+		await tabToButton(attached[0]);
+		await userEvent.keyboard("{Enter}");
+		const panel = document.getElementById(button().getAttribute("aria-controls")!)!;
+		attached[0].getCanvas().focus();
+		expect(document.activeElement).toBe(attached[0].getCanvas());
+		expect(shown()).toBe(true);
+		expect(rectOf(panel).height).toBeGreaterThan(1);
+	});
+
+	it("hides again once the panel is closed and focus leaves", async () => {
+		const { attached } = await show(options);
+		await tabToButton(attached[0]);
+		await userEvent.keyboard("{Enter}");
+		const listbox = page.getByRole("listbox", { name: "Features on the map" });
+		await expect.element(listbox).toBeVisible();
+		(listbox.element() as HTMLElement).focus();
+		await userEvent.keyboard("{Escape}");
+		expect(document.activeElement).toBe(button());
+		expect(shown()).toBe(true);
+		await userEvent.tab();
+		expect(document.activeElement).not.toBe(button());
+		expect(shown()).toBe(false);
+	});
+
+	it("doesn't animate the reveal", async () => {
+		await show(options);
+		const transitions = getComputedStyle(button()).transitionProperty;
+		for (const property of ["clip-path", "width", "height", "all"]) {
+			expect(transitions.split(", ")).not.toContain(property);
+		}
+	});
+
+	it("is always visible by default", async () => {
+		await show(true);
+		expect(shown()).toBe(true);
 	});
 });
