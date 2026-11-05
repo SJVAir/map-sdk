@@ -3,6 +3,7 @@
 	import { SvelteMap } from "svelte/reactivity";
 	import {
 		calHeatScorePlugin,
+		collocationSitesPlugin,
 		createMap,
 		forecastZonesPlugin,
 		hmsFirePlugin,
@@ -19,7 +20,13 @@
 		SelectionMode,
 		SpatialSelection
 	} from "../src/lib/data/index.js";
-	import { createMonitorsStore } from "../src/lib/stores/index.js";
+	import {
+		createCollocationSitesStore,
+		createHmsFireStore,
+		createHmsSmokeStore,
+		createMonitorsStore
+	} from "../src/lib/stores/index.js";
+	import { defaultBasemaps } from "../src/lib/view/create-gl-map.js";
 	import {
 		createDateRangeSource,
 		type DateRangeSource,
@@ -33,6 +40,27 @@
 	const left = createMap({ config: { maptilerKey } });
 	const right = createMap({ config: { maptilerKey } });
 	const live = createMonitorsStore();
+
+	// The live map: today's monitor-map setup (globe, space, Streets v4 with every layer, live
+	// stores, click eases to zoom 12), on its own stores.
+	const today = createMap({
+		config: {
+			maptilerKey,
+			initialView: {
+				center: [-119.7987626619462, 36.76272050981146],
+				zoom: 7,
+				bearing: 0,
+				pitch: 0
+			},
+			projection: "globe",
+			space: { preset: "milkyway" },
+			basemaps: { ...defaultBasemaps(), excludedLayers: [] }
+		}
+	});
+	const todayMonitors = createMonitorsStore();
+	const todaySmoke = createHmsSmokeStore();
+	const todayFire = createHmsFireStore();
+	const todaySites = createCollocationSitesStore({ monitors: todayMonitors });
 
 	interface Preset {
 		kind: SourceKind;
@@ -233,7 +261,59 @@
 		return status.state;
 	});
 
+	/** The live map's monitors status for the panel. */
+	const todayStatus = $derived.by(() => {
+		const status = todayMonitors.dataSource.status;
+		if (status.state === "ready")
+			return `${todayMonitors.dataSource.features?.features.length ?? 0} features`;
+		if (status.state === "unavailable") return status.reason;
+		return status.state;
+	});
+
 	onMount(() => {
+		// Bottom to top, as monitor-map draws: smoke, fire (groups, then hotspots by zoom),
+		// collocation sites, monitors.
+		today.addPlugin(
+			hmsSmokePlugin({ source: todaySmoke.dataSource, layerLabel: "Smoke", id: "hms-smoke" })
+		);
+		today.addPlugin(
+			hmsFirePlugin({
+				source: todayFire.groups,
+				layerLabel: "Fires",
+				id: "hms-fire-groups",
+				zoomRange: { max: 10 }
+			})
+		);
+		today.addPlugin(
+			hmsFirePlugin({
+				source: todayFire.hotspots,
+				layerLabel: "Fires",
+				id: "hms-fire-hotspots",
+				zoomRange: { min: 10 },
+				listed: false
+			})
+		);
+		today.addPlugin(
+			collocationSitesPlugin({
+				source: todaySites.dataSource,
+				layerLabel: "Collocation sites"
+			})
+		);
+		today.addPlugin(
+			monitorsPlugin({
+				source: todayMonitors.dataSource,
+				layerLabel: "Monitors",
+				id: "monitors",
+				selectable: true,
+				selectedStyle: "enlarge"
+			}),
+			{ selectionMode: "single" }
+		);
+		today.on("featureclick", (e) => today.easeTo({ center: e.lngLat, minZoom: 12 }));
+		todayMonitors.init("pm25").catch(() => {});
+		todaySmoke.init().catch(() => {});
+		todayFire.init().catch(() => {});
+		todaySites.init().catch(() => {});
 		for (const preset of presets) if (enabled[preset.kind]) enable(preset);
 		right.addPlugin(
 			monitorsPlugin({
@@ -250,6 +330,11 @@
 	});
 
 	onDestroy(() => {
+		todayMonitors.dispose();
+		todaySmoke.dispose();
+		todayFire.dispose();
+		todaySites.dispose();
+		today.destroy();
 		live.dispose();
 		left.destroy();
 		right.destroy();
@@ -268,6 +353,36 @@
 </header>
 
 <main class="demo-main">
+	<section class="demo-panel demo-wide" aria-labelledby="today-title">
+		<h2 id="today-title" class="text-base">Live map (monitor-map setup)</h2>
+		<div class="demo-controls text-sm">
+			<fieldset>
+				<legend>Store</legend>
+				<label for="today-entry-type">Pollutant</label>
+				<select
+					id="today-entry-type"
+					value={todayMonitors.entryType ?? ""}
+					disabled={!todayMonitors.initialized}
+					onchange={(e) => todayMonitors.entryTypeFor(e.currentTarget.value)}
+				>
+					{#each todayMonitors.availableEntryTypes as entryType (entryType)}
+						<option value={entryType}>{entryType}</option>
+					{/each}
+				</select>
+				<output data-testid="today-status" class="demo-muted">{todayStatus}</output>
+			</fieldset>
+		</div>
+		<MapView
+			map={today}
+			label="Monitor-map setup map"
+			controls="engine"
+			selectionBar={false}
+			tooltip="pointer"
+			class="demo-map demo-map-tall"
+		/>
+		<Legend map={today} order="top-first" />
+	</section>
+
 	<section class="demo-panel" aria-labelledby="left-title">
 		<h2 id="left-title" class="text-base">Date-range sources</h2>
 		<div class="demo-controls text-sm">
@@ -376,6 +491,10 @@
 		padding: 1rem;
 	}
 
+	.demo-wide {
+		grid-column: 1 / -1;
+	}
+
 	.demo-panel {
 		display: flex;
 		flex-direction: column;
@@ -447,5 +566,9 @@
 		border: 1px solid var(--card-border, var(--border));
 		border-radius: var(--radius);
 		overflow: hidden;
+	}
+
+	:global(.demo-map-tall) {
+		height: 40rem;
 	}
 </style>

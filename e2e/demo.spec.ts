@@ -51,7 +51,10 @@ async function stubNetwork(page: Page) {
 }
 
 const leftMap = (page: Page) => page.getByRole("region", { name: "Date-range map" });
-const rightMap = (page: Page) => page.getByRole("region", { name: "Live map" });
+const rightMap = (page: Page) => page.getByRole("region", { name: "Live map", exact: true });
+const todayPanel = (page: Page) =>
+	page.getByRole("region", { name: "Live map (monitor-map setup)", exact: true });
+const todayMap = (page: Page) => page.getByRole("region", { name: "Monitor-map setup map" });
 const selectionBox = (page: Page) =>
 	page.getByRole("textbox", { name: "Monitors selection (JSON)" });
 
@@ -73,6 +76,7 @@ async function load(page: Page) {
 	const list = await openList(leftMap(page));
 	await expect(list.getByRole("option", { name: /Fixture Alpha/ })).toBeVisible();
 	await expect(page.getByTestId("live-status")).toHaveText("5 features");
+	await expect(page.getByTestId("today-status")).toHaveText("5 features");
 }
 
 test.beforeEach(async ({ page }) => {
@@ -108,7 +112,7 @@ test("both maps render a canvas", async ({ page }) => {
 });
 
 test("credits line is present", async ({ page }) => {
-	for (const map of [leftMap(page), rightMap(page)]) {
+	for (const map of [leftMap(page), rightMap(page), todayMap(page)]) {
 		const credits = map.locator(".maplibregl-ctrl-attrib");
 		await expect(credits).toHaveCount(1);
 		await expect(credits).toContainText("© MapTiler");
@@ -121,7 +125,31 @@ test("the live map shows the same monitors from the live store", async ({ page }
 	const list = await openList(rightMap(page));
 	await expect(list.getByRole("option", { name: /Fixture Alpha/ })).toBeVisible();
 	await expect(list.getByRole("option", { name: /Fixture Bravo/ })).toBeVisible();
-	await expect(page.getByRole("combobox", { name: "Pollutant" })).toHaveValue("pm25");
+	await expect(
+		page.getByRole("region", { name: "Live monitors" }).getByRole("combobox", { name: "Pollutant" })
+	).toHaveValue("pm25");
+	await expect(todayPanel(page).getByRole("combobox", { name: "Pollutant" })).toHaveValue("pm25");
+});
+
+test("the monitor-map setup map renders its layers, engine controls and legend", async ({
+	page
+}) => {
+	const map = todayMap(page);
+	await expect(map.locator("canvas")).toBeVisible();
+	// Engine controls (zoom/compass/locate), not map-sdk's buttons; no selection bar.
+	await expect(map.locator(".maplibregl-ctrl-zoom-in")).toBeVisible();
+	await expect(map.getByRole("button", { name: /^Clear/ })).toHaveCount(0);
+	// Listed: monitors, collocation sites, smoke and the fire groups (hotspots are unlisted).
+	const list = await openList(map);
+	await expect(list.getByRole("option", { name: /Fixture Alpha/ })).toBeVisible();
+	await expect(list.getByRole("option", { name: /Fixture Collocation Site/ })).toBeVisible();
+	// Legend: top-first (pollutant, then fire once, then smoke).
+	const headings = todayPanel(page).getByRole("heading", { level: 3 });
+	await expect(headings.filter({ hasText: /^Fires/ })).toHaveCount(1);
+	const texts = await headings.allTextContents();
+	const at = (re: RegExp) => texts.findIndex((t) => re.test(t));
+	expect(at(/^Monitors/)).toBeLessThan(at(/^Fires/));
+	expect(at(/^Fires/)).toBeLessThan(at(/^Smoke/));
 });
 
 test("picking a monitor in the left list updates the editor and leaves the right map alone", async ({
@@ -219,6 +247,11 @@ for (const theme of ["light", "dark"] as const) {
 		}
 		for (const heading of LEGEND_SECTIONS) {
 			await expect(panel.getByRole("heading", { level: 3, name: heading })).toBeVisible();
+		}
+		for (const heading of [/^Monitors/, /^Fires/, /^Smoke/]) {
+			await expect(
+				todayPanel(page).getByRole("heading", { level: 3, name: heading })
+			).toBeVisible();
 		}
 		const list = await openList(leftMap(page));
 		await list.getByRole("option", { name: /Fixture Alpha/ }).click();
