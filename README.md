@@ -21,7 +21,7 @@ JSR and installed through npm's JSR registry as an alias:
 ```json
 {
 	"dependencies": {
-		"@sjvair/sdk": "npm:@jsr/sjvair__sdk@^4.8.0-beta.4"
+		"@sjvair/sdk": "npm:@jsr/sjvair__sdk@^5.0.0-beta.2"
 	}
 }
 ```

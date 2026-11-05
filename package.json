@@ -57,7 +57,7 @@
 		}
 	},
 	"peerDependencies": {
-		"@sjvair/sdk": "npm:@jsr/sjvair__sdk@^4.8.0-beta.4",
+		"@sjvair/sdk": "npm:@jsr/sjvair__sdk@^5.0.0-beta.2",
 		"svelte": "^5.57.0"
 	},
 	"dependencies": {
@@ -75,7 +75,7 @@
 		"@eslint/js": "^10.0.1",
 		"@maplibre/maplibre-gl-style-spec": "^24.10.0",
 		"@playwright/test": "^1.64.1",
-		"@sjvair/sdk": "npm:@jsr/sjvair__sdk@4.8.0-beta.4",
+		"@sjvair/sdk": "npm:@jsr/sjvair__sdk@5.0.0-beta.2",
 		"@sveltejs/package": "^2.5.8",
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",
 		"@tailwindcss/vite": "^4.3.3",

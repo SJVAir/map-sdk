@@ -2,15 +2,14 @@ import type { Feature, FeatureCollection, Geometry, Point } from "geojson";
 import {
 	getCalHeatScores,
 	getForecasts,
+	getHMSFire,
+	getHMSSmoke,
 	getMonitorSummariesBulkDaily,
 	getRegionsGeoJSON,
 	getRegionSummariesBulkDaily,
-	type HMSFireGeoJSON,
-	type HMSSmokeGeoJSON,
 	type MonitorEntryType,
 	type RegionType
 } from "@sjvair/sdk";
-import { paginatedApiCall } from "@sjvair/sdk/http";
 import { groupFires } from "../src/lib/index.js";
 import {
 	encodeRef,
@@ -53,24 +52,13 @@ const collection = (features: Feature<Geometry, MapFeatureProperties>[]): Collec
 const average = (values: number[]) =>
 	values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : null;
 
-/** The server looks up at most this many region codes per request. */
-const CODES_PER_REQUEST = 100;
-
-/** Region boundaries keyed by code, from the regions GeoJSON wrapper. */
+/** Region boundaries keyed by code, from the regions GeoJSON wrapper (it batches long lists). */
 async function boundaries(type: RegionType, codes: string[], signal: AbortSignal) {
 	const simplify = type === "county" || type === "zipcode" || type === "tract";
-	const chunks: string[][] = [];
-	for (let i = 0; i < codes.length; i += CODES_PER_REQUEST) {
-		chunks.push(codes.slice(i, i + CODES_PER_REQUEST));
-	}
-	const pages = await Promise.all(
-		chunks.map((external_id) => getRegionsGeoJSON({ type, simplify, external_id }, { signal }))
-	);
+	const shapes = await getRegionsGeoJSON({ type, simplify, external_id: codes }, { signal });
 	return new Map(
-		pages.flatMap((page) =>
-			page.features.flatMap((f) =>
-				f.properties.external_id ? [[f.properties.external_id, f as Feature<Geometry>]] : []
-			)
+		shapes.features.flatMap((f) =>
+			f.properties.external_id ? [[f.properties.external_id, f as Feature<Geometry>]] : []
 		)
 	);
 }
@@ -170,14 +158,8 @@ const loaders: Record<SourceKind, Loader> = {
 		);
 	},
 
-	// getHMSSmoke and getHMSFire take no date (they return the latest day), so these ask the
-	// same endpoints through the SDK's request helper with the server's `date` filter.
 	async "hms-smoke"(range, _entryType, signal) {
-		const smoke = await paginatedApiCall<HMSSmokeGeoJSON>({
-			url: "hms/smoke",
-			searchParams: { date: range.end },
-			options: { signal }
-		});
+		const smoke = await getHMSSmoke({ date: range.end }, { signal });
 		return collection(
 			smoke.map((s) => ({
 				type: "Feature",
@@ -192,11 +174,7 @@ const loaders: Record<SourceKind, Loader> = {
 	},
 
 	async "hms-fire"(range, _entryType, signal) {
-		const fires = await paginatedApiCall<HMSFireGeoJSON>({
-			url: "hms/fire",
-			searchParams: { date: range.end },
-			options: { signal }
-		});
+		const fires = await getHMSFire({ date: range.end }, { signal });
 		const groups = groupFires(
 			fires.map((f) => ({
 				id: f.id,
