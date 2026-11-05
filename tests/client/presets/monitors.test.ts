@@ -27,6 +27,21 @@ vi.mock("../../../src/lib/data/selection.js", async (importOriginal) => {
 	return { ...actual, applyPick: vi.fn(actual.applyPick) };
 });
 
+// A host theme to inject: the plugin reads its colors through themeColors().
+const injected = vi.hoisted(() => ({ theme: null as Record<string, string> | null }));
+vi.mock("../../../src/lib/plugins/style.js", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../../../src/lib/plugins/style.js")>();
+	return {
+		...actual,
+		themeColors: (container: Element | null) => ({
+			...actual.themeColors(container),
+			...injected.theme
+		})
+	};
+});
+
+const DARK_THEME = { foreground: "#ffffff", mutedForeground: "#cccccc" };
+
 type Symbol = Extract<LayerSpecification, { type: "symbol" }>;
 
 /** Evaluates a data expression for a feature with `properties`. */
@@ -78,6 +93,7 @@ let errorSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
 	errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 	vi.mocked(applyPick).mockClear();
+	injected.theme = null;
 });
 afterEach(() => {
 	expect(errorSpy).not.toHaveBeenCalled();
@@ -352,6 +368,7 @@ describe("monitorsPlugin", () => {
 			}
 		}
 		vi.stubGlobal("Image", FakeImage);
+		injected.theme = DARK_THEME;
 		const { gl, id } = setUp();
 		const icons = layer(gl, id("points:airgradient")) as Symbol;
 		const [inactive] = sourceData(gl, id("points:airgradient")).features;
@@ -380,6 +397,7 @@ describe("monitorsPlugin", () => {
 			}
 		}
 		vi.stubGlobal("Image", FakeImage);
+		injected.theme = DARK_THEME;
 		const { gl, id } = setUp([
 			monitor("1", "purpleair", 4),
 			monitor("2", "purpleair", 4, { location: "inside" })
@@ -399,7 +417,8 @@ describe("monitorsPlugin", () => {
 		// The stroke goes through darken(), which writes black as #000.
 		const outline = darken(MONITOR_INSIDE_OUTLINE, 0.1);
 		expect(good.filter((svg) => svg.includes(`stroke="${outline}"`))).toHaveLength(1);
-		expect(darken(FALLBACK_THEME_COLORS.foreground, 0.1)).not.toBe(outline);
+		const light = darken(DARK_THEME.foreground, 0.1);
+		expect([...svgs.values()].some((svg) => svg.includes(`stroke="${light}"`))).toBe(false);
 	});
 
 	it("draws unclustered when clustered is false", () => {
