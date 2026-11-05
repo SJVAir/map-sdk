@@ -9,7 +9,8 @@
 
 	// Ported from monitor-map's CollocationTooltip: the reference monitor's reading beside its
 	// details, then the collocated monitor's with the box on the other side. Readings are whole
-	// numbers cut off, not rounded, as monitor-map's. The reference monitor's name is shown here, not above.
+	// numbers cut off, not rounded, as monitor-map's. The reference monitor's name is shown here, not
+	// above.
 
 	interface Props {
 		site: CollocationFeatureProperties;

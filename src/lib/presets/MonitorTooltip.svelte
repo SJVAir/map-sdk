@@ -8,8 +8,9 @@
 	import MonitorReadingBox from "./MonitorReadingBox.svelte";
 
 	// Ported from monitor-map's MonitorTooltip: the reading in a level-colored box beside when it
-	// was taken, the monitor's name, and how long ago. The whole number is cut off, not rounded, as monitor-map's is;
-	// the level label is added for accessibility. The map tooltip leaves its own name header out.
+	// was taken, the monitor's name, and how long ago. The whole number is cut off, not rounded, as
+	// monitor-map's is; the level label is added for accessibility. The map tooltip leaves its own
+	// name header out.
 
 	interface Props {
 		item: FeatureListItem;
