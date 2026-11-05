@@ -87,9 +87,10 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   (`CollocationTooltip`). Presets never fetch.
 - **View** (`src/lib/view/`): `MapView.svelte` creates the GL map (`create-gl-map.ts`: per-map key
   through `transformRequest`, theme watching, `active` releases WebGL). Props include `controls`
-  (`"mapsdk"` | `"engine"` | `"none"`), `selectionBar`, and `tooltip` (`"pinned"` | `"pointer"`).
-  Credits come from the engine's AttributionControl, with data credits from
-  `ui/data-credits.svelte.ts`.
+  (`"mapsdk"` | `"engine"` | `"none"`), `selectionBar`, `tooltip` (`"pinned"` | `"pointer"`), and
+  `featureList` (`boolean` or `{ position, reveal }`; `list-placement.ts`; the button stacks clear
+  of the controls in its corner, measured with a `ResizeObserver`). Credits come from the engine's
+  AttributionControl, with data credits from `ui/data-credits.svelte.ts`.
 - **UI** (`src/lib/ui/`): Legend (`order`; blocks legends are one labeled bar), FeatureList,
   MapTooltip, SelectionBar, ViewSummary, and MapControls (zoom buttons only; basemap switching is
   `MapContext`, credits are the engine's). `controls.css` holds the focus ring and motion classes.

@@ -16,6 +16,7 @@ import {
 import type {
 	CustomLayerInterface,
 	FeatureListItem,
+	FeatureListOptions,
 	MapContext,
 	MapPlugin,
 	PluginContext
@@ -55,6 +56,11 @@ describe("README examples", () => {
 		expect(map.plugins.map((p) => p.id)).toEqual(["monitors"]);
 		map.destroy();
 		store.dispose();
+	});
+
+	it("MapView's featureList options, as monitor-map uses them", () => {
+		const featureList: FeatureListOptions = { position: "top-right", reveal: "focus" };
+		expect(featureList).toEqual({ position: "top-right", reveal: "focus" });
 	});
 
 	it("today's basemaps without the POI layer filter", () => {

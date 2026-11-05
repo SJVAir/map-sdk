@@ -114,7 +114,15 @@ Standard (no fallback, must exist): `--background`, `--foreground`, `--card`, `-
 `MapView` creates the GL map when it mounts. `MapView` draws the tooltip, selection bar, view
 summary, zoom buttons, and the List button with its feature list, and the engine draws the
 credits. `featureList={false}` leaves out the List button and its panel, and `selectionBar={false}`
-the selection bar. `controls` picks the zoom controls: `"mapsdk"` (default) draws map-sdk's zoom
+the selection bar. `featureList` also takes options (type `FeatureListOptions`): `position` puts the
+button in any corner (`"top-left"`, the default, `"top-right"`, `"bottom-left"`, `"bottom-right"`),
+stacked below the controls in that corner (above them in a bottom corner), and the open panel
+stops short of the controls and credits at the far end of its side. `reveal: "focus"` shows the
+button only while it or its open panel has keyboard focus, and the whole time the panel is open;
+otherwise it's visually hidden but stays in the Tab order and the accessibility tree, like a skip
+link. monitor-map uses `featureList={{ position: "top-right", reveal: "focus" }}` with
+`controls="engine"`. The List button and its open panel are `z-index: 2` inside the map, so a
+host's own menus over the map can sit above them. `controls` picks the zoom controls: `"mapsdk"` (default) draws map-sdk's zoom
 buttons, `"engine"` the MapTiler SDK's default zoom/compass and locate-me controls (top right, as
 monitor-map uses today), and `"none"` none; the credits show in every case. Choose `controls` up
 front: changing it after mount recreates the map. `tooltip` is `"pinned"` (default: anchored to the
