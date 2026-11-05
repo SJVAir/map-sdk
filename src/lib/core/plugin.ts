@@ -1,4 +1,4 @@
-import type { LayerSpecification, SourceSpecification } from "@maptiler/sdk";
+import type { CustomLayerInterface, LayerSpecification, SourceSpecification } from "@maptiler/sdk";
 import type { Geometry } from "geojson";
 import type { Snippet } from "svelte";
 import type { FormatProvider } from "../data/format.js";
@@ -88,6 +88,13 @@ export interface PluginContext {
 	addSource(local: string, spec: SourceSpecification): string;
 	/** Returns the namespaced id; removed on teardown, before sources. */
 	addLayer(local: string, spec: LayerSpecWithoutId): string;
+	/**
+	 * Adds a MapLibre custom layer (e.g. a wind layer from a library the host adds) in the
+	 * plugin's draw-order slot, with the same lifecycle as `addLayer`. `create` gets the
+	 * namespaced id, which the layer must use; the object it returns is added as is, never copied,
+	 * and `create` runs again on each restyle, so build a fresh layer every time. Returns the id.
+	 */
+	addCustomLayer(local: string, create: (id: string) => CustomLayerInterface): string;
 	/** Adds the image as `id(local)`; removed on teardown. */
 	addImage(local: string, image: HTMLImageElement | ImageData): void;
 	/** Registers layers for click, hover, tooltip, and `featuresAt`. */

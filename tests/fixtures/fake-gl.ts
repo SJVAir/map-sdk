@@ -1,4 +1,4 @@
-import type { LayerSpecification, SourceSpecification } from "@maptiler/sdk";
+import type { CustomLayerInterface, LayerSpecification, SourceSpecification } from "@maptiler/sdk";
 import type { GlMapLike } from "../../src/lib/core/gl.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- event payloads are untyped, as in MapLibre */
@@ -10,7 +10,7 @@ export interface FakeGl extends GlMapLike {
 	/** Specs as added; a `setData` through `getSource(id)` replaces the spec's `data`. */
 	readonly sources: Map<string, SourceSpecification>;
 	/** In draw order. */
-	readonly layers: LayerSpecification[];
+	readonly layers: Array<LayerSpecification | CustomLayerInterface>;
 	readonly images: Map<string, HTMLImageElement | ImageData>;
 	readonly featureStates: Map<string, Record<string, unknown>>;
 	readonly listeners: Array<{ type: string; layerId?: string; listener: Listener }>;
@@ -35,7 +35,7 @@ export interface FakeGl extends GlMapLike {
  */
 export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 	const sources = new Map<string, SourceSpecification>();
-	const layers: LayerSpecification[] = [];
+	const layers: Array<LayerSpecification | CustomLayerInterface> = [];
 	const images = new Map<string, HTMLImageElement | ImageData>();
 	const featureStates = new Map<string, Record<string, unknown>>();
 	const listeners: FakeGl["listeners"] = [];

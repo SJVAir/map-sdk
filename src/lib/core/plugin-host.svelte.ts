@@ -1,4 +1,4 @@
-import type { LayerSpecification } from "@maptiler/sdk";
+import type { CustomLayerInterface, LayerSpecification } from "@maptiler/sdk";
 import { untrack } from "svelte";
 import type { GlMapLike } from "./gl.js";
 import type { InteractionRouter } from "./interactions.svelte.js";
@@ -317,6 +317,15 @@ export class PluginHost {
 		const { gl } = running;
 		const layerAbove = () => this.#layerAbove(pluginId);
 		const id = (local: string) => `${mapUid}:${pluginId}:${local}`;
+		const addTracked = (full: string, layer: LayerSpecification | CustomLayerInterface) => {
+			if (running.dead) return full;
+			gl.addLayer(layer, layerAbove());
+			// A re-added layer (a plugin rebuilding its layers) is now its plugin's top layer.
+			const at = running.layers.indexOf(full);
+			if (at >= 0) running.layers.splice(at, 1);
+			running.layers.push(full);
+			return full;
+		};
 		return {
 			gl,
 			id,
@@ -331,14 +340,16 @@ export class PluginHost {
 				return full;
 			},
 			addLayer(local, spec) {
+				return addTracked(id(local), { ...spec, id: id(local) } as LayerSpecification);
+			},
+			addCustomLayer(local, create) {
 				const full = id(local);
 				if (running.dead) return full;
-				gl.addLayer({ ...spec, id: full } as LayerSpecification, layerAbove());
-				// A re-added layer (a plugin rebuilding its layers) is now its plugin's top layer.
-				const at = running.layers.indexOf(full);
-				if (at >= 0) running.layers.splice(at, 1);
-				running.layers.push(full);
-				return full;
+				const layer = create(full);
+				if (layer.id !== full) {
+					throw new Error(`map-sdk: custom layer "${local}" must use the id it is given (${full})`);
+				}
+				return addTracked(full, layer);
 			},
 			addImage(local, image) {
 				if (running.dead) return;

@@ -50,6 +50,7 @@ export type {
 	Providers
 } from "./core/plugin.js";
 export type { GlMapLike } from "./core/gl.js";
+export type { CustomLayerInterface } from "@maptiler/sdk";
 export type { Hovered } from "./core/interactions.svelte.js";
 export type { BasemapConfig } from "./core/basemap.svelte.js";
 export type {

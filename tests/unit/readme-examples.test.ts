@@ -6,7 +6,13 @@ import {
 	regionsPlugin,
 	shapesPlugin
 } from "../../src/lib/index.js";
-import type { FeatureListItem, MapContext, MapPlugin, PluginContext } from "../../src/lib/index.js";
+import type {
+	CustomLayerInterface,
+	FeatureListItem,
+	MapContext,
+	MapPlugin,
+	PluginContext
+} from "../../src/lib/index.js";
 import {
 	decodeRef,
 	NO_LEVEL,
@@ -118,6 +124,30 @@ describe("README examples", () => {
 		expect(map.plugins[0].features!()).toEqual([
 			expect.objectContaining({ name: "Fresno", ref: { kind: "feature", id: "fresno" } })
 		]);
+		map.destroy();
+	});
+
+	it("writing a plugin: a custom layer", () => {
+		class WindLayer implements CustomLayerInterface {
+			readonly type = "custom";
+			constructor(readonly id: string) {}
+			onAdd() {}
+			render() {}
+			onRemove() {}
+		}
+
+		const windPlugin: MapPlugin = {
+			id: "wind",
+			label: "Wind",
+			setup(ctx: PluginContext) {
+				ctx.addCustomLayer("particles", (id) => new WindLayer(id));
+				return () => {};
+			}
+		};
+
+		const map = createMap({ config: { maptilerKey: "" } });
+		map.addPlugin(windPlugin);
+		expect(map.plugins.map((p) => p.id)).toEqual(["wind"]);
 		map.destroy();
 	});
 

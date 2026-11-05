@@ -224,8 +224,35 @@ function sitesPlugin(sites: Sites): MapPlugin {
 }
 ```
 
+A plugin can also add a MapLibre custom layer, such as a wind layer from a library you add
+yourself, with `ctx.addCustomLayer(local, create)`. The host calls `create` with the namespaced id
+(the layer must use it) and adds the object it returns as is, in the plugin's draw-order slot. It is
+removed on teardown, `create` runs again after a basemap or theme change (return a fresh layer each
+time), and `movePlugin` moves it with the plugin's other layers.
+
+```ts
+import type { CustomLayerInterface, MapPlugin, PluginContext } from "@sjvair/map-sdk";
+
+class WindLayer implements CustomLayerInterface {
+	readonly type = "custom";
+	constructor(readonly id: string) {}
+	onAdd() {} // set up the library's renderer
+	render() {} // draw one frame
+	onRemove() {} // release it
+}
+
+const windPlugin: MapPlugin = {
+	id: "wind",
+	label: "Wind",
+	setup(ctx: PluginContext) {
+		ctx.addCustomLayer("particles", (id) => new WindLayer(id));
+		return () => {};
+	}
+};
+```
+
 The root entry exports the types a plugin needs (`MapPlugin`, `PluginContext`, `FeatureHit`,
-`FeatureListItem`, `LegendData`, `Providers`, `GlMapLike`, `LayerSpecWithoutId`, `ThemeColors`,
+`FeatureListItem`, `LegendData`, `Providers`, `GlMapLike`, `CustomLayerInterface`, `LayerSpecWithoutId`, `ThemeColors`,
 `ClusterLayers`, `ClusterLayerArgs`, `BlockingClick`, `Hovered`) and the scale expressions the
 built-in plugins use (`colorExpression`, `opacityExpression`, `levelKeyExpression`).
 

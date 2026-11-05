@@ -1,4 +1,4 @@
-import type { LayerSpecification, SourceSpecification } from "@maptiler/sdk";
+import type { CustomLayerInterface, LayerSpecification, SourceSpecification } from "@maptiler/sdk";
 import type { Geometry } from "geojson";
 
 /**
@@ -9,7 +9,7 @@ export interface GlMapLike {
 	addSource(id: string, source: SourceSpecification): void;
 	removeSource(id: string): void;
 	getSource(id: string): unknown;
-	addLayer(layer: LayerSpecification, beforeId?: string): void;
+	addLayer(layer: LayerSpecification | CustomLayerInterface, beforeId?: string): void;
 	/** Moves a layer below `beforeId`, or to the top without it. */
 	moveLayer(id: string, beforeId?: string): void;
 	removeLayer(id: string): void;

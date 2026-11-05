@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushSync } from "svelte";
+import type { CustomLayerInterface } from "@maptiler/sdk";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { InteractionRouter } from "../../../src/lib/core/interactions.svelte.js";
 import type { MapPlugin, PluginContext, Providers } from "../../../src/lib/core/plugin.js";
@@ -42,6 +43,39 @@ function resourcePlugin(id: string, log: string[] = [], onSetup?: (ctx: PluginCo
 			ctx.addImage("icon", { width: 1, height: 1 } as ImageData);
 			onSetup?.(ctx);
 			return () => log.push(`teardown:${id}`);
+		}
+	} satisfies MapPlugin;
+}
+
+/** A class instance, so its methods live on the prototype (a spread would drop them). */
+class StandInLayer implements CustomLayerInterface {
+	type = "custom" as const;
+	removed = 0;
+	constructor(public id: string) {}
+	render() {}
+	onAdd() {}
+	onRemove() {
+		this.removed++;
+	}
+}
+
+/** A plugin with a custom layer between a fill and a line; `made` collects what `create` built. */
+function customPlugin(id: string, made: StandInLayer[] = []) {
+	return {
+		id,
+		setup(ctx) {
+			const source = ctx.addSource("src", {
+				type: "geojson",
+				data: { type: "FeatureCollection", features: [] }
+			});
+			ctx.addLayer("fill", { type: "fill", source });
+			ctx.addCustomLayer("wind", (layerId) => {
+				const layer = new StandInLayer(layerId);
+				made.push(layer);
+				return layer;
+			});
+			ctx.addLayer("line", { type: "line", source });
+			return () => {};
 		}
 	} satisfies MapPlugin;
 }
@@ -598,6 +632,60 @@ describe("PluginHost", () => {
 			expect(ids(gl)).toEqual(["basemap", "m1:b:fill", "m1:b:line", "m1:a:fill", "m1:a:line"]);
 			host.move("b");
 			expect(ids(gl)).toEqual(["basemap", "m1:a:fill", "m1:a:line", "m1:b:fill", "m1:b:line"]);
+		});
+
+		describe("custom layers", () => {
+			it("addCustomLayer adds the same object, not a copy", () => {
+				const { host } = makeHost();
+				const gl = createFakeGl({ styleLoaded: true });
+				host.attach(gl);
+				const made: StandInLayer[] = [];
+				host.add(customPlugin("a", made));
+				expect(made).toHaveLength(1);
+				expect(made[0].id).toBe("m1:a:wind");
+				expect(gl.layers[1]).toBe(made[0]);
+			});
+
+			it("custom layer sits in its plugin's slot", () => {
+				const { host } = makeHost();
+				const gl = createFakeGl({ styleLoaded: true });
+				host.attach(gl);
+				host.add(customPlugin("a"));
+				host.add(resourcePlugin("b"));
+				host.add(customPlugin("c"), "a");
+				expect(ids(gl)).toEqual([
+					"m1:c:fill",
+					"m1:c:wind",
+					"m1:c:line",
+					"m1:a:fill",
+					"m1:a:wind",
+					"m1:a:line",
+					"m1:b:fill",
+					"m1:b:line"
+				]);
+				host.move("c");
+				expect(ids(gl).slice(-3)).toEqual(["m1:c:fill", "m1:c:wind", "m1:c:line"]);
+				expect(ids(gl).slice(0, 3)).toEqual(["m1:a:fill", "m1:a:wind", "m1:a:line"]);
+			});
+
+			it("custom layer is re-added after a restyle and removed once on teardown", () => {
+				const { host } = makeHost();
+				const gl = createFakeGl({ styleLoaded: true });
+				host.attach(gl);
+				const made: StandInLayer[] = [];
+				host.add(customPlugin("a", made));
+				host.add(resourcePlugin("b"));
+				gl.setStyle({});
+				host.restyle();
+				gl.fireStyleLoad();
+				expect(made).toHaveLength(2);
+				expect(ids(gl)).toEqual(["m1:a:fill", "m1:a:wind", "m1:a:line", "m1:b:fill", "m1:b:line"]);
+				expect(gl.layers[1]).toBe(made[1]);
+				host.detach();
+				expect(gl.calls.filter((c) => c === "removeLayer:m1:a:wind")).toHaveLength(1);
+				expect(ids(gl)).toEqual([]);
+				expect(errorSpy).not.toHaveBeenCalled();
+			});
 		});
 	});
 });
