@@ -136,6 +136,12 @@ export interface MapPlugin {
 	legend?(): LegendData | null;
 	features?(): FeatureListItem[];
 	selectable?: boolean;
+	/**
+	 * Which plugin's feature the hover tooltip shows where several are under the pointer: the
+	 * highest wins, the topmost on a tie. Default 0. A blocking layer on top still hides what is
+	 * beneath it, and clicks ignore this (topmost first).
+	 */
+	hoverPriority?: number;
 	displayOptions?: Snippet;
 	/** Richer tooltip content for one of this plugin's features, below its name. */
 	tooltip?(item: FeatureListItem): Snippet | undefined;

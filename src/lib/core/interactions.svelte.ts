@@ -9,11 +9,15 @@ interface Registration {
 	blocking: boolean;
 	/** For a blocking layer: called for a click where it is topmost. */
 	onClick?: (feature: BlockingClick) => void;
+	/** The plugin's `hoverPriority`. */
+	priority: number;
 }
 
 /** What is under one point. */
 interface Lookup {
 	hits: FeatureHit[];
+	/** The hit hover shows: the highest plugin priority among `hits`, the topmost on a tie. */
+	hover: FeatureHit | null;
 	/** True when the topmost feature is on a blocking layer: nothing beneath is hit. */
 	blocked: boolean;
 	/** The blocking layer's hover hit, if it gives one. */
@@ -62,6 +66,8 @@ export class InteractionRouter {
 	 */
 	#lastPointerType: string | null = null;
 	#hovered = $state.raw<Hovered | null>(null);
+	/** Whether the canvas cursor is set to a pointer. */
+	#pointer = false;
 
 	/** The top hit under the pointer and where it is. Reactive, for the tooltip. */
 	get hovered(): Hovered | null {
@@ -72,9 +78,10 @@ export class InteractionRouter {
 	register(
 		pluginId: string,
 		layerIds: string[],
-		toHit: (props: Record<string, unknown>) => FeatureHit | null
+		toHit: (props: Record<string, unknown>) => FeatureHit | null,
+		priority = 0
 	): () => void {
-		return this.#add({ pluginId, layerIds: [...layerIds], toHit, blocking: false });
+		return this.#add({ pluginId, layerIds: [...layerIds], toHit, blocking: false, priority });
 	}
 
 	/**
@@ -87,14 +94,16 @@ export class InteractionRouter {
 		pluginId: string,
 		layerIds: string[],
 		toHover?: (props: Record<string, unknown>) => FeatureHit | null,
-		onClick?: (feature: BlockingClick) => void
+		onClick?: (feature: BlockingClick) => void,
+		priority = 0
 	): () => void {
 		return this.#add({
 			pluginId,
 			layerIds: [...layerIds],
 			toHit: toHover ?? (() => null),
 			blocking: true,
-			onClick
+			onClick,
+			priority
 		});
 	}
 
@@ -104,6 +113,8 @@ export class InteractionRouter {
 		return () => {
 			if (!this.#registrations.delete(registration)) return;
 			if (this.#hovered?.hit.pluginId === pluginId) this.#hovered = null;
+			// The pointer may have been over this plugin; the next move sets it again.
+			this.#setPointer(false);
 		};
 	}
 
@@ -127,6 +138,7 @@ export class InteractionRouter {
 		gl.off("mousemove", this.#onMove);
 		gl.off("mouseout", this.#onOut);
 		this.#canvas?.removeEventListener("pointerdown", this.#onPointerDown);
+		this.#setPointer(false);
 		this.#canvas = null;
 		this.#lastPointerType = null;
 		this.#gl = null;
@@ -143,7 +155,7 @@ export class InteractionRouter {
 	}
 
 	#lookup(point: [number, number]): Lookup {
-		const none: Lookup = { hits: [], blocked: false, blocker: null, blockedBy: null };
+		const none: Lookup = { hits: [], hover: null, blocked: false, blocker: null, blockedBy: null };
 		const gl = this.#gl;
 		if (!gl) return none;
 		// Locals for one lookup; nothing reads them reactively.
@@ -157,6 +169,8 @@ export class InteractionRouter {
 		}
 		if (byLayer.size === 0) return none;
 		const hits: FeatureHit[] = [];
+		let hover: FeatureHit | null = null;
+		let hoverPriority = -Infinity;
 		const seen = new Set<string>();
 		/* eslint-enable svelte/prefer-svelte-reactivity */
 		const features = gl.queryRenderedFeatures(point, { layers: [...byLayer.keys()] });
@@ -166,6 +180,7 @@ export class InteractionRouter {
 			const hit = top.toHit(properties);
 			return {
 				hits: [],
+				hover: null,
 				blocked: true,
 				blocker: hit && { ...hit, pluginId: top.pluginId },
 				blockedBy: { registration: top, feature: { properties, geometry: features[0].geometry } }
@@ -177,9 +192,15 @@ export class InteractionRouter {
 			const hit = registration.toHit(feature.properties ?? {});
 			if (!hit || seen.has(hit.refKey)) continue;
 			seen.add(hit.refKey);
-			hits.push({ ...hit, pluginId: registration.pluginId });
+			const withPlugin = { ...hit, pluginId: registration.pluginId };
+			hits.push(withPlugin);
+			// Strictly greater, so a tie keeps the topmost.
+			if (registration.priority > hoverPriority) {
+				hover = withPlugin;
+				hoverPriority = registration.priority;
+			}
 		}
-		return { hits, blocked: false, blocker: null, blockedBy: null };
+		return { hits, hover, blocked: false, blocker: null, blockedBy: null };
 	}
 
 	/**
@@ -230,11 +251,20 @@ export class InteractionRouter {
 
 	#onMove = (e: PointerEventLike) => {
 		const found = this.#lookup([e.point.x, e.point.y]);
-		const hit = found.blocked ? found.blocker : found.hits[0];
+		const hit = found.blocked ? found.blocker : found.hover;
 		this.#hovered = hit ? { hit, lngLat: [e.lngLat.lng, e.lngLat.lat] } : null;
+		this.#setPointer(found.blocked || hit !== null);
 	};
 
 	#onOut = () => {
 		this.#hovered = null;
+		this.#setPointer(false);
 	};
+
+	/** Sets the canvas cursor only when it changes, so the engine's own cursors are left alone. */
+	#setPointer(on: boolean): void {
+		if (on === this.#pointer) return;
+		this.#pointer = on;
+		if (this.#canvas) this.#canvas.style.cursor = on ? "pointer" : "";
+	}
 }

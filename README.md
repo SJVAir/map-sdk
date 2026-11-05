@@ -230,6 +230,11 @@ yourself, with `ctx.addCustomLayer(local, create)`. The host calls `create` with
 removed on teardown, `create` runs again after a basemap or theme change (return a fresh layer each
 time), and `movePlugin` moves it with the plugin's other layers.
 
+The cursor is a pointer over any interactive feature or cluster bubble. Where several plugins'
+features are under the pointer, the hover tooltip shows the one whose plugin has the highest
+`hoverPriority` (default 0), the topmost on a tie; a cluster bubble on top still hides what is
+beneath it, and clicks always go to the topmost.
+
 ```ts
 import type { CustomLayerInterface, MapPlugin, PluginContext } from "@sjvair/map-sdk";
 

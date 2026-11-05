@@ -359,11 +359,21 @@ export class PluginHost {
 			},
 			interactive(layerIds, toHit) {
 				if (running.dead) return;
-				running.unregisters.push(router.register(pluginId, layerIds, toHit));
+				running.unregisters.push(
+					router.register(pluginId, layerIds, toHit, running.plugin.hoverPriority ?? 0)
+				);
 			},
 			blocking(layerIds, toHover, onClick) {
 				if (running.dead) return;
-				running.unregisters.push(router.registerBlocking(pluginId, layerIds, toHover, onClick));
+				running.unregisters.push(
+					router.registerBlocking(
+						pluginId,
+						layerIds,
+						toHover,
+						onClick,
+						running.plugin.hoverPriority ?? 0
+					)
+				);
 			},
 			on(type, layerId, listener) {
 				if (running.dead) return;

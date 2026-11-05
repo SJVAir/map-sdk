@@ -476,3 +476,102 @@ describe("blocking layers", () => {
 		expect(map.featuresAt({ x: 1, y: 2 }).map((h) => h.refKey)).toEqual(["region:county:019"]);
 	});
 });
+
+describe("hover priority and cursor", () => {
+	const move = (gl: FakeGl) =>
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+
+	function twoPlugins(lowPriority = 0, highPriority = 5) {
+		const map = createMap({ config });
+		map.addPlugin({ ...points("low"), hoverPriority: lowPriority });
+		map.addPlugin({ ...points("high", "region"), hoverPriority: highPriority });
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		return { map, gl };
+	}
+
+	it("hover prefers the higher-priority plugin under a lower-drawn feature", () => {
+		const { map, gl } = twoPlugins();
+		// "low" is topmost (first), "high" beneath it.
+		gl.setRenderedFeatures([rendered(map, "low", "1"), rendered(map, "high", "2")]);
+		move(gl);
+		expect(map.hovered?.hit.pluginId).toBe("high");
+	});
+
+	it("equal priority keeps topmost", () => {
+		const { map, gl } = twoPlugins(3, 3);
+		gl.setRenderedFeatures([rendered(map, "low", "1"), rendered(map, "high", "2")]);
+		move(gl);
+		expect(map.hovered?.hit.pluginId).toBe("low");
+	});
+
+	it("click ignores priority", () => {
+		const { map, gl } = twoPlugins();
+		const handler = vi.fn();
+		map.on("featureclick", handler);
+		gl.setRenderedFeatures([rendered(map, "low", "1"), rendered(map, "high", "2")]);
+		click(gl);
+		expect(handler).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ pluginId: "low" }));
+	});
+
+	it("a blocking bubble on top still blocks a higher priority beneath", () => {
+		const map = createMap({ config });
+		map.addPlugin({
+			id: "clusters",
+			setup(ctx) {
+				const source = ctx.addSource("src", {
+					type: "geojson",
+					data: { type: "FeatureCollection", features: [] }
+				});
+				ctx.blocking([ctx.addLayer("bubbles", { type: "circle", source })]);
+				return () => {};
+			}
+		});
+		map.addPlugin({ ...points("high"), hoverPriority: 9 });
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		gl.setRenderedFeatures([
+			{
+				layer: { id: `${map.uid}:clusters:bubbles` },
+				source: `${map.uid}:clusters:src`,
+				properties: {},
+				geometry: { type: "Point", coordinates: [-119, 36] }
+			},
+			rendered(map, "high", "2")
+		]);
+		move(gl);
+		expect(map.hovered).toBeNull();
+		expect(gl.canvas.style.cursor).toBe("pointer");
+	});
+
+	it("cursor is pointer over a hit and cleared on mouseout", () => {
+		const { map, gl } = setUp("none");
+		gl.setRenderedFeatures([rendered(map, "monitors", "3")]);
+		move(gl);
+		expect(gl.canvas.style.cursor).toBe("pointer");
+		gl.emit("mouseout", {});
+		expect(gl.canvas.style.cursor).toBe("");
+	});
+
+	it("cursor is cleared off every feature, and untouched while nothing was hovered", () => {
+		const { map, gl } = setUp("none");
+		gl.canvas.style.cursor = "grabbing";
+		gl.setRenderedFeatures([]);
+		move(gl);
+		expect(gl.canvas.style.cursor).toBe("grabbing");
+		gl.setRenderedFeatures([rendered(map, "monitors", "3")]);
+		move(gl);
+		gl.setRenderedFeatures([]);
+		move(gl);
+		expect(gl.canvas.style.cursor).toBe("");
+	});
+
+	it("detach clears the cursor", () => {
+		const { map, gl } = setUp("none");
+		gl.setRenderedFeatures([rendered(map, "monitors", "3")]);
+		move(gl);
+		const canvas = gl.canvas;
+		map.detach();
+		expect(canvas.style.cursor).toBe("");
+	});
+});
