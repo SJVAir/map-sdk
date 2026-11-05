@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from "svelte";
 	import type { MapContext } from "../core/create-map.svelte.js";
+	import type { GlMapLike } from "../core/gl.js";
 	import type { FeatureListItem, MapPlugin } from "../core/plugin.js";
 	import { NO_LEVEL } from "../data/scale.js";
 	import { levelChip } from "./level-chip.js";
@@ -16,9 +17,30 @@
 		/** The map container's size; the tooltip stays inside it. Unset: no clamping. */
 		width?: number;
 		height?: number;
+		/**
+		 * `"pinned"` (default) anchors the tooltip to its feature; `"pointer"` shows it at the last
+		 * pointer position and hides it on `gl`'s `zoomstart` until the next pointer move over a hit.
+		 * A keyboard-focused list item is always pinned.
+		 */
+		mode?: "pinned" | "pointer";
+		/** The GL map, for `zoomstart` in `"pointer"` mode. */
+		gl?: Pick<GlMapLike, "on" | "off"> | null;
 	}
 
-	let { map, project, width, height }: Props = $props();
+	let { map, project, width, height, mode = "pinned", gl = null }: Props = $props();
+
+	// Pointer mode only: set by a zoom, cleared by the next pointer move over a hit.
+	let zoomHidden = $state(false);
+	$effect(() => {
+		if (mode !== "pointer" || !gl) return;
+		const onZoomStart = () => (zoomHidden = true);
+		gl.on("zoomstart", onZoomStart);
+		return () => gl.off("zoomstart", onZoomStart);
+	});
+	$effect(() => {
+		// A new hovered object comes with every pointer move over a hit.
+		if (map.hovered) zoomHidden = false;
+	});
 
 	let tipWidth = $state(0);
 	let tipHeight = $state(0);
@@ -47,7 +69,12 @@
 	const item = $derived(found?.item ?? null);
 	const name = $derived(item?.name ?? hitName);
 	// A found item anchors the tooltip at its point (stable while the pointer moves over it).
-	const anchor = $derived(item?.lngLat ?? map.hovered?.lngLat ?? null);
+	// In pointer mode a hovered hit is anchored at the pointer instead (a focused item stays pinned).
+	const anchor = $derived(
+		mode === "pointer" && !map.focusedKey
+			? (map.hovered?.lngLat ?? null)
+			: (item?.lngLat ?? map.hovered?.lngLat ?? null)
+	);
 	const projected = $derived(anchor ? project(anchor) : null);
 	// Centered above the point; flipped below it near the top edge; inside the container.
 	const position = $derived.by(() => {
@@ -86,7 +113,7 @@
 </script>
 
 <!-- Only with something to show: a hit with no name, item, or content gets no empty box. -->
-{#if (name || item || custom) && position}
+{#if (name || item || custom) && position && !(zoomHidden && !map.focusedKey)}
 	<div
 		class="mapsdk-tooltip text-sm"
 		role="tooltip"

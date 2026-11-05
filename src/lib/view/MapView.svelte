@@ -35,6 +35,12 @@
 		 * engine's zoom, compass, and locate-me buttons, `"none"` none. The credits always show.
 		 */
 		controls?: "mapsdk" | "engine" | "none";
+		/**
+		 * `"pinned"` (default) anchors the tooltip to its feature. `"pointer"` shows it at the
+		 * pointer, like sjvair.com's map, and hides it on zoom until the pointer moves again.
+		 * Keyboard focus from the feature list always shows it pinned.
+		 */
+		tooltip?: "pinned" | "pointer";
 	}
 
 	let {
@@ -45,7 +51,8 @@
 		overlays,
 		featureList = true,
 		selectionBar = true,
-		controls = "mapsdk"
+		controls = "mapsdk",
+		tooltip = "pinned"
 	}: Props = $props();
 
 	const uid = $props.id();
@@ -175,7 +182,7 @@
 	data-mapsdk-map={map.uid}
 >
 	<div class="mapsdk-gl" bind:this={glContainer}></div>
-	<MapTooltip {map} {project} {width} {height} />
+	<MapTooltip {map} {project} {width} {height} mode={tooltip} gl={projector} />
 	{#if featureList}
 		<div class="mapsdk-list-panel">
 			<button
