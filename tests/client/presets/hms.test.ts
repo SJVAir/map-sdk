@@ -130,6 +130,12 @@ describe("hmsFirePlugin", () => {
 		expect(hmsFirePlugin({ id: "x", source, layerLabel: "F" }).id).toBe("x");
 	});
 
+	it("reports its legend as blocks", () => {
+		const source = new TestSource<Props>({ features: points([]), scale: fireScale });
+		const data = hmsFirePlugin({ source, layerLabel: "Fire" }).legend?.();
+		expect(data).toMatchObject({ display: "blocks", title: "Fire" });
+	});
+
 	it("listed: false keeps its fires out of the feature list", () => {
 		const source = new TestSource<Props>({ features: points([]), scale: ref });
 		expect(hmsFirePlugin({ source, layerLabel: "F", listed: false }).features).toBeUndefined();

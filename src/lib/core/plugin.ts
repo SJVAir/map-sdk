@@ -60,7 +60,17 @@ export interface FeatureListItem {
 }
 
 export type LegendData =
-	| { pluginId: string; title: string; units: string; scale: Scale }
+	| {
+			pluginId: string;
+			title: string;
+			units: string;
+			scale: Scale;
+			/**
+			 * `"gradient"` or `"blocks"` (labeled swatches with the levels' own labels). Absent: a
+			 * gradient for range scales and blocks for category scales.
+			 */
+			display?: "gradient" | "blocks";
+	  }
 	| { pluginId: string; status: DataStatus };
 
 export interface ClickEvent {

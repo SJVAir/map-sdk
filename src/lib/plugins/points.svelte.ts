@@ -9,6 +9,7 @@ import { untrack, type Snippet } from "svelte";
 import type {
 	FeatureHit,
 	FeatureListItem,
+	LegendData,
 	LayerSpecWithoutId,
 	MapPlugin,
 	PluginContext,
@@ -103,6 +104,8 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	 * zooming. Default: all zooms.
 	 */
 	zoomRange?: { min?: number; max?: number };
+	/** How the legend shows a range scale: a gradient (default) or labeled blocks. */
+	legendDisplay?: "gradient" | "blocks";
 	/** Whether `features()` lists this plugin's features. Default true. */
 	listed?: boolean;
 	/** Tooltip content for a feature, below its name; `props` are its source properties. */
@@ -135,7 +138,12 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 
 	const scales = createScaleResolver(pluginId, layerLabel, source);
 	const currentScale = scales.current;
-	const legend = scales.legend;
+	const legend = (): LegendData | null => {
+		const data = scales.legend();
+		return data && "scale" in data && options.legendDisplay
+			? { ...data, display: options.legendDisplay }
+			: data;
+	};
 
 	/** The providers of the running setup, for tooltips; null while not set up. */
 	let providers: Providers | null = null;

@@ -2,35 +2,44 @@
 	import { onMount } from "svelte";
 	import "./controls.css";
 	import type { MapContext } from "../core/create-map.svelte.js";
-	import type { DataStatus } from "../data/types.js";
 	import { watchTheme } from "../view/create-gl-map.js";
 	import LegendBar from "./LegendBar.svelte";
-	import { legendSection } from "./legend-data.js";
+	import { dropDuplicateEntries, legendSection, type LegendEntry } from "./legend-data.js";
 
-	let { map }: { map: MapContext } = $props();
+	let {
+		map,
+		order = "bottom-first"
+	}: {
+		map: MapContext;
+		/** `"bottom-first"` (default) lists the bottom plugin's section first; `"top-first"` last. */
+		order?: "bottom-first" | "top-first";
+	} = $props();
 
 	let root: HTMLElement | undefined = $state();
 	// The `--background` token as rgb, for mixing translucent swatches over it. Read as soon as the
 	// element exists (the bars wait for it), so no color is assumed before.
 	let background = $state<string | null>(null);
 
-	type Entry =
-		| { kind: "scale"; section: NonNullable<ReturnType<typeof legendSection>> }
-		| { kind: "status"; pluginId: string; layer: string; status: DataStatus };
-
-	/** A section per plugin with a scale, and a status line per plugin still loading or failing. */
+	/**
+	 * A section per plugin with a scale, and a status line per plugin still loading or failing, in
+	 * `order`; an entry identical to an earlier one is dropped.
+	 */
 	const entries = $derived(
-		map.plugins.flatMap((plugin): Entry[] => {
-			const data = plugin.legend?.();
-			if (!data) return [];
-			if ("status" in data) {
-				if (data.status.state === "ready") return [];
-				const layer = plugin.label ?? plugin.id;
-				return [{ kind: "status", pluginId: data.pluginId, layer, status: data.status }];
-			}
-			const section = legendSection(data, map.format);
-			return section ? [{ kind: "scale", section }] : [];
-		})
+		dropDuplicateEntries(
+			(order === "top-first" ? [...map.plugins].reverse() : map.plugins).flatMap(
+				(plugin): LegendEntry[] => {
+					const data = plugin.legend?.();
+					if (!data) return [];
+					if ("status" in data) {
+						if (data.status.state === "ready") return [];
+						const layer = plugin.label ?? plugin.id;
+						return [{ kind: "status", pluginId: data.pluginId, layer, status: data.status }];
+					}
+					const section = legendSection(data, map.format);
+					return section ? [{ kind: "scale", section }] : [];
+				}
+			)
+		)
 	);
 
 	/** Computed colors can be oklch() or color(); a 1x1 canvas turns any of them into rgb. */

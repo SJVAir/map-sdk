@@ -159,6 +159,11 @@ keyboard list). To show fire groups below zoom 10 and single hotspots from it, a
 `hmsFirePlugin({ id: "hms-fire-hotspots", zoomRange: { min: 10 }, listed: false, ... })` fed by
 `cleanFires` (both also from `@sjvair/map-sdk/stores`).
 
+`legendDisplay: "gradient" | "blocks"` on `pointsPlugin` sets how the legend draws a range scale
+(default a gradient; `hmsFirePlugin` uses `"blocks"`, labeled with the levels' own labels). `Legend`
+takes `order` (`"bottom-first"`, default, or `"top-first"`), and shows a section identical to one
+already shown (same title, units and bar, as with the two fire plugins) only once.
+
 ## Data sources
 
 A `DataSource` is `{ status, features, scale }`: a load status (`loading`, `ready`, `error` with

@@ -42,6 +42,7 @@ export function hmsFirePlugin(options: HmsFirePluginOptions): MapPlugin {
 		selectable: false,
 		zoomRange: options.zoomRange,
 		listed: options.listed,
+		legendDisplay: "blocks",
 		icon: {
 			category: () => "fire",
 			draw: (_category, color, _theme, levelIndex) => drawFire(color, levelIndex),
