@@ -31,7 +31,8 @@ export interface ShapesOptions<P extends MapFeatureProperties> {
 	fillOpacity?: number;
 	/**
 	 * Edge of the shapes. `theme` (default) is a 1px `--foreground` line; `level` draws it in the
-	 * level's color at the level's opacity (choropleth); `none` draws no outline layer.
+	 * level's color at the level's opacity (choropleth); `none` draws no outline layer
+	 * (so LineString geometries are not drawn either).
 	 */
 	outline?: "theme" | "level" | "none";
 }

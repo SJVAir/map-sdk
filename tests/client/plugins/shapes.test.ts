@@ -281,6 +281,14 @@ describe("shapesPlugin", () => {
 		]);
 	});
 
+	it("outline level in plain mode falls back to the theme outline", () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
+		const { gl } = setup({ source, mode: "plain", outline: "level" }, smokeScale, metaSpy);
+		const outline = layer(gl, "m1:shp:outline") as Extract<LayerSpecification, { type: "line" }>;
+		expect(outline.paint!["line-color"]).toBe(FALLBACK_THEME_COLORS.foreground);
+		expect(outline.paint!["line-opacity"]).toBeUndefined();
+	});
+
 	it("outline none adds no outline layer and fill stays interactive", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
 		const { gl, router } = setup({ source, outline: "none" });

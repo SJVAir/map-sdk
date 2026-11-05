@@ -147,6 +147,10 @@ Selected points show a highlight ring and check mark by default. `selectedStyle:
 `pointsPlugin` or `monitorsPlugin` instead draws the selected icon at 1.3x with no ring (icon
 points only), as sjvair.com's map does today.
 
+`outline` on `shapesPlugin` is `"theme"` (default, a 1px `--foreground` edge), `"level"` (the edge
+in each level's color at the fill's opacity; choropleth only), or `"none"` (no outline layer).
+`hmsSmokePlugin` uses `"level"`.
+
 ## Data sources
 
 A `DataSource` is `{ status, features, scale }`: a load status (`loading`, `ready`, `error` with
