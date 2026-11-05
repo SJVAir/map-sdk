@@ -5,7 +5,6 @@ import {
 	getHMSMeta,
 	getMonitorsMeta
 } from "@sjvair/sdk";
-import { scaleFromLegacyLevels } from "./scale.js";
 import type { Scale, ScaleRef } from "./scale-types.js";
 
 export interface EntryTypeInfo {
@@ -129,11 +128,7 @@ export function createDefaultMetadata(): MetadataProvider {
 					return Object.hasOwn(scales, ref.entryType) ? scales[ref.entryType] : undefined;
 				}
 				const entry = await entryMeta(ref, signal);
-				if (!entry) return undefined;
-				if (entry.scale) return entry.scale;
-				if (!entry.levels) return undefined;
-				const levels = Object.values(entry.levels).sort((a, b) => a.range[0] - b.range[0]);
-				return scaleFromLegacyLevels(ref.entryType, entry.label, entry.units ?? "", levels);
+				return entry?.scale ?? undefined;
 			}),
 		entryType: (ref, signal) =>
 			guarded(signal, async () => {
