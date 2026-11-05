@@ -26,10 +26,12 @@ JSR and installed through npm's JSR registry as an alias:
 }
 ```
 
-and in the host's `.npmrc`:
+and in the host's `.npmrc` (npm 12 refuses the JSR registry's tarball URLs unless
+`allow-remote` lets the root project fetch them):
 
 ```ini
 @jsr:registry=https://npm.jsr.io
+allow-remote=root
 ```
 
 Tailwind CSS v4 is required in the host. Its stylesheet must scan this package for classes and
