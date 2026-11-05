@@ -152,7 +152,10 @@ export function createGlMap(container: HTMLElement, ctx: MapContext): GlMapLike 
 		forceNoAttributionControl: true,
 		navigationControl: false,
 		geolocateControl: false,
-		logSDKVersion: false
+		logSDKVersion: false,
+		// Only when set, so a map without them gets today's constructor options.
+		...(ctx.config.projection ? { projection: ctx.config.projection } : {}),
+		...(ctx.config.space ? { space: ctx.config.space } : {})
 	});
 	gl.on("load", () => recordView(gl, ctx));
 	gl.on("moveend", () => recordView(gl, ctx));

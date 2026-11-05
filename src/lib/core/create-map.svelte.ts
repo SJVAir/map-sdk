@@ -30,6 +30,10 @@ export interface MapConfig {
 	basemaps?: BasemapConfig;
 	initialView?: CameraState;
 	cooperativeGestures?: boolean;
+	/** Default `"mercator"`. `"globe"` draws the map on a globe when zoomed out. */
+	projection?: "mercator" | "globe";
+	/** Default `false`. A preset (monitor-map uses `{ preset: "milkyway" }`) draws space behind a globe. */
+	space?: false | { preset: string };
 }
 
 export interface CreateMapOptions {

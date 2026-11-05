@@ -116,6 +116,8 @@ summary, basemap/zoom controls, credits, and the List button with its feature li
 (`featureList={false}` leaves them out). Anything else goes in the `overlays` snippet, where
 `getMapContext()` returns the map. `config.basemaps` replaces the default MapTiler Streets v4
 variants; `config.initialView` and `config.cooperativeGestures` set the camera and gesture handling.
+`config.projection` (`"mercator"` by default, or `"globe"`) and `config.space` (`false` by default, or
+`{ preset: "milkyway" }` for a space background behind the globe) are passed to MapTiler only when set.
 
 Without `createMonitorsStore`, build a `DataSource` yourself (below).
 
