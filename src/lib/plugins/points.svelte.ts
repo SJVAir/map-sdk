@@ -116,6 +116,8 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	listed?: boolean;
 	/** Tooltip content for a feature, below its name; `props` are its source properties. */
 	tooltip?(item: FeatureListItem, props: P, env: PointsTooltipEnv): Snippet | undefined;
+	/** The `tooltip` content shows the feature's name itself, so no name header is drawn above it. */
+	tooltipShowsName?: boolean;
 }
 
 /** Properties the plugin adds to each feature it hands MapLibre. */
@@ -616,6 +618,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 	};
 	if (options.listed ?? true) plugin.features = features;
 	if (options.tooltip) plugin.tooltip = featureTooltip;
+	if (options.tooltipShowsName) plugin.tooltipShowsName = true;
 	if (cluster?.tooltip) plugin.hoverTooltip = clusterTooltip;
 	return plugin;
 }

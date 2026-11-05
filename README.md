@@ -191,7 +191,9 @@ A `DataSource` is `{ status, features, scale }`: a load status (`loading`, `read
 and level labels) or a full `Scale`. A value the scale doesn't cover (null, negative) draws neutral
 and reads "No level"; a level with an empty color draws neutral with its own label. While a
 source loads, fails, or is unavailable, the legend says so (a failure offers "Try again", which
-calls `status.retry()`). Values are shown with the metadata's display precision.
+calls `status.retry()`). Values are shown with the metadata's display precision, except in the
+monitor, cluster, and collocation tooltips, which match monitor-map: the reading and a cluster's
+average are whole numbers, and a cluster's max and min are as reported.
 
 `createMonitorsStore()` (from `@sjvair/map-sdk/stores`) loads the monitors list and latest readings
 for an entry type, polls every two minutes, and exposes `dataSource`. `init()`, `update()`,
@@ -266,7 +268,9 @@ A plugin is an object with an `id` and a `setup(ctx)` that adds sources, layers,
 through its `PluginContext` and returns a teardown. The host runs `setup` once the map's style is
 ready and again after a basemap or theme change; everything added through `ctx` is removed on
 teardown, and ids are namespaced per map. `features()` feeds the feature list, tooltip, and
-summary; `legend()` the legend.
+summary; `legend()` the legend. A plugin's `tooltip` content sits under the feature's name; set
+`tooltipShowsName` when the content shows the name itself (the monitor and collocation tooltips
+do), and the name header is left out.
 
 ```ts
 import type { FeatureListItem, MapPlugin, PluginContext } from "@sjvair/map-sdk";

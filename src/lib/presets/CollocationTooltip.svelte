@@ -8,14 +8,12 @@
 	import MonitorReadingBox from "./MonitorReadingBox.svelte";
 
 	// Ported from monitor-map's CollocationTooltip: the reference monitor's reading beside its
-	// details, then the collocated monitor's with the box on the other side. The map tooltip
-	// shows the site's name above this.
+	// details, then the collocated monitor's with the box on the other side. Readings are whole
+	// numbers, as monitor-map's. The reference monitor's name is shown here, not above.
 
 	interface Props {
 		site: CollocationFeatureProperties;
 		scale: Scale | null;
-		/** Decimal places for the readings. */
-		precision: number;
 		messages: MessageProvider;
 		format: FormatProvider;
 		/** How often each monitor's type reports (e.g. "1 hour"); null leaves its note out. */
@@ -23,8 +21,7 @@
 		colocatedInterval: string | null;
 	}
 
-	let { site, scale, precision, messages, format, referenceInterval, colocatedInterval }: Props =
-		$props();
+	let { site, scale, messages, format, referenceInterval, colocatedInterval }: Props = $props();
 
 	function side(
 		name: string | null,
@@ -44,7 +41,7 @@
 			role,
 			color: level?.color || null,
 			level: level ? level.label : messages("mapsdk_no_level"),
-			reading: n === null ? null : formatValue(n, precision, format),
+			reading: n === null ? null : formatValue(n, 0, format),
 			subheading: interval ? messages("mapsdk_collocation_interval_avg", { interval }) : undefined,
 			at:
 				formatted && zone

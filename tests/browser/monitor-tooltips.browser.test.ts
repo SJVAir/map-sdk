@@ -44,6 +44,7 @@ describe("MonitorTooltip", () => {
 		});
 		const text = document.body.textContent!.replace(/\s+/g, " ");
 		expect(text).toContain("PM2.5 13");
+		expect(text).toContain("Fresno Garland");
 		expect(text).toContain("Nov 3, 2026, 1:00 PM");
 		expect(text).toContain("Moderate");
 		expect(text).toMatch(/Last updated \d+ (minutes|hours|days?) ago/);
@@ -52,7 +53,7 @@ describe("MonitorTooltip", () => {
 		expect(getComputedStyle(box).color).toBe("rgb(0, 0, 0)");
 	});
 
-	it("rounds the reading to the item's precision", async () => {
+	it("shows a whole number whatever the item's precision, as monitor-map does", async () => {
 		render(MonitorTooltip, {
 			item: { ...item(12.64), precision: 1 },
 			timestamp: null,
@@ -61,7 +62,32 @@ describe("MonitorTooltip", () => {
 			format,
 			interval: null
 		});
-		expect(document.body.textContent!.replace(/\s+/g, " ")).toContain("PM2.5 12.6");
+		expect(document.body.textContent!.replace(/\s+/g, " ")).toContain("PM2.5 13");
+		expect(document.body.textContent).not.toContain("12.6");
+	});
+
+	it("lays out the box left; time, bold underlined name, level, then the age on the right", async () => {
+		render(MonitorTooltip, {
+			item: item(12.6),
+			timestamp: "2026-11-03T21:00:00Z",
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			interval: null
+		});
+		const detail = document.querySelector(".mapsdk-monitor-detail")!;
+		const texts = [...detail.children].map((c) => c.textContent!.trim());
+		expect(texts[0]).toContain("Nov 3, 2026");
+		expect(texts[1]).toBe("Fresno Garland");
+		expect(texts[2]).toBe("Moderate");
+		expect(texts[3]).toMatch(/^Last updated/);
+		const name = getComputedStyle(detail.children[1]);
+		expect(name.fontWeight).toBe("700");
+		expect(name.textDecorationLine).toBe("underline");
+		const box = document.querySelector(".mapsdk-reading-box")!;
+		expect(box.getBoundingClientRect().right).toBeLessThanOrEqual(
+			detail.getBoundingClientRect().left
+		);
 	});
 
 	it("shows no reading and No level in a neutral box", async () => {
@@ -180,21 +206,20 @@ describe("MonitorClusterTooltip", () => {
 		expect(text).not.toContain("Good");
 	});
 
-	it("rounds the average, max, and min to the given precision", async () => {
-		const near = [monitor("1", "purpleair", 9.12), monitor("2", "purpleair", 9.16)];
+	it("rounds the average to a whole number and shows max and min as reported", async () => {
+		const near = [monitor("1", "purpleair", 8.02), monitor("2", "purpleair", 24.93)];
 		render(MonitorClusterTooltip, {
 			cluster: cluster(near, coords),
 			scale: pm25Scale,
-			precision: 1,
 			messages: defaultMessages,
 			format,
 			metadata
 		});
 		await expect.element(page.getByText(/^Max:/)).toBeVisible();
 		const text = document.body.textContent!.replace(/\s+/g, " ");
-		expect(text).toContain("PM2.5 9.1 (cluster avg)");
-		expect(text).toContain("Max: 9.2 µg/m³");
-		expect(text).toContain("Min: 9.1 µg/m³");
+		expect(text).toContain("PM2.5 16 (cluster avg)");
+		expect(text).toContain("Max: 24.93 µg/m³");
+		expect(text).toContain("Min: 8.02 µg/m³");
 	});
 
 	it("keeps the bubble's count and average when the leaves fail", async () => {
@@ -215,7 +240,7 @@ describe("MonitorClusterTooltip", () => {
 		monitorTypeLabel: vi.fn(async () => "PurpleAir")
 	} as unknown as MetadataProvider;
 
-	it("shows the type, count, area, average, max, and min with units", async () => {
+	it("shows the type, count, average, max, and min with units", async () => {
 		render(MonitorClusterTooltip, {
 			cluster: cluster(
 				[
@@ -236,14 +261,15 @@ describe("MonitorClusterTooltip", () => {
 		});
 		await expect.element(page.getByText("SJVAir PurpleAir Monitors")).toBeVisible();
 		const text = document.body.textContent!.replace(/\s+/g, " ");
-		expect(text).toMatch(/3 monitors covering \d+\.\d{3} mi²/);
+		expect(text).toContain("3 monitors");
+		expect(text).not.toContain("covering");
 		expect(text).toContain("PM2.5 15 (cluster avg)");
 		expect(text).toContain("Moderate");
 		expect(text).toContain("Max: 20 µg/m³");
 		expect(text).toContain("Min: 10 µg/m³");
 	});
 
-	it("leaves out the area for two monitors and falls back to the type id", async () => {
+	it("falls back to the type id", async () => {
 		const unavailable = {
 			monitorTypeLabel: vi.fn(async () => "unavailable")
 		} as unknown as MetadataProvider;
@@ -286,7 +312,6 @@ describe("CollocationTooltip", () => {
 		render(CollocationTooltip, {
 			site: site(),
 			scale: pm25Scale,
-			precision: 0,
 			messages: defaultMessages,
 			format,
 			referenceInterval: "1 hour",
@@ -323,7 +348,6 @@ describe("CollocationTooltip", () => {
 				colocatedTimestamp: null
 			}),
 			scale: pm25Scale,
-			precision: 0,
 			messages: defaultMessages,
 			format,
 			referenceInterval: null,

@@ -8,7 +8,8 @@
 	import MonitorReadingBox from "./MonitorReadingBox.svelte";
 
 	// Ported from monitor-map's MonitorTooltip: the reading in a level-colored box beside when it
-	// was taken. The map tooltip shows the monitor's name above this.
+	// was taken, the monitor's name, and how long ago. The whole number is monitor-map's;
+	// the level label is added for accessibility. The map tooltip leaves its own name header out.
 
 	interface Props {
 		item: FeatureListItem;
@@ -27,8 +28,7 @@
 	const level = $derived(item.level !== NO_LEVEL ? item.level : null);
 	const reading = $derived.by(() => {
 		const n = numericValue(item.value);
-		// Monitor-map's whole number unless the item says otherwise.
-		return n === null ? null : formatValue(n, item.precision ?? 0, format);
+		return n === null ? null : formatValue(n, 0, format);
 	});
 	const time = $derived.by(() => {
 		if (!timestamp || Number.isNaN(Date.parse(timestamp))) return null;
@@ -53,9 +53,10 @@
 		{#if time}
 			<span>{time.at}</span>
 		{/if}
+		<span class="mapsdk-monitor-name text-lg">{item.name}</span>
 		<span>{level ? level.label : messages("mapsdk_no_level")}</span>
 		{#if time}
-			<span class="text-base">{time.ago}</span>
+			<span class="mapsdk-monitor-ago text-base">{time.ago}</span>
 		{/if}
 	</div>
 </div>
@@ -64,6 +65,15 @@
 	.mapsdk-monitor-tip {
 		display: flex;
 		gap: 0.5rem;
+	}
+
+	.mapsdk-monitor-name {
+		font-weight: 700;
+		text-decoration: underline;
+	}
+
+	.mapsdk-monitor-ago {
+		margin-top: auto;
 	}
 
 	.mapsdk-monitor-detail {

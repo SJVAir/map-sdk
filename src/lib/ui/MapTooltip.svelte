@@ -96,6 +96,14 @@
 		return hit && plugin?.hoverTooltip?.(hit);
 	});
 
+	// The name header is left out when the plugin's own tooltip content shows the name.
+	const showName = $derived.by(() => {
+		if (!name) return false;
+		if (!custom) return true;
+		const plugin = found?.plugin ?? map.plugins.find((p) => p.id === hitPluginId);
+		return !plugin?.tooltipShowsName;
+	});
+
 	// A level with an empty color shows its label on the neutral chip.
 	const level = $derived(item && item.level !== NO_LEVEL ? item.level : null);
 	const levelLabel = $derived(level ? level.label : map.messages("mapsdk_no_level"));
@@ -122,7 +130,7 @@
 		style:left="{position.left}px"
 		style:top="{position.top}px"
 	>
-		{#if name}
+		{#if showName}
 			<div class="mapsdk-tooltip-name">{name}</div>
 		{/if}
 		{#if custom}
@@ -148,7 +156,9 @@
 		flex-direction: column;
 		align-items: flex-start;
 		gap: 0.25rem;
-		max-width: 16rem;
+		width: max-content;
+		/* Wide enough for a monitor's reading box and name; never wider than the map. */
+		max-width: min(28rem, calc(100% - 1rem));
 		box-sizing: border-box;
 		padding: 0.5rem 0.75rem;
 		border: 1px solid var(--card-border, var(--border));

@@ -65,6 +65,7 @@ export function collocationSitesPlugin(options: CollocationSitesPluginOptions): 
 			muted: (props) => !props.isActive,
 			mutedColor: MONITOR_INACTIVE_COLOR
 		},
+		tooltipShowsName: true,
 		tooltip: (_item, props, env) =>
 			componentSnippet<ComponentProps<typeof CollocationTooltip>>(
 				CollocationTooltip,
@@ -76,7 +77,6 @@ export function collocationSitesPlugin(options: CollocationSitesPluginOptions): 
 				]).then(([referenceInterval, colocatedInterval]) => ({
 					site: props,
 					scale: env.scale,
-					precision: env.precision,
 					messages: env.messages,
 					format: env.format,
 					referenceInterval,

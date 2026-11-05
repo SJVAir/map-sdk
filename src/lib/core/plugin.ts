@@ -156,6 +156,11 @@ export interface MapPlugin {
 	/** Richer tooltip content for one of this plugin's features, below its name. */
 	tooltip?(item: FeatureListItem): Snippet | undefined;
 	/**
+	 * Set when this plugin's `tooltip` content shows the feature's name itself, so the generic
+	 * tooltip leaves its name header out. Default false.
+	 */
+	tooltipShowsName?: boolean;
+	/**
 	 * Tooltip content for a hovered hit that isn't a listed feature (e.g. a cluster bubble's hover
 	 * hit from `PluginContext.blocking`).
 	 */

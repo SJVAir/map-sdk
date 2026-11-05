@@ -74,6 +74,50 @@ describe("MapTooltip", () => {
 		expect(document.querySelector(".mapsdk-tooltip-name")!.textContent).toBe("Second site");
 	});
 
+	it("leaves the name header out when the plugin's tooltip content shows the name", async () => {
+		const content = createRawSnippet(() => ({ render: () => "<span>Own layout</span>" }));
+		const make = (tooltipShowsName: boolean): MapContext =>
+			({
+				plugins: [
+					{
+						id: "points",
+						setup: () => () => {},
+						features: () => [item("a", "Fresno Yosemite", NO_LEVEL)],
+						tooltip: () => content,
+						tooltipShowsName
+					}
+				],
+				messages: defaultMessages,
+				format: createDefaultFormat(),
+				focusedKey: "a",
+				hovered: null
+			}) as never;
+		render(MapTooltip, { map: make(true), project });
+		await expect.element(page.getByText("Own layout")).toBeVisible();
+		expect(document.querySelector(".mapsdk-tooltip-name")).toBeNull();
+	});
+
+	it("keeps the name header above plugin content that doesn't show the name", async () => {
+		const content = createRawSnippet(() => ({ render: () => "<span>Own layout</span>" }));
+		const map = {
+			plugins: [
+				{
+					id: "points",
+					setup: () => () => {},
+					features: () => [item("a", "Fresno Yosemite", NO_LEVEL)],
+					tooltip: () => content
+				}
+			],
+			messages: defaultMessages,
+			format: createDefaultFormat(),
+			focusedKey: "a",
+			hovered: null
+		} as never;
+		render(MapTooltip, { map, project });
+		await expect.element(page.getByText("Own layout")).toBeVisible();
+		expect(document.querySelector(".mapsdk-tooltip-name")!.textContent).toBe("Fresno Yosemite");
+	});
+
 	it("shows the focused item's name, value, and level label", async () => {
 		const map = fakeMap([item("a", "Fresno Yosemite", level("Moderate", "#ff7e00"))], {
 			focusedKey: "a"
