@@ -2,9 +2,7 @@ import { untrack } from "svelte";
 import {
 	AttributionControl,
 	AttributionControlMLGL,
-	GeolocateControl,
 	Map as MaptilerMap,
-	NavigationControl,
 	MapStyle,
 	config as maptilerConfig
 } from "@maptiler/sdk";
@@ -156,8 +154,9 @@ function recordView(gl: MaptilerMap, ctx: MapContext): void {
 /**
  * Creates the MapTiler map for `ctx` in `container`, at `ctx`'s camera with its current basemap.
  * Reads `ctx` untracked, so calling this in an effect doesn't make it depend on the camera or
- * basemap. With `engineControls`, adds the engine's zoom and compass and locate-me buttons at
- * the top right; they go with the map. Records the camera and bounds once the map loads and after every move.
+ * basemap. With `engineControls`, the MapTiler SDK adds its default zoom/compass and locate-me
+ * controls at the top right; they go with the map.
+ * Records the camera and bounds once the map loads and after every move.
  */
 export function createGlMap(
 	container: HTMLElement,
@@ -181,21 +180,15 @@ export function createGlMap(
 		// at its automatic size: full on wide maps, collapsed on narrow ones. The SDK's default is
 		// always full, so ask for its automatic mode.
 		attributionControl: { compact: "auto" },
-		// Added below for `controls: "engine"`; MapView draws the rest.
-		navigationControl: false,
-		geolocateControl: false,
+		// `controls: "engine"` gets the SDK's own zoom/compass and locate-me controls, with its
+		// defaults (as monitor-map has today); otherwise MapView draws the controls.
+		navigationControl: engineControls ? "top-right" : false,
+		geolocateControl: engineControls ? "top-right" : false,
 		logSDKVersion: false,
 		// Only when set, so a map without them gets today's constructor options.
 		...(ctx.config.projection ? { projection: ctx.config.projection } : {}),
 		...(ctx.config.space ? { space: ctx.config.space } : {})
 	});
-	if (engineControls) {
-		gl.addControl(new NavigationControl({ visualizePitch: false }), "top-right");
-		gl.addControl(
-			new GeolocateControl({ trackUserLocation: true, showAccuracyCircle: true }),
-			"top-right"
-		);
-	}
 	gl.on("load", () => recordView(gl, ctx));
 	gl.on("moveend", () => recordView(gl, ctx));
 	return gl;

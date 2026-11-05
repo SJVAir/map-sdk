@@ -115,8 +115,8 @@ Standard (no fallback, must exist): `--background`, `--foreground`, `--card`, `-
 summary, zoom buttons, and the List button with its feature list, and the engine draws the
 credits. `featureList={false}` leaves out the List button and its panel, and `selectionBar={false}`
 the selection bar. `controls` picks the zoom controls: `"mapsdk"` (default) draws map-sdk's zoom
-buttons, `"engine"` the engine's zoom, compass, and locate-me buttons (top right), and `"none"`
-none; the credits show in every case. Anything else goes in the `overlays` snippet, where
+buttons, `"engine"` the MapTiler SDK's default zoom/compass and locate-me controls (top right, as
+monitor-map uses today), and `"none"` none; the credits show in every case. Anything else goes in the `overlays` snippet, where
 `getMapContext()` returns the map. `config.basemaps` replaces the default MapTiler Streets v4
 variants; `config.initialView` and `config.cooperativeGestures` set the camera and gesture handling.
 `config.projection` (`"mercator"` by default, or `"globe"`) and `config.space` (`false` by default, or

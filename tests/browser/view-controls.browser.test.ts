@@ -90,10 +90,12 @@ async function show(props: Record<string, unknown> = {}) {
 }
 
 describe("MapView controls", () => {
-	it("selectionBar false leaves the bar out with a selection set", async () => {
+	it("the selection bar shows by default with a selection set", async () => {
 		await show();
 		await vi.waitFor(() => expect(q(".mapsdk-selection")).toHaveLength(1));
-		document.body.replaceChildren();
+	});
+
+	it("selectionBar false leaves the bar out with a selection set", async () => {
 		await show({ selectionBar: false });
 		expect(q(".mapsdk-selection")).toHaveLength(0);
 	});
