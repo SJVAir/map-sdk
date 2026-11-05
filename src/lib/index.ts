@@ -7,6 +7,7 @@ import { defaultBasemaps } from "./view/create-gl-map.js";
 
 export { defaultBasemaps } from "./view/create-gl-map.js";
 export { default as MapView } from "./view/MapView.svelte";
+export type { FeatureListOptions, ListPosition } from "./view/list-placement.js";
 export { default as Legend } from "./ui/Legend.svelte";
 export { default as FeatureList } from "./ui/FeatureList.svelte";
 export { default as MapTooltip } from "./ui/MapTooltip.svelte";
