@@ -5,6 +5,7 @@ import {
 } from "./core/create-map.svelte.js";
 import { defaultBasemaps } from "./view/create-gl-map.js";
 
+export { defaultBasemaps } from "./view/create-gl-map.js";
 export { default as MapView } from "./view/MapView.svelte";
 export { default as Legend } from "./ui/Legend.svelte";
 export { default as FeatureList } from "./ui/FeatureList.svelte";
@@ -50,17 +51,27 @@ export type {
 	Providers
 } from "./core/plugin.js";
 export type { GlMapLike } from "./core/gl.js";
+export type { CustomLayerInterface } from "@maptiler/sdk";
 export type { Hovered } from "./core/interactions.svelte.js";
 export type { BasemapConfig } from "./core/basemap.svelte.js";
 export type {
 	Bounds,
 	CameraState,
+	CameraTarget,
 	CreateMapOptions,
 	FeatureClickHandler,
 	MapConfig,
 	MapContext,
 	PluginOptions
 } from "./core/create-map.svelte.js";
+
+/**
+ * The attached MapTiler `Map`, or `null` while detached: an escape hatch for markers and popups
+ * only. The host must never add sources or layers through it; plugins own those.
+ */
+export function maptilerMap(map: MapContext): import("@maptiler/sdk").Map | null {
+	return map.gl as unknown as import("@maptiler/sdk").Map | null;
+}
 
 /**
  * Creates a map's state and services; show it with `<MapView map={…} />`. Without
@@ -74,5 +85,11 @@ export { hmsSmokePlugin } from "./presets/hms-smoke.js";
 export type { HmsSmokePluginOptions } from "./presets/hms-smoke.js";
 export { hmsFirePlugin } from "./presets/hms-fire.js";
 export type { HmsFirePluginOptions } from "./presets/hms-fire.js";
-export { groupFires } from "./presets/fire-groups.js";
+export { cleanFires, groupFires } from "./presets/fire-groups.js";
 export type { FireDetection, FireGroup } from "./presets/fire-groups.js";
+export {
+	collocationSitesPlugin,
+	COLLOCATION_CROSSHAIR_COLOR
+} from "./presets/collocation-sites.js";
+export type { CollocationSitesPluginOptions } from "./presets/collocation-sites.js";
+export { circle, CROSSHAIR_ICON_SIZE, square, triangle, withCrosshair } from "./plugins/icons.js";

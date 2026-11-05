@@ -1,1 +1,11 @@
-{ "version": 8, "sources": {}, "layers": [] }
+{
+	"version": 8,
+	"sources": {
+		"openmaptiles": {
+			"type": "geojson",
+			"data": { "type": "FeatureCollection", "features": [] },
+			"attribution": "<a href=\"https://www.maptiler.com/copyright/\" target=\"_blank\">&copy; MapTiler</a> <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\">&copy; OpenStreetMap contributors</a>"
+		}
+	},
+	"layers": [{ "id": "empty-dots", "type": "circle", "source": "openmaptiles" }]
+}

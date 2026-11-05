@@ -1,15 +1,24 @@
-import type { MapPlugin } from "../core/plugin.js";
+import type { MapPlugin, PluginContext } from "../core/plugin.js";
+import { scopedContext } from "../core/scoped-context.js";
 import type { DataSource } from "../data/types.js";
 import { fireIcon } from "../plugins/icons.js";
 import { pointsPlugin } from "../plugins/points.svelte.js";
+import TooltipItem from "../ui/TooltipItem.svelte";
+import { componentSnippet } from "./monitors.js";
 
 export interface HmsFirePluginOptions {
 	/** Default "hms-fire". */
 	id?: string;
+	/** The fires, or with `hotspots` the groups shown below zoom 10 (listed). */
 	source: DataSource;
+	/** Single detections shown from zoom 10 instead of `source` (not listed). Default: none. */
+	hotspots?: DataSource;
 	/** Already-translated layer name for the list and summary. */
 	layerLabel: string;
 }
+
+/** The zoom where `hotspots` replace the groups (inclusive), as sjvair.com's map does. */
+const HOTSPOT_ZOOM = 10;
 
 /** Icon size in pixels by level index, smallest to largest (presentation). */
 const SIZES = [20, 24, 28, 32, 36];
@@ -22,24 +31,78 @@ function drawFire(color: string, levelIndex = -1): string {
 	return `<svg width="${CANVAS}" height="${CANVAS}" viewBox="0 0 ${CANVAS} ${CANVAS}" xmlns="http://www.w3.org/2000/svg"><g transform="translate(${offset} ${offset})">${fireIcon(color, size)}</g></svg>`;
 }
 
-/**
- * NOAA HMS fire detections as flame icons colored by fire radiative power (MW) and growing with
- * its level. Not selectable; listed.
- *
- * The source's `scale` is expected to be the ScaleRef
- * `{ dataset: "hms-fire", entryType: "fire-frp" }`, and each feature's `value` its FRP. Pass groups
- * from `groupFires` (value = `avgFrp`) to merge nearby detections. This preset does not fetch.
- */
-export function hmsFirePlugin(options: HmsFirePluginOptions): MapPlugin {
+function firePoints(
+	id: string,
+	source: DataSource,
+	layerLabel: string,
+	zoomRange?: { min?: number; max?: number }
+): MapPlugin {
 	return pointsPlugin({
-		id: options.id ?? "hms-fire",
-		source: options.source,
-		layerLabel: options.layerLabel,
+		id,
+		source,
+		layerLabel,
 		selectable: false,
+		zoomRange,
+		legendDisplay: "blocks",
 		icon: {
 			category: () => "fire",
 			draw: (_category, color, _theme, levelIndex) => drawFire(color, levelIndex),
 			size: CANVAS
 		}
 	});
+}
+
+/**
+ * NOAA HMS fire detections as flame icons colored by fire radiative power (MW) and growing with
+ * its level. Not selectable; `source`'s fires are listed.
+ *
+ * With `hotspots`, it is still one layer (one legend section, one list) that switches by itself
+ * while zooming: `source` (groups from `groupFires`, value = `avgFrp`) below zoom 10, `hotspots`
+ * (each detection) from zoom 10. Both are hit-tested and show the same tooltip (name, value,
+ * level);
+ * only the groups are listed.
+ *
+ * The sources' `scale` is expected to be the ScaleRef `{ dataset: "hms-fire", entryType:
+ * "fire-frp" }`, and each feature's `value` its FRP. This preset does not fetch.
+ */
+export function hmsFirePlugin(options: HmsFirePluginOptions): MapPlugin {
+	const id = options.id ?? "hms-fire";
+	const { source, hotspots, layerLabel } = options;
+	if (!hotspots) return firePoints(id, source, layerLabel);
+	// Both inner plugins share the outer id, so their hits are this plugin's.
+	const groups = firePoints(id, source, layerLabel, { max: HOTSPOT_ZOOM });
+	const singles = firePoints(id, hotspots, layerLabel, { min: HOTSPOT_ZOOM });
+	// The providers of the running setup, for the hotspots' tooltips.
+	let ctxNow: PluginContext | null = null;
+	return {
+		id,
+		label: layerLabel,
+		get dataset() {
+			return groups.dataset;
+		},
+		selectable: false,
+		setup(ctx) {
+			ctxNow = ctx;
+			const teardownGroups = groups.setup(scopedContext(ctx, "groups:"));
+			const teardownSingles = singles.setup(scopedContext(ctx, "hotspots:"));
+			return () => {
+				ctxNow = null;
+				teardownSingles();
+				teardownGroups();
+			};
+		},
+		legend: groups.legend,
+		// Only the groups are listed; a hovered hotspot shows what a group's hover does: its name
+		// (the generic header) with its value and level.
+		features: groups.features,
+		hoverTooltip(hit) {
+			const item = singles.features?.().find((f) => f.refKey === hit.refKey);
+			if (!item || !ctxNow) return undefined;
+			return componentSnippet(TooltipItem, {
+				item,
+				messages: ctxNow.messages,
+				format: ctxNow.format
+			});
+		}
+	};
 }

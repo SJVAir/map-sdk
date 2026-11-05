@@ -1,6 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { createMap, monitorsPlugin, regionsPlugin, shapesPlugin } from "../../src/lib/index.js";
-import type { FeatureListItem, MapContext, MapPlugin, PluginContext } from "../../src/lib/index.js";
+import {
+	circle,
+	collocationSitesPlugin,
+	CROSSHAIR_ICON_SIZE,
+	createMap,
+	defaultBasemaps,
+	hmsFirePlugin,
+	hmsSmokePlugin,
+	maptilerMap,
+	monitorsPlugin,
+	regionsPlugin,
+	shapesPlugin,
+	withCrosshair
+} from "../../src/lib/index.js";
+import type {
+	CustomLayerInterface,
+	FeatureListItem,
+	MapContext,
+	MapPlugin,
+	PluginContext
+} from "../../src/lib/index.js";
 import {
 	decodeRef,
 	NO_LEVEL,
@@ -11,7 +30,12 @@ import {
 	type MessageProvider,
 	type SpatialSelection
 } from "../../src/lib/data/index.js";
-import { createMonitorsStore } from "../../src/lib/stores/index.js";
+import {
+	createCollocationSitesStore,
+	createHmsFireStore,
+	createHmsSmokeStore,
+	createMonitorsStore
+} from "../../src/lib/stores/index.js";
 import type { FeatureCollection, Point } from "geojson";
 
 // The README's examples, compiled by `npm run check` (they are type-checked against the real
@@ -31,6 +55,21 @@ describe("README examples", () => {
 		expect(map.plugins.map((p) => p.id)).toEqual(["monitors"]);
 		map.destroy();
 		store.dispose();
+	});
+
+	it("today's basemaps without the POI layer filter", () => {
+		const basemaps = { ...defaultBasemaps(), excludedLayers: [] };
+		const map = createMap({ config: { maptilerKey: "your-maptiler-key", basemaps } });
+		expect(basemaps.styles.length).toBeGreaterThan(0);
+		expect(basemaps.excludedLayers).toEqual([]);
+		map.destroy();
+	});
+
+	it("maptilerMap is null while detached", () => {
+		const map = createMap({ config: { maptilerKey: "your-maptiler-key" } });
+		expect(map.ready).toBe(false);
+		expect(maptilerMap(map)).toBeNull();
+		map.destroy();
 	});
 
 	it("static GeoJSON through shapesPlugin and staticSource", () => {
@@ -108,6 +147,30 @@ describe("README examples", () => {
 		map.destroy();
 	});
 
+	it("writing a plugin: a custom layer", () => {
+		class WindLayer implements CustomLayerInterface {
+			readonly type = "custom";
+			constructor(readonly id: string) {}
+			onAdd() {}
+			render() {}
+			onRemove() {}
+		}
+
+		const windPlugin: MapPlugin = {
+			id: "wind",
+			label: "Wind",
+			setup(ctx: PluginContext) {
+				ctx.addCustomLayer("particles", (id) => new WindLayer(id));
+				return () => {};
+			}
+		};
+
+		const map = createMap({ config: { maptilerKey: "" } });
+		map.addPlugin(windPlugin);
+		expect(map.plugins.map((p) => p.id)).toEqual(["wind"]);
+		map.destroy();
+	});
+
 	it("selection: host-owned, featureclick, featuresAt, featureForElement", () => {
 		const map: MapContext = createMap({ config: { maptilerKey: "" } });
 		const store = createMonitorsStore();
@@ -127,6 +190,8 @@ describe("README examples", () => {
 			return [hits, row];
 		};
 		expect(onContextMenu).toBeTypeOf("function");
+		map.flyTo({ center: [-119.7, 36.7], zoom: 16 });
+		map.easeTo({ center: [-119.7, 36.7], minZoom: 12 });
 		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["abc"] });
 		expect(decodeRef("monitor:abc")).toEqual({ kind: "monitor", id: "abc" });
 		off();
@@ -142,5 +207,38 @@ describe("README examples", () => {
 		const map = createMap({ config: { maptilerKey: "" }, messages });
 		expect(map.messages("mapsdk_list_button")).toBe("Lista");
 		map.destroy();
+	});
+
+	it("HMS stores feed the HMS plugins", () => {
+		const smoke = createHmsSmokeStore();
+		const fires = createHmsFireStore();
+		const map = createMap({ config: { maptilerKey: "your-maptiler-key" } });
+		map.addPlugin(hmsSmokePlugin({ source: smoke.dataSource, layerLabel: "Smoke" }));
+		map.addPlugin(
+			hmsFirePlugin({ source: fires.groups, hotspots: fires.hotspots, layerLabel: "Fires" })
+		);
+		expect(map.plugins.map((p) => p.id)).toEqual(["hms-smoke", "hms-fire"]);
+		smoke.dispose();
+		fires.dispose();
+	});
+
+	it("collocation sites draw under the monitors from a store joined to them", () => {
+		const monitors = createMonitorsStore();
+		const collocations = createCollocationSitesStore({ monitors });
+		const map = createMap({ config: { maptilerKey: "your-maptiler-key" } });
+		map.addPlugin(
+			collocationSitesPlugin({ source: collocations.dataSource, layerLabel: "Collocation sites" })
+		);
+		map.addPlugin(monitorsPlugin({ source: monitors.dataSource, layerLabel: "Monitors" }));
+		expect(map.plugins.map((p) => p.id)).toEqual(["collocation-sites", "monitors"]);
+		expect(collocations.dataSource.features).toBeNull();
+		collocations.dispose();
+		monitors.dispose();
+		map.destroy();
+	});
+
+	it("marker shapes in a crosshair", () => {
+		const svg = withCrosshair(circle("#00e400", 2), "#4A5FC6");
+		expect(svg).toContain(`width="${CROSSHAIR_ICON_SIZE}"`);
 	});
 });

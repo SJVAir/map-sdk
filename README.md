@@ -3,7 +3,7 @@
 Svelte 5 map components for SJVAir air-quality data, built on the MapTiler SDK. A map is a
 `createMap()` context, shown with `<MapView>`, with data drawn by plugins (monitors, region fills,
 CalHeatScore, forecast zones, HMS smoke and fire, or your own GeoJSON). It ships a legend, a
-feature list, a selection bar, tooltips, and basemap controls, all themed from the host's tokens.
+feature list, a selection bar, tooltips, and zoom controls, all themed from the host's tokens.
 
 Supported browsers: Chrome/Edge 111+, Safari 16.4+, Firefox 128+. MIT licensed.
 
@@ -112,10 +112,20 @@ Standard (no fallback, must exist): `--background`, `--foreground`, `--card`, `-
 
 `createMap(options)` returns the map's state and services (`MapContext`) with no GL map yet;
 `MapView` creates the GL map when it mounts. `MapView` draws the tooltip, selection bar, view
-summary, basemap/zoom controls, credits, and the List button with its feature list
-(`featureList={false}` leaves them out). Anything else goes in the `overlays` snippet, where
-`getMapContext()` returns the map. `config.basemaps` replaces the default MapTiler Streets v4
-variants; `config.initialView` and `config.cooperativeGestures` set the camera and gesture handling.
+summary, zoom buttons, and the List button with its feature list, and the engine draws the
+credits. `featureList={false}` leaves out the List button and its panel, and `selectionBar={false}`
+the selection bar. `controls` picks the zoom controls: `"mapsdk"` (default) draws map-sdk's zoom
+buttons, `"engine"` the MapTiler SDK's default zoom/compass and locate-me controls (top right, as
+monitor-map uses today), and `"none"` none; the credits show in every case. Choose `controls` up
+front: changing it after mount recreates the map. `tooltip` is `"pinned"` (default: anchored to the
+feature) or `"pointer"` (shown at the pointer, as sjvair.com's map does, and hidden on zoom until
+the pointer moves again); a feature focused from the list is always pinned. Anything else goes in
+the `overlays` snippet, where `getMapContext()` returns the map. `config.basemaps` replaces the
+default MapTiler Streets v4 variants (build on `defaultBasemaps()`, which `createMap` uses: today's
+sjvair.com setup is `{ ...defaultBasemaps(), excludedLayers: [] }`); `config.initialView` and
+`config.cooperativeGestures` set the camera and gesture handling. `config.projection` (`"mercator"`
+by default, or `"globe"`) and `config.space` (`false` by default, or `{ preset: "milkyway" }` for a
+space background behind the globe) are passed to MapTiler only when set.
 
 Without `createMonitorsStore`, build a `DataSource` yourself (below).
 
@@ -127,14 +137,54 @@ Use it for a map on a hidden tab.
 
 ### Plugins and draw order
 
-Plugins draw in the order they were added, later on top. `addPlugin(plugin, { before: "id" })`
-draws just below another plugin, and `map.movePlugin(id, { before? })` moves an added plugin and
-its layers to the top, or just below the plugin `before` names. A plugin object belongs to one
-map: create one per map (adding an object that is set up on another map throws). The
-presets are `monitorsPlugin`, `regionsPlugin`, `calHeatScorePlugin`, `forecastZonesPlugin`,
-`hmsSmokePlugin`, and `hmsFirePlugin`; `pointsPlugin` and `shapesPlugin` are the general ones they
-are built on. Presets don't fetch: the host supplies a `DataSource`. `monitorsPlugin` is
+Plugins draw in the order they were added, later on top. `addPlugin(plugin, { before: "id" })` draws
+just below another plugin, and `map.movePlugin(id, { before? })` moves an added plugin and its
+layers to the top, or just below the plugin `before` names. A plugin object belongs to one map:
+create one per map (adding an object that is set up on another map throws). The presets are
+`monitorsPlugin`, `regionsPlugin`, `calHeatScorePlugin`, `forecastZonesPlugin`, `hmsSmokePlugin`,
+`hmsFirePlugin`, and `collocationSitesPlugin`; `pointsPlugin` and `shapesPlugin` are the general
+ones they are built on. Presets don't fetch: the host supplies a `DataSource`. `monitorsPlugin` is
 selectable by default, like the shape presets.
+
+Selected points show a highlight ring and check mark by default. `selectedStyle: "enlarge"` on
+`pointsPlugin` or `monitorsPlugin` instead draws the selected icon at 1.3x with no ring (icon
+points only), as sjvair.com's map does today.
+
+`outline` on `shapesPlugin` is `"theme"` (default, a 1px `--foreground` edge), `"level"` (the edge
+in each level's color at the fill's opacity; choropleth only), or `"none"` (no outline layer).
+`hmsSmokePlugin` uses `"level"`.
+
+`zoomRange: { min?, max? }` on `pointsPlugin` limits every layer it draws (points, clusters,
+selection) to zooms from `min` (inclusive) up to `max` (exclusive), switching live while zooming.
+
+`hmsFirePlugin({ id?, source, hotspots?, layerLabel })` draws fires as flame icons sized and
+colored by FRP. With `hotspots`, it switches by itself while zooming, as sjvair.com's map does:
+`source` (the fire store's `groups`) below zoom 10 and `hotspots` from zoom 10. It stays one
+layer: one legend section, one feature list (the groups, so keyboard users reach every fire;
+hotspots aren't listed), and tooltips for both.
+
+`legendDisplay: "gradient" | "blocks"` on `pointsPlugin` sets how the legend draws a range scale
+(default a gradient; `hmsFirePlugin` uses `"blocks"`, labeled with the levels' own labels). A blocks
+legend (also every category scale, such as smoke) is one outlined bar of contiguous segments with
+each level's label under its segment; long labels wrap. `legendTitle: "layer" | "entry-type"` sets
+the legend section's title: `layerLabel` (default) or the entry type's label from the metadata
+provider (`monitorsPlugin` uses the latter, so its section reads "PM2.5"; `layerLabel` still names
+the layer in the list, selection bar and summary). `Legend` takes `order` (`"bottom-first"`,
+default, or `"top-first"`).
+
+`collocationSitesPlugin({ id?, source, layerLabel })` draws collocation sites as sjvair.com does:
+each at its reference monitor, in that monitor's shape and level color (inactive gray, inside
+outlined), wrapped in a crosshair of `COLLOCATION_CROSSHAIR_COLOR` (`#4A5FC6`, a fixed color on
+every theme). Its tooltip shows the reference and collocated monitors' readings side by side, each
+with its time and level. It isn't selectable and adds no legend section (the monitors' scale is
+shown by `monitorsPlugin`). Add it before `monitorsPlugin` so it draws under the monitors; its
+`hoverPriority` is `Number.MAX_SAFE_INTEGER`, so its tooltip still wins over a monitor drawn above
+it (clicks go to the topmost feature).
+
+The monitor marker shapes are exported for your own plugins: `circle`, `square`, and
+`triangle(color, borderWidth, borderColor?)` return a 24px SVG, and `withCrosshair(svg, color)`
+wraps one in the crosshair (`CROSSHAIR_ICON_SIZE`, 56px, square). Pass the size to
+`pointsPlugin`'s `icon.size`.
 
 ## Data sources
 
@@ -145,12 +195,52 @@ A `DataSource` is `{ status, features, scale }`: a load status (`loading`, `read
 and level labels) or a full `Scale`. A value the scale doesn't cover (null, negative) draws neutral
 and reads "No level"; a level with an empty color draws neutral with its own label. While a
 source loads, fails, or is unavailable, the legend says so (a failure offers "Try again", which
-calls `status.retry()`). Values are shown with the metadata's display precision.
+calls `status.retry()`). Values are shown with the metadata's display precision, except in the
+monitor, cluster, and collocation tooltips, which match monitor-map: the reading and a cluster's
+average are whole numbers, and a cluster's max and min are as reported.
 
 `createMonitorsStore()` (from `@sjvair/map-sdk/stores`) loads the monitors list and latest readings
 for an entry type, polls every two minutes, and exposes `dataSource`. `init()`, `update()`,
 `entryTypeFor()`, `pauseAutoUpdate()`, `resumeAutoUpdate()`, and `dispose()` are its controls. A
 dashboard that has its own date-range data builds a `DataSource` itself instead.
+`meta` is the read-only monitors meta (the SDK's `MonitorsMeta`), null until `init()` resolves.
+
+`createHmsSmokeStore()` and `createHmsFireStore()` (also from `@sjvair/map-sdk/stores`) load today's
+NOAA HMS smoke and fire once, with no polling. Each has `status`, `init({ signal })`, and
+`dispose()`; overlapping `init()` calls share one request, a failed load reports `error` with
+`retry()` (on `status` and on every source), and a caller's abort rejects only that caller. A day
+with no data is `ready` with an empty collection, so the legend still shows. The smoke store has one
+`dataSource` for `hmsSmokePlugin` (scale `hms-smoke` / `smoke-density`, value the density). The fire
+store has `groups` (nearby detections merged by `groupFires`, value the mean FRP) and `hotspots`
+(each detection after `cleanFires`, value its FRP), for `hmsFirePlugin`'s `source` and `hotspots`
+(scale `hms-fire` / `fire-frp`). Pass `{ messages }` to name the features with your own provider.
+
+```ts
+const smoke = createHmsSmokeStore();
+const fires = createHmsFireStore();
+await Promise.all([smoke.init(), fires.init()]);
+map.addPlugin(hmsSmokePlugin({ source: smoke.dataSource, layerLabel: "Smoke" }));
+map.addPlugin(
+	hmsFirePlugin({ source: fires.groups, hotspots: fires.hotspots, layerLabel: "Fires" })
+);
+```
+
+`createCollocationSitesStore({ monitors })` (also from `@sjvair/map-sdk/stores`) loads the
+collocation sites once and joins each to a monitors store: `dataSource` follows that store's
+readings as it polls and uses its scale. A site whose reference or collocated monitor isn't in the
+monitors store (inactive, filtered out, or not loaded yet) still draws at its own position, in the
+neutral color with "No reading". It has `status`, `init({ signal })`, and `dispose()`, like the
+HMS stores; `init()` doesn't load the monitors store.
+
+```ts
+const monitors = createMonitorsStore();
+const collocations = createCollocationSitesStore({ monitors });
+await Promise.all([monitors.init("pm25"), collocations.init()]);
+map.addPlugin(
+	collocationSitesPlugin({ source: collocations.dataSource, layerLabel: "Collocation sites" })
+);
+map.addPlugin(monitorsPlugin({ source: monitors.dataSource, layerLabel: "Monitors" }));
+```
 
 ### Plain GeoJSON: `staticSource`
 
@@ -182,7 +272,9 @@ A plugin is an object with an `id` and a `setup(ctx)` that adds sources, layers,
 through its `PluginContext` and returns a teardown. The host runs `setup` once the map's style is
 ready and again after a basemap or theme change; everything added through `ctx` is removed on
 teardown, and ids are namespaced per map. `features()` feeds the feature list, tooltip, and
-summary; `legend()` the legend.
+summary; `legend()` the legend. A plugin's `tooltip` content sits under the feature's name; set
+`tooltipShowsName` when the content shows the name itself (the monitor and collocation tooltips
+do), and the name header is left out.
 
 ```ts
 import type { FeatureListItem, MapPlugin, PluginContext } from "@sjvair/map-sdk";
@@ -219,10 +311,43 @@ function sitesPlugin(sites: Sites): MapPlugin {
 }
 ```
 
+A plugin can also add a MapLibre custom layer, such as a wind layer from a library you add
+yourself, with `ctx.addCustomLayer(local, create)`. The host calls `create` with the namespaced id
+(the layer must use it) and adds the object it returns as is, in the plugin's draw-order slot. It is
+removed on teardown, `create` runs again after a basemap or theme change (return a fresh layer each
+time), and `movePlugin` moves it with the plugin's other layers.
+
+The cursor is a pointer over any interactive feature or cluster bubble. Where several plugins'
+features are under the pointer, the hover tooltip shows the one whose plugin has the highest
+`hoverPriority` (default 0), the topmost on a tie; a cluster bubble on top still hides what is
+beneath it, and clicks always go to the topmost.
+
+```ts
+import type { CustomLayerInterface, MapPlugin, PluginContext } from "@sjvair/map-sdk";
+
+class WindLayer implements CustomLayerInterface {
+	readonly type = "custom";
+	constructor(readonly id: string) {}
+	onAdd() {} // set up the library's renderer
+	render() {} // draw one frame
+	onRemove() {} // release it
+}
+
+const windPlugin: MapPlugin = {
+	id: "wind",
+	label: "Wind",
+	setup(ctx: PluginContext) {
+		ctx.addCustomLayer("particles", (id) => new WindLayer(id));
+		return () => {};
+	}
+};
+```
+
 The root entry exports the types a plugin needs (`MapPlugin`, `PluginContext`, `FeatureHit`,
-`FeatureListItem`, `LegendData`, `Providers`, `GlMapLike`, `LayerSpecWithoutId`, `ThemeColors`,
-`ClusterLayers`, `ClusterLayerArgs`, `BlockingClick`, `Hovered`) and the scale expressions the
-built-in plugins use (`colorExpression`, `opacityExpression`, `levelKeyExpression`).
+`FeatureListItem`, `LegendData`, `Providers`, `GlMapLike`, `CustomLayerInterface`,
+`LayerSpecWithoutId`, `ThemeColors`, `ClusterLayers`, `ClusterLayerArgs`, `BlockingClick`,
+`Hovered`) and the scale expressions the built-in plugins use (`colorExpression`,
+`opacityExpression`, `levelKeyExpression`).
 
 ## Selection
 
@@ -245,12 +370,41 @@ map.addPlugin(plugin, {
 in the selection bar, and a feature that appears later shows as selected. `map.getSelection(id)`
 and `getSelectionMode(id)` are reactive.
 
-`map.on("featureclick", ({ pluginId, ref }) => …)` fires for every click on a feature, whatever the
-mode, and also for a pick in the feature list, so keyboard users get the same event; it returns an
-unsubscribe function. For your own context menu, `map.featuresAt({ x, y })` returns the hits under
+`map.on("featureclick", ({ pluginId, ref, lngLat }) => …)` fires for every click on a feature,
+whatever the mode, and also for a pick in the feature list, so keyboard users get the same event;
+`lngLat` is the click point (the item's position for a list pick). It returns an unsubscribe
+function. For your own context menu, `map.featuresAt({ x, y })` returns the hits under
 a canvas point, topmost first, and `map.featureForElement(element)` returns the hit for a row of
 the feature list (an element with `data-mapsdk-ref`). Both return nothing while the map is
 detached.
+
+## Camera
+
+`map.easeTo({ center, zoom?, minZoom? })` and `map.flyTo(...)` move the camera; `minZoom` means
+"zoom in to at least this" (`max(current zoom, minZoom)`), and `zoom` wins when both are given.
+`map.fitBounds({ west, south, east, north }, { padding?, maxZoom? })` fits a box. All three do
+nothing while the map is detached or destroyed, and use no animation under `prefers-reduced-motion`.
+
+```ts
+map.flyTo({ center: [-119.7, 36.7], zoom: 16 });
+map.easeTo({ center: monitor.lngLat, minZoom: 12 });
+```
+
+## Ready, and reaching the GL map
+
+`map.ready` is reactive: true once the attached map's style has loaded and the map has gone idle
+for the first time, false again on detach and while a basemap switch reloads the style. Show a load
+screen until it is true. `map.gl` is the attached GL map (or `null`), reactive.
+
+`maptilerMap(map)` returns it as a MapTiler `Map` (or `null` while detached). It is an escape hatch
+for markers and popups only: never add sources or layers through it, because plugins own those.
+
+```ts
+import { maptilerMap } from "@sjvair/map-sdk";
+
+const gl = maptilerMap(map);
+if (gl) new Marker().setLngLat(lngLat).addTo(gl);
+```
 
 ## Providers
 
@@ -258,7 +412,10 @@ detached.
 from:
 
 - `metadata`: scales, entry-type labels and units, monitor type labels, and dataset attribution.
-  The default reads the SJVAir API through `@sjvair/sdk`.
+  The default reads the SJVAir API through `@sjvair/sdk`. `monitorTypeInterval(type)` is an
+  optional method returning how often a monitor type reports (e.g. `"2 min"`); the monitor
+  tooltip shows "(2 min avg)" under the entry-type label when it exists, and omits the note when a
+  host's provider lacks it.
 - `messages`: `(key, params) => string`. The default is the English catalog,
   `@sjvair/map-sdk/messages/en.json`, with `{name}`-style parameters and `_one`/`_other` plurals
   selected by `count`.

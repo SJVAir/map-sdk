@@ -74,6 +74,50 @@ describe("MapTooltip", () => {
 		expect(document.querySelector(".mapsdk-tooltip-name")!.textContent).toBe("Second site");
 	});
 
+	it("leaves the name header out when the plugin's tooltip content shows the name", async () => {
+		const content = createRawSnippet(() => ({ render: () => "<span>Own layout</span>" }));
+		const make = (tooltipShowsName: boolean): MapContext =>
+			({
+				plugins: [
+					{
+						id: "points",
+						setup: () => () => {},
+						features: () => [item("a", "Fresno Yosemite", NO_LEVEL)],
+						tooltip: () => content,
+						tooltipShowsName
+					}
+				],
+				messages: defaultMessages,
+				format: createDefaultFormat(),
+				focusedKey: "a",
+				hovered: null
+			}) as never;
+		render(MapTooltip, { map: make(true), project });
+		await expect.element(page.getByText("Own layout")).toBeVisible();
+		expect(document.querySelector(".mapsdk-tooltip-name")).toBeNull();
+	});
+
+	it("keeps the name header above plugin content that doesn't show the name", async () => {
+		const content = createRawSnippet(() => ({ render: () => "<span>Own layout</span>" }));
+		const map = {
+			plugins: [
+				{
+					id: "points",
+					setup: () => () => {},
+					features: () => [item("a", "Fresno Yosemite", NO_LEVEL)],
+					tooltip: () => content
+				}
+			],
+			messages: defaultMessages,
+			format: createDefaultFormat(),
+			focusedKey: "a",
+			hovered: null
+		} as never;
+		render(MapTooltip, { map, project });
+		await expect.element(page.getByText("Own layout")).toBeVisible();
+		expect(document.querySelector(".mapsdk-tooltip-name")!.textContent).toBe("Fresno Yosemite");
+	});
+
 	it("shows the focused item's name, value, and level label", async () => {
 		const map = fakeMap([item("a", "Fresno Yosemite", level("Moderate", "#ff7e00"))], {
 			focusedKey: "a"
@@ -157,6 +201,26 @@ describe("MapTooltip", () => {
 		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Custom Extra");
 	});
 
+	it("keeps the narrow width for other content and widens only the wide cards", async () => {
+		const wide = (cls: string) => {
+			const map = fakeMap([item("a", "Wide", NO_LEVEL)], { focusedKey: "a" });
+			(map.plugins[0] as { tooltip?: unknown }).tooltip = () =>
+				createRawSnippet(() => ({
+					render: () => `<div class="${cls}" style="width:600px;flex:none">x</div>`
+				}));
+			render(MapTooltip, { map, project });
+		};
+		wide("other");
+		wide("mapsdk-tooltip-wide");
+		await expect.poll(() => document.querySelectorAll(".mapsdk-tooltip").length).toBe(2);
+		const [plain, card] = [...document.querySelectorAll<HTMLElement>(".mapsdk-tooltip")].map(
+			(e) => e.offsetWidth
+		);
+		expect(plain).toBeLessThanOrEqual(256);
+		expect(card).toBeGreaterThan(256);
+		expect(card).toBeLessThanOrEqual(448);
+	});
+
 	it("shows a plugin's hover content for a hit it doesn't list, without an empty name", async () => {
 		const hit = {
 			pluginId: "points",
@@ -213,5 +277,73 @@ describe("MapTooltip", () => {
 		const h = host?.getBoundingClientRect() ?? { left: 0, top: 0 };
 		expect(r.left).toBeGreaterThanOrEqual(h.left - 0.5);
 		expect(r.top).toBeGreaterThanOrEqual(h.top - 0.5);
+	});
+
+	describe("tooltip mode", () => {
+		function fakeGl() {
+			const listeners = new Map<string, Set<() => void>>();
+			return {
+				on(type: string, fn: () => void) {
+					if (!listeners.has(type)) listeners.set(type, new Set());
+					listeners.get(type)!.add(fn);
+				},
+				off(type: string, fn: () => void) {
+					listeners.get(type)?.delete(fn);
+				},
+				emit(type: string) {
+					for (const fn of listeners.get(type) ?? []) fn();
+				}
+			};
+		}
+		const hit = { pluginId: "points", refKey: "a", name: "Hovered site" } as never;
+		const hoverMap = (lngLat: [number, number]) => fakeMap([], { hovered: { hit, lngLat } });
+
+		it("pointer mode hides the tooltip on zoom", async () => {
+			const gl = fakeGl();
+			render(MapTooltip, { map: hoverMap([0, 0]), project, mode: "pointer", gl: gl as never });
+			await expect.element(page.getByRole("tooltip")).toBeVisible();
+			gl.emit("zoomstart");
+			await vi.waitFor(() => expect(document.querySelector("[role=tooltip]")).toBeNull());
+		});
+
+		it("pointer mode shows it again on the next move", async () => {
+			const gl = fakeGl();
+			const screen = await render(MapTooltip, {
+				map: hoverMap([0, 0]),
+				project,
+				mode: "pointer",
+				gl: gl as never
+			});
+			await expect.element(page.getByRole("tooltip")).toBeVisible();
+			gl.emit("zoomstart");
+			await vi.waitFor(() => expect(document.querySelector("[role=tooltip]")).toBeNull());
+			await screen.rerender({ map: hoverMap([1, 1]) });
+			await expect.element(page.getByRole("tooltip")).toBeVisible();
+		});
+
+		it("pointer mode anchors at the pointer, not the feature", async () => {
+			const seen: Array<[number, number]> = [];
+			const record = (p: [number, number]) => (seen.push(p), { x: 100, y: 100 });
+			render(MapTooltip, { map: hoverMap([5, 6]), project: record, mode: "pointer" });
+			await expect.element(page.getByRole("tooltip")).toBeVisible();
+			expect(seen.at(-1)).toEqual([5, 6]);
+		});
+
+		it("pointer mode still pins a keyboard-focused item", async () => {
+			const gl = fakeGl();
+			const map = fakeMap([item("a", "Fresno", level("Good", "#00e400"))], { focusedKey: "a" });
+			render(MapTooltip, { map, project, mode: "pointer", gl: gl as never });
+			gl.emit("zoomstart");
+			await expect.element(page.getByRole("tooltip")).toBeVisible();
+		});
+
+		it("pinned mode keeps it through a zoom", async () => {
+			const gl = fakeGl();
+			render(MapTooltip, { map: hoverMap([0, 0]), project, mode: "pinned", gl: gl as never });
+			await expect.element(page.getByRole("tooltip")).toBeVisible();
+			gl.emit("zoomstart");
+			await new Promise((r) => setTimeout(r, 50));
+			expect(document.querySelector("[role=tooltip]")).not.toBeNull();
+		});
 	});
 });

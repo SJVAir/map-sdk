@@ -57,28 +57,42 @@ A Svelte 5 library (`@sjvair/map-sdk`, built with `svelte-package`) of map compo
 air-quality data on the MapTiler SDK. The demo page in `demo/` is the dev server's root and is
 not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 
-- **Core** (`src/lib/core/`): `createMap()` returns a `MapContext` (`create-map.svelte.ts`): reactive
-  camera, bounds, basemap, plugin list, selection per plugin, `featureclick`, `featuresAt`,
-  `featureForElement`. It has no GL map of its own; `MapView` attaches one. `plugin.ts` defines
-  `MapPlugin` and `PluginContext`; `plugin-host.svelte.ts` runs plugins' `setup` when the style is
-  ready and tears them down on detach or restyle (draw order = registry order); `interactions.svelte.ts`
-  routes clicks, hovers, and blocking layers (cluster bubbles); `basemap.svelte.ts` switches and
+- **Core** (`src/lib/core/`): `createMap()` returns a `MapContext` (`create-map.svelte.ts`):
+  reactive camera, bounds, basemap, plugin list, selection per plugin, `featureclick`, `featuresAt`,
+  `featureForElement`, camera moves (`easeTo`/`flyTo`/`fitBounds`), `ready`, `gl`,
+  `projection`/`space` config, and the `maptilerMap()` escape hatch (for markers and popups only).
+  It has no GL map of its own; `MapView` attaches one. `plugin.ts` defines `MapPlugin`
+  (`hoverPriority`, `tooltipShowsName`) and `PluginContext` (`addCustomLayer`);
+  `scoped-context.ts`'s internal `scopedContext` lets a preset run a nested plugin under a prefix.
+  `plugin-host.svelte.ts` runs plugins' `setup` when the style is ready and tears them down on
+  detach or restyle (draw order = registry order); `interactions.svelte.ts` routes clicks, hovers
+  (and the pointer cursor), and blocking layers (cluster bubbles); `basemap.svelte.ts` switches and
   falls back between styles. Nothing is module-global: two maps on a page never share state, and
   every source/layer id is namespaced `${mapUid}:${pluginId}:${local}`.
 - **Data** (`src/lib/data/`, entry `./data`): types (`DataSource`, `FeatureRef`,
   `SpatialSelection`), `Scale` helpers (`levelFor`, `NO_LEVEL`), refs, selection rules, `staticSource`,
   and the three providers (`metadata`, `messages`, `format`) with defaults. `messages/en.json` holds
   every `mapsdk_*` UI string.
-- **Stores** (`src/lib/stores/`, entry `./stores`): `createMonitorsStore()`, the live monitors list
-  and readings with polling, which exposes a `dataSource`.
-- **Plugins** (`src/lib/plugins/`): the general `pointsPlugin` (icons, clusters) and `shapesPlugin`
-  (fill/outline/check overlay), plus shared style expressions and scale resolution.
-- **Presets** (`src/lib/presets/`): `monitorsPlugin`, `regionsPlugin`, `calHeatScorePlugin`,
-  `forecastZonesPlugin`, `hmsSmokePlugin`, `hmsFirePlugin`, and `groupFires`. Presets never fetch.
+- **Stores** (`src/lib/stores/`, entry `./stores`): `createMonitorsStore()` (live monitors list and
+  readings with polling, `meta`), `createHmsSmokeStore`, `createHmsFireStore`, and
+  `createCollocationSitesStore`, the last three on the shared `load-once` core. Each exposes a
+  `dataSource`. `cleanFires` is exported from here.
+- **Plugins** (`src/lib/plugins/`): the general `pointsPlugin` (icons, clusters; `selectedStyle`,
+  `icon.mutedColor`, `zoomRange`, `legendDisplay`, `legendTitle`) and `shapesPlugin`
+  (fill/`outline`/check overlay), plus shared style expressions, scale resolution, and the exported
+  marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
+- **Presets** (`src/lib/presets/`): `monitorsPlugin`, `collocationSitesPlugin`, `regionsPlugin`,
+  `calHeatScorePlugin`, `forecastZonesPlugin`, `hmsSmokePlugin`, `hmsFirePlugin` (groups, then
+  hotspots from zoom 10), and `groupFires`, with the monitor, cluster, and collocation tooltips
+  (`CollocationTooltip`). Presets never fetch.
 - **View** (`src/lib/view/`): `MapView.svelte` creates the GL map (`create-gl-map.ts`: per-map key
-  through `transformRequest`, theme watching, `active` releases WebGL).
-- **UI** (`src/lib/ui/`): Legend, FeatureList, MapTooltip, SelectionBar, ViewSummary, MapControls
-  (basemap, zoom, credits). `controls.css` holds the focus ring and motion classes.
+  through `transformRequest`, theme watching, `active` releases WebGL). Props include `controls`
+  (`"mapsdk"` | `"engine"` | `"none"`), `selectionBar`, and `tooltip` (`"pinned"` | `"pointer"`).
+  Credits come from the engine's AttributionControl, with data credits from
+  `ui/data-credits.svelte.ts`.
+- **UI** (`src/lib/ui/`): Legend (`order`; blocks legends are one labeled bar), FeatureList,
+  MapTooltip, SelectionBar, ViewSummary, and MapControls (zoom buttons only; basemap switching is
+  `MapContext`, credits are the engine's). `controls.css` holds the focus ring and motion classes.
 - **Entries**: `.` (everything, reaches the map engine), `./data` and `./stores` (must not reach
   maplibre or MapTiler; `test:bundle` enforces it), `./messages/en.json`, `./theme.css`.
   `theme.css` maps the family tokens to Tailwind utilities with fallbacks.
@@ -87,7 +101,9 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 
 - Components use only theme tokens (shadcn names plus family tokens with fallbacks, listed in
   README.md). `--highlight` is never for text. Never assume a `.dark` class. Type sizes are
-  Tailwind `text-*` classes, so hosts add the `@source` line.
+  Tailwind `text-*` classes, so hosts add the `@source` line. The user's fixed-color exceptions
+  (decided 2026-11-04, never "fix" them back to tokens): inactive monitors `#969696`, the
+  inside-monitor outline `#000000`, and the collocation crosshair `#4A5FC6`.
 - No hardcoded labels, units, breakpoints, colors, or scales: they come from a `Scale` or the
   metadata provider. Every UI string is a `mapsdk_*` message key in `en.json`; no concatenated
   sentences. Dates and times are formatted in America/Los_Angeles through the `format` provider.

@@ -1,5 +1,11 @@
 import { untrack } from "svelte";
-import { Map as MaptilerMap, MapStyle, config as maptilerConfig } from "@maptiler/sdk";
+import {
+	AttributionControl,
+	AttributionControlMLGL,
+	Map as MaptilerMap,
+	MapStyle,
+	config as maptilerConfig
+} from "@maptiler/sdk";
 import type { StyleSpecification } from "@maptiler/sdk";
 import type { BasemapConfig } from "../core/basemap.svelte.js";
 import type { MapContext } from "../core/create-map.svelte.js";
@@ -84,6 +90,22 @@ const clearStyle = (Object.getPrototypeOf(MaptilerMap.prototype) as { setStyle: 
  * space and halo setup, which would read the cleared style, is marked done.
  */
 class GlMap extends MaptilerMap {
+	/**
+	 * The attribution control now on the map: the SDK's own, until `setDataCredits` replaces it.
+	 * Declared without an initializer, which would run after the constructor and drop the SDK's.
+	 */
+	declare attribution: {
+		control: InstanceType<typeof AttributionControlMLGL>;
+		credits: string;
+	} | null;
+
+	/** Notes the SDK's own attribution control, which it adds while constructing the map. */
+	override addControl(...args: Parameters<MaptilerMap["addControl"]>): this {
+		const [control] = args;
+		if (control instanceof AttributionControlMLGL) this.attribution = { control, credits: "[]" };
+		return super.addControl(...args);
+	}
+
 	override setStyle(...args: Parameters<SetStyle>): this {
 		if (args[0] !== null) return super.setStyle(...args);
 		const pending = (this as unknown as { spaceboxLoadingState?: SpaceboxLoadingState })
@@ -132,9 +154,15 @@ function recordView(gl: MaptilerMap, ctx: MapContext): void {
 /**
  * Creates the MapTiler map for `ctx` in `container`, at `ctx`'s camera with its current basemap.
  * Reads `ctx` untracked, so calling this in an effect doesn't make it depend on the camera or
- * basemap. Records the camera and bounds once the map loads and after every move.
+ * basemap. With `engineControls`, the MapTiler SDK adds its default zoom/compass and locate-me
+ * controls at the top right; they go with the map.
+ * Records the camera and bounds once the map loads and after every move.
  */
-export function createGlMap(container: HTMLElement, ctx: MapContext): GlMapLike {
+export function createGlMap(
+	container: HTMLElement,
+	ctx: MapContext,
+	engineControls = false
+): GlMapLike {
 	const { camera, style } = untrack(() => ({ camera: ctx.camera, style: styleOf(ctx) }));
 	const gl = new GlMap({
 		container,
@@ -148,13 +176,43 @@ export function createGlMap(container: HTMLElement, ctx: MapContext): GlMapLike 
 		transformRequest: maptilerKeyTransform(ctx.config.maptilerKey),
 		cooperativeGestures: ctx.config.cooperativeGestures ?? false,
 		keyboard: true,
-		// MapView draws its own controls and attribution.
-		forceNoAttributionControl: true,
-		navigationControl: false,
-		geolocateControl: false,
-		logSDKVersion: false
+		// The engine's attribution control (and MapTiler's logo, when the key's plan requires it),
+		// at its automatic size: full on wide maps, collapsed on narrow ones. The SDK's default is
+		// always full, so ask for its automatic mode.
+		attributionControl: { compact: "auto" },
+		// `controls: "engine"` gets the SDK's own zoom/compass and locate-me controls, with its
+		// defaults (as monitor-map has today); otherwise MapView draws the controls.
+		navigationControl: engineControls ? "top-right" : false,
+		geolocateControl: engineControls ? "top-right" : false,
+		logSDKVersion: false,
+		// Only when set, so a map without them gets today's constructor options.
+		...(ctx.config.projection ? { projection: ctx.config.projection } : {}),
+		...(ctx.config.space ? { space: ctx.config.space } : {})
 	});
 	gl.on("load", () => recordView(gl, ctx));
 	gl.on("moveend", () => recordView(gl, ctx));
 	return gl;
+}
+
+const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/**
+ * Shows `credits` (plain text, one per dataset) in the map's attribution control, after the
+ * style's own credits. The control is replaced, not edited: MapLibre reads its custom
+ * attribution once. Does nothing for a map that isn't one of `createGlMap`'s or has no change.
+ */
+export function setDataCredits(gl: GlMapLike, credits: string[]): void {
+	const map = gl as GlMap;
+	const current = map.attribution;
+	if (!current || !(map instanceof GlMap)) return;
+	const key = JSON.stringify(credits);
+	if (key === current.credits) return;
+	map.removeControl(current.control);
+	map.attribution = null;
+	const next = new AttributionControl({
+		compact: undefined,
+		customAttribution: credits.map(escapeHtml)
+	});
+	map.addControl(next);
+	map.attribution = { control: next, credits: key };
 }

@@ -7,6 +7,7 @@ import type { GlMapLike } from "../../src/lib/core/gl.js";
 import type { FeatureListItem, MapPlugin } from "../../src/lib/core/plugin.js";
 import type { MetadataProvider } from "../../src/lib/data/metadata.js";
 import MapControls from "../../src/lib/ui/MapControls.svelte";
+import DataCreditsHost from "../fixtures/DataCreditsHost.svelte";
 import SelectionBarHost from "../fixtures/SelectionBarHost.svelte";
 import SelectionBar from "../../src/lib/ui/SelectionBar.svelte";
 import ViewSummary from "../../src/lib/ui/ViewSummary.svelte";
@@ -44,30 +45,6 @@ function newMap(metadata?: Partial<MetadataProvider>): MapContext {
 		config: { maptilerKey: "k", basemaps: { styles: [], defaultId: "x" } },
 		metadata: metadata as MetadataProvider
 	});
-}
-
-/** Any CSS color to sRGBA channels (0–255), through a canvas. */
-function rgba(css: string): [number, number, number, number] {
-	const ctx = document.createElement("canvas").getContext("2d")!;
-	ctx.fillStyle = css;
-	ctx.fillRect(0, 0, 1, 1);
-	const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-	return [r, g, b, a];
-}
-
-/** WCAG contrast ratio of two opaque colors. */
-function contrast(a: string, b: string): number {
-	const luminance = (css: string) => {
-		const lin = rgba(css)
-			.slice(0, 3)
-			.map((c) => {
-				const v = c / 255;
-				return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-			});
-		return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
-	};
-	const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-	return (hi + 0.05) / (lo + 0.05);
 }
 
 afterEach(() => {
@@ -331,34 +308,13 @@ describe("MapControls", () => {
 		expect(gl.easeTo).toHaveBeenCalledWith({ zoom: 8, duration: 0 });
 	});
 
-	it("shows each dataset's attribution once, with the MapTiler and OSM credits", async () => {
-		const attribution = vi.fn(async (dataset: string) =>
-			dataset === "missing" ? ("unavailable" as const) : "PurpleAir"
-		);
-		const map = newMap({ attribution });
-		map.addPlugin(plugin([], { dataset: "air-quality" }));
-		map.addPlugin(plugin([], { id: "b", dataset: "air-quality" }));
-		map.addPlugin(plugin([], { id: "c", dataset: "missing" }));
-		render(MapControls, { map, gl: null });
-		await expect.element(page.getByText("PurpleAir")).toBeVisible();
-		expect(document.querySelectorAll(".mapsdk-credits li")).toHaveLength(3);
-		expect(attribution.mock.calls.map(([d]) => d).sort()).toEqual(["air-quality", "missing"]);
-		const osm = page.getByRole("link", { name: "© OpenStreetMap contributors" });
-		await expect.element(osm).toHaveAttribute("href", "https://www.openstreetmap.org/copyright");
-		await expect
-			.element(page.getByRole("link", { name: "© MapTiler" }))
-			.toHaveAttribute("href", "https://www.maptiler.com/copyright/");
-		const logo = page.getByRole("link", { name: "MapTiler logo, opens maptiler.com" });
-		await expect.element(logo).toHaveAttribute("href", "https://www.maptiler.com/");
-	});
-
 	it("retries an unavailable attribution on a later move, at most once a minute", async () => {
 		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
 		let ready = false;
 		const attribution = vi.fn(async () => (ready ? "PurpleAir" : ("unavailable" as const)));
 		const map = newMap({ attribution });
 		map.addPlugin(plugin([], { dataset: "air-quality" }));
-		render(MapControls, { map, gl: null });
+		render(DataCreditsHost, { map });
 		await vi.advanceTimersByTimeAsync(0);
 		expect(attribution).toHaveBeenCalledTimes(1);
 		const view = { west: -120, south: 36, east: -119, north: 37 };
@@ -376,61 +332,9 @@ describe("MapControls", () => {
 		await expect.element(page.getByText("PurpleAir")).toBeVisible();
 	});
 
-	/** The design pass's light and dark values, as in the demo's app.css. */
-	const THEMES = {
-		light: {
-			"--card": "oklch(1 0 0)",
-			"--card-foreground": "oklch(0.257 0.061 257.8)",
-			"--link": "oklch(0.527 0.124 247.4)",
-			"--overlay": "oklch(0.257 0.061 257.8 / 10%)"
-		},
-		dark: {
-			"--card": "oklch(0.252 0.05 259.4)",
-			"--card-foreground": "oklch(0.946 0.015 251.2)",
-			"--link": "oklch(0.791 0.101 239.5)",
-			"--overlay": "oklch(0 0 0 / 40%)"
-		}
-	};
-
-	it.each(["light", "dark"] as const)(
-		"puts the credits on an opaque card with 4.5:1 text and links in %s",
-		async (theme) => {
-			const root = document.documentElement.style;
-			for (const [token, value] of Object.entries(THEMES[theme])) root.setProperty(token, value);
-			try {
-				const map = newMap({ attribution: async () => "PurpleAir" });
-				map.addPlugin(plugin([], { dataset: "air-quality" }));
-				render(MapControls, { map, gl: null });
-				await expect.element(page.getByText("PurpleAir")).toBeVisible();
-				const credits = getComputedStyle(document.querySelector(".mapsdk-credits")!);
-				const background = rgba(credits.backgroundColor);
-				expect(background[3]).toBe(255);
-				expect(background).toEqual(rgba(THEMES[theme]["--card"]));
-				const text = getComputedStyle(page.getByText("PurpleAir").element()).color;
-				const link = getComputedStyle(page.getByRole("link", { name: "© MapTiler" }).element());
-				expect(contrast(text, credits.backgroundColor)).toBeGreaterThanOrEqual(4.5);
-				expect(contrast(link.color, credits.backgroundColor)).toBeGreaterThanOrEqual(4.5);
-			} finally {
-				for (const token of Object.keys(THEMES[theme])) root.removeProperty(token);
-			}
-		}
-	);
-
-	it("gives the logo a size before it loads", () => {
-		render(MapControls, { map: newMap(), gl: null });
-		const img = document.querySelector<HTMLImageElement>(".mapsdk-logo img")!;
-		expect(img.getAttribute("width")).toBe("80");
-		expect(img.getAttribute("height")).toBe("24");
-	});
-
 	it("has no axe violations", async () => {
-		const map = newMap({ attribution: async () => "PurpleAir" });
-		map.addPlugin(plugin([], { dataset: "air-quality" }));
-		render(MapControls, { map, gl: fakeGl() });
-		await expect.element(page.getByText("PurpleAir")).toBeVisible();
-		for (const selector of [".mapsdk-zoom", ".mapsdk-credits"]) {
-			const result = await axe.run(document.querySelector(selector)!);
-			expect(result.violations).toEqual([]);
-		}
+		render(MapControls, { map: newMap(), gl: fakeGl() });
+		const result = await axe.run(document.querySelector(".mapsdk-zoom")!);
+		expect(result.violations).toEqual([]);
 	});
 });

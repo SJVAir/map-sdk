@@ -1,4 +1,4 @@
-import type { LayerSpecification, SourceSpecification } from "@maptiler/sdk";
+import type { CustomLayerInterface, LayerSpecification, SourceSpecification } from "@maptiler/sdk";
 import type { Geometry } from "geojson";
 
 /**
@@ -9,7 +9,7 @@ export interface GlMapLike {
 	addSource(id: string, source: SourceSpecification): void;
 	removeSource(id: string): void;
 	getSource(id: string): unknown;
-	addLayer(layer: LayerSpecification, beforeId?: string): void;
+	addLayer(layer: LayerSpecification | CustomLayerInterface, beforeId?: string): void;
 	/** Moves a layer below `beforeId`, or to the top without it. */
 	moveLayer(id: string, beforeId?: string): void;
 	removeLayer(id: string): void;
@@ -25,6 +25,7 @@ export interface GlMapLike {
 		target: { source: string; id: string | number },
 		state: Record<string, unknown>
 	): void;
+	setLayoutProperty(layerId: string, name: string, value: unknown): void;
 	removeFeatureState(target: { source: string; id?: string | number }, key?: string): void;
 	queryRenderedFeatures(
 		point: [number, number] | [[number, number], [number, number]],
@@ -56,6 +57,11 @@ export interface GlMapLike {
 		/** Where `center` ends up, in pixels from the container's center (positive x is right). */
 		offset?: [number, number];
 	}): void;
+	flyTo(options: { center?: [number, number]; zoom?: number; duration?: number }): void;
+	fitBounds(
+		bounds: [[number, number], [number, number]],
+		options?: { padding?: number; maxZoom?: number; duration?: number }
+	): void;
 	jumpTo(options: {
 		center?: [number, number];
 		zoom?: number;

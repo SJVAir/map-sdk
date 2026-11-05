@@ -29,6 +29,12 @@ export interface ShapesOptions<P extends MapFeatureProperties> {
 	listed?: boolean;
 	/** Fill opacity where a level sets none. Default 0.6. */
 	fillOpacity?: number;
+	/**
+	 * Edge of the shapes. `theme` (default) is a 1px `--foreground` line; `level` draws it in the
+	 * level's color at the level's opacity (choropleth); `none` draws no outline layer
+	 * (so LineString geometries are not drawn either).
+	 */
+	outline?: "theme" | "level" | "none";
 }
 
 /** The check image is drawn at this multiple of its size and scaled down, for sharp HiDPI. */
@@ -112,6 +118,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 	const selectable = options.selectable ?? false;
 	const fillOpacity = options.fillOpacity ?? DEFAULT_FILL_OPACITY;
 	const choropleth = mode === "choropleth";
+	const outlineMode = options.outline ?? "theme";
 
 	const scales = createScaleResolver(pluginId, layerLabel, source);
 	/** Plain mode ignores the source's scale. */
@@ -194,14 +201,21 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 					"fill-opacity": choropleth ? opacityExpression(scale, "value", fillOpacity) : fillOpacity
 				}
 			});
-			const outline = ctx.addLayer("outline", {
-				type: "line",
-				source: src,
-				paint: {
-					"line-color": lineColor,
-					"line-width": ["case", isLine, LINE_WIDTH, OUTLINE_WIDTH] as ExpressionSpecification
-				}
-			});
+			const byLevel = outlineMode === "level" && choropleth;
+			const outline =
+				outlineMode === "none"
+					? null
+					: ctx.addLayer("outline", {
+							type: "line",
+							source: src,
+							paint: {
+								"line-color": byLevel ? colorExpression(scale, "value", theme.neutral) : lineColor,
+								...(byLevel
+									? { "line-opacity": opacityExpression(scale, "value", fillOpacity) }
+									: {}),
+								"line-width": ["case", isLine, LINE_WIDTH, OUTLINE_WIDTH] as ExpressionSpecification
+							}
+						});
 			const selectedLayer = ctx.addLayer("selected", {
 				type: "line",
 				source: src,
@@ -221,11 +235,11 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 					"icon-ignore-placement": true
 				}
 			});
-			layers = [fill, outline, selectedLayer, check];
+			layers = outline ? [fill, outline, selectedLayer, check] : [fill, selectedLayer, check];
 			// Layer ids repeat across rebuilds; register them once.
 			if (!interactiveDone) {
 				interactiveDone = true;
-				ctx.interactive([fill, outline], toHit);
+				ctx.interactive(outline ? [fill, outline] : [fill], toHit);
 			}
 			builtKey = scaleKey(scale);
 		}

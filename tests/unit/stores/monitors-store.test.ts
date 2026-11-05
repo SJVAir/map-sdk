@@ -1002,6 +1002,18 @@ describe("store.dispose", () => {
 	});
 });
 
+describe("store.meta", () => {
+	it("is null before init", () => {
+		expect(store.meta).toBeNull();
+	});
+
+	it("is the fetched monitors meta after init", async () => {
+		await store.init();
+
+		expect(store.meta).toBe(META);
+	});
+});
+
 describe("two stores", () => {
 	it("are independent", async () => {
 		const other = create({ pollIntervalMs: 1_000 });

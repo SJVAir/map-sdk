@@ -131,6 +131,25 @@ describe("MapView", () => {
 		expect(container.querySelector("canvas")).toBeNull();
 	});
 
+	it("sets ready after the first idle", async () => {
+		const map = newMap();
+		const attached = trackAttach(map);
+		expect(map.ready).toBe(false);
+		await render(MapView, { map, class: "test-map" });
+		await vi.waitFor(() => expect(map.ready).toBe(true));
+		expect(map.gl).toBe(attached[0]);
+	});
+
+	it("goes back to not ready when unmounted before the first idle", async () => {
+		const map = newMap();
+		const { unmount } = await render(MapView, { map, class: "test-map" });
+		unmount();
+		expect(map.ready).toBe(false);
+		expect(map.gl).toBeNull();
+		await new Promise((r) => setTimeout(r, 300));
+		expect(map.ready).toBe(false);
+	});
+
 	it("marks its container with the map's uid", async () => {
 		const map = newMap();
 		const { container } = await render(MapView, { map, class: "test-map" });
@@ -240,6 +259,45 @@ describe("MapView", () => {
 		};
 		gl.remove();
 		expect(gl.isGlobeProjection()).toBe(false);
+	});
+
+	describe("projection and space", () => {
+		async function glFor(config: Partial<Parameters<typeof createMap>[0]["config"]>) {
+			const container = document.createElement("div");
+			container.className = "test-map";
+			document.body.append(container);
+			const map = createMap({ config: { maptilerKey: "test-key", basemaps, ...config } });
+			const gl = createGlMap(container, map) as unknown as GlMapLike & {
+				isGlobeProjection(): boolean;
+				options: Record<string, unknown>;
+				remove(): void;
+			};
+			await whenLoaded(gl);
+			return gl;
+		}
+
+		it("globe projection reaches the map", async () => {
+			const gl = await glFor({ projection: "globe" });
+			expect(gl.isGlobeProjection()).toBe(true);
+			gl.remove();
+		});
+
+		it("default stays mercator, with no projection or space options", async () => {
+			const gl = await glFor({});
+			expect(gl.isGlobeProjection()).toBe(false);
+			expect("projection" in gl.options).toBe(false);
+			expect("space" in gl.options).toBe(false);
+			gl.remove();
+		});
+
+		it("passes a space preset through, and omits space: false", async () => {
+			const withSpace = await glFor({ space: { preset: "milkyway" } });
+			expect(withSpace.options.space).toEqual({ preset: "milkyway" });
+			withSpace.remove();
+			const off = await glFor({ space: false });
+			expect("space" in off.options).toBe(false);
+			off.remove();
+		});
 	});
 
 	it("never sets MapTiler's global key", async () => {

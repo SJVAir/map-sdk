@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	NO_LEVEL,
-	levelFor,
-	numericValue,
-	scaleFromLegacyLevels
-} from "../../../src/lib/data/scale.js";
+import { NO_LEVEL, levelFor, numericValue } from "../../../src/lib/data/scale.js";
 import { fireScale, heatScale, pm25Scale, smokeScale } from "../../fixtures/scales.js";
 
 function keyOf(value: Parameters<typeof levelFor>[0], scale = pm25Scale) {
@@ -51,39 +46,6 @@ describe("levelFor", () => {
 
 	it("does not coerce strings for category scales", () => {
 		expect(keyOf("2", heatScale)).toBe(NO_LEVEL);
-	});
-});
-
-describe("scaleFromLegacyLevels", () => {
-	const scale = scaleFromLegacyLevels("pm25", "PM2.5", "µg/m³", [
-		{ name: "Good", label: "Good", color: "#00e400", range: [0, 9], guidance: null },
-		{ name: "Moderate", label: "Moderate", color: "#ffff00", range: [9.1, 35.4], guidance: "Hi" },
-		{ name: "Hazardous", label: "Hazardous", color: "#7e0023", range: [35.5, 99999], guidance: "X" }
-	]);
-
-	it("builds half-open range levels", () => {
-		expect(scale).toMatchObject({ id: "pm25", label: "PM2.5", units: "µg/m³", kind: "range" });
-		expect(scale.levels.map((l) => [l.min, l.max])).toEqual([
-			[0, 9.1],
-			[9.1, 35.5],
-			[35.5, null]
-		]);
-	});
-
-	it("lowercases keys and nulls tier and opacity", () => {
-		expect(scale.levels.map((l) => l.key)).toEqual(["good", "moderate", "hazardous"]);
-		for (const l of scale.levels) {
-			expect(l.tier).toBeNull();
-			expect(l.opacity).toBeNull();
-		}
-		expect(scale.levels[0].guidance).toBe("");
-		expect(scale.levels[1].guidance).toBe("Hi");
-	});
-
-	it("works with levelFor", () => {
-		expect(keyOf(9.05, scale)).toBe("good");
-		expect(keyOf(9.1, scale)).toBe("moderate");
-		expect(keyOf(500, scale)).toBe("hazardous");
 	});
 });
 

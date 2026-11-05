@@ -95,6 +95,24 @@ describe("hmsSmokePlugin", () => {
 	});
 });
 
+describe("hmsSmokePlugin outline", () => {
+	it("hmsSmokePlugin uses level outline", () => {
+		const source = new TestSource<Props>({ features: SMOKE, scale: smokeScale });
+		const map = createMap({ config: { maptilerKey: "test-key" } });
+		map.addPlugin(hmsSmokePlugin({ source, layerLabel: "Smoke" }));
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		flushSync();
+		const outline = gl.layers.find((l) => l.id.endsWith(":outline")) as Extract<
+			LayerSpecification,
+			{ type: "line" }
+		>;
+		expect(evaluate(outline.paint!["line-color"], { value: "heavy" })).toBe("#333634");
+		expect(evaluate(outline.paint!["line-color"], { value: "light" })).toBe("#bfc8c3");
+		expect(evaluate(outline.paint!["line-opacity"], { value: "medium" }, "number")).toBe(0.3);
+	});
+});
+
 describe("hmsFirePlugin", () => {
 	const ref = { dataset: "hms-fire", entryType: "fire-frp" };
 
@@ -110,6 +128,12 @@ describe("hmsFirePlugin", () => {
 		expect(plugin.selectable).toBe(false);
 		expect(plugin.features).toBeTypeOf("function");
 		expect(hmsFirePlugin({ id: "x", source, layerLabel: "F" }).id).toBe("x");
+	});
+
+	it("reports its legend as blocks", () => {
+		const source = new TestSource<Props>({ features: points([]), scale: fireScale });
+		const data = hmsFirePlugin({ source, layerLabel: "Fire" }).legend?.();
+		expect(data).toMatchObject({ display: "blocks", title: "Fire" });
 	});
 
 	it("picks the icon of the level for FRP 9.9 and 10 and sizes it by level", async () => {
@@ -158,5 +182,135 @@ describe("hmsFirePlugin", () => {
 				fireSvgs.some((s) => s.includes(`fill="${level.color}"`) && s.includes(`width="${size}"`))
 			).toBe(true);
 		});
+	});
+});
+
+describe("hmsFirePlugin with hotspots", () => {
+	const groupRows = [
+		{ refKey: "feature:hms-fire-group-cluster-1", name: "Fire group", value: 45 },
+		{ refKey: "feature:hms-fire-group-cluster-2", name: "Fire group", value: 200 }
+	];
+	const hotspotRows = [
+		{ refKey: "feature:f1", name: "Fire", value: 40 },
+		{ refKey: "feature:f2", name: "Fire", value: 50 },
+		{ refKey: "feature:f3", name: "Fire", value: 200 }
+	];
+
+	function build() {
+		const groups = new TestSource<Props>({ features: points(groupRows), scale: fireScale });
+		const hotspots = new TestSource<Props>({ features: points(hotspotRows), scale: fireScale });
+		const plugin = hmsFirePlugin({ source: groups, hotspots, layerLabel: "Fires" });
+		const map = createMap({ config: { maptilerKey: "test-key" } });
+		map.addPlugin(plugin);
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		flushSync();
+		const id = (local: string) => `${map.uid}:hms-fire:${local}`;
+		return { plugin, map, gl, id };
+	}
+
+	it("is one plugin: one id, not selectable, the groups' legend and list", () => {
+		const { plugin, map } = build();
+		expect(map.plugins.map((p) => p.id)).toEqual(["hms-fire"]);
+		expect(plugin.selectable).toBe(false);
+		expect(plugin.legend?.()).toMatchObject({ display: "blocks", title: "Fires" });
+		expect(plugin.features?.().map((f) => f.refKey)).toEqual(groupRows.map((r) => r.refKey));
+		const ref = { dataset: "hms-fire", entryType: "fire-frp" };
+		const withRefs = hmsFirePlugin({
+			source: new TestSource<Props>({ features: points([]), scale: ref }),
+			hotspots: new TestSource<Props>({ features: points([]), scale: ref }),
+			layerLabel: "Fires"
+		});
+		expect(withRefs.dataset).toBe("hms-fire");
+	});
+
+	it("draws groups below zoom 10 and hotspots from zoom 10, on the layers", () => {
+		const { gl, id } = build();
+		expect(gl.sources.has(id("groups:points"))).toBe(true);
+		expect(gl.sources.has(id("hotspots:points"))).toBe(true);
+		const groupLayers = gl.layers.filter((l) => l.id.startsWith(id("groups:")));
+		const hotspotLayers = gl.layers.filter((l) => l.id.startsWith(id("hotspots:")));
+		expect(groupLayers.map((l) => l.id)).toContain(id("groups:points"));
+		expect(hotspotLayers.map((l) => l.id)).toContain(id("hotspots:points"));
+		expect(groupLayers.length + hotspotLayers.length).toBe(gl.layers.length);
+		for (const layer of groupLayers) {
+			expect(layer).toMatchObject({ maxzoom: 10 });
+			expect(layer).not.toHaveProperty("minzoom");
+		}
+		for (const layer of hotspotLayers) {
+			expect(layer).toMatchObject({ minzoom: 10 });
+			expect(layer).not.toHaveProperty("maxzoom");
+		}
+		// Each draws from its own source and its own icon images.
+		const hotspotPoints = gl.layers.find((l) => l.id === id("hotspots:points")) as Extract<
+			LayerSpecification,
+			{ type: "symbol" }
+		>;
+		expect(hotspotPoints.source).toBe(id("hotspots:points"));
+		expect(
+			evaluate(hotspotPoints.layout!["icon-image"], { value: 45, "mapsdk:category": "fire" })
+		).toBe(id("hotspots:icon:0:fire:md"));
+	});
+
+	it("hit-tests both the groups and the hotspots as the one plugin", () => {
+		const { map, gl, id } = build();
+		const rendered = (layer: string, props: Props) => ({
+			layer: { id: id(layer) },
+			source: id(layer),
+			properties: { ...props },
+			geometry: { type: "Point" as const, coordinates: [0, 0] }
+		});
+		gl.setRenderedFeatures([
+			rendered("hotspots:points", hotspotRows[0]),
+			rendered("groups:points", groupRows[0])
+		]);
+		expect(map.featuresAt({ x: 1, y: 2 }).map((h) => [h.pluginId, h.refKey])).toEqual([
+			["hms-fire", "feature:f1"],
+			["hms-fire", "feature:hms-fire-group-cluster-1"]
+		]);
+	});
+
+	it("hovering a hotspot gives the same content as a group, without listing it", () => {
+		const { plugin, map } = build();
+		const hit = (refKey: string) => ({ pluginId: "hms-fire", refKey, name: "Fire" }) as never;
+		expect(plugin.hoverTooltip?.(hit("feature:f3"))).toBeTypeOf("function");
+		// A key no hotspot has gets nothing, and hotspots aren't listed.
+		expect(plugin.hoverTooltip?.(hit("feature:other"))).toBeUndefined();
+		expect(plugin.features?.().map((f) => f.refKey)).not.toContain("feature:f3");
+		map.removePlugin("hms-fire");
+		expect(plugin.hoverTooltip?.(hit("feature:f3"))).toBeUndefined();
+	});
+
+	it("teardown removes every layer and source once; a restyle adds them again", () => {
+		const { map, gl } = build();
+		const layers = gl.layers.map((l) => l.id);
+		const sources = [...gl.sources.keys()];
+		map.themeChanged();
+		flushSync();
+		expect(gl.layers.map((l) => l.id)).toEqual(layers);
+		expect([...gl.sources.keys()]).toEqual(sources);
+		gl.calls.length = 0;
+		map.removePlugin("hms-fire");
+		expect(gl.layers).toHaveLength(0);
+		expect(gl.sources.size).toBe(0);
+		for (const layer of layers) {
+			expect(gl.calls.filter((c) => c === `removeLayer:${layer}`)).toHaveLength(1);
+		}
+		for (const source of sources) {
+			expect(gl.calls.filter((c) => c === `removeSource:${source}`)).toHaveLength(1);
+		}
+	});
+
+	it("without hotspots draws its one source at every zoom", () => {
+		const source = new TestSource<Props>({ features: points(groupRows), scale: fireScale });
+		const map = createMap({ config: { maptilerKey: "test-key" } });
+		map.addPlugin(hmsFirePlugin({ source, layerLabel: "Fires" }));
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		flushSync();
+		const pointsLayer = gl.layers.find((l) => l.id === `${map.uid}:hms-fire:points`);
+		expect(pointsLayer).toBeDefined();
+		expect(pointsLayer).not.toHaveProperty("minzoom");
+		expect(pointsLayer).not.toHaveProperty("maxzoom");
 	});
 });

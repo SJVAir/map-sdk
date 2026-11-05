@@ -1,4 +1,4 @@
-import type { LayerSpecification, SourceSpecification } from "@maptiler/sdk";
+import type { CustomLayerInterface, LayerSpecification, SourceSpecification } from "@maptiler/sdk";
 import type { GlMapLike } from "../../src/lib/core/gl.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- event payloads are untyped, as in MapLibre */
@@ -10,12 +10,14 @@ export interface FakeGl extends GlMapLike {
 	/** Specs as added; a `setData` through `getSource(id)` replaces the spec's `data`. */
 	readonly sources: Map<string, SourceSpecification>;
 	/** In draw order. */
-	readonly layers: LayerSpecification[];
+	readonly layers: Array<LayerSpecification | CustomLayerInterface>;
 	readonly images: Map<string, HTMLImageElement | ImageData>;
 	readonly featureStates: Map<string, Record<string, unknown>>;
 	readonly listeners: Array<{ type: string; layerId?: string; listener: Listener }>;
 	/** Every GlMapLike call, as `method:firstArg`. */
 	readonly calls: string[];
+	/** Every `easeTo`, `flyTo`, and `fitBounds`, with its options. */
+	readonly moves: Array<{ method: "easeTo" | "flyTo" | "fitBounds"; options: any }>;
 	/** The one canvas `getCanvas()` returns: a real `EventTarget`, so DOM listeners work. */
 	readonly canvas: HTMLCanvasElement;
 	/** Calls listeners for `type` (with `layerId`, only those registered on that layer). */
@@ -33,11 +35,12 @@ export interface FakeGl extends GlMapLike {
  */
 export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 	const sources = new Map<string, SourceSpecification>();
-	const layers: LayerSpecification[] = [];
+	const layers: Array<LayerSpecification | CustomLayerInterface> = [];
 	const images = new Map<string, HTMLImageElement | ImageData>();
 	const featureStates = new Map<string, Record<string, unknown>>();
 	const listeners: FakeGl["listeners"] = [];
 	const calls: string[] = [];
+	const moves: FakeGl["moves"] = [];
 	let rendered: Rendered[] = [];
 	let center = { lng: -119.7, lat: 36.7 };
 	let zoom = 7;
@@ -63,6 +66,7 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 		featureStates,
 		listeners,
 		calls,
+		moves,
 		canvas,
 
 		addSource(id, source) {
@@ -144,6 +148,13 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 			const key = stateKey(target.source, target.id);
 			featureStates.set(key, { ...featureStates.get(key), ...state });
 		},
+		setLayoutProperty(layerId, name, value) {
+			log("setLayoutProperty", layerId);
+			const layer = layers.find((l) => l.id === layerId);
+			if (!layer) throw new Error(`fake-gl: no layer ${layerId}`);
+			const spec = layer as { layout?: Record<string, unknown> };
+			spec.layout = { ...spec.layout, [name]: value };
+		},
 		removeFeatureState(target, key) {
 			log("removeFeatureState", target.source);
 			for (const k of [...featureStates.keys()]) {
@@ -218,8 +229,19 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 		},
 		easeTo(o) {
 			log("easeTo");
+			moves.push({ method: "easeTo", options: o });
 			if (o.center) center = { lng: o.center[0], lat: o.center[1] };
 			if (o.zoom !== undefined) zoom = o.zoom;
+		},
+		flyTo(o) {
+			log("flyTo");
+			moves.push({ method: "flyTo", options: o });
+			if (o.center) center = { lng: o.center[0], lat: o.center[1] };
+			if (o.zoom !== undefined) zoom = o.zoom;
+		},
+		fitBounds(b, o) {
+			log("fitBounds");
+			moves.push({ method: "fitBounds", options: { bounds: b, ...o } });
 		},
 		jumpTo(o) {
 			log("jumpTo");

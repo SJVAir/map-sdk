@@ -48,6 +48,7 @@ describe("package.json", () => {
 		);
 		for (const name of [
 			"MapView",
+			"defaultBasemaps",
 			"Legend",
 			"MapTooltip",
 			"FeatureList",
@@ -67,6 +68,13 @@ describe("package.json", () => {
 			"hmsSmokePlugin",
 			"hmsFirePlugin",
 			"groupFires",
+			"cleanFires",
+			"collocationSitesPlugin",
+			"COLLOCATION_CROSSHAIR_COLOR",
+			"circle",
+			"square",
+			"triangle",
+			"withCrosshair",
 			"levelKeyExpression",
 			"colorExpression",
 			"opacityExpression",

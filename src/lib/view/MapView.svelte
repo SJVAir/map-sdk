@@ -13,7 +13,8 @@
 	import MapTooltip from "../ui/MapTooltip.svelte";
 	import SelectionBar from "../ui/SelectionBar.svelte";
 	import ViewSummary from "../ui/ViewSummary.svelte";
-	import { createGlMap, watchTheme } from "./create-gl-map.js";
+	import { createDataCredits } from "../ui/data-credits.svelte.js";
+	import { createGlMap, setDataCredits, watchTheme } from "./create-gl-map.js";
 
 	interface Props {
 		/** The map to show. Fixed for the component's life. */
@@ -27,6 +28,21 @@
 		overlays?: Snippet;
 		/** `false` leaves out the List button and its feature list panel. */
 		featureList?: boolean;
+		/** `false` leaves out the selection bar. */
+		selectionBar?: boolean;
+		/**
+		 * The zoom controls: `"mapsdk"` (default) draws map-sdk's zoom buttons, `"engine"` the
+		 * MapTiler SDK's default zoom/compass and locate-me controls, `"none"` none. The credits
+		 * always show. Choose it up front: changing it after mount recreates the map (the engine
+		 * controls are part of how the map is built), like `active`.
+		 */
+		controls?: "mapsdk" | "engine" | "none";
+		/**
+		 * `"pinned"` (default) anchors the tooltip to its feature. `"pointer"` shows it at the
+		 * pointer, like sjvair.com's map, and hides it on zoom until the pointer moves again.
+		 * Keyboard focus from the feature list always shows it pinned.
+		 */
+		tooltip?: "pinned" | "pointer";
 	}
 
 	let {
@@ -35,7 +51,10 @@
 		class: className,
 		label,
 		overlays,
-		featureList = true
+		featureList = true,
+		selectionBar = true,
+		controls = "mapsdk",
+		tooltip = "pinned"
 	}: Props = $props();
 
 	const uid = $props.id();
@@ -80,6 +99,13 @@
 		});
 	}
 
+	const dataCredits = createDataCredits(firstMap);
+	// The dataset credits go in the engine's attribution control; it is replaced when they change.
+	$effect(() => {
+		const credits = dataCredits.list;
+		if (projector) untrack(() => setDataCredits(projector!, credits));
+	});
+
 	let root: HTMLDivElement;
 	let glContainer: HTMLDivElement;
 	// The live GL map and a counter bumped on every camera move or resize: the tooltip's `project` reads
@@ -97,8 +123,9 @@
 	$effect(() => {
 		if (!active) return;
 		const ctx = map;
+		const engine = controls === "engine";
 		const gl = untrack(() => {
-			const gl = createGlMap(glContainer, ctx);
+			const gl = createGlMap(glContainer, ctx, engine);
 			try {
 				ctx.attach(gl);
 			} catch (error) {
@@ -111,10 +138,30 @@
 		gl.on("move", onMove);
 		gl.on("resize", onMove);
 		projector = gl;
+		// Ready is the first idle after each style load (the first style, and every basemap
+		// switch). A wait still pending when the style is replaced or the map detached is dropped,
+		// so a stale idle never marks the context ready.
+		let stopWaiting: (() => void) | null = null;
+		const waitForIdle = () => {
+			stopWaiting?.();
+			const onIdle = () => {
+				stopWaiting?.();
+				if (ctx.gl === gl) ctx.markReady();
+			};
+			stopWaiting = () => {
+				gl.off("idle", onIdle);
+				stopWaiting = null;
+			};
+			gl.on("idle", onIdle);
+		};
+		gl.on("style.load", waitForIdle);
+		waitForIdle();
 		// Plugins bake theme colors into paint and images, so they set up again on a change.
 		const stopTheme = watchTheme(root, () => ctx.themeChanged());
 		return () => {
 			stopTheme();
+			gl.off("style.load", waitForIdle);
+			stopWaiting?.();
 			projector = null;
 			gl.off("move", onMove);
 			gl.off("resize", onMove);
@@ -137,7 +184,7 @@
 	data-mapsdk-map={map.uid}
 >
 	<div class="mapsdk-gl" bind:this={glContainer}></div>
-	<MapTooltip {map} {project} {width} {height} />
+	<MapTooltip {map} {project} {width} {height} mode={tooltip} gl={projector} />
 	{#if featureList}
 		<div class="mapsdk-list-panel">
 			<button
@@ -161,9 +208,13 @@
 		</div>
 	{/if}
 	<!-- After the list, so Tab reaches the List button first. -->
-	<SelectionBar {map} />
+	{#if selectionBar}
+		<SelectionBar {map} />
+	{/if}
 	<ViewSummary {map} />
-	<MapControls {map} gl={projector} />
+	{#if controls === "mapsdk"}
+		<MapControls {map} gl={projector} />
+	{/if}
 	{@render overlays?.()}
 </div>
 

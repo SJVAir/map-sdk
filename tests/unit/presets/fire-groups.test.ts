@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupFires } from "../../../src/lib/presets/fire-groups.js";
+import { cleanFires, groupFires } from "../../../src/lib/presets/fire-groups.js";
 
 // One degree of latitude is about 111 km.
 const KM = 1 / 111;
@@ -72,5 +72,35 @@ describe("groupFires", () => {
 		]);
 		expect(groups).toHaveLength(1);
 		expect(groups[0].avgFrp).toBe(10);
+	});
+});
+
+describe("cleanFires", () => {
+	it("drops fires without a finite FRP", () => {
+		const fires = [
+			{ id: "a", coordinates: [-119, 36] as [number, number], frp: 10 },
+			{ id: "b", coordinates: [-119, 37] as [number, number], frp: null },
+			{ id: "c", coordinates: [-119, 38] as [number, number], frp: Number.NaN }
+		];
+		expect(cleanFires(fires).map((f) => f.id)).toEqual(["a"]);
+	});
+
+	it("keeps the latest of fires at the same coordinates", () => {
+		const fires = [
+			{
+				id: "a",
+				coordinates: [-119, 36] as [number, number],
+				frp: 10,
+				timestamp: "2026-11-03T10:00:00Z"
+			},
+			{
+				id: "b",
+				coordinates: [-119, 36] as [number, number],
+				frp: 30,
+				timestamp: "2026-11-03T12:00:00Z"
+			},
+			{ id: "c", coordinates: [-119, 37] as [number, number], frp: 5 }
+		];
+		expect(cleanFires(fires).map((f) => f.id)).toEqual(["b", "c"]);
 	});
 });

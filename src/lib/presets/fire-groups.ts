@@ -27,10 +27,14 @@ export interface FireDetection {
 	timestamp?: string;
 }
 
-/** One fire per exact coordinates: the latest by timestamp, else the first listed. */
-function dedupeByCoordinates<F extends FireDetection>(fires: F[]): F[] {
+/**
+ * Drops fires without a finite FRP, then keeps one fire per exact coordinates: the latest by
+ * timestamp, else the first listed. Dropping first means a newer fire with no FRP hides nothing.
+ */
+export function cleanFires<F extends FireDetection>(fires: F[]): F[] {
 	const latest = new Map<string, F>();
 	for (const fire of fires) {
+		if (!Number.isFinite(fire.frp)) continue;
 		const key = `${fire.coordinates[0]},${fire.coordinates[1]}`;
 		const existing = latest.get(key);
 		if (!existing || (fire.timestamp ?? "") > (existing.timestamp ?? "")) latest.set(key, fire);
@@ -43,9 +47,7 @@ function dedupeByCoordinates<F extends FireDetection>(fires: F[]): F[] {
  * skipping fires without a finite FRP and keeping one fire per coordinates, as monitor-map does.
  */
 export function groupFires(fires: FireDetection[]): FireGroup[] {
-	const usable = dedupeByCoordinates(
-		fires.filter((f): f is FireDetection & { frp: number } => Number.isFinite(f.frp))
-	);
+	const usable = cleanFires(fires) as (FireDetection & { frp: number })[];
 	if (!usable.length) return [];
 	const clustered = clustersDbscan(
 		featureCollection(usable.map((f) => point(f.coordinates, { fireId: f.id, frp: f.frp }))),

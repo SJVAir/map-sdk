@@ -1,6 +1,14 @@
 import type { ExpressionSpecification } from "@maptiler/sdk";
-import { createRawSnippet, mount, unmount, type Component, type Snippet } from "svelte";
+import {
+	createRawSnippet,
+	mount,
+	unmount,
+	type Component,
+	type ComponentProps,
+	type Snippet
+} from "svelte";
 import type { MapPlugin } from "../core/plugin.js";
+import type { MetadataProvider } from "../data/metadata.js";
 import type { DataSource, MonitorFeatureProperties } from "../data/types.js";
 import { circle, square, triangle } from "../plugins/icons.js";
 import { pointsPlugin, type ClusterLayerArgs } from "../plugins/points.svelte.js";
@@ -11,12 +19,18 @@ import {
 	MISSING_VALUE
 } from "../plugins/style.js";
 import { levelChip } from "../ui/level-chip.js";
+import { reactiveProps } from "./reactive-props.svelte.js";
 import MonitorClusterTooltip from "./MonitorClusterTooltip.svelte";
 import MonitorTooltip from "./MonitorTooltip.svelte";
 
 // Ported from monitor-map 4.3.0 (src/lib/monitors/): shapes, draw order, icon variants, and
 // cluster rendering. Shapes, sizes, and order are presentation; colors come from the scale and
-// the theme.
+// the theme, except the two fixed monitor colors below.
+
+// The user's decision (2026-11-04), an exception to the theme-token rule: inactive monitors are
+// this gray and inside monitors have a black outline, on every map and theme, as on sjvair.com.
+export const MONITOR_INACTIVE_COLOR = "#969696";
+export const MONITOR_INSIDE_OUTLINE = "#000000";
 
 export interface MonitorsPluginOptions {
 	/** Default "monitors". */
@@ -26,6 +40,8 @@ export interface MonitorsPluginOptions {
 	layerLabel: string;
 	/** Default true, like the shape presets. */
 	selectable?: boolean;
+	/** "ring" (default): ring and check mark. "enlarge": the selected icon draws at 1.3x. */
+	selectedStyle?: "ring" | "enlarge";
 	/** Cluster each monitor type below zoom 9. Default true. */
 	clustered?: boolean;
 }
@@ -67,7 +83,8 @@ function monitorOrder(props: MonitorFeatureProperties): number {
 	}
 }
 
-const SHAPES = { circle, square, triangle };
+/** The marker drawing for each shape. */
+export const SHAPES = { circle, square, triangle };
 const ICON_SIZE = 24;
 const BORDER_WIDTH = 2;
 const CLUSTER_RADIUS = 40;
@@ -157,20 +174,77 @@ function clusterLayers({
 	];
 }
 
-/** A snippet that mounts `component` with `props` (a tooltip outside the map's component tree). */
-function componentSnippet<Props extends Record<string, unknown>>(
+/**
+ * A snippet that mounts `component` with `props` (a tooltip outside the map's component tree).
+ * It mounts at once; `late`, when given, updates the props once it resolves (e.g. a note that
+ * needs a lookup), so a slow lookup never leaves an empty card. Nothing is mounted or updated
+ * after the tooltip closes, and a failure to mount or update is logged, not thrown.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function componentSnippet<Props extends Record<string, any>>(
 	component: Component<Props>,
-	props: Props
+	props: Props,
+	late?: Promise<Partial<Props>>
 ): Snippet {
 	return createRawSnippet(() => ({
 		render: () => "<div></div>",
 		setup(target) {
-			const instance = mount(component, { target, props });
+			let instance: ReturnType<typeof mount> | undefined;
+			let closed = false;
+			const live = reactiveProps(props);
+			try {
+				instance = mount(component, { target, props: live });
+			} catch (error) {
+				console.error("map-sdk: a tooltip failed to mount", error);
+			}
+			void late?.then((extra) => {
+				if (closed || !instance) return;
+				try {
+					Object.assign(live, extra);
+				} catch (error) {
+					console.error("map-sdk: a tooltip failed to update", error);
+				}
+			});
 			return () => {
-				void unmount(instance);
+				closed = true;
+				if (instance) void unmount(instance);
 			};
 		}
 	}));
+}
+
+/**
+ * Looks up a monitor type's reporting interval (e.g. "1 hour") for tooltips' "(N avg)" note,
+ * once per type; null when the provider has none. Failures (a rejection or a synchronous throw)
+ * give null and are forgotten, so they're retried.
+ */
+export function intervalLookup(): (
+	type: string,
+	metadata: MetadataProvider
+) => Promise<string | null> {
+	const intervals = new Map<string, Promise<string | null>>();
+	return function intervalFor(type, metadata) {
+		if (!metadata.monitorTypeInterval) return Promise.resolve(null);
+		let found = intervals.get(type);
+		if (!found) {
+			let call: Promise<string>;
+			try {
+				call = Promise.resolve(metadata.monitorTypeInterval(type));
+			} catch {
+				return Promise.resolve(null);
+			}
+			const lookup = call.then(
+				(value) => (value === "unavailable" ? null : value),
+				() => null
+			);
+			found = lookup;
+			intervals.set(type, lookup);
+			void lookup.then((value) => {
+				if (value === null && intervals.get(type) === lookup) intervals.delete(type);
+			});
+		}
+		return found;
+	};
 }
 
 /**
@@ -180,23 +254,27 @@ function componentSnippet<Props extends Record<string, unknown>>(
  */
 export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 	const clustered = options.clustered ?? true;
+	const intervalFor = intervalLookup();
 	return pointsPlugin<MonitorFeatureProperties>({
 		id: options.id ?? "monitors",
 		source: options.source,
 		layerLabel: options.layerLabel,
+		legendTitle: "entry-type",
 		selectable: options.selectable ?? true,
+		selectedStyle: options.selectedStyle,
 		icon: {
 			category,
-			draw(cat, color, theme) {
+			draw(cat, color) {
 				const [shape, location] = cat.split(":") as [MonitorShape, string];
 				return SHAPES[shape](
 					color,
 					BORDER_WIDTH,
-					location === "inside" ? theme.foreground : undefined
+					location === "inside" ? MONITOR_INSIDE_OUTLINE : undefined
 				);
 			},
 			size: ICON_SIZE,
-			muted: (props) => !props.isActive
+			muted: (props) => !props.isActive,
+			mutedColor: MONITOR_INACTIVE_COLOR
 		},
 		sortKey: monitorOrder,
 		cluster: clustered
@@ -213,20 +291,25 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 						componentSnippet(MonitorClusterTooltip, {
 							cluster,
 							scale: env.scale,
-							precision: env.precision,
 							messages: env.messages,
 							format: env.format,
 							metadata: env.metadata
 						})
 				}
 			: undefined,
+		tooltipShowsName: true,
 		tooltip: (item, props, env) =>
-			componentSnippet(MonitorTooltip, {
-				item,
-				timestamp: props.timestamp ?? null,
-				scale: env.scale,
-				messages: env.messages,
-				format: env.format
-			})
+			componentSnippet<ComponentProps<typeof MonitorTooltip>>(
+				MonitorTooltip,
+				{
+					item,
+					timestamp: props.timestamp ?? null,
+					scale: env.scale,
+					messages: env.messages,
+					format: env.format,
+					interval: null
+				},
+				intervalFor(props.type, env.metadata).then((interval) => ({ interval }))
+			)
 	});
 }

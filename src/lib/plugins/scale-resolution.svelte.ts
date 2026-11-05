@@ -55,12 +55,18 @@ export interface ScaleResolver {
 export function createScaleResolver<P extends MapFeatureProperties>(
 	pluginId: string,
 	layerLabel: string,
-	source: DataSource<P>
+	source: DataSource<P>,
+	/** Title the legend with the entry type's label from the metadata once known. */
+	entryTypeTitle = false
 ): ScaleResolver {
 	/** The scale resolved for a source scale input, from the latest setup. */
 	let resolution = $state.raw<{ input: ScaleInput; scale: Resolved } | null>(null);
-	/** The metadata's display precision for a source scale input, once known. */
-	let hint = $state.raw<{ input: ScaleInput; precision: number | null } | null>(null);
+	/** The metadata's display precision and label for a source scale input, once known. */
+	let hint = $state.raw<{
+		input: ScaleInput;
+		precision: number | null;
+		label: string | null;
+	} | null>(null);
 
 	function current(): Resolved | null {
 		const input = source.scale;
@@ -81,7 +87,11 @@ export function createScaleResolver<P extends MapFeatureProperties>(
 			return { pluginId, status: unavailable };
 		}
 		if (scale === NO_SCALE) return null;
-		return { pluginId, title: layerLabel, units: scale.units, scale };
+		const title =
+			entryTypeTitle && hint !== null && hint.input === source.scale && hint.label
+				? hint.label
+				: layerLabel;
+		return { pluginId, title, units: scale.units, scale };
 	}
 
 	function precision(): number {
@@ -102,7 +112,10 @@ export function createScaleResolver<P extends MapFeatureProperties>(
 			ctx.metadata.entryType(input, controller.signal).then(
 				(info) => {
 					if (isDead() || controller.signal.aborted) return;
-					hint = { input, precision: info === "unavailable" ? null : info.precision };
+					hint =
+						info === "unavailable"
+							? { input, precision: null, label: null }
+							: { input, precision: info.precision, label: info.label };
 				},
 				() => {}
 			);

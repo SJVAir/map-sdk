@@ -18,26 +18,13 @@ const { createDefaultMetadata } = await import("../../../src/lib/data/metadata.j
 
 const pm25 = { dataset: "air-quality", entryType: "pm25" };
 
-function legacyMeta() {
+function monitorsMeta() {
 	return {
 		entries: {
-			pm25: {
-				label: "PM2.5",
-				units: "µg/m³",
-				levels: {
-					GOOD: { name: "good", label: "Good", color: "#0f0", range: [0, 9], guidance: null },
-					MODERATE: {
-						name: "moderate",
-						label: "Moderate",
-						color: "#ff0",
-						range: [9, 35.4],
-						guidance: "Be careful"
-					}
-				}
-			},
-			o3: { label: "Ozone", units: "ppb", levels: null }
+			pm25: { label: "PM2.5", units: "µg/m³", scale: pm25Scale },
+			o3: { label: "Ozone", units: "ppb" }
 		},
-		monitors: { airgradient: { label: "AirGradient" } }
+		monitors: { airgradient: { label: "AirGradient", expected_interval: "1 min" } }
 	};
 }
 
@@ -51,33 +38,28 @@ beforeEach(() => {
 
 describe("default metadata", () => {
 	it("shares one fetch between concurrent callers", async () => {
-		getMonitorsMeta.mockResolvedValue(legacyMeta());
+		getMonitorsMeta.mockResolvedValue(monitorsMeta());
 		const meta = createDefaultMetadata();
 		const [a, b] = await Promise.all([meta.scale(pm25), meta.scale(pm25)]);
 		expect(getMonitorsMeta).toHaveBeenCalledTimes(1);
 		expect(a).toEqual(b);
 	});
 
-	it("builds a range scale from legacy levels", async () => {
-		getMonitorsMeta.mockResolvedValue(legacyMeta());
-		const scale = await createDefaultMetadata().scale(pm25);
-		expect(scale).toMatchObject({ id: "pm25", label: "PM2.5", units: "µg/m³", kind: "range" });
-		if (scale === "unavailable") throw new Error("unavailable");
-		expect(scale.levels.map((l) => [l.min, l.max])).toEqual([
-			[0, 9],
-			[9, null]
-		]);
-	});
-
 	it("uses a scale on the meta unchanged", async () => {
-		const meta = legacyMeta();
-		(meta.entries.pm25 as Record<string, unknown>).scale = pm25Scale;
-		getMonitorsMeta.mockResolvedValue(meta);
+		getMonitorsMeta.mockResolvedValue(monitorsMeta());
 		expect(await createDefaultMetadata().scale(pm25)).toBe(pm25Scale);
 	});
 
-	it("is unavailable for an unknown entry type, an entry without levels, and other datasets", async () => {
-		getMonitorsMeta.mockResolvedValue(legacyMeta());
+	it("monitors meta without scale is unavailable", async () => {
+		const meta = monitorsMeta();
+		delete (meta.entries.pm25 as { scale?: unknown }).scale;
+		(meta.entries.pm25 as Record<string, unknown>).levels = { GOOD: { range: [0, 9] } };
+		getMonitorsMeta.mockResolvedValue(meta);
+		expect(await createDefaultMetadata().scale(pm25)).toBe("unavailable");
+	});
+
+	it("is unavailable for an unknown entry type, an entry without a scale, and other datasets", async () => {
+		getMonitorsMeta.mockResolvedValue(monitorsMeta());
 		const meta = createDefaultMetadata();
 		expect(await meta.scale({ dataset: "air-quality", entryType: "nope" })).toBe("unavailable");
 		expect(await meta.scale({ dataset: "air-quality", entryType: "o3" })).toBe("unavailable");
@@ -147,7 +129,7 @@ describe("default metadata", () => {
 	});
 
 	it("gives label and units for an entry type", async () => {
-		getMonitorsMeta.mockResolvedValue(legacyMeta());
+		getMonitorsMeta.mockResolvedValue(monitorsMeta());
 		const meta = createDefaultMetadata();
 		expect(await meta.entryType(pm25)).toEqual({ label: "PM2.5", units: "µg/m³", precision: null });
 		expect(await meta.entryType({ dataset: "air-quality", entryType: "o3" })).toEqual({
@@ -158,7 +140,7 @@ describe("default metadata", () => {
 	});
 
 	it("gives the catalog's display precision", async () => {
-		getMonitorsMeta.mockResolvedValue(legacyMeta());
+		getMonitorsMeta.mockResolvedValue(monitorsMeta());
 		getHMSMeta.mockResolvedValue({ scales: { "fire-frp": fireScale } });
 		const entry = (id: string, precision: number | null) => ({ id, display: { precision } });
 		getDatasetCatalog.mockResolvedValue({
@@ -178,7 +160,7 @@ describe("default metadata", () => {
 	});
 
 	it("gives a null precision when the catalog fails", async () => {
-		getMonitorsMeta.mockResolvedValue(legacyMeta());
+		getMonitorsMeta.mockResolvedValue(monitorsMeta());
 		getDatasetCatalog.mockRejectedValue(new Error("404"));
 		expect(await createDefaultMetadata().entryType(pm25)).toMatchObject({
 			label: "PM2.5",
@@ -187,14 +169,24 @@ describe("default metadata", () => {
 	});
 
 	it("reads monitor type labels", async () => {
-		getMonitorsMeta.mockResolvedValue(legacyMeta());
+		getMonitorsMeta.mockResolvedValue(monitorsMeta());
 		const meta = createDefaultMetadata();
 		expect(await meta.monitorTypeLabel("airgradient")).toBe("AirGradient");
 		expect(await meta.monitorTypeLabel("zzz")).toBe("unavailable");
 	});
 
+	it("monitorTypeInterval returns expected_interval", async () => {
+		getMonitorsMeta.mockResolvedValue(monitorsMeta());
+		expect(await createDefaultMetadata().monitorTypeInterval!("airgradient")).toBe("1 min");
+	});
+
+	it("unknown type is unavailable for monitorTypeInterval", async () => {
+		getMonitorsMeta.mockResolvedValue(monitorsMeta());
+		expect(await createDefaultMetadata().monitorTypeInterval!("zzz")).toBe("unavailable");
+	});
+
 	it("is unavailable after a failed fetch and fetches again next time", async () => {
-		getMonitorsMeta.mockRejectedValueOnce(new Error("down")).mockResolvedValue(legacyMeta());
+		getMonitorsMeta.mockRejectedValueOnce(new Error("down")).mockResolvedValue(monitorsMeta());
 		const meta = createDefaultMetadata();
 		expect(await meta.scale(pm25)).toBe("unavailable");
 		expect(await meta.scale(pm25)).not.toBe("unavailable");
@@ -210,7 +202,7 @@ describe("default metadata", () => {
 		const other = meta.scale(pm25);
 		controller.abort();
 		await expect(aborted).rejects.toMatchObject({ name: "AbortError" });
-		resolve(legacyMeta());
+		resolve(monitorsMeta());
 		expect(await other).not.toBe("unavailable");
 		expect(getMonitorsMeta).toHaveBeenCalledTimes(1);
 		expect(getMonitorsMeta).toHaveBeenCalledWith();

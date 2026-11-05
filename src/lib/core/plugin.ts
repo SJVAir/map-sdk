@@ -1,4 +1,4 @@
-import type { LayerSpecification, SourceSpecification } from "@maptiler/sdk";
+import type { CustomLayerInterface, LayerSpecification, SourceSpecification } from "@maptiler/sdk";
 import type { Geometry } from "geojson";
 import type { Snippet } from "svelte";
 import type { FormatProvider } from "../data/format.js";
@@ -60,7 +60,17 @@ export interface FeatureListItem {
 }
 
 export type LegendData =
-	| { pluginId: string; title: string; units: string; scale: Scale }
+	| {
+			pluginId: string;
+			title: string;
+			units: string;
+			scale: Scale;
+			/**
+			 * `"gradient"` or `"blocks"` (labeled swatches with the levels' own labels). Absent: a
+			 * gradient for range scales and blocks for category scales.
+			 */
+			display?: "gradient" | "blocks";
+	  }
 	| { pluginId: string; status: DataStatus };
 
 export interface ClickEvent {
@@ -88,6 +98,13 @@ export interface PluginContext {
 	addSource(local: string, spec: SourceSpecification): string;
 	/** Returns the namespaced id; removed on teardown, before sources. */
 	addLayer(local: string, spec: LayerSpecWithoutId): string;
+	/**
+	 * Adds a MapLibre custom layer (e.g. a wind layer from a library the host adds) in the
+	 * plugin's draw-order slot, with the same lifecycle as `addLayer`. `create` gets the
+	 * namespaced id, which the layer must use; the object it returns is added as is, never copied,
+	 * and `create` runs again on each restyle, so build a fresh layer every time. Returns the id.
+	 */
+	addCustomLayer(local: string, create: (id: string) => CustomLayerInterface): string;
 	/** Adds the image as `id(local)`; removed on teardown. */
 	addImage(local: string, image: HTMLImageElement | ImageData): void;
 	/** Registers layers for click, hover, tooltip, and `featuresAt`. */
@@ -129,9 +146,20 @@ export interface MapPlugin {
 	legend?(): LegendData | null;
 	features?(): FeatureListItem[];
 	selectable?: boolean;
+	/**
+	 * Which plugin's feature the hover tooltip shows where several are under the pointer: the
+	 * highest wins, the topmost on a tie. Default 0. A blocking layer on top still hides what is
+	 * beneath it, and clicks ignore this (topmost first).
+	 */
+	hoverPriority?: number;
 	displayOptions?: Snippet;
 	/** Richer tooltip content for one of this plugin's features, below its name. */
 	tooltip?(item: FeatureListItem): Snippet | undefined;
+	/**
+	 * Set when this plugin's `tooltip` content shows the feature's name itself, so the generic
+	 * tooltip leaves its name header out. Default false.
+	 */
+	tooltipShowsName?: boolean;
 	/**
 	 * Tooltip content for a hovered hit that isn't a listed feature (e.g. a cluster bubble's hover
 	 * hit from `PluginContext.blocking`).

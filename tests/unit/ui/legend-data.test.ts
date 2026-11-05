@@ -27,9 +27,9 @@ describe("legendSection", () => {
 		expect(section?.bar).toEqual({
 			kind: "blocks",
 			blocks: [
-				{ color: "#bfc8c3", opacity: 0.2, label: "Light" },
-				{ color: "#757b78", opacity: 0.3, label: "Medium" },
-				{ color: "#333634", opacity: 0.4, label: "Heavy" }
+				{ color: "#bfc8c3", opacity: 0.2, label: "Light", tick: "" },
+				{ color: "#757b78", opacity: 0.3, label: "Medium", tick: "" },
+				{ color: "#333634", opacity: 0.4, label: "Heavy", tick: "" }
 			]
 		});
 	});
@@ -58,5 +58,29 @@ describe("swatchOverBackground", () => {
 	it("returns the color for no opacity or an empty color", () => {
 		expect(swatchOverBackground("#ff0000", null, "#ffffff")).toBe("#ff0000");
 		expect(swatchOverBackground("", 0.5, "#ffffff")).toBe("");
+	});
+
+	it("range scale with display blocks gives blocks with level labels", () => {
+		const section = legendSection(
+			{ pluginId: "points", title: "PM2.5", units: "µg/m³", scale: pm25Scale, display: "blocks" },
+			format
+		);
+		expect(section?.bar.kind).toBe("blocks");
+		if (section?.bar.kind !== "blocks") return;
+		expect(section.bar.blocks.map((b) => b.label)).toEqual(pm25Scale.levels.map((l) => l.label));
+		expect(section.bar.blocks[1]).toEqual({
+			color: "#ffff00",
+			opacity: null,
+			label: "Moderate",
+			tick: "9"
+		});
+	});
+
+	it("no display keeps the gradient", () => {
+		const section = legendSection(
+			{ pluginId: "points", title: "PM2.5", units: "µg/m³", scale: pm25Scale },
+			format
+		);
+		expect(section?.bar.kind).toBe("gradient");
 	});
 });

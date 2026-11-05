@@ -242,6 +242,38 @@ describe("pointsPlugin", () => {
 		expect(plugin.features!()[0].precision).toBe(1);
 	});
 
+	it("zoomRange sets minzoom and maxzoom on every layer", () => {
+		const source = new TestSource<Props>({
+			features: points([
+				{ refKey: "monitor:a", name: "A", value: 1 },
+				{ refKey: "monitor:b", name: "B", value: 2 }
+			]),
+			scale: pm25Scale
+		});
+		const { gl } = setup({
+			source,
+			cluster: { radius: 40, maxZoom: 9 },
+			zoomRange: { min: 4, max: 10 }
+		});
+		expect(gl.layers.length).toBeGreaterThan(2);
+		for (const l of gl.layers) expect(l).toMatchObject({ minzoom: 4, maxzoom: 10 });
+	});
+
+	it("zoomRange with one end sets only that end; none sets neither", () => {
+		const make = (zoomRange?: { min?: number; max?: number }) => {
+			const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
+			return setup({ source, zoomRange }).gl.layers;
+		};
+		for (const l of make({ max: 10 })) {
+			expect(l).toMatchObject({ maxzoom: 10 });
+			expect(l).not.toHaveProperty("minzoom");
+		}
+		for (const l of make()) {
+			expect(l).not.toHaveProperty("minzoom");
+			expect(l).not.toHaveProperty("maxzoom");
+		}
+	});
+
 	it("creates one clustered source per group", () => {
 		const source = new TestSource<Props>({
 			features: points([
@@ -308,6 +340,39 @@ describe("pointsPlugin", () => {
 		expect(picks).not.toHaveBeenCalled();
 		expect(expansionZoom).toHaveBeenCalledWith(9);
 		expect(gl.getZoom()).toBe(12);
+	});
+
+	it("draws muted images in theme mutedForeground unless icon.mutedColor says otherwise", () => {
+		vi.stubGlobal(
+			"Image",
+			class {
+				onload: (() => void) | null = null;
+				set src(_v: string) {}
+			}
+		);
+		try {
+			const run = (mutedColor?: string) => {
+				const source = new TestSource<Props>({
+					features: points([{ refKey: "monitor:a", name: "A", value: 1, type: "purple" }]),
+					scale: pm25Scale
+				});
+				const draw = vi.fn((category: string, color: string) => `<svg>${category}${color}</svg>`);
+				setup({
+					source,
+					circle: undefined,
+					icon: { category: (p) => p.type ?? "", draw, size: 24, muted: () => true, mutedColor }
+				});
+				return draw;
+			};
+			expect(run()).toHaveBeenCalledWith(
+				"purple",
+				FALLBACK_THEME_COLORS.mutedForeground,
+				FALLBACK_THEME_COLORS
+			);
+			expect(run("#123456")).toHaveBeenCalledWith("purple", "#123456", FALLBACK_THEME_COLORS);
+		} finally {
+			vi.unstubAllGlobals();
+		}
 	});
 
 	it("picks icons by category and level key and registers their images", async () => {
@@ -483,5 +548,98 @@ describe("pointsPlugin", () => {
 		]);
 		flushSync();
 		expect(gl.featureStates.get("m1:pts:points:airnow/monitor:late")).toEqual({ selected: true });
+	});
+});
+
+describe("pointsPlugin selectedStyle", () => {
+	const A = { refKey: "monitor:a", name: "A", value: 1, type: "purple" };
+	const B = { refKey: "monitor:b", name: "B", value: 2, type: "purple" };
+	const draw = (category: string, color: string) => `<svg>${category}${color}</svg>`;
+
+	function enlargeSetup(selectedStyle?: "ring" | "enlarge") {
+		const source = new TestSource<Props>({ features: points([A, B]), scale: pm25Scale });
+		const result = setup({
+			source,
+			selectable: true,
+			selectedStyle,
+			circle: undefined,
+			icon: { category: (p) => p.type ?? "", draw, size: 24 }
+		});
+		return { source, ...result };
+	}
+	const iconSize = (gl: FakeGl) =>
+		(layer(gl, "m1:pts:points") as Extract<LayerSpecification, { type: "symbol" }>).layout![
+			"icon-size"
+		];
+	const sizeFor = (keys: string[]) => [
+		"case",
+		["in", ["get", "refKey"], ["literal", keys]],
+		1.3 / 2,
+		1 / 2
+	];
+
+	it("enlarge adds no selected overlay layers", () => {
+		const { gl } = enlargeSetup("enlarge");
+		expect(layerIds(gl)).toEqual(["m1:pts:points"]);
+		expect(gl.images.has("m1:pts:selected")).toBe(false);
+	});
+
+	it("enlarge sets icon-size 1.3x for the selected key", () => {
+		const { gl, selected } = enlargeSetup("enlarge");
+		expect(iconSize(gl)).toBe(1 / 2);
+		selected.set("pts", new SvelteSet(["monitor:a"]));
+		flushSync();
+		expect(iconSize(gl)).toEqual(sizeFor(["monitor:a"]));
+	});
+
+	it("enlarge follows selection changes", () => {
+		const { gl, selected } = enlargeSetup("enlarge");
+		selected.set("pts", new SvelteSet(["monitor:a"]));
+		flushSync();
+		selected.set("pts", new SvelteSet(["monitor:b"]));
+		flushSync();
+		expect(iconSize(gl)).toEqual(sizeFor(["monitor:b"]));
+		selected.set("pts", new SvelteSet());
+		flushSync();
+		expect(iconSize(gl)).toBe(1 / 2);
+	});
+
+	it("enlarge keeps the selected size after a data refresh", () => {
+		const { gl, source, selected } = enlargeSetup("enlarge");
+		selected.set("pts", new SvelteSet(["monitor:a"]));
+		flushSync();
+		// A refresh with new values, as the 2-minute poll does.
+		source.features = points([{ ...A, value: 200 }, B]);
+		flushSync();
+		expect(iconSize(gl)).toEqual(sizeFor(["monitor:a"]));
+		// Selection changes, then data refreshes again: still the new key, no ring layer.
+		selected.set("pts", new SvelteSet(["monitor:b"]));
+		flushSync();
+		source.features = points([A, { ...B, value: 300 }]);
+		flushSync();
+		expect(iconSize(gl)).toEqual(sizeFor(["monitor:b"]));
+		expect(layerIds(gl)).toEqual(["m1:pts:points"]);
+	});
+
+	it("enlarge re-applies the size when the layers are rebuilt", () => {
+		const { gl, source, selected } = enlargeSetup("enlarge");
+		selected.set("pts", new SvelteSet(["monitor:a"]));
+		flushSync();
+		// A new group forces a rebuild only when clustered; a new scale rebuilds either way.
+		source.scale = { ...pm25Scale, levels: pm25Scale.levels.slice(0, 2) };
+		flushSync();
+		expect(iconSize(gl)).toEqual(sizeFor(["monitor:a"]));
+	});
+
+	it("ring default unchanged", () => {
+		for (const style of [undefined, "ring" as const]) {
+			const { gl, selected } = enlargeSetup(style);
+			expect(layerIds(gl)).toEqual(["m1:pts:points", "m1:pts:selected"]);
+			selected.set("pts", new SvelteSet(["monitor:a"]));
+			flushSync();
+			expect(iconSize(gl)).toBe(1 / 2);
+			expect(gl.calls).not.toContain("setLayoutProperty:m1:pts:points");
+			expect(gl.featureStates.get("m1:pts:points/monitor:a")).toEqual({ selected: true });
+		}
 	});
 });

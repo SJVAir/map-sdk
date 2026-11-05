@@ -1,10 +1,14 @@
 import { mix } from "color2k";
 import type { LegendData } from "../core/plugin.js";
 import type { FormatProvider } from "../data/format.js";
+import type { DataStatus } from "../data/types.js";
 
 export type LegendBar =
 	| { kind: "gradient"; stops: Array<{ color: string; label: string; tick: string }> }
-	| { kind: "blocks"; blocks: Array<{ color: string; opacity: number | null; label: string }> };
+	| {
+			kind: "blocks";
+			blocks: Array<{ color: string; opacity: number | null; label: string; tick: string }>;
+	  };
 
 export interface LegendSection {
 	pluginId: string;
@@ -13,13 +17,17 @@ export interface LegendSection {
 	bar: LegendBar;
 }
 
+export type LegendEntry =
+	| { kind: "scale"; section: LegendSection }
+	| { kind: "status"; pluginId: string; layer: string; status: DataStatus };
+
 /** One legend section from a plugin's legend data; null for status-only data or no levels. */
 export function legendSection(data: LegendData, format: FormatProvider): LegendSection | null {
 	if (!("scale" in data)) return null;
 	const { scale } = data;
 	if (scale.levels.length === 0) return null;
 	const bar: LegendBar =
-		scale.kind === "range"
+		scale.kind === "range" && data.display !== "blocks"
 			? {
 					kind: "gradient",
 					stops: scale.levels.map((level) => ({
@@ -33,7 +41,12 @@ export function legendSection(data: LegendData, format: FormatProvider): LegendS
 					blocks: scale.levels.map((level) => ({
 						color: level.color ?? "",
 						opacity: level.opacity,
-						label: level.label
+						label: level.label,
+						// A range scale's lower bound, for screen readers; categories have none.
+						tick:
+							scale.kind === "range" && level.min !== null
+								? format.number(Math.floor(level.min))
+								: ""
 					}))
 				};
 	return { pluginId: data.pluginId, title: data.title, units: data.units, bar };

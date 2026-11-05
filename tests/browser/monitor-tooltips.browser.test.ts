@@ -6,8 +6,12 @@ import { createDefaultFormat } from "../../src/lib/data/format.js";
 import { defaultMessages } from "../../src/lib/data/messages.js";
 import type { MetadataProvider } from "../../src/lib/data/metadata.js";
 import { NO_LEVEL } from "../../src/lib/data/scale.js";
-import type { MonitorFeatureProperties } from "../../src/lib/data/types.js";
+import type {
+	CollocationFeatureProperties,
+	MonitorFeatureProperties
+} from "../../src/lib/data/types.js";
 import type { ClusterInfo } from "../../src/lib/plugins/points.svelte.js";
+import CollocationTooltip from "../../src/lib/presets/CollocationTooltip.svelte";
 import MonitorClusterTooltip from "../../src/lib/presets/MonitorClusterTooltip.svelte";
 import MonitorTooltip from "../../src/lib/presets/MonitorTooltip.svelte";
 import { monitor } from "../fixtures/monitors.js";
@@ -29,33 +33,76 @@ function item(value: FeatureListItem["value"]): FeatureListItem {
 }
 
 describe("MonitorTooltip", () => {
-	it("shows the rounded reading in a box with the scale's label, the time, and the level", async () => {
+	it("shows the whole-number reading in a box with the scale's label, the time, and the level", async () => {
 		render(MonitorTooltip, {
 			item: item(12.6),
 			timestamp: "2026-11-03T21:00:00Z",
 			scale: pm25Scale,
 			messages: defaultMessages,
-			format
+			format,
+			interval: null
 		});
 		const text = document.body.textContent!.replace(/\s+/g, " ");
-		expect(text).toContain("PM2.5 13");
+		expect(text).toContain("PM2.5 12");
+		expect(text).toContain("Fresno Garland");
 		expect(text).toContain("Nov 3, 2026, 1:00 PM");
 		expect(text).toContain("Moderate");
 		expect(text).toMatch(/Last updated \d+ (minutes|hours|days?) ago/);
-		const box = page.getByText("13").element().parentElement!;
+		const box = page.getByText("12").element().parentElement!;
 		expect(getComputedStyle(box).backgroundColor).toBe("rgb(255, 255, 0)");
 		expect(getComputedStyle(box).color).toBe("rgb(0, 0, 0)");
 	});
 
-	it("rounds the reading to the item's precision", async () => {
+	it("shows a whole number whatever the item's precision, as monitor-map does", async () => {
 		render(MonitorTooltip, {
 			item: { ...item(12.64), precision: 1 },
 			timestamp: null,
 			scale: pm25Scale,
 			messages: defaultMessages,
-			format
+			format,
+			interval: null
 		});
-		expect(document.body.textContent!.replace(/\s+/g, " ")).toContain("PM2.5 12.6");
+		expect(document.body.textContent!.replace(/\s+/g, " ")).toContain("PM2.5 12");
+		expect(document.body.textContent).not.toContain("12.6");
+	});
+
+	it("cuts the reading off like monitor-map: 9.3 shows 9 in Moderate's color and label", async () => {
+		render(MonitorTooltip, {
+			item: { ...item(9.3), level: pm25Scale.levels[1] },
+			timestamp: null,
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			interval: null
+		});
+		expect(document.body.textContent!.replace(/\s+/g, " ")).toContain("PM2.5 9");
+		expect(document.body.textContent).toContain("Moderate");
+		const box = page.getByText("9", { exact: true }).element().parentElement!;
+		expect(getComputedStyle(box).backgroundColor).toBe("rgb(255, 255, 0)");
+	});
+
+	it("lays out the box left; time, bold underlined name, level, then the age on the right", async () => {
+		render(MonitorTooltip, {
+			item: item(12.6),
+			timestamp: "2026-11-03T21:00:00Z",
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			interval: null
+		});
+		const detail = document.querySelector(".mapsdk-monitor-detail")!;
+		const texts = [...detail.children].map((c) => c.textContent!.trim());
+		expect(texts[0]).toContain("Nov 3, 2026");
+		expect(texts[1]).toBe("Fresno Garland");
+		expect(texts[2]).toBe("Moderate");
+		expect(texts[3]).toMatch(/^Last updated/);
+		const name = getComputedStyle(detail.children[1]);
+		expect(name.fontWeight).toBe("700");
+		expect(name.textDecorationLine).toBe("underline");
+		const box = document.querySelector(".mapsdk-reading-box")!;
+		expect(box.getBoundingClientRect().right).toBeLessThanOrEqual(
+			detail.getBoundingClientRect().left
+		);
 	});
 
 	it("shows no reading and No level in a neutral box", async () => {
@@ -64,10 +111,37 @@ describe("MonitorTooltip", () => {
 			timestamp: null,
 			scale: pm25Scale,
 			messages: defaultMessages,
-			format
+			format,
+			interval: null
 		});
 		await expect.element(page.getByText("No reading")).toBeVisible();
 		await expect.element(page.getByText("No level")).toBeVisible();
+	});
+});
+
+describe("MonitorTooltip interval note", () => {
+	it("monitor tooltip shows (1 hour avg) for airnow", async () => {
+		render(MonitorTooltip, {
+			item: item(12.6),
+			timestamp: null,
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			interval: "1 hour"
+		});
+		await expect.element(page.getByText("(1 hour avg)")).toBeVisible();
+	});
+
+	it("no note when the provider lacks monitorTypeInterval", async () => {
+		render(MonitorTooltip, {
+			item: item(12.6),
+			timestamp: null,
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			interval: null
+		});
+		expect(document.body.textContent).not.toContain("avg)");
 	});
 });
 
@@ -79,11 +153,12 @@ describe("MonitorTooltip with an empty-color level", () => {
 			timestamp: null,
 			scale: pm25Scale,
 			messages: defaultMessages,
-			format
+			format,
+			interval: null
 		});
 		await expect.element(page.getByText("Unknown")).toBeVisible();
 		expect(page.getByText("No level").elements()).toHaveLength(0);
-		const box = page.getByText("13").element().parentElement!;
+		const box = page.getByText("12").element().parentElement!;
 		expect(getComputedStyle(box).backgroundColor).not.toBe("rgb(255, 255, 0)");
 	});
 });
@@ -146,21 +221,20 @@ describe("MonitorClusterTooltip", () => {
 		expect(text).not.toContain("Good");
 	});
 
-	it("rounds the average, max, and min to the given precision", async () => {
-		const near = [monitor("1", "purpleair", 9.12), monitor("2", "purpleair", 9.16)];
+	it("rounds the average to a whole number and shows max and min as reported", async () => {
+		const near = [monitor("1", "purpleair", 8.02), monitor("2", "purpleair", 24.93)];
 		render(MonitorClusterTooltip, {
 			cluster: cluster(near, coords),
 			scale: pm25Scale,
-			precision: 1,
 			messages: defaultMessages,
 			format,
 			metadata
 		});
 		await expect.element(page.getByText(/^Max:/)).toBeVisible();
 		const text = document.body.textContent!.replace(/\s+/g, " ");
-		expect(text).toContain("PM2.5 9.1 (cluster avg)");
-		expect(text).toContain("Max: 9.2 µg/m³");
-		expect(text).toContain("Min: 9.1 µg/m³");
+		expect(text).toContain("PM2.5 16 (cluster avg)");
+		expect(text).toContain("Max: 24.93 µg/m³");
+		expect(text).toContain("Min: 8.02 µg/m³");
 	});
 
 	it("keeps the bubble's count and average when the leaves fail", async () => {
@@ -181,7 +255,7 @@ describe("MonitorClusterTooltip", () => {
 		monitorTypeLabel: vi.fn(async () => "PurpleAir")
 	} as unknown as MetadataProvider;
 
-	it("shows the type, count, area, average, max, and min with units", async () => {
+	it("shows the type, count, average, max, and min with units", async () => {
 		render(MonitorClusterTooltip, {
 			cluster: cluster(
 				[
@@ -202,14 +276,15 @@ describe("MonitorClusterTooltip", () => {
 		});
 		await expect.element(page.getByText("SJVAir PurpleAir Monitors")).toBeVisible();
 		const text = document.body.textContent!.replace(/\s+/g, " ");
-		expect(text).toMatch(/3 monitors covering \d+\.\d{3} mi²/);
+		expect(text).toContain("3 monitors");
+		expect(text).not.toContain("covering");
 		expect(text).toContain("PM2.5 15 (cluster avg)");
 		expect(text).toContain("Moderate");
 		expect(text).toContain("Max: 20 µg/m³");
 		expect(text).toContain("Min: 10 µg/m³");
 	});
 
-	it("leaves out the area for two monitors and falls back to the type id", async () => {
+	it("falls back to the type id", async () => {
 		const unavailable = {
 			monitorTypeLabel: vi.fn(async () => "unavailable")
 		} as unknown as MetadataProvider;
@@ -228,5 +303,90 @@ describe("MonitorClusterTooltip", () => {
 		});
 		await expect.element(page.getByText("purpleair Monitors")).toBeVisible();
 		await expect.element(page.getByText("2 monitors", { exact: true })).toBeVisible();
+	});
+});
+
+describe("CollocationTooltip", () => {
+	const site = (
+		extra: Partial<CollocationFeatureProperties> = {}
+	): CollocationFeatureProperties => ({
+		...monitor("ref", "airnow", 12.6, {
+			name: "Fresno Garland",
+			timestamp: "2026-11-03T21:00:00Z"
+		}),
+		refKey: "feature:s1",
+		referenceName: "Garland Reference",
+		colocatedId: "col",
+		colocatedName: "Garland PurpleAir",
+		colocatedType: "purpleair",
+		colocatedValue: 40.2,
+		colocatedTimestamp: "2026-11-03T21:02:00Z",
+		...extra
+	});
+
+	it("collocation tooltip shows both readings", async () => {
+		render(CollocationTooltip, {
+			site: site(),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			referenceInterval: "1 hour",
+			colocatedInterval: "2 min"
+		});
+		const text = document.body.textContent!.replace(/\s+/g, " ");
+		expect(text).toContain("PM2.5 12 (1 hour avg)");
+		expect(text).toContain("PM2.5 40 (2 min avg)");
+		expect(text).toContain("Nov 3, 2026, 1:00 PM");
+		expect(text).toContain("Nov 3, 2026, 1:02 PM");
+		// The reference monitor's own name, not the site's.
+		expect(text).toContain("Garland Reference");
+		expect(text).not.toContain("Fresno Garland");
+		expect(text).toContain("Garland PurpleAir");
+		expect(text).toContain("Reference monitor");
+		expect(text).toContain("Collocated monitor");
+		expect(text).toContain("Moderate");
+		expect(text).toContain("Unhealthy for Sensitive Groups");
+		expect(text.match(/Last updated \d+ (minutes|hours|days?) ago/g)).toHaveLength(2);
+		const reference = page.getByText("12").element().parentElement!;
+		expect(getComputedStyle(reference).backgroundColor).toBe("rgb(255, 255, 0)");
+		const colocated = page.getByText("40").element().parentElement!;
+		expect(getComputedStyle(colocated).backgroundColor).toBe("rgb(255, 126, 0)");
+		// The collocated row puts its box on the other side, as monitor-map does.
+		const rows = document.querySelectorAll(".mapsdk-collocation-row");
+		expect(getComputedStyle(rows[0]).flexDirection).toBe("row");
+		expect(getComputedStyle(rows[1]).flexDirection).toBe("row-reverse");
+	});
+
+	it("falls back to the site name without a reference monitor name", async () => {
+		render(CollocationTooltip, {
+			site: site({ referenceName: null }),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			referenceInterval: null,
+			colocatedInterval: null
+		});
+		await expect.element(page.getByText("Fresno Garland")).toBeVisible();
+	});
+
+	it("a missing monitor shows No reading and No level in a neutral box", async () => {
+		render(CollocationTooltip, {
+			site: site({
+				colocatedName: null,
+				colocatedType: null,
+				colocatedValue: null,
+				colocatedTimestamp: null
+			}),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			referenceInterval: null,
+			colocatedInterval: null
+		});
+		await expect.element(page.getByText("No reading")).toBeVisible();
+		await expect.element(page.getByText("No level")).toBeVisible();
+		await expect.element(page.getByText("Collocated monitor")).toBeVisible();
+		expect(document.body.textContent).not.toContain("avg)");
+		expect(document.body.textContent!.match(/Last updated/g)).toHaveLength(1);
 	});
 });

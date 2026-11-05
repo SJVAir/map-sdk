@@ -14,7 +14,7 @@ export interface ThemeColors {
 	highlightForeground: string;
 	/** Marker and cluster outlines and cluster counts: `--foreground`. */
 	foreground: string;
-	/** Markers drawn muted whatever their value (e.g. inactive monitors): `--muted-foreground`. */
+	/** Markers drawn muted by default (see `icon.mutedColor`): `--muted-foreground`. */
 	mutedForeground: string;
 }
 

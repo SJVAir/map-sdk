@@ -250,6 +250,62 @@ describe("shapesPlugin", () => {
 		expect(setup({ source, listed: false }).plugin.features).toBeUndefined();
 	});
 
+	it("default theme outline unchanged", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
+		const { gl } = setup({ source });
+		await settle();
+		const outline = layer(gl, "m1:shp:outline") as Extract<LayerSpecification, { type: "line" }>;
+		expect(outline.paint!["line-color"]).toEqual([
+			"case",
+			["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false],
+			colorExpression(smokeScale, "value", FALLBACK_THEME_COLORS.neutral),
+			FALLBACK_THEME_COLORS.foreground
+		]);
+		expect(outline.paint!["line-opacity"]).toBeUndefined();
+	});
+
+	it("outline level paints line-color from the scale", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
+		const { gl } = setup({ source, outline: "level" });
+		await settle();
+		const outline = layer(gl, "m1:shp:outline") as Extract<LayerSpecification, { type: "line" }>;
+		expect(outline.paint!["line-color"]).toEqual(
+			colorExpression(smokeScale, "value", FALLBACK_THEME_COLORS.neutral)
+		);
+		expect(outline.paint!["line-opacity"]).toEqual(opacityExpression(smokeScale, "value", 0.6));
+		expect(outline.paint!["line-width"]).toEqual([
+			"case",
+			["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false],
+			2,
+			1
+		]);
+	});
+
+	it("outline level in plain mode falls back to the theme outline", () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
+		const { gl } = setup({ source, mode: "plain", outline: "level" }, smokeScale, metaSpy);
+		const outline = layer(gl, "m1:shp:outline") as Extract<LayerSpecification, { type: "line" }>;
+		expect(outline.paint!["line-color"]).toBe(FALLBACK_THEME_COLORS.foreground);
+		expect(outline.paint!["line-opacity"]).toBeUndefined();
+	});
+
+	it("outline none adds no outline layer and fill stays interactive", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
+		const { gl, router } = setup({ source, outline: "none" });
+		await settle();
+		expect(layerIds(gl)).toEqual(["m1:shp:fill", "m1:shp:selected", "m1:shp:check"]);
+		router.attach(gl);
+		gl.setRenderedFeatures([
+			{
+				layer: { id: "m1:shp:fill" },
+				source: "m1:shp:shapes",
+				properties: { refKey: "feature:a", name: "Alpha" },
+				geometry: { type: "Point", coordinates: [0, 0] }
+			}
+		]);
+		expect(router.hitsAt([0, 0])).toHaveLength(1);
+	});
+
 	it("registers the fill and outline for interaction", () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
 		const { gl, router } = setup({ source });

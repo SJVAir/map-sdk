@@ -9,6 +9,7 @@ import { untrack, type Snippet } from "svelte";
 import type {
 	FeatureHit,
 	FeatureListItem,
+	LegendData,
 	LayerSpecWithoutId,
 	MapPlugin,
 	PluginContext,
@@ -60,6 +61,11 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	/** Already-translated layer name for the list and summary. */
 	layerLabel: string;
 	selectable?: boolean;
+	/**
+	 * How a selected feature shows. "ring" (default): a highlight ring and check mark over it.
+	 * "enlarge": the icon draws at 1.3x with no ring (icons only; circles are unchanged).
+	 */
+	selectedStyle?: "ring" | "enlarge";
 	icon?: {
 		category(props: P): string;
 		/**
@@ -68,8 +74,10 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 		 */
 		draw(category: string, color: string, theme: ThemeColors, levelIndex?: number): string;
 		size: number;
-		/** Draws in `--muted-foreground` whatever the value (e.g. an inactive monitor). */
+		/** Draws in `mutedColor` whatever the value (e.g. an inactive monitor). */
 		muted?(props: P): boolean;
+		/** The color of muted images. Default: the theme's `--muted-foreground`. */
+		mutedColor?: string;
 	};
 	/** Used when there is no `icon`. */
 	circle?: { radius: number };
@@ -90,10 +98,29 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	};
 	/** Higher draws on top (and, clustered, a group with a higher key draws above the others). */
 	sortKey?(props: P): number;
+	/**
+	 * Limits every layer the plugin draws (points, clusters, selection) to a zoom range: visible
+	 * from `min` (inclusive) up to `max` (exclusive). Set on the layers, so it switches live while
+	 * zooming. Default: all zooms.
+	 */
+	zoomRange?: { min?: number; max?: number };
+	/** How the legend shows a range scale: a gradient (default) or labeled blocks. */
+	legendDisplay?: "gradient" | "blocks";
+	/**
+	 * What titles the legend section: `layerLabel` (default) or, for a source with a `ScaleRef`,
+	 * the entry type's label from the metadata provider (e.g. "PM2.5"), with `layerLabel` until
+	 * it loads.
+	 */
+	legendTitle?: "layer" | "entry-type";
 	/** Whether `features()` lists this plugin's features. Default true. */
 	listed?: boolean;
 	/** Tooltip content for a feature, below its name; `props` are its source properties. */
 	tooltip?(item: FeatureListItem, props: P, env: PointsTooltipEnv): Snippet | undefined;
+	/**
+	 * The `tooltip` content shows the feature's name itself, so no name header is drawn above
+	 * it.
+	 */
+	tooltipShowsName?: boolean;
 }
 
 /** Properties the plugin adds to each feature it hands MapLibre. */
@@ -105,6 +132,8 @@ const MUTED_IMAGE = "mapsdk:muted";
 
 /** Marker images are drawn at this multiple of their size and scaled down, for sharp HiDPI. */
 const IMAGE_RATIO = 2;
+/** The icon scale of a selected feature with `selectedStyle: "enlarge"`. */
+const ENLARGE = 1.3;
 const DEFAULT_RADIUS = 6;
 const UNCLUSTERED: FilterSpecification = ["!", ["has", "point_count"]];
 /**
@@ -115,11 +144,22 @@ const UNCLUSTERED: FilterSpecification = ["!", ["has", "point_count"]];
 export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOptions<P>): MapPlugin {
 	const { id: pluginId, source, layerLabel, icon, cluster } = options;
 	const selectable = options.selectable ?? false;
+	const enlarge = options.selectedStyle === "enlarge";
 	const groupOf = cluster?.groupBy ?? (() => "");
 
-	const scales = createScaleResolver(pluginId, layerLabel, source);
+	const scales = createScaleResolver(
+		pluginId,
+		layerLabel,
+		source,
+		options.legendTitle === "entry-type"
+	);
 	const currentScale = scales.current;
-	const legend = scales.legend;
+	const legend = (): LegendData | null => {
+		const data = scales.legend();
+		return data && "scale" in data && options.legendDisplay
+			? { ...data, display: options.legendDisplay }
+			: data;
+	};
 
 	/** The providers of the running setup, for tooltips; null while not set up. */
 	let providers: Providers | null = null;
@@ -211,6 +251,8 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		const sources = new Map<string, string>();
 		/** Namespaced ids of the layers currently on the map, in draw order. */
 		let layers: string[] = [];
+		/** The subset of `layers` that draw the points themselves. */
+		let pointLayerIds: string[] = [];
 		const interactiveLayers = new Set<string>();
 		const clusterLayerIds = new Set<string>();
 		const images = new Set<string>();
@@ -255,7 +297,11 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				}
 				const muted = `${iconPrefix()}${category}:${MUTED_IMAGE}`;
 				if (icon.muted && !images.has(muted)) {
-					loadImage(muted, icon.draw(category, theme.mutedForeground, theme), icon.size);
+					loadImage(
+						muted,
+						icon.draw(category, icon.mutedColor ?? theme.mutedForeground, theme),
+						icon.size
+					);
 				}
 			}
 		}
@@ -297,11 +343,22 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			return spec;
 		}
 
+		/** The spec limited to the plugin's zoom range. */
+		function zoomed(spec: LayerSpecWithoutId): LayerSpecWithoutId {
+			const { min, max } = options.zoomRange ?? {};
+			return {
+				...spec,
+				...(min !== undefined ? { minzoom: min } : {}),
+				...(max !== undefined ? { maxzoom: max } : {})
+			} as LayerSpecWithoutId;
+		}
+
 		function removeLayers(): void {
 			for (const layerId of layers.toReversed()) {
 				if (gl.getLayer(layerId)) gl.removeLayer(layerId);
 			}
 			layers = [];
+			pointLayerIds = [];
 			built = null;
 		}
 
@@ -375,7 +432,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			};
 			const added: string[] = [];
 			for (const { local, spec } of (cluster?.layers ?? defaultClusterLayers)(args)) {
-				added.push(ctx.addLayer(layerLocal(local, group), spec));
+				added.push(ctx.addLayer(layerLocal(local, group), zoomed(spec)));
 			}
 			layers.push(...added);
 			const fresh = added.filter((layerId) => !clusterLayerIds.has(layerId));
@@ -406,13 +463,18 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			for (const group of groups) {
 				const layerId = ctx.addLayer(
 					layerLocal("points", group),
-					pointLayer(scale, sources.get(group)!)
+					zoomed(pointLayer(scale, sources.get(group)!))
 				);
 				layers.push(layerId);
 				pointIds.push(layerId);
 			}
-			for (const group of groups) {
-				layers.push(ctx.addLayer(layerLocal("selected", group), overlayLayer(sources.get(group)!)));
+			pointLayerIds = pointIds;
+			if (!enlarge) {
+				for (const group of groups) {
+					layers.push(
+						ctx.addLayer(layerLocal("selected", group), zoomed(overlayLayer(sources.get(group)!)))
+					);
+				}
 			}
 			const fresh = pointIds.filter((layerId) => !interactiveLayers.has(layerId));
 			if (fresh.length) {
@@ -440,6 +502,23 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				}
 				applied.set(sourceId, want);
 			}
+			if (enlarge && icon) enlargeSelected(keys);
+		}
+
+		/**
+		 * Sizes the selected keys' icons up. `icon-size` is a layout property: no feature-state.
+		 */
+		function enlargeSelected(keys: ReadonlySet<string>): void {
+			const size =
+				keys.size === 0
+					? 1 / IMAGE_RATIO
+					: [
+							"case",
+							["in", ["get", "refKey"], ["literal", [...keys]]],
+							ENLARGE / IMAGE_RATIO,
+							1 / IMAGE_RATIO
+						];
+			for (const layerId of pointLayerIds) gl.setLayoutProperty(layerId, "icon-size", size);
 		}
 
 		function render(reactive: FeatureCollection<Geometry, P> | null, scale: Resolved | null): void {
@@ -504,11 +583,13 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			applySelection(untrack(() => ctx.selectedKeys));
 		}
 
-		loadImage(
-			"selected",
-			selectedOverlay(theme.highlight, theme.highlightForeground, markerSize),
-			markerSize + 2 * SELECTED_OVERLAY_PADDING
-		);
+		if (!enlarge) {
+			loadImage(
+				"selected",
+				selectedOverlay(theme.highlight, theme.highlightForeground, markerSize),
+				markerSize + 2 * SELECTED_OVERLAY_PADDING
+			);
+		}
 
 		scales.track(ctx, () => dead);
 
@@ -542,6 +623,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 	};
 	if (options.listed ?? true) plugin.features = features;
 	if (options.tooltip) plugin.tooltip = featureTooltip;
+	if (options.tooltipShowsName) plugin.tooltipShowsName = true;
 	if (cluster?.tooltip) plugin.hoverTooltip = clusterTooltip;
 	return plugin;
 }

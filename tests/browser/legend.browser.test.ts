@@ -82,17 +82,92 @@ describe("Legend", () => {
 	it("shows every level's label next to its swatch", async () => {
 		applyTheme("light");
 		render(Legend, { map });
-		const labels = [...pm25Scale.levels, ...smokeScale.levels].map((level) => level.label);
-		for (const label of labels) {
+		for (const { label } of pm25Scale.levels) {
 			const text = page.getByText(label, { exact: true });
 			await expect.element(text).toBeVisible();
-			const item = text.element().closest("li")!;
-			expect(item.querySelector(".mapsdk-legend-swatch")).not.toBeNull();
+			expect(text.element().closest("li")!.querySelector(".mapsdk-legend-swatch")).not.toBeNull();
+		}
+		// A blocks legend is one bar with the labels under it, not chips.
+		for (const { label } of smokeScale.levels) {
+			await expect.element(page.getByText(label, { exact: true })).toBeVisible();
 		}
 		const ticks = [...document.querySelectorAll(".mapsdk-legend-ticks span")].map(
 			(el) => el.textContent
 		);
 		expect(ticks).toEqual(["0", "9", "35", "55", "125", "225"]);
+	});
+
+	it("gives a range scale's blocks the visually hidden threshold text, none for categories", async () => {
+		const blocks = fakeMap([
+			{
+				id: "points",
+				legend: () => ({
+					pluginId: "points",
+					title: "PM2.5",
+					units: "µg/m³",
+					scale: pm25Scale,
+					display: "blocks"
+				})
+			}
+		]);
+		render(Legend, { map: blocks });
+		const items = [...document.querySelectorAll(".mapsdk-legend-block-labels li")];
+		expect(items[0].textContent!.replace(/\s+/g, " ").trim()).toBe("Good from 0");
+		expect(items[1].textContent!.replace(/\s+/g, " ").trim()).toBe("Moderate from 9");
+		const hidden = items[1].querySelector<HTMLElement>(".mapsdk-legend-threshold")!;
+		expect(hidden.getBoundingClientRect().width).toBeLessThanOrEqual(1);
+	});
+
+	it("leaves the threshold text out of a category scale's blocks", async () => {
+		render(Legend, { map });
+		const smoke = document.querySelectorAll(".mapsdk-legend-section")[1];
+		expect(smoke.querySelector(".mapsdk-legend-threshold")).toBeNull();
+	});
+
+	it("draws blocks as one outlined bar with each label under its segment", async () => {
+		applyTheme("light");
+		render(Legend, { map });
+		const bar = document.querySelector<HTMLElement>(".mapsdk-legend-blocks")!;
+		const segments = [...bar.querySelectorAll<HTMLElement>(".mapsdk-legend-block")];
+		expect(segments).toHaveLength(smokeScale.levels.length);
+		// Contiguous: segments touch edge to edge, inside one outlined bar.
+		const rects = segments.map((el) => el.getBoundingClientRect());
+		for (let i = 1; i < rects.length; i++) {
+			expect(rects[i].left).toBeCloseTo(rects[i - 1].right, 1);
+		}
+		expect(getComputedStyle(bar).outlineStyle).toBe("solid");
+		expect(
+			document
+				.querySelectorAll(".mapsdk-legend-section")[1]
+				.querySelector("li > .mapsdk-legend-swatch")
+		).toBeNull();
+		// Each label is centered under its own segment.
+		const labels = [...document.querySelectorAll<HTMLElement>(".mapsdk-legend-block-labels li")];
+		labels.forEach((li, i) => {
+			const box = li.getBoundingClientRect();
+			expect(box.left).toBeCloseTo(rects[i].left, 0);
+			expect(box.top).toBeGreaterThanOrEqual(rects[i].bottom);
+		});
+	});
+
+	it("wraps a long block label inside its segment's column", async () => {
+		applyTheme("light");
+		const long = {
+			...smokeScale,
+			levels: smokeScale.levels.map((level, i) =>
+				i === 0 ? { ...level, label: "Unhealthy for Sensitive Groups" } : level
+			)
+		};
+		render(Legend, {
+			map: fakeMap([
+				{ id: "s", legend: () => ({ pluginId: "s", title: "Smoke", units: "", scale: long }) }
+			])
+		});
+		const li = document.querySelector<HTMLElement>(".mapsdk-legend-block-labels li")!;
+		const block = document.querySelector<HTMLElement>(".mapsdk-legend-block")!;
+		expect(li.scrollWidth).toBeLessThanOrEqual(li.clientWidth);
+		expect(li.getBoundingClientRect().width).toBeCloseTo(block.getBoundingClientRect().width, 0);
+		expect(li.getBoundingClientRect().height).toBeGreaterThan(20);
 	});
 
 	it("gives range levels' thresholds to screen readers", async () => {
@@ -137,8 +212,7 @@ describe("Legend", () => {
 	it("mixes a translucent block over the background token", async () => {
 		applyTheme("dark");
 		render(Legend, { map });
-		const heavy = page.getByText("Heavy", { exact: true }).element().closest("li")!;
-		const swatch = heavy.querySelector<HTMLElement>(".mapsdk-legend-swatch")!;
+		const swatch = document.querySelectorAll<HTMLElement>(".mapsdk-legend-block")[2];
 		// #333634 at 0.4 over near-black is darker than #333634 itself.
 		const [r] = rgb(getComputedStyle(swatch).backgroundColor);
 		expect(r).toBeLessThan(0x33);
@@ -215,5 +289,21 @@ describe("Legend", () => {
 			map: fakeMap([{ id: "x", legend: () => ({ pluginId: "x", status: { state: "ready" } }) }])
 		});
 		expect(document.querySelector(".mapsdk-legend")!.hasAttribute("hidden")).toBe(true);
+	});
+
+	it("top-first lists the top plugin first", async () => {
+		applyTheme("light");
+		const titled = (id: string, title: string, scale = pm25Scale): never =>
+			({ id, legend: () => ({ pluginId: id, title, units: "", scale }) }) as never;
+		const three = fakeMap([titled("a", "Bottom"), titled("b", "Middle"), titled("c", "Top")]);
+		const headings = () =>
+			[...document.querySelectorAll(".mapsdk-legend-section h3")].map((h) => h.textContent?.trim());
+		const { unmount } = await render(Legend, { map: three, order: "top-first" });
+		await expect.element(page.getByRole("heading", { name: "Top" })).toBeVisible();
+		expect(headings()).toEqual(["Top", "Middle", "Bottom"]);
+		unmount();
+		render(Legend, { map: three });
+		await expect.element(page.getByRole("heading", { name: "Top" })).toBeVisible();
+		expect(headings()).toEqual(["Bottom", "Middle", "Top"]);
 	});
 });

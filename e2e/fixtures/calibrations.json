@@ -1,0 +1,16 @@
+{
+	"data": [
+		{
+			"id": "fixture-site-1",
+			"reference_id": "IWfuyb1fRU6yY-D1xEa2Vw",
+			"colocated_id": "AIHbqnQjQ0WkZi1a5_gEug",
+			"name": "Fixture Collocation Site",
+			"position": { "type": "Point", "coordinates": [-119.7, 36.75] }
+		}
+	],
+	"page": 1,
+	"count": 1,
+	"pages": 1,
+	"has_next_page": false,
+	"has_previous_page": false
+}

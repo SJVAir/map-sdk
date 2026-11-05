@@ -5,7 +5,6 @@ import {
 	getHMSMeta,
 	getMonitorsMeta
 } from "@sjvair/sdk";
-import { scaleFromLegacyLevels } from "./scale.js";
 import type { Scale, ScaleRef } from "./scale-types.js";
 
 export interface EntryTypeInfo {
@@ -22,6 +21,11 @@ export interface MetadataProvider {
 	scale(ref: ScaleRef, signal?: AbortSignal): Promise<Scale | "unavailable">;
 	entryType(ref: ScaleRef, signal?: AbortSignal): Promise<EntryTypeInfo | "unavailable">;
 	monitorTypeLabel(type: string, signal?: AbortSignal): Promise<string | "unavailable">;
+	/**
+	 * How often a monitor type reports (e.g. "2 min"), for the tooltip's "(N avg)" note. Optional:
+	 * the note is left out when a host's provider lacks it.
+	 */
+	monitorTypeInterval?(type: string, signal?: AbortSignal): Promise<string | "unavailable">;
 	attribution(dataset: string, signal?: AbortSignal): Promise<string | "unavailable">;
 }
 
@@ -124,11 +128,7 @@ export function createDefaultMetadata(): MetadataProvider {
 					return Object.hasOwn(scales, ref.entryType) ? scales[ref.entryType] : undefined;
 				}
 				const entry = await entryMeta(ref, signal);
-				if (!entry) return undefined;
-				if (entry.scale) return entry.scale;
-				if (!entry.levels) return undefined;
-				const levels = Object.values(entry.levels).sort((a, b) => a.range[0] - b.range[0]);
-				return scaleFromLegacyLevels(ref.entryType, entry.label, entry.units ?? "", levels);
+				return entry?.scale ?? undefined;
 			}),
 		entryType: (ref, signal) =>
 			guarded(signal, async () => {
@@ -145,6 +145,8 @@ export function createDefaultMetadata(): MetadataProvider {
 			}),
 		monitorTypeLabel: (type, signal) =>
 			guarded(signal, async () => (await monitorsMeta(signal)).monitors[type]?.label),
+		monitorTypeInterval: (type, signal) =>
+			guarded(signal, async () => (await monitorsMeta(signal)).monitors[type]?.expected_interval),
 		attribution: (dataset, signal) =>
 			guarded(
 				signal,
