@@ -87,7 +87,9 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 
 - Components use only theme tokens (shadcn names plus family tokens with fallbacks, listed in
   README.md). `--highlight` is never for text. Never assume a `.dark` class. Type sizes are
-  Tailwind `text-*` classes, so hosts add the `@source` line.
+  Tailwind `text-*` classes, so hosts add the `@source` line. The user's fixed-color exceptions
+  (decided 2026-11-04, never "fix" them back to tokens): inactive monitors `#969696`, the
+  inside-monitor outline `#000000`, and the collocation crosshair `#4A5FC6`.
 - No hardcoded labels, units, breakpoints, colors, or scales: they come from a `Scale` or the
   metadata provider. Every UI string is a `mapsdk_*` message key in `en.json`; no concatenated
   sentences. Dates and times are formatted in America/Los_Angeles through the `format` provider.

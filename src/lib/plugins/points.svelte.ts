@@ -68,8 +68,10 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 		 */
 		draw(category: string, color: string, theme: ThemeColors, levelIndex?: number): string;
 		size: number;
-		/** Draws in `--muted-foreground` whatever the value (e.g. an inactive monitor). */
+		/** Draws in `mutedColor` whatever the value (e.g. an inactive monitor). */
 		muted?(props: P): boolean;
+		/** The color of muted images. Default: the theme's `--muted-foreground`. */
+		mutedColor?: string;
 	};
 	/** Used when there is no `icon`. */
 	circle?: { radius: number };
@@ -255,7 +257,11 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				}
 				const muted = `${iconPrefix()}${category}:${MUTED_IMAGE}`;
 				if (icon.muted && !images.has(muted)) {
-					loadImage(muted, icon.draw(category, theme.mutedForeground, theme), icon.size);
+					loadImage(
+						muted,
+						icon.draw(category, icon.mutedColor ?? theme.mutedForeground, theme),
+						icon.size
+					);
 				}
 			}
 		}

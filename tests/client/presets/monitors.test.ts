@@ -10,7 +10,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMap } from "../../../src/lib/core/create-map.svelte.js";
 import { applyPick } from "../../../src/lib/data/selection.js";
 import type { MonitorFeatureProperties } from "../../../src/lib/data/types.js";
-import { monitorShape, monitorsPlugin } from "../../../src/lib/presets/monitors.js";
+import {
+	MONITOR_INACTIVE_COLOR,
+	MONITOR_INSIDE_OUTLINE,
+	monitorShape,
+	monitorsPlugin
+} from "../../../src/lib/presets/monitors.js";
 import { FALLBACK_THEME_COLORS } from "../../../src/lib/plugins/style.js";
 import { createFakeGl, type FakeGl } from "../../fixtures/fake-gl.js";
 import { monitor, MONITORS } from "../../fixtures/monitors.js";
@@ -338,7 +343,7 @@ describe("monitorsPlugin", () => {
 		expect(plugin.hoverTooltip!(map.hovered!.hit)).toBeTypeOf("function");
 	});
 
-	it("draws inactive monitors in the muted-foreground color whatever their value", () => {
+	it("inactive monitor image is drawn #969696 whatever the value and the theme", () => {
 		const svgs: string[] = [];
 		class FakeImage {
 			onload: (() => void) | null = null;
@@ -354,17 +359,19 @@ describe("monitorsPlugin", () => {
 		expect(evaluate(icons.layout!["icon-image"], inactive.properties!)).toBe(
 			`${id("icon:0:")}circle:outside:mapsdk:muted`
 		);
-		expect(FALLBACK_THEME_COLORS.mutedForeground).not.toBe(FALLBACK_THEME_COLORS.neutral);
+		expect(MONITOR_INACTIVE_COLOR).toBe("#969696");
+		expect(FALLBACK_THEME_COLORS.mutedForeground).not.toBe(MONITOR_INACTIVE_COLOR);
+		expect(svgs.some((svg) => svg.includes(`fill="${MONITOR_INACTIVE_COLOR}"`))).toBe(true);
 		expect(
 			svgs.some((svg) => svg.includes(`fill="${FALLBACK_THEME_COLORS.mutedForeground}"`))
-		).toBe(true);
+		).toBe(false);
 		const active = sourceData(gl, id("points:purpleair")).features[1];
 		expect(evaluate(icons.layout!["icon-image"], active.properties!)).toBe(
 			`${id("icon:0:")}circle:outside:unhealthy_sensitive`
 		);
 	});
 
-	it("outlines inside monitors in the foreground color", () => {
+	it("inside outline is black in a dark theme", () => {
 		const svgs = new Map<string, string>();
 		class FakeImage {
 			onload: (() => void) | null = null;
@@ -383,13 +390,16 @@ describe("monitorsPlugin", () => {
 			`${id("icon:0:")}circle:inside:good`
 		);
 		const good = [...svgs.values()].filter((svg) => svg.includes('fill="#00e400"'));
-		// Outside: the fill darkened; inside: the foreground (darkened, as monitor-map's black was).
+		// Outside: the fill darkened; inside: black, whatever the theme.
 		expect(good).toHaveLength(2);
 		expect(good.filter((svg) => svg.includes(`stroke="${darken("#00e400", 0.1)}"`))).toHaveLength(
 			1
 		);
-		const outline = darken(FALLBACK_THEME_COLORS.foreground, 0.1);
+		expect(MONITOR_INSIDE_OUTLINE).toBe("#000000");
+		// The stroke goes through darken(), which writes black as #000.
+		const outline = darken(MONITOR_INSIDE_OUTLINE, 0.1);
 		expect(good.filter((svg) => svg.includes(`stroke="${outline}"`))).toHaveLength(1);
+		expect(darken(FALLBACK_THEME_COLORS.foreground, 0.1)).not.toBe(outline);
 	});
 
 	it("draws unclustered when clustered is false", () => {

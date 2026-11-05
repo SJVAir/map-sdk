@@ -310,6 +310,39 @@ describe("pointsPlugin", () => {
 		expect(gl.getZoom()).toBe(12);
 	});
 
+	it("draws muted images in theme mutedForeground unless icon.mutedColor says otherwise", () => {
+		vi.stubGlobal(
+			"Image",
+			class {
+				onload: (() => void) | null = null;
+				set src(_v: string) {}
+			}
+		);
+		try {
+			const run = (mutedColor?: string) => {
+				const source = new TestSource<Props>({
+					features: points([{ refKey: "monitor:a", name: "A", value: 1, type: "purple" }]),
+					scale: pm25Scale
+				});
+				const draw = vi.fn((category: string, color: string) => `<svg>${category}${color}</svg>`);
+				setup({
+					source,
+					circle: undefined,
+					icon: { category: (p) => p.type ?? "", draw, size: 24, muted: () => true, mutedColor }
+				});
+				return draw;
+			};
+			expect(run()).toHaveBeenCalledWith(
+				"purple",
+				FALLBACK_THEME_COLORS.mutedForeground,
+				FALLBACK_THEME_COLORS
+			);
+			expect(run("#123456")).toHaveBeenCalledWith("purple", "#123456", FALLBACK_THEME_COLORS);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
 	it("picks icons by category and level key and registers their images", async () => {
 		const images: string[] = [];
 		class FakeImage {

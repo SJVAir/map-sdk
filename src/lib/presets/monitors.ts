@@ -16,7 +16,12 @@ import MonitorTooltip from "./MonitorTooltip.svelte";
 
 // Ported from monitor-map 4.3.0 (src/lib/monitors/): shapes, draw order, icon variants, and
 // cluster rendering. Shapes, sizes, and order are presentation; colors come from the scale and
-// the theme.
+// the theme, except the two fixed monitor colors below.
+
+// The user's decision (2026-11-04), an exception to the theme-token rule: inactive monitors are
+// this gray and inside monitors have a black outline, on every map and theme, as on sjvair.com.
+export const MONITOR_INACTIVE_COLOR = "#969696";
+export const MONITOR_INSIDE_OUTLINE = "#000000";
 
 export interface MonitorsPluginOptions {
 	/** Default "monitors". */
@@ -187,16 +192,17 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 		selectable: options.selectable ?? true,
 		icon: {
 			category,
-			draw(cat, color, theme) {
+			draw(cat, color) {
 				const [shape, location] = cat.split(":") as [MonitorShape, string];
 				return SHAPES[shape](
 					color,
 					BORDER_WIDTH,
-					location === "inside" ? theme.foreground : undefined
+					location === "inside" ? MONITOR_INSIDE_OUTLINE : undefined
 				);
 			},
 			size: ICON_SIZE,
-			muted: (props) => !props.isActive
+			muted: (props) => !props.isActive,
+			mutedColor: MONITOR_INACTIVE_COLOR
 		},
 		sortKey: monitorOrder,
 		cluster: clustered
