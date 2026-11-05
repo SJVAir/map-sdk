@@ -201,6 +201,26 @@ describe("MapTooltip", () => {
 		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Custom Extra");
 	});
 
+	it("keeps the narrow width for other content and widens only the wide cards", async () => {
+		const wide = (cls: string) => {
+			const map = fakeMap([item("a", "Wide", NO_LEVEL)], { focusedKey: "a" });
+			(map.plugins[0] as { tooltip?: unknown }).tooltip = () =>
+				createRawSnippet(() => ({
+					render: () => `<div class="${cls}" style="width:600px;flex:none">x</div>`
+				}));
+			render(MapTooltip, { map, project });
+		};
+		wide("other");
+		wide("mapsdk-tooltip-wide");
+		await expect.poll(() => document.querySelectorAll(".mapsdk-tooltip").length).toBe(2);
+		const [plain, card] = [...document.querySelectorAll<HTMLElement>(".mapsdk-tooltip")].map(
+			(e) => e.offsetWidth
+		);
+		expect(plain).toBeLessThanOrEqual(256);
+		expect(card).toBeGreaterThan(256);
+		expect(card).toBeLessThanOrEqual(448);
+	});
+
 	it("shows a plugin's hover content for a hit it doesn't list, without an empty name", async () => {
 		const hit = {
 			pluginId: "points",

@@ -32,7 +32,9 @@
 		selectionBar?: boolean;
 		/**
 		 * The zoom controls: `"mapsdk"` (default) draws map-sdk's zoom buttons, `"engine"` the
-		 * engine's zoom, compass, and locate-me buttons, `"none"` none. The credits always show.
+		 * MapTiler SDK's default zoom/compass and locate-me controls, `"none"` none. The credits
+		 * always show. Choose it up front: changing it after mount recreates the map (the engine
+		 * controls are part of how the map is built), like `active`.
 		 */
 		controls?: "mapsdk" | "engine" | "none";
 		/**
@@ -136,9 +138,9 @@
 		gl.on("move", onMove);
 		gl.on("resize", onMove);
 		projector = gl;
-		// Ready is the first idle after each style load (the first style, and every basemap switch).
-		// A wait still pending when the style is replaced or the map detached is dropped, so a stale
-		// idle never marks the context ready.
+		// Ready is the first idle after each style load (the first style, and every basemap
+		// switch). A wait still pending when the style is replaced or the map detached is dropped,
+		// so a stale idle never marks the context ready.
 		let stopWaiting: (() => void) | null = null;
 		const waitForIdle = () => {
 			stopWaiting?.();

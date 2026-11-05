@@ -3,9 +3,7 @@
 	import type { MapContext } from "../core/create-map.svelte.js";
 	import type { GlMapLike } from "../core/gl.js";
 	import type { FeatureListItem, MapPlugin } from "../core/plugin.js";
-	import { NO_LEVEL } from "../data/scale.js";
-	import { levelChip } from "./level-chip.js";
-	import { formatValue } from "./value-format.js";
+	import TooltipItem from "./TooltipItem.svelte";
 
 	interface Props {
 		map: MapContext;
@@ -19,7 +17,8 @@
 		height?: number;
 		/**
 		 * `"pinned"` (default) anchors the tooltip to its feature; `"pointer"` shows it at the last
-		 * pointer position and hides it on `gl`'s `zoomstart` until the next pointer move over a hit.
+		 * pointer position and hides it on `gl`'s `zoomstart` until the next pointer move over a
+		 * hit.
 		 * A keyboard-focused list item is always pinned.
 		 */
 		mode?: "pinned" | "pointer";
@@ -69,7 +68,8 @@
 	const item = $derived(found?.item ?? null);
 	const name = $derived(item?.name ?? hitName);
 	// A found item anchors the tooltip at its point (stable while the pointer moves over it).
-	// In pointer mode a hovered hit is anchored at the pointer instead (a focused item stays pinned).
+	// In pointer mode a hovered hit is anchored at the pointer instead (a focused item stays
+	// pinned).
 	const anchor = $derived(
 		mode === "pointer" && !map.focusedKey
 			? (map.hovered?.lngLat ?? null)
@@ -103,21 +103,6 @@
 		const plugin = found?.plugin ?? map.plugins.find((p) => p.id === hitPluginId);
 		return !plugin?.tooltipShowsName;
 	});
-
-	// A level with an empty color shows its label on the neutral chip.
-	const level = $derived(item && item.level !== NO_LEVEL ? item.level : null);
-	const levelLabel = $derived(level ? level.label : map.messages("mapsdk_no_level"));
-	const chipColors = $derived.by(() => {
-		const chip = levelChip(level?.color);
-		return chip ? `background:${chip.background};color:${chip.text}` : "";
-	});
-	const valueText = $derived(
-		item?.value == null
-			? null
-			: typeof item.value === "number"
-				? formatValue(item.value, item.precision, map.format)
-				: item.value
-	);
 </script>
 
 <!-- Only with something to show: a hit with no name, item, or content gets no empty box. -->
@@ -136,14 +121,7 @@
 		{#if custom}
 			{@render custom()}
 		{:else if item}
-			{#if valueText !== null}
-				<div class="mapsdk-tooltip-value">
-					{valueText}{#if item.units}&nbsp;{item.units}{/if}
-				</div>
-			{/if}
-			<span class="mapsdk-tooltip-chip text-xs" class:neutral={!chipColors} style={chipColors}>
-				{levelLabel}
-			</span>
+			<TooltipItem {item} messages={map.messages} format={map.format} />
 		{/if}
 	</div>
 {/if}
@@ -156,9 +134,7 @@
 		flex-direction: column;
 		align-items: flex-start;
 		gap: 0.25rem;
-		width: max-content;
-		/* Wide enough for a monitor's reading box and name; never wider than the map. */
-		max-width: min(28rem, calc(100% - 1rem));
+		max-width: 16rem;
 		box-sizing: border-box;
 		padding: 0.5rem 0.75rem;
 		border: 1px solid var(--card-border, var(--border));
@@ -169,19 +145,14 @@
 		pointer-events: none;
 	}
 
+	/* The monitor, cluster, and collocation tooltips (today's ~420px cards) mark their content
+	   `mapsdk-tooltip-wide`: wide enough for a reading box and name, never wider than the map. */
+	.mapsdk-tooltip:has(:global(.mapsdk-tooltip-wide)) {
+		width: max-content;
+		max-width: min(28rem, calc(100% - 1rem));
+	}
+
 	.mapsdk-tooltip-name {
 		font-weight: 600;
-	}
-
-	.mapsdk-tooltip-chip {
-		padding: 0.0625rem 0.5rem;
-		border: var(--swatch-outline-width, 1px) solid
-			var(--swatch-outline-color, color-mix(in srgb, var(--foreground) 75%, var(--background)));
-		border-radius: 999px;
-	}
-
-	.mapsdk-tooltip-chip.neutral {
-		background: var(--muted);
-		color: var(--muted-foreground);
 	}
 </style>

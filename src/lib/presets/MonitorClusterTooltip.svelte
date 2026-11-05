@@ -91,7 +91,7 @@
 	const min = $derived(leaves?.values.length ? Math.min(...leaves.values) : null);
 </script>
 
-<div class="mapsdk-monitor-tip">
+<div class="mapsdk-monitor-tip mapsdk-tooltip-wide">
 	<MonitorReadingBox
 		color={level?.color || null}
 		header={scale?.label ?? ""}

@@ -19,6 +19,7 @@ import {
 	MISSING_VALUE
 } from "../plugins/style.js";
 import { levelChip } from "../ui/level-chip.js";
+import { reactiveProps } from "./reactive-props.svelte.js";
 import MonitorClusterTooltip from "./MonitorClusterTooltip.svelte";
 import MonitorTooltip from "./MonitorTooltip.svelte";
 
@@ -175,20 +176,34 @@ function clusterLayers({
 
 /**
  * A snippet that mounts `component` with `props` (a tooltip outside the map's component tree).
- * Props that are a promise are awaited first; nothing mounts if the tooltip closes meanwhile.
+ * It mounts at once; `late`, when given, updates the props once it resolves (e.g. a note that
+ * needs a lookup), so a slow lookup never leaves an empty card. Nothing is mounted or updated
+ * after the tooltip closes, and a failure to mount or update is logged, not thrown.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function componentSnippet<Props extends Record<string, any>>(
 	component: Component<Props>,
-	props: Props | Promise<Props>
+	props: Props,
+	late?: Promise<Partial<Props>>
 ): Snippet {
 	return createRawSnippet(() => ({
 		render: () => "<div></div>",
 		setup(target) {
 			let instance: ReturnType<typeof mount> | undefined;
 			let closed = false;
-			void Promise.resolve(props).then((resolved) => {
-				if (!closed) instance = mount(component, { target, props: resolved });
+			const live = reactiveProps(props);
+			try {
+				instance = mount(component, { target, props: live });
+			} catch (error) {
+				console.error("map-sdk: a tooltip failed to mount", error);
+			}
+			void late?.then((extra) => {
+				if (closed || !instance) return;
+				try {
+					Object.assign(live, extra);
+				} catch (error) {
+					console.error("map-sdk: a tooltip failed to update", error);
+				}
 			});
 			return () => {
 				closed = true;
@@ -200,7 +215,8 @@ export function componentSnippet<Props extends Record<string, any>>(
 
 /**
  * Looks up a monitor type's reporting interval (e.g. "1 hour") for tooltips' "(N avg)" note,
- * once per type; null when the provider has none. Failures are forgotten, so they're retried.
+ * once per type; null when the provider has none. Failures (a rejection or a synchronous throw)
+ * give null and are forgotten, so they're retried.
  */
 export function intervalLookup(): (
 	type: string,
@@ -211,7 +227,13 @@ export function intervalLookup(): (
 		if (!metadata.monitorTypeInterval) return Promise.resolve(null);
 		let found = intervals.get(type);
 		if (!found) {
-			const lookup = metadata.monitorTypeInterval(type).then(
+			let call: Promise<string>;
+			try {
+				call = Promise.resolve(metadata.monitorTypeInterval(type));
+			} catch {
+				return Promise.resolve(null);
+			}
+			const lookup = call.then(
 				(value) => (value === "unavailable" ? null : value),
 				() => null
 			);
@@ -279,14 +301,15 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 		tooltip: (item, props, env) =>
 			componentSnippet<ComponentProps<typeof MonitorTooltip>>(
 				MonitorTooltip,
-				intervalFor(props.type, env.metadata).then((interval) => ({
+				{
 					item,
 					timestamp: props.timestamp ?? null,
 					scale: env.scale,
 					messages: env.messages,
 					format: env.format,
-					interval
-				}))
+					interval: null
+				},
+				intervalFor(props.type, env.metadata).then((interval) => ({ interval }))
 			)
 	});
 }

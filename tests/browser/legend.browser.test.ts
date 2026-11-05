@@ -97,6 +97,33 @@ describe("Legend", () => {
 		expect(ticks).toEqual(["0", "9", "35", "55", "125", "225"]);
 	});
 
+	it("gives a range scale's blocks the visually hidden threshold text, none for categories", async () => {
+		const blocks = fakeMap([
+			{
+				id: "points",
+				legend: () => ({
+					pluginId: "points",
+					title: "PM2.5",
+					units: "µg/m³",
+					scale: pm25Scale,
+					display: "blocks"
+				})
+			}
+		]);
+		render(Legend, { map: blocks });
+		const items = [...document.querySelectorAll(".mapsdk-legend-block-labels li")];
+		expect(items[0].textContent!.replace(/\s+/g, " ").trim()).toBe("Good from 0");
+		expect(items[1].textContent!.replace(/\s+/g, " ").trim()).toBe("Moderate from 9");
+		const hidden = items[1].querySelector<HTMLElement>(".mapsdk-legend-threshold")!;
+		expect(hidden.getBoundingClientRect().width).toBeLessThanOrEqual(1);
+	});
+
+	it("leaves the threshold text out of a category scale's blocks", async () => {
+		render(Legend, { map });
+		const smoke = document.querySelectorAll(".mapsdk-legend-section")[1];
+		expect(smoke.querySelector(".mapsdk-legend-threshold")).toBeNull();
+	});
+
 	it("draws blocks as one outlined bar with each label under its segment", async () => {
 		applyTheme("light");
 		render(Legend, { map });

@@ -19,7 +19,10 @@
 		scale: Scale | null;
 		messages: MessageProvider;
 		format: FormatProvider;
-		/** How often the monitor's type reports (e.g. "1 hour"); null leaves the "(N avg)" note out. */
+		/**
+		 * How often the monitor's type reports (e.g. "1 hour"); null leaves the "(N avg)" note
+		 * out.
+		 */
 		interval: string | null;
 	}
 
@@ -42,7 +45,7 @@
 	});
 </script>
 
-<div class="mapsdk-monitor-tip">
+<div class="mapsdk-monitor-tip mapsdk-tooltip-wide">
 	<MonitorReadingBox
 		color={level?.color || null}
 		header={scale?.label ?? ""}

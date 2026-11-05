@@ -315,6 +315,7 @@ describe("CollocationTooltip", () => {
 			timestamp: "2026-11-03T21:00:00Z"
 		}),
 		refKey: "feature:s1",
+		referenceName: "Garland Reference",
 		colocatedId: "col",
 		colocatedName: "Garland PurpleAir",
 		colocatedType: "purpleair",
@@ -337,7 +338,9 @@ describe("CollocationTooltip", () => {
 		expect(text).toContain("PM2.5 40 (2 min avg)");
 		expect(text).toContain("Nov 3, 2026, 1:00 PM");
 		expect(text).toContain("Nov 3, 2026, 1:02 PM");
-		expect(text).toContain("Fresno Garland");
+		// The reference monitor's own name, not the site's.
+		expect(text).toContain("Garland Reference");
+		expect(text).not.toContain("Fresno Garland");
 		expect(text).toContain("Garland PurpleAir");
 		expect(text).toContain("Reference monitor");
 		expect(text).toContain("Collocated monitor");
@@ -352,6 +355,18 @@ describe("CollocationTooltip", () => {
 		const rows = document.querySelectorAll(".mapsdk-collocation-row");
 		expect(getComputedStyle(rows[0]).flexDirection).toBe("row");
 		expect(getComputedStyle(rows[1]).flexDirection).toBe("row-reverse");
+	});
+
+	it("falls back to the site name without a reference monitor name", async () => {
+		render(CollocationTooltip, {
+			site: site({ referenceName: null }),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			referenceInterval: null,
+			colocatedInterval: null
+		});
+		await expect.element(page.getByText("Fresno Garland")).toBeVisible();
 	});
 
 	it("a missing monitor shows No reading and No level in a neutral box", async () => {

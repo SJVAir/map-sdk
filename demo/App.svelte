@@ -5,6 +5,7 @@
 		calHeatScorePlugin,
 		collocationSitesPlugin,
 		createMap,
+		defaultBasemaps,
 		forecastZonesPlugin,
 		hmsFirePlugin,
 		hmsSmokePlugin,
@@ -26,7 +27,6 @@
 		createHmsSmokeStore,
 		createMonitorsStore
 	} from "../src/lib/stores/index.js";
-	import { defaultBasemaps } from "../src/lib/view/create-gl-map.js";
 	import {
 		createDateRangeSource,
 		type DateRangeSource,

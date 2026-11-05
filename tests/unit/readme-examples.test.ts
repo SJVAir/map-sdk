@@ -4,6 +4,7 @@ import {
 	collocationSitesPlugin,
 	CROSSHAIR_ICON_SIZE,
 	createMap,
+	defaultBasemaps,
 	hmsFirePlugin,
 	hmsSmokePlugin,
 	maptilerMap,
@@ -54,6 +55,14 @@ describe("README examples", () => {
 		expect(map.plugins.map((p) => p.id)).toEqual(["monitors"]);
 		map.destroy();
 		store.dispose();
+	});
+
+	it("today's basemaps without the POI layer filter", () => {
+		const basemaps = { ...defaultBasemaps(), excludedLayers: [] };
+		const map = createMap({ config: { maptilerKey: "your-maptiler-key", basemaps } });
+		expect(basemaps.styles.length).toBeGreaterThan(0);
+		expect(basemaps.excludedLayers).toEqual([]);
+		map.destroy();
 	});
 
 	it("maptilerMap is null while detached", () => {

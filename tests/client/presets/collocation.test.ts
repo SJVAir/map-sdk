@@ -31,6 +31,7 @@ function site(id: string, extra: Partial<Props> = {}): Props {
 		...monitor(`ref-${id}`, "airnow", 12),
 		refKey: `feature:${id}`,
 		name: `Site ${id}`,
+		referenceName: `Monitor ref-${id}`,
 		colocatedId: `col-${id}`,
 		colocatedName: `Monitor col-${id}`,
 		colocatedType: "purpleair",

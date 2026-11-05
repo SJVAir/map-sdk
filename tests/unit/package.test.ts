@@ -48,6 +48,7 @@ describe("package.json", () => {
 		);
 		for (const name of [
 			"MapView",
+			"defaultBasemaps",
 			"Legend",
 			"MapTooltip",
 			"FeatureList",

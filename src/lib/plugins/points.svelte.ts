@@ -116,7 +116,10 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	listed?: boolean;
 	/** Tooltip content for a feature, below its name; `props` are its source properties. */
 	tooltip?(item: FeatureListItem, props: P, env: PointsTooltipEnv): Snippet | undefined;
-	/** The `tooltip` content shows the feature's name itself, so no name header is drawn above it. */
+	/**
+	 * The `tooltip` content shows the feature's name itself, so no name header is drawn above
+	 * it.
+	 */
 	tooltipShowsName?: boolean;
 }
 
@@ -502,7 +505,9 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			if (enlarge && icon) enlargeSelected(keys);
 		}
 
-		/** Sizes the selected keys' icons up. `icon-size` is a layout property: no feature-state. */
+		/**
+		 * Sizes the selected keys' icons up. `icon-size` is a layout property: no feature-state.
+		 */
 		function enlargeSelected(keys: ReadonlySet<string>): void {
 			const size =
 				keys.size === 0

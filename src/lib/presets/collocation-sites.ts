@@ -69,16 +69,20 @@ export function collocationSitesPlugin(options: CollocationSitesPluginOptions): 
 		tooltip: (_item, props, env) =>
 			componentSnippet<ComponentProps<typeof CollocationTooltip>>(
 				CollocationTooltip,
+				{
+					site: props,
+					scale: env.scale,
+					messages: env.messages,
+					format: env.format,
+					referenceInterval: null,
+					colocatedInterval: null
+				},
 				Promise.all([
 					intervalFor(props.type, env.metadata),
 					props.colocatedType
 						? intervalFor(props.colocatedType, env.metadata)
 						: Promise.resolve(null)
 				]).then(([referenceInterval, colocatedInterval]) => ({
-					site: props,
-					scale: env.scale,
-					messages: env.messages,
-					format: env.format,
 					referenceInterval,
 					colocatedInterval
 				}))

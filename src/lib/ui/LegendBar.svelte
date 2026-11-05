@@ -27,7 +27,7 @@
 						? swatchOverBackground(block.color, block.opacity, background)
 						: NEUTRAL,
 					label: block.label,
-					threshold: ""
+					threshold: block.tick ? messages("mapsdk_legend_threshold", { value: block.tick }) : ""
 				}))
 	);
 
@@ -57,7 +57,10 @@
 	</div>
 	<ul class="mapsdk-legend-block-labels text-xs" style:--blocks={items.length}>
 		{#each items as item, i (i)}
-			<li>{item.label}</li>
+			<li>
+				{item.label}
+				{#if item.threshold}<span class="mapsdk-legend-threshold">{item.threshold}</span>{/if}
+			</li>
 		{/each}
 	</ul>
 {:else}
@@ -106,6 +109,7 @@
 	}
 
 	.mapsdk-legend-block-labels li {
+		position: relative;
 		padding: 0 0.125rem;
 		overflow-wrap: anywhere;
 	}

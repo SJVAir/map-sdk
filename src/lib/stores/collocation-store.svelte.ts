@@ -52,11 +52,13 @@ function join(sites: CollocationSite[], monitors: MonitorsStore): Collection {
 				name: site.name,
 				value: referenceReading?.value ?? null,
 				timestamp: referenceReading?.timestamp ?? null,
-				// A missing reference monitor draws as a sensor in the neutral color, not inactive gray.
+				// A missing reference monitor draws as a sensor in the neutral color, not inactive
+				// gray.
 				type: reference?.type ?? "",
 				isActive: reference?.is_active ?? true,
 				isSjvair: reference?.is_sjvair ?? false,
 				location: reference?.location === "inside" ? "inside" : "outside",
+				referenceName: reference?.name ?? null,
 				colocatedId: site.colocated_id,
 				colocatedName: colocated?.name ?? null,
 				colocatedType: colocated?.type ?? null,

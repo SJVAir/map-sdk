@@ -116,13 +116,16 @@ summary, zoom buttons, and the List button with its feature list, and the engine
 credits. `featureList={false}` leaves out the List button and its panel, and `selectionBar={false}`
 the selection bar. `controls` picks the zoom controls: `"mapsdk"` (default) draws map-sdk's zoom
 buttons, `"engine"` the MapTiler SDK's default zoom/compass and locate-me controls (top right, as
-monitor-map uses today), and `"none"` none; the credits show in every case. `tooltip` is `"pinned"` (default: anchored to the feature) or
-`"pointer"` (shown at the pointer, as sjvair.com's map does, and hidden on zoom until the pointer
-moves again); a feature focused from the list is always pinned. Anything else goes in the `overlays` snippet, where
-`getMapContext()` returns the map. `config.basemaps` replaces the default MapTiler Streets v4
-variants; `config.initialView` and `config.cooperativeGestures` set the camera and gesture handling.
-`config.projection` (`"mercator"` by default, or `"globe"`) and `config.space` (`false` by default, or
-`{ preset: "milkyway" }` for a space background behind the globe) are passed to MapTiler only when set.
+monitor-map uses today), and `"none"` none; the credits show in every case. Choose `controls` up
+front: changing it after mount recreates the map. `tooltip` is `"pinned"` (default: anchored to the
+feature) or `"pointer"` (shown at the pointer, as sjvair.com's map does, and hidden on zoom until
+the pointer moves again); a feature focused from the list is always pinned. Anything else goes in
+the `overlays` snippet, where `getMapContext()` returns the map. `config.basemaps` replaces the
+default MapTiler Streets v4 variants (build on `defaultBasemaps()`, which `createMap` uses: today's
+sjvair.com setup is `{ ...defaultBasemaps(), excludedLayers: [] }`); `config.initialView` and
+`config.cooperativeGestures` set the camera and gesture handling. `config.projection` (`"mercator"`
+by default, or `"globe"`) and `config.space` (`false` by default, or `{ preset: "milkyway" }` for a
+space background behind the globe) are passed to MapTiler only when set.
 
 Without `createMonitorsStore`, build a `DataSource` yourself (below).
 
@@ -134,13 +137,13 @@ Use it for a map on a hidden tab.
 
 ### Plugins and draw order
 
-Plugins draw in the order they were added, later on top. `addPlugin(plugin, { before: "id" })`
-draws just below another plugin, and `map.movePlugin(id, { before? })` moves an added plugin and
-its layers to the top, or just below the plugin `before` names. A plugin object belongs to one
-map: create one per map (adding an object that is set up on another map throws). The
-presets are `monitorsPlugin`, `regionsPlugin`, `calHeatScorePlugin`, `forecastZonesPlugin`,
-`hmsSmokePlugin`, `hmsFirePlugin`, and `collocationSitesPlugin`; `pointsPlugin` and `shapesPlugin` are the general ones they
-are built on. Presets don't fetch: the host supplies a `DataSource`. `monitorsPlugin` is
+Plugins draw in the order they were added, later on top. `addPlugin(plugin, { before: "id" })` draws
+just below another plugin, and `map.movePlugin(id, { before? })` moves an added plugin and its
+layers to the top, or just below the plugin `before` names. A plugin object belongs to one map:
+create one per map (adding an object that is set up on another map throws). The presets are
+`monitorsPlugin`, `regionsPlugin`, `calHeatScorePlugin`, `forecastZonesPlugin`, `hmsSmokePlugin`,
+`hmsFirePlugin`, and `collocationSitesPlugin`; `pointsPlugin` and `shapesPlugin` are the general
+ones they are built on. Presets don't fetch: the host supplies a `DataSource`. `monitorsPlugin` is
 selectable by default, like the shape presets.
 
 Selected points show a highlight ring and check mark by default. `selectedStyle: "enlarge"` on
@@ -173,9 +176,10 @@ default, or `"top-first"`).
 each at its reference monitor, in that monitor's shape and level color (inactive gray, inside
 outlined), wrapped in a crosshair of `COLLOCATION_CROSSHAIR_COLOR` (`#4A5FC6`, a fixed color on
 every theme). Its tooltip shows the reference and collocated monitors' readings side by side, each
-with its time and level. It isn't selectable and adds no legend section (the monitors' scale is shown by `monitorsPlugin`). Add it before `monitorsPlugin` so it draws under the
-monitors; its `hoverPriority` is `Number.MAX_SAFE_INTEGER`, so its tooltip still wins over a
-monitor drawn above it (clicks go to the topmost feature).
+with its time and level. It isn't selectable and adds no legend section (the monitors' scale is
+shown by `monitorsPlugin`). Add it before `monitorsPlugin` so it draws under the monitors; its
+`hoverPriority` is `Number.MAX_SAFE_INTEGER`, so its tooltip still wins over a monitor drawn above
+it (clicks go to the topmost feature).
 
 The monitor marker shapes are exported for your own plugins: `circle`, `square`, and
 `triangle(color, borderWidth, borderColor?)` return a 24px SVG, and `withCrosshair(svg, color)`
@@ -201,15 +205,15 @@ for an entry type, polls every two minutes, and exposes `dataSource`. `init()`, 
 dashboard that has its own date-range data builds a `DataSource` itself instead.
 `meta` is the read-only monitors meta (the SDK's `MonitorsMeta`), null until `init()` resolves.
 
-`createHmsSmokeStore()` and `createHmsFireStore()` (also from `@sjvair/map-sdk/stores`) load
-today's NOAA HMS smoke and fire once, with no polling. Each has `status`, `init({ signal })`, and
+`createHmsSmokeStore()` and `createHmsFireStore()` (also from `@sjvair/map-sdk/stores`) load today's
+NOAA HMS smoke and fire once, with no polling. Each has `status`, `init({ signal })`, and
 `dispose()`; overlapping `init()` calls share one request, a failed load reports `error` with
-`retry()` (on `status` and on every source), and a caller's abort rejects only that caller.
-A day with no data is `ready` with an empty collection, so the legend still shows. The smoke store
-has one `dataSource` for `hmsSmokePlugin` (scale `hms-smoke` / `smoke-density`, value the density).
-The fire store has `groups` (nearby detections merged by `groupFires`, value the mean FRP) and
-`hotspots` (each detection after `cleanFires`, value its FRP), for `hmsFirePlugin`'s `source` and
-`hotspots` (scale `hms-fire` / `fire-frp`). Pass `{ messages }` to name the features with your own provider.
+`retry()` (on `status` and on every source), and a caller's abort rejects only that caller. A day
+with no data is `ready` with an empty collection, so the legend still shows. The smoke store has one
+`dataSource` for `hmsSmokePlugin` (scale `hms-smoke` / `smoke-density`, value the density). The fire
+store has `groups` (nearby detections merged by `groupFires`, value the mean FRP) and `hotspots`
+(each detection after `cleanFires`, value its FRP), for `hmsFirePlugin`'s `source` and `hotspots`
+(scale `hms-fire` / `fire-frp`). Pass `{ messages }` to name the features with your own provider.
 
 ```ts
 const smoke = createHmsSmokeStore();
@@ -340,9 +344,10 @@ const windPlugin: MapPlugin = {
 ```
 
 The root entry exports the types a plugin needs (`MapPlugin`, `PluginContext`, `FeatureHit`,
-`FeatureListItem`, `LegendData`, `Providers`, `GlMapLike`, `CustomLayerInterface`, `LayerSpecWithoutId`, `ThemeColors`,
-`ClusterLayers`, `ClusterLayerArgs`, `BlockingClick`, `Hovered`) and the scale expressions the
-built-in plugins use (`colorExpression`, `opacityExpression`, `levelKeyExpression`).
+`FeatureListItem`, `LegendData`, `Providers`, `GlMapLike`, `CustomLayerInterface`,
+`LayerSpecWithoutId`, `ThemeColors`, `ClusterLayers`, `ClusterLayerArgs`, `BlockingClick`,
+`Hovered`) and the scale expressions the built-in plugins use (`colorExpression`,
+`opacityExpression`, `levelKeyExpression`).
 
 ## Selection
 
@@ -375,8 +380,8 @@ detached.
 
 ## Camera
 
-`map.easeTo({ center, zoom?, minZoom? })` and `map.flyTo(...)` move the camera; `minZoom` means "zoom
-in to at least this" (`max(current zoom, minZoom)`), and `zoom` wins when both are given.
+`map.easeTo({ center, zoom?, minZoom? })` and `map.flyTo(...)` move the camera; `minZoom` means
+"zoom in to at least this" (`max(current zoom, minZoom)`), and `zoom` wins when both are given.
 `map.fitBounds({ west, south, east, north }, { padding?, maxZoom? })` fits a box. All three do
 nothing while the map is detached or destroyed, and use no animation under `prefers-reduced-motion`.
 

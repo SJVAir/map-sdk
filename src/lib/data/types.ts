@@ -45,6 +45,11 @@ export interface DataSource<P extends MapFeatureProperties = MapFeaturePropertie
  * monitor isn't in the monitors store (inactive, filtered out, or not loaded yet).
  */
 export interface CollocationFeatureProperties extends MonitorFeatureProperties {
+	/**
+	 * The reference monitor's own name (the tooltip shows it); null when it isn't in the
+	 * monitors store.
+	 */
+	referenceName: string | null;
 	colocatedId: string;
 	/** Null when the collocated monitor isn't in the monitors store. */
 	colocatedName: string | null;

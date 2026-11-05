@@ -270,6 +270,17 @@ describe("hmsFirePlugin with hotspots", () => {
 		]);
 	});
 
+	it("hovering a hotspot gives the same content as a group, without listing it", () => {
+		const { plugin, map } = build();
+		const hit = (refKey: string) => ({ pluginId: "hms-fire", refKey, name: "Fire" }) as never;
+		expect(plugin.hoverTooltip?.(hit("feature:f3"))).toBeTypeOf("function");
+		// A key no hotspot has gets nothing, and hotspots aren't listed.
+		expect(plugin.hoverTooltip?.(hit("feature:other"))).toBeUndefined();
+		expect(plugin.features?.().map((f) => f.refKey)).not.toContain("feature:f3");
+		map.removePlugin("hms-fire");
+		expect(plugin.hoverTooltip?.(hit("feature:f3"))).toBeUndefined();
+	});
+
 	it("teardown removes every layer and source once; a restyle adds them again", () => {
 		const { map, gl } = build();
 		const layers = gl.layers.map((l) => l.id);

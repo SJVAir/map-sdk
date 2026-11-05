@@ -1,8 +1,10 @@
-import type { MapPlugin } from "../core/plugin.js";
+import type { MapPlugin, PluginContext } from "../core/plugin.js";
 import { scopedContext } from "../core/scoped-context.js";
 import type { DataSource } from "../data/types.js";
 import { fireIcon } from "../plugins/icons.js";
 import { pointsPlugin } from "../plugins/points.svelte.js";
+import TooltipItem from "../ui/TooltipItem.svelte";
+import { componentSnippet } from "./monitors.js";
 
 export interface HmsFirePluginOptions {
 	/** Default "hms-fire". */
@@ -33,8 +35,7 @@ function firePoints(
 	id: string,
 	source: DataSource,
 	layerLabel: string,
-	zoomRange?: { min?: number; max?: number },
-	listed = true
+	zoomRange?: { min?: number; max?: number }
 ): MapPlugin {
 	return pointsPlugin({
 		id,
@@ -42,7 +43,6 @@ function firePoints(
 		layerLabel,
 		selectable: false,
 		zoomRange,
-		listed,
 		legendDisplay: "blocks",
 		icon: {
 			category: () => "fire",
@@ -58,7 +58,9 @@ function firePoints(
  *
  * With `hotspots`, it is still one layer (one legend section, one list) that switches by itself
  * while zooming: `source` (groups from `groupFires`, value = `avgFrp`) below zoom 10, `hotspots`
- * (each detection) from zoom 10. Both are hit-tested and show tooltips; only the groups are listed.
+ * (each detection) from zoom 10. Both are hit-tested and show the same tooltip (name, value,
+ * level);
+ * only the groups are listed.
  *
  * The sources' `scale` is expected to be the ScaleRef `{ dataset: "hms-fire", entryType:
  * "fire-frp" }`, and each feature's `value` its FRP. This preset does not fetch.
@@ -69,7 +71,9 @@ export function hmsFirePlugin(options: HmsFirePluginOptions): MapPlugin {
 	if (!hotspots) return firePoints(id, source, layerLabel);
 	// Both inner plugins share the outer id, so their hits are this plugin's.
 	const groups = firePoints(id, source, layerLabel, { max: HOTSPOT_ZOOM });
-	const singles = firePoints(id, hotspots, layerLabel, { min: HOTSPOT_ZOOM }, false);
+	const singles = firePoints(id, hotspots, layerLabel, { min: HOTSPOT_ZOOM });
+	// The providers of the running setup, for the hotspots' tooltips.
+	let ctxNow: PluginContext | null = null;
 	return {
 		id,
 		label: layerLabel,
@@ -78,14 +82,27 @@ export function hmsFirePlugin(options: HmsFirePluginOptions): MapPlugin {
 		},
 		selectable: false,
 		setup(ctx) {
+			ctxNow = ctx;
 			const teardownGroups = groups.setup(scopedContext(ctx, "groups:"));
 			const teardownSingles = singles.setup(scopedContext(ctx, "hotspots:"));
 			return () => {
+				ctxNow = null;
 				teardownSingles();
 				teardownGroups();
 			};
 		},
 		legend: groups.legend,
-		features: groups.features
+		// Only the groups are listed; a hovered hotspot shows what a group's hover does: its name
+		// (the generic header) with its value and level.
+		features: groups.features,
+		hoverTooltip(hit) {
+			const item = singles.features?.().find((f) => f.refKey === hit.refKey);
+			if (!item || !ctxNow) return undefined;
+			return componentSnippet(TooltipItem, {
+				item,
+				messages: ctxNow.messages,
+				format: ctxNow.format
+			});
+		}
 	};
 }

@@ -27,9 +27,9 @@ describe("legendSection", () => {
 		expect(section?.bar).toEqual({
 			kind: "blocks",
 			blocks: [
-				{ color: "#bfc8c3", opacity: 0.2, label: "Light" },
-				{ color: "#757b78", opacity: 0.3, label: "Medium" },
-				{ color: "#333634", opacity: 0.4, label: "Heavy" }
+				{ color: "#bfc8c3", opacity: 0.2, label: "Light", tick: "" },
+				{ color: "#757b78", opacity: 0.3, label: "Medium", tick: "" },
+				{ color: "#333634", opacity: 0.4, label: "Heavy", tick: "" }
 			]
 		});
 	});
@@ -68,7 +68,12 @@ describe("swatchOverBackground", () => {
 		expect(section?.bar.kind).toBe("blocks");
 		if (section?.bar.kind !== "blocks") return;
 		expect(section.bar.blocks.map((b) => b.label)).toEqual(pm25Scale.levels.map((l) => l.label));
-		expect(section.bar.blocks[1]).toEqual({ color: "#ffff00", opacity: null, label: "Moderate" });
+		expect(section.bar.blocks[1]).toEqual({
+			color: "#ffff00",
+			opacity: null,
+			label: "Moderate",
+			tick: "9"
+		});
 	});
 
 	it("no display keeps the gradient", () => {

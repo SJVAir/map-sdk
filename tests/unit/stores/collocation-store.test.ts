@@ -88,6 +88,7 @@ describe("collocation sites store", () => {
 			isActive: true,
 			isSjvair: true,
 			location: "outside",
+			referenceName: "Monitor ref",
 			colocatedId: "col",
 			colocatedName: "Monitor col",
 			colocatedType: "purpleair",
@@ -122,6 +123,7 @@ describe("collocation sites store", () => {
 		monitors.monitors = new Map([["ref", listItem("ref", "airnow", { is_active: false })]]);
 		expect(store.dataSource.features!.features[0].properties).toMatchObject({
 			isActive: false,
+			referenceName: "Monitor ref",
 			colocatedName: null,
 			colocatedType: null
 		});
@@ -147,6 +149,7 @@ describe("collocation sites store", () => {
 			timestamp: null,
 			// Not inactive gray: the neutral color for a missing reading.
 			isActive: true,
+			referenceName: null,
 			colocatedValue: 9
 		});
 		expect(typeof first.properties.type).toBe("string");
@@ -156,6 +159,7 @@ describe("collocation sites store", () => {
 			type: "airnow",
 			value: null,
 			timestamp: null,
+			referenceName: "Monitor ref",
 			colocatedId: "gone",
 			colocatedName: null,
 			colocatedValue: null,

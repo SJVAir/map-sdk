@@ -32,7 +32,10 @@ export interface MapConfig {
 	cooperativeGestures?: boolean;
 	/** Default `"mercator"`. `"globe"` draws the map on a globe when zoomed out. */
 	projection?: "mercator" | "globe";
-	/** Default `false`. A preset (monitor-map uses `{ preset: "milkyway" }`) draws space behind a globe. */
+	/**
+	 * Default `false`. A preset (monitor-map uses `{ preset: "milkyway" }`) draws space behind a
+	 * globe.
+	 */
 	space?: false | { preset: string };
 }
 
@@ -99,7 +102,10 @@ export interface MapContext {
 	 * never add sources or layers through it.
 	 */
 	readonly gl: GlMapLike | null;
-	/** For `MapView`: marks the attached map ready. Does nothing while detached. */
+	/**
+	 * @internal For `MapView` only; hosts never call it. Marks the attached map ready. Does
+	 * nothing while detached.
+	 */
 	markReady(): void;
 	/**
 	 * Adds a plugin on top, or below `options.before`. Throws if a plugin with the same id is
@@ -164,11 +170,17 @@ export interface MapContext {
 	 * centers the feature in the part of the map the feature list panel leaves clear.
 	 */
 	focusFeature(refKey: string | null, pluginId?: string): void;
-	/** Eases the camera to `target` (no animation under reduced motion). Does nothing while detached. */
+	/**
+	 * Eases the camera to `target` (no animation under reduced motion). Does nothing while
+	 * detached.
+	 */
 	easeTo(target: CameraTarget): void;
 	/** Like `easeTo`, with a flying animation. */
 	flyTo(target: CameraTarget): void;
-	/** Fits the camera to `bounds` (no animation under reduced motion). Does nothing while detached. */
+	/**
+	 * Fits the camera to `bounds` (no animation under reduced motion). Does nothing while
+	 * detached.
+	 */
 	fitBounds(bounds: Bounds, options?: { padding?: number; maxZoom?: number }): void;
 	/** Reactive. */
 	readonly focusedKey: string | null;

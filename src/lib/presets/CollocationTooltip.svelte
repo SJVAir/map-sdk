@@ -9,8 +9,8 @@
 
 	// Ported from monitor-map's CollocationTooltip: the reference monitor's reading beside its
 	// details, then the collocated monitor's with the box on the other side. Readings are whole
-	// numbers cut off, not rounded, as monitor-map's. The reference monitor's name is shown here, not
-	// above.
+	// numbers cut off, not rounded, as monitor-map's. The reference monitor's own name is shown
+	// here (the site's name when it isn't loaded), not above.
 
 	interface Props {
 		site: CollocationFeatureProperties;
@@ -56,7 +56,7 @@
 
 	const sides = $derived([
 		side(
-			site.name,
+			site.referenceName ?? site.name,
 			messages("mapsdk_collocation_reference"),
 			numericValue(site.value),
 			site.timestamp ?? null,
@@ -72,7 +72,7 @@
 	]);
 </script>
 
-<div class="mapsdk-collocation-tip">
+<div class="mapsdk-collocation-tip mapsdk-tooltip-wide">
 	{#each sides as entry, i (i)}
 		<div class="mapsdk-collocation-row" class:reverse={i === 1}>
 			<MonitorReadingBox

@@ -11,7 +11,10 @@
 		order = "bottom-first"
 	}: {
 		map: MapContext;
-		/** `"bottom-first"` (default) lists the bottom plugin's section first; `"top-first"` last. */
+		/**
+		 * `"bottom-first"` (default) lists the bottom plugin's section first; `"top-first"`
+		 * last.
+		 */
 		order?: "bottom-first" | "top-first";
 	} = $props();
 

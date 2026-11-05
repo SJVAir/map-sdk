@@ -109,7 +109,8 @@ class LoadOnceCore<T> implements LoadOnce<T> {
 
 	async #fetch(signal: AbortSignal): Promise<void> {
 		const value = await this.#load(signal);
-		// Cancelled while a request that ignores the signal was settling: leave state to the next run.
+		// Cancelled while a request that ignores the signal was settling: leave state to the next
+		// run.
 		if (signal.aborted) throw signal.reason;
 		this.value = value;
 		this.status = { state: "ready" };
