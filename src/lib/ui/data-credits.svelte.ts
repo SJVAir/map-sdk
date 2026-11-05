@@ -20,9 +20,7 @@ export function createDataCredits(map: MapContext): { readonly list: string[] } 
 	const controller = new AbortController();
 	onDestroy(() => controller.abort());
 	// Plain collections: bookkeeping, never rendered.
-	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	const inflight = new Set<string>();
-	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	const failedAt = new Map<string, number>();
 
 	$effect(() => {
