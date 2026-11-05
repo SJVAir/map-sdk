@@ -38,3 +38,18 @@ export interface DataSource<P extends MapFeatureProperties = MapFeaturePropertie
 	readonly features: FeatureCollection<Geometry, P> | null;
 	readonly scale: ScaleRef | Scale | null;
 }
+
+/**
+ * A collocation site: drawn at its reference monitor with that monitor's type, location,
+ * activity, and reading, plus the collocated monitor's reading. Readings are null when a
+ * monitor isn't in the monitors store (inactive, filtered out, or not loaded yet).
+ */
+export interface CollocationFeatureProperties extends MonitorFeatureProperties {
+	colocatedId: string;
+	/** Null when the collocated monitor isn't in the monitors store. */
+	colocatedName: string | null;
+	/** The collocated monitor's type, for its tooltip's "(N avg)" note; null when unknown. */
+	colocatedType: string | null;
+	colocatedValue: number | null;
+	colocatedTimestamp: string | null;
+}

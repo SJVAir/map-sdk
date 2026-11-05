@@ -86,3 +86,9 @@ export { hmsFirePlugin } from "./presets/hms-fire.js";
 export type { HmsFirePluginOptions } from "./presets/hms-fire.js";
 export { cleanFires, groupFires } from "./presets/fire-groups.js";
 export type { FireDetection, FireGroup } from "./presets/fire-groups.js";
+export {
+	collocationSitesPlugin,
+	COLLOCATION_CROSSHAIR_COLOR
+} from "./presets/collocation-sites.js";
+export type { CollocationSitesPluginOptions } from "./presets/collocation-sites.js";
+export { circle, CROSSHAIR_ICON_SIZE, square, triangle, withCrosshair } from "./plugins/icons.js";

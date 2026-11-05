@@ -139,7 +139,7 @@ draws just below another plugin, and `map.movePlugin(id, { before? })` moves an 
 its layers to the top, or just below the plugin `before` names. A plugin object belongs to one
 map: create one per map (adding an object that is set up on another map throws). The
 presets are `monitorsPlugin`, `regionsPlugin`, `calHeatScorePlugin`, `forecastZonesPlugin`,
-`hmsSmokePlugin`, and `hmsFirePlugin`; `pointsPlugin` and `shapesPlugin` are the general ones they
+`hmsSmokePlugin`, `hmsFirePlugin`, and `collocationSitesPlugin`; `pointsPlugin` and `shapesPlugin` are the general ones they
 are built on. Presets don't fetch: the host supplies a `DataSource`. `monitorsPlugin` is
 selectable by default, like the shape presets.
 
@@ -163,6 +163,19 @@ keyboard list). To show fire groups below zoom 10 and single hotspots from it, a
 (default a gradient; `hmsFirePlugin` uses `"blocks"`, labeled with the levels' own labels). `Legend`
 takes `order` (`"bottom-first"`, default, or `"top-first"`), and shows a section identical to one
 already shown (same title, units and bar, as with the two fire plugins) only once.
+
+`collocationSitesPlugin({ id?, source, layerLabel })` draws collocation sites as sjvair.com does:
+each at its reference monitor, in that monitor's shape and level color (inactive gray, inside
+outlined), wrapped in a crosshair of `COLLOCATION_CROSSHAIR_COLOR` (`#4A5FC6`, a fixed color on
+every theme). Its tooltip shows the reference and collocated monitors' readings side by side, each
+with its time and level. It isn't selectable. Add it before `monitorsPlugin` so it draws under the
+monitors; its `hoverPriority` is `Number.MAX_SAFE_INTEGER`, so its tooltip still wins over a
+monitor drawn above it (clicks go to the topmost feature).
+
+The monitor marker shapes are exported for your own plugins: `circle`, `square`, and
+`triangle(color, borderWidth, borderColor?)` return a 24px SVG, and `withCrosshair(svg, color)`
+wraps one in the crosshair (`CROSSHAIR_ICON_SIZE`, 56px, square). Pass the size to
+`pointsPlugin`'s `icon.size`.
 
 ## Data sources
 
@@ -197,6 +210,23 @@ const fires = createHmsFireStore();
 await Promise.all([smoke.init(), fires.init()]);
 map.addPlugin(hmsSmokePlugin({ source: smoke.dataSource, layerLabel: "Smoke" }));
 map.addPlugin(hmsFirePlugin({ source: fires.groups, layerLabel: "Fires" }));
+```
+
+`createCollocationSitesStore({ monitors })` (also from `@sjvair/map-sdk/stores`) loads the
+collocation sites once and joins each to a monitors store: `dataSource` follows that store's
+readings as it polls and uses its scale. A site whose reference or collocated monitor isn't in the
+monitors store (inactive, filtered out, or not loaded yet) still draws at its own position, in the
+neutral color with "No reading". It has `status`, `init({ signal })`, and `dispose()`, like the
+HMS stores; `init()` doesn't load the monitors store.
+
+```ts
+const monitors = createMonitorsStore();
+const collocations = createCollocationSitesStore({ monitors });
+await Promise.all([monitors.init("pm25"), collocations.init()]);
+map.addPlugin(
+	collocationSitesPlugin({ source: collocations.dataSource, layerLabel: "Collocation sites" })
+);
+map.addPlugin(monitorsPlugin({ source: monitors.dataSource, layerLabel: "Monitors" }));
 ```
 
 ### Plain GeoJSON: `staticSource`

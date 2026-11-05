@@ -82,7 +82,8 @@ function monitorOrder(props: MonitorFeatureProperties): number {
 	}
 }
 
-const SHAPES = { circle, square, triangle };
+/** The marker drawing for each shape. */
+export const SHAPES = { circle, square, triangle };
 const ICON_SIZE = 24;
 const BORDER_WIDTH = 2;
 const CLUSTER_RADIUS = 40;
@@ -177,7 +178,7 @@ function clusterLayers({
  * Props that are a promise are awaited first; nothing mounts if the tooltip closes meanwhile.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function componentSnippet<Props extends Record<string, any>>(
+export function componentSnippet<Props extends Record<string, any>>(
 	component: Component<Props>,
 	props: Props | Promise<Props>
 ): Snippet {
@@ -198,15 +199,15 @@ function componentSnippet<Props extends Record<string, any>>(
 }
 
 /**
- * Air-quality monitors as on today's live map: a shape per monitor type filled with its level's
- * color, inactive monitors in the neutral color, inside monitors outlined, and per-type clusters
- * colored by their average that zoom in when clicked.
+ * Looks up a monitor type's reporting interval (e.g. "1 hour") for tooltips' "(N avg)" note,
+ * once per type; null when the provider has none. Failures are forgotten, so they're retried.
  */
-export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
-	const clustered = options.clustered ?? true;
-	// Per monitor type, so each type's interval is looked up once. Failures are forgotten.
+export function intervalLookup(): (
+	type: string,
+	metadata: MetadataProvider
+) => Promise<string | null> {
 	const intervals = new Map<string, Promise<string | null>>();
-	function intervalFor(type: string, metadata: MetadataProvider): Promise<string | null> {
+	return function intervalFor(type, metadata) {
 		if (!metadata.monitorTypeInterval) return Promise.resolve(null);
 		let found = intervals.get(type);
 		if (!found) {
@@ -221,7 +222,17 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 			});
 		}
 		return found;
-	}
+	};
+}
+
+/**
+ * Air-quality monitors as on today's live map: a shape per monitor type filled with its level's
+ * color, inactive monitors in the neutral color, inside monitors outlined, and per-type clusters
+ * colored by their average that zoom in when clicked.
+ */
+export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
+	const clustered = options.clustered ?? true;
+	const intervalFor = intervalLookup();
 	return pointsPlugin<MonitorFeatureProperties>({
 		id: options.id ?? "monitors",
 		source: options.source,

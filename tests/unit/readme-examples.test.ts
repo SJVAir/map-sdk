@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+	circle,
+	collocationSitesPlugin,
+	CROSSHAIR_ICON_SIZE,
 	createMap,
 	hmsFirePlugin,
 	hmsSmokePlugin,
 	maptilerMap,
 	monitorsPlugin,
 	regionsPlugin,
-	shapesPlugin
+	shapesPlugin,
+	withCrosshair
 } from "../../src/lib/index.js";
 import type {
 	CustomLayerInterface,
@@ -26,6 +30,7 @@ import {
 	type SpatialSelection
 } from "../../src/lib/data/index.js";
 import {
+	createCollocationSitesStore,
 	createHmsFireStore,
 	createHmsSmokeStore,
 	createMonitorsStore
@@ -204,5 +209,25 @@ describe("README examples", () => {
 		expect(map.plugins.map((p) => p.id)).toEqual(["hms-smoke", "hms-fire"]);
 		smoke.dispose();
 		fires.dispose();
+	});
+
+	it("collocation sites draw under the monitors from a store joined to them", () => {
+		const monitors = createMonitorsStore();
+		const collocations = createCollocationSitesStore({ monitors });
+		const map = createMap({ config: { maptilerKey: "your-maptiler-key" } });
+		map.addPlugin(
+			collocationSitesPlugin({ source: collocations.dataSource, layerLabel: "Collocation sites" })
+		);
+		map.addPlugin(monitorsPlugin({ source: monitors.dataSource, layerLabel: "Monitors" }));
+		expect(map.plugins.map((p) => p.id)).toEqual(["collocation-sites", "monitors"]);
+		expect(collocations.dataSource.features).toBeNull();
+		collocations.dispose();
+		monitors.dispose();
+		map.destroy();
+	});
+
+	it("marker shapes in a crosshair", () => {
+		const svg = withCrosshair(circle("#00e400", 2), "#4A5FC6");
+		expect(svg).toContain(`width="${CROSSHAIR_ICON_SIZE}"`);
 	});
 });

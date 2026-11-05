@@ -6,8 +6,12 @@ import { createDefaultFormat } from "../../src/lib/data/format.js";
 import { defaultMessages } from "../../src/lib/data/messages.js";
 import type { MetadataProvider } from "../../src/lib/data/metadata.js";
 import { NO_LEVEL } from "../../src/lib/data/scale.js";
-import type { MonitorFeatureProperties } from "../../src/lib/data/types.js";
+import type {
+	CollocationFeatureProperties,
+	MonitorFeatureProperties
+} from "../../src/lib/data/types.js";
 import type { ClusterInfo } from "../../src/lib/plugins/points.svelte.js";
+import CollocationTooltip from "../../src/lib/presets/CollocationTooltip.svelte";
 import MonitorClusterTooltip from "../../src/lib/presets/MonitorClusterTooltip.svelte";
 import MonitorTooltip from "../../src/lib/presets/MonitorTooltip.svelte";
 import { monitor } from "../fixtures/monitors.js";
@@ -258,5 +262,77 @@ describe("MonitorClusterTooltip", () => {
 		});
 		await expect.element(page.getByText("purpleair Monitors")).toBeVisible();
 		await expect.element(page.getByText("2 monitors", { exact: true })).toBeVisible();
+	});
+});
+
+describe("CollocationTooltip", () => {
+	const site = (
+		extra: Partial<CollocationFeatureProperties> = {}
+	): CollocationFeatureProperties => ({
+		...monitor("ref", "airnow", 12.6, {
+			name: "Fresno Garland",
+			timestamp: "2026-11-03T21:00:00Z"
+		}),
+		refKey: "feature:s1",
+		colocatedId: "col",
+		colocatedName: "Garland PurpleAir",
+		colocatedType: "purpleair",
+		colocatedValue: 40.2,
+		colocatedTimestamp: "2026-11-03T21:02:00Z",
+		...extra
+	});
+
+	it("collocation tooltip shows both readings", async () => {
+		render(CollocationTooltip, {
+			site: site(),
+			scale: pm25Scale,
+			precision: 0,
+			messages: defaultMessages,
+			format,
+			referenceInterval: "1 hour",
+			colocatedInterval: "2 min"
+		});
+		const text = document.body.textContent!.replace(/\s+/g, " ");
+		expect(text).toContain("PM2.5 13 (1 hour avg)");
+		expect(text).toContain("PM2.5 40 (2 min avg)");
+		expect(text).toContain("Nov 3, 2026, 1:00 PM");
+		expect(text).toContain("Nov 3, 2026, 1:02 PM");
+		expect(text).toContain("Fresno Garland");
+		expect(text).toContain("Garland PurpleAir");
+		expect(text).toContain("Reference monitor");
+		expect(text).toContain("Collocated monitor");
+		expect(text).toContain("Moderate");
+		expect(text).toContain("Unhealthy for Sensitive Groups");
+		expect(text.match(/Last updated \d+ (minutes|hours|days?) ago/g)).toHaveLength(2);
+		const reference = page.getByText("13").element().parentElement!;
+		expect(getComputedStyle(reference).backgroundColor).toBe("rgb(255, 255, 0)");
+		const colocated = page.getByText("40").element().parentElement!;
+		expect(getComputedStyle(colocated).backgroundColor).toBe("rgb(255, 126, 0)");
+		// The collocated row puts its box on the other side, as monitor-map does.
+		const rows = document.querySelectorAll(".mapsdk-collocation-row");
+		expect(getComputedStyle(rows[0]).flexDirection).toBe("row");
+		expect(getComputedStyle(rows[1]).flexDirection).toBe("row-reverse");
+	});
+
+	it("a missing monitor shows No reading and No level in a neutral box", async () => {
+		render(CollocationTooltip, {
+			site: site({
+				colocatedName: null,
+				colocatedType: null,
+				colocatedValue: null,
+				colocatedTimestamp: null
+			}),
+			scale: pm25Scale,
+			precision: 0,
+			messages: defaultMessages,
+			format,
+			referenceInterval: null,
+			colocatedInterval: null
+		});
+		await expect.element(page.getByText("No reading")).toBeVisible();
+		await expect.element(page.getByText("No level")).toBeVisible();
+		await expect.element(page.getByText("Collocated monitor")).toBeVisible();
+		expect(document.body.textContent).not.toContain("avg)");
+		expect(document.body.textContent!.match(/Last updated/g)).toHaveLength(1);
 	});
 });
