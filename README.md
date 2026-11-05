@@ -156,6 +156,7 @@ calls `status.retry()`). Values are shown with the metadata's display precision.
 for an entry type, polls every two minutes, and exposes `dataSource`. `init()`, `update()`,
 `entryTypeFor()`, `pauseAutoUpdate()`, `resumeAutoUpdate()`, and `dispose()` are its controls. A
 dashboard that has its own date-range data builds a `DataSource` itself instead.
+`meta` is the read-only monitors meta (the SDK's `MonitorsMeta`), null until `init()` resolves.
 
 ### Plain GeoJSON: `staticSource`
 

@@ -58,6 +58,8 @@ export interface MonitorsStore {
 	readonly latest: ReadonlyMap<string, MonitorReading>;
 	/** The entry types the server publishes on the map (monitors meta `available_pollutants`). */
 	readonly availableEntryTypes: readonly string[];
+	/** The monitors meta from init (the SDK's `MonitorsMeta`), or null before init. Read-only. */
+	readonly meta: MonitorsMeta | null;
 	/**
 	 * Sets the entry type. Once initialized, an entry type the server doesn't list falls back to
 	 * its default, and the readings blank at once (so markers never show the previous entry
@@ -156,6 +158,10 @@ class LiveMonitorsStore implements MonitorsStore {
 	entryType = $state<string | null>(null);
 	monitors = $state.raw<ReadonlyMap<string, MonitorsListItem>>(new Map());
 	availableEntryTypes = $derived<readonly string[]>(this.#meta?.available_pollutants ?? []);
+
+	get meta(): MonitorsMeta | null {
+		return this.#meta;
+	}
 
 	latest = $state.raw<ReadonlyMap<string, MonitorReading>>(new Map());
 
