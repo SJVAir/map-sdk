@@ -1,6 +1,6 @@
 # `@sjvair/map-sdk`: List button position and focus reveal
 
-Date: 2026-11-05. Status: **awaiting the user's review.**
+Date: 2026-11-05. Status: **approved by the user 2026-11-05.**
 Release 1, step 5 (data-dashboard `TODO.md` → "Release 1, step 5"). Builds on milestone 2
 (`2026-11-04-map-sdk-milestone-2-design.md`, merged #4).
 
