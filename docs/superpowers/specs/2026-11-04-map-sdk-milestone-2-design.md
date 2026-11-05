@@ -1,6 +1,6 @@
 # `@sjvair/map-sdk`: milestone 2 design (monitor-map parity)
 
-Date: 2026-11-04. Status: **draft, not yet approved.**
+Date: 2026-11-04. Status: **approved by the user 2026-11-04.**
 Release 1, step 5 (data-dashboard `ROADMAP.md` item 5, `TODO.md` → "Release 1, step 5").
 Milestone 1: `2026-11-03-map-sdk-design.md` (built and merged, #1). This spec adds to it; where
 the two disagree, this one wins.
