@@ -294,3 +294,48 @@ test("keyboard only: Tab reaches the map, the List button, and the list; Space s
 	await expect(list.getByRole("option", { selected: true })).toHaveCount(1);
 	expect(JSON.parse(await selectionBox(page).inputValue())).toMatchObject({ kind: "monitors" });
 });
+
+test("keyboard only: monitor-map's focus-revealed List button top right", async ({
+	page,
+	browserName
+}) => {
+	const tab = browserName === "webkit" ? "Alt+Tab" : "Tab";
+	const map = todayMap(page);
+	await expect(map.locator("canvas")).toBeVisible();
+	await todayPanel(page)
+		.getByRole("combobox", { name: "List button corner" })
+		.selectOption("top-right");
+	await todayPanel(page)
+		.getByRole("checkbox", { name: "Show the List button only on keyboard focus" })
+		.check();
+	const button = map.getByRole("button", { name: "List of features on the map" });
+	const width = async () => (await button.boundingBox())?.width ?? 0;
+	await expect.poll(width).toBeLessThanOrEqual(1);
+
+	await map.locator("canvas").focus();
+	for (let i = 0; i < 15; i++) {
+		if (await button.evaluate((el) => el === document.activeElement)) break;
+		await page.keyboard.press(tab);
+	}
+	await expect(button).toBeFocused();
+	expect(await width()).toBeGreaterThan(1);
+	// Below the engine's zoom/compass/locate-me controls.
+	const controls = await map.locator(".maplibregl-ctrl-top-right").boundingBox();
+	const box = await button.boundingBox();
+	expect(box!.y).toBeGreaterThanOrEqual(controls!.y + controls!.height);
+
+	await page.keyboard.press("Enter");
+	const list = map.getByRole("listbox", { name: "Features on the map" });
+	await expect(list.getByRole("option", { name: /Fixture Alpha/ })).toBeVisible();
+	for (let i = 0; i < 5; i++) {
+		if (await list.evaluate((el) => el === document.activeElement)) break;
+		await page.keyboard.press(tab);
+	}
+	await expect(list).toBeFocused();
+	await page.keyboard.press("Escape");
+	await expect(button).toBeFocused();
+	expect(await width()).toBeGreaterThan(1);
+	await page.keyboard.press(tab);
+	await expect(button).not.toBeFocused();
+	await expect.poll(width).toBeLessThanOrEqual(1);
+});

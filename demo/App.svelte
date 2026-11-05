@@ -12,7 +12,8 @@
 		Legend,
 		MapView,
 		monitorsPlugin,
-		regionsPlugin
+		regionsPlugin,
+		type ListPosition
 	} from "../src/lib/index.js";
 	import type { MapPlugin } from "../src/lib/core/plugin.js";
 	import type {
@@ -143,6 +144,9 @@
 	let mode = $state<SelectionMode>("multiple");
 	let hidden = $state(false);
 	let theme = $state<"system" | "light" | "dark">("system");
+	// The setup map's List button: monitor-map uses top-right, shown only on keyboard focus.
+	let listPosition = $state<ListPosition>("top-left");
+	let listFocusOnly = $state(false);
 	const enabled = $state<Record<SourceKind, boolean>>({
 		monitors: true,
 		regions: false,
@@ -362,6 +366,20 @@
 				</select>
 				<output data-testid="today-status" class="demo-muted">{todayStatus}</output>
 			</fieldset>
+			<fieldset>
+				<legend>List button</legend>
+				<label for="today-list-position">List button corner</label>
+				<select id="today-list-position" bind:value={listPosition}>
+					<option value="top-left">Top left</option>
+					<option value="top-right">Top right</option>
+					<option value="bottom-left">Bottom left</option>
+					<option value="bottom-right">Bottom right</option>
+				</select>
+				<label>
+					<input type="checkbox" bind:checked={listFocusOnly} />
+					Show the List button only on keyboard focus
+				</label>
+			</fieldset>
 		</div>
 		<MapView
 			map={today}
@@ -369,6 +387,7 @@
 			controls="engine"
 			selectionBar={false}
 			tooltip="pointer"
+			featureList={{ position: listPosition, reveal: listFocusOnly ? "focus" : "always" }}
 			class="demo-map demo-map-tall"
 		/>
 		<Legend map={today} order="top-first" />

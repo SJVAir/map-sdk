@@ -191,10 +191,10 @@ export interface MapContext {
 	/** For MapView only: stops using the current GL map. */
 	detach(): void;
 	/**
-	 * For MapView only: how many pixels at the map's left the open feature list panel covers (0
-	 * when closed), which `focusFeature` pans clear of.
+	 * For MapView only: how many pixels at the map's left or right edge (`side`, default left)
+	 * the open feature list panel covers (0 when closed), which `focusFeature` pans clear of.
 	 */
-	setListInset(left: number): void;
+	setListInset(width: number, side?: "left" | "right"): void;
 	/** For MapView only: records the camera and bounds after a move. */
 	updateView(camera: CameraState, bounds: Bounds): void;
 	/**
@@ -268,6 +268,7 @@ class MapContextImpl implements MapContext {
 	#gl: GlMapLike | null = null;
 	#destroyed = false;
 	#listInset = 0;
+	#listInsetSide: "left" | "right" = "left";
 
 	constructor(options: CreateMapOptions) {
 		const initialView = copyView(options.config.initialView ?? DEFAULT_VIEW);
@@ -435,7 +436,7 @@ class MapContextImpl implements MapContext {
 			center: found.item.lngLat,
 			// The middle of the part the panel leaves clear. An offset, not padding: MapLibre keeps
 			// padding for later moves (zooms, the reported center), an offset applies to this one.
-			...(this.#listInset > 0 && { offset: [this.#listInset / 2, 0] as [number, number] }),
+			...(this.#listInset > 0 && { offset: [this.#listOffsetX(), 0] as [number, number] }),
 			...(prefersReducedMotion() && { duration: 0 })
 		});
 	}
@@ -511,8 +512,14 @@ class MapContextImpl implements MapContext {
 		if (this.#gl) this.#host.restyle();
 	}
 
-	setListInset(left: number): void {
-		this.#listInset = Math.max(0, left);
+	/** Half the panel's width, toward the part of the map it leaves clear. */
+	#listOffsetX(): number {
+		return ((this.#listInsetSide === "left" ? 1 : -1) * this.#listInset) / 2;
+	}
+
+	setListInset(width: number, side: "left" | "right" = "left"): void {
+		this.#listInset = Math.max(0, width);
+		this.#listInsetSide = side;
 	}
 
 	updateView(camera: CameraState, bounds: Bounds): void {

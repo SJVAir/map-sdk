@@ -226,6 +226,10 @@ describe("createMap", () => {
 		map.focusFeature("monitor:5");
 		expect(easeTo).toHaveBeenLastCalledWith(expect.objectContaining({ offset: [120, 0] }));
 		expect(easeTo.mock.lastCall![0]).not.toHaveProperty("padding");
+		// A panel on the right: the clear part is on the left.
+		map.setListInset(240, "right");
+		map.focusFeature("monitor:5");
+		expect(easeTo).toHaveBeenLastCalledWith(expect.objectContaining({ offset: [-120, 0] }));
 		map.setListInset(0);
 		map.focusFeature("monitor:5");
 		expect(easeTo.mock.lastCall![0]).not.toHaveProperty("offset");

@@ -2,7 +2,13 @@
 	import type { MapContext } from "../core/create-map.svelte.js";
 	import "./controls.css";
 
-	let { map }: { map: MapContext } = $props();
+	interface Props {
+		map: MapContext;
+		/** Leaves room at the right for a top-right List button, as the bar does at the left. */
+		clearRight?: boolean;
+	}
+
+	let { map, clearRight = false }: Props = $props();
 
 	let bar: HTMLElement | undefined = $state();
 
@@ -35,7 +41,7 @@
 {#if entries.length > 0}
 	<div
 		bind:this={bar}
-		class="mapsdk-selection text-sm"
+		class={["mapsdk-selection text-sm", clearRight && "mapsdk-selection-clear-right"]}
 		role="group"
 		aria-label={map.messages("mapsdk_selection_label")}
 	>
@@ -81,6 +87,10 @@
 		color: var(--foreground);
 		box-shadow: var(--shadow-card, none);
 		pointer-events: auto;
+	}
+
+	.mapsdk-selection-clear-right {
+		right: 5rem;
 	}
 
 	.mapsdk-selection-row {
