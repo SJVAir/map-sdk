@@ -106,6 +106,12 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	zoomRange?: { min?: number; max?: number };
 	/** How the legend shows a range scale: a gradient (default) or labeled blocks. */
 	legendDisplay?: "gradient" | "blocks";
+	/**
+	 * What titles the legend section: `layerLabel` (default) or, for a source with a `ScaleRef`,
+	 * the entry type's label from the metadata provider (e.g. "PM2.5"), with `layerLabel` until
+	 * it loads.
+	 */
+	legendTitle?: "layer" | "entry-type";
 	/** Whether `features()` lists this plugin's features. Default true. */
 	listed?: boolean;
 	/** Tooltip content for a feature, below its name; `props` are its source properties. */
@@ -136,7 +142,12 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 	const enlarge = options.selectedStyle === "enlarge";
 	const groupOf = cluster?.groupBy ?? (() => "");
 
-	const scales = createScaleResolver(pluginId, layerLabel, source);
+	const scales = createScaleResolver(
+		pluginId,
+		layerLabel,
+		source,
+		options.legendTitle === "entry-type"
+	);
 	const currentScale = scales.current;
 	const legend = (): LegendData | null => {
 		const data = scales.legend();

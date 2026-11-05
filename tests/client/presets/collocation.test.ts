@@ -173,3 +173,13 @@ describe("collocationSitesPlugin", () => {
 		}
 	});
 });
+
+describe("collocationSitesPlugin legend", () => {
+	it("contributes no legend section, only a loading or failure status", () => {
+		const { plugin, source } = setUp();
+		expect(plugin.legend!()).toBeNull();
+		const error = { state: "error" as const, error: new Error("x"), retry: () => {} };
+		source.status = error;
+		expect(plugin.legend!()).toEqual({ pluginId: "collocation-sites", status: error });
+	});
+});

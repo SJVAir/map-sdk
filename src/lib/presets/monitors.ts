@@ -237,6 +237,7 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 		id: options.id ?? "monitors",
 		source: options.source,
 		layerLabel: options.layerLabel,
+		legendTitle: "entry-type",
 		selectable: options.selectable ?? true,
 		selectedStyle: options.selectedStyle,
 		icon: {

@@ -86,5 +86,12 @@ export function collocationSitesPlugin(options: CollocationSitesPluginOptions): 
 	});
 	// monitor-map registers the collocation tooltip at the highest priority, over the monitors.
 	plugin.hoverPriority = Number.MAX_SAFE_INTEGER;
+	// The sites use the monitors' scale, which the monitors' own section shows; only a loading
+	// or failure status still reports here.
+	const legend = plugin.legend;
+	plugin.legend = () => {
+		const data = legend?.() ?? null;
+		return data && "scale" in data ? null : data;
+	};
 	return plugin;
 }

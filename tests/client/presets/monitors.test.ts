@@ -116,6 +116,43 @@ describe("monitorShape", () => {
 	});
 });
 
+describe("monitorsPlugin legend title", () => {
+	const REF = { dataset: "air-quality", entryType: "pm25" };
+	function titled(entryType: () => Promise<unknown>) {
+		const metadata = {
+			scale: () => Promise.resolve(pm25Scale),
+			entryType: vi.fn(entryType)
+		} as never;
+		const source = new TestSource<MonitorFeatureProperties>({
+			features: points(MONITORS),
+			scale: REF
+		});
+		const map = createMap({ config: { maptilerKey: "test-key" }, metadata });
+		const plugin = monitorsPlugin({ source, layerLabel: "Air monitors" });
+		map.addPlugin(plugin);
+		map.attach(createFakeGl({ styleLoaded: true }));
+		flushSync();
+		return plugin;
+	}
+	const settle = async () => {
+		for (let i = 0; i < 5; i++) await Promise.resolve();
+		flushSync();
+	};
+
+	it("is the entry type's label from the metadata, not layerLabel", async () => {
+		const plugin = titled(() => Promise.resolve({ label: "PM2.5", units: "µg/m³", precision: 1 }));
+		await settle();
+		expect(plugin.legend!()).toMatchObject({ title: "PM2.5" });
+		expect(plugin.label).toBe("Air monitors");
+	});
+
+	it("falls back to layerLabel when the metadata has none", async () => {
+		const plugin = titled(() => Promise.resolve("unavailable"));
+		await settle();
+		expect(plugin.legend!()).toMatchObject({ title: "Air monitors" });
+	});
+});
+
 describe("monitorsPlugin", () => {
 	it("is named monitors, labeled, and attributed to its ScaleRef's dataset", () => {
 		const source = new TestSource<MonitorFeatureProperties>({

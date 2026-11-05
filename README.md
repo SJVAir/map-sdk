@@ -160,15 +160,20 @@ keyboard list). To show fire groups below zoom 10 and single hotspots from it, a
 `cleanFires` (both also from `@sjvair/map-sdk/stores`).
 
 `legendDisplay: "gradient" | "blocks"` on `pointsPlugin` sets how the legend draws a range scale
-(default a gradient; `hmsFirePlugin` uses `"blocks"`, labeled with the levels' own labels). `Legend`
-takes `order` (`"bottom-first"`, default, or `"top-first"`), and shows a section identical to one
-already shown (same title, units and bar, as with the two fire plugins) only once.
+(default a gradient; `hmsFirePlugin` uses `"blocks"`, labeled with the levels' own labels). A blocks
+legend (also every category scale, such as smoke) is one outlined bar of contiguous segments with
+each level's label under its segment; long labels wrap. `legendTitle: "layer" | "entry-type"` sets
+the legend section's title: `layerLabel` (default) or the entry type's label from the metadata
+provider (`monitorsPlugin` uses the latter, so its section reads "PM2.5"; `layerLabel` still names
+the layer in the list, selection bar and summary). `Legend` takes `order` (`"bottom-first"`,
+default, or `"top-first"`), and shows a section identical to one already shown (same title, units
+and bar, as with the two fire plugins) only once.
 
 `collocationSitesPlugin({ id?, source, layerLabel })` draws collocation sites as sjvair.com does:
 each at its reference monitor, in that monitor's shape and level color (inactive gray, inside
 outlined), wrapped in a crosshair of `COLLOCATION_CROSSHAIR_COLOR` (`#4A5FC6`, a fixed color on
 every theme). Its tooltip shows the reference and collocated monitors' readings side by side, each
-with its time and level. It isn't selectable. Add it before `monitorsPlugin` so it draws under the
+with its time and level. It isn't selectable and adds no legend section (the monitors' scale is shown by `monitorsPlugin`). Add it before `monitorsPlugin` so it draws under the
 monitors; its `hoverPriority` is `Number.MAX_SAFE_INTEGER`, so its tooltip still wins over a
 monitor drawn above it (clicks go to the topmost feature).
 

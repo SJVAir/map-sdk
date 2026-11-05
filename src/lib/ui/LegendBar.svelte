@@ -48,15 +48,29 @@
 		{/each}
 	</div>
 {/if}
-<ul class="mapsdk-legend-items text-xs">
-	{#each items as item, i (i)}
-		<li>
-			<span class="mapsdk-legend-swatch" style:background={item.color}></span>
-			<span>{item.label}</span>
-			{#if item.threshold}<span class="mapsdk-legend-threshold">{item.threshold}</span>{/if}
-		</li>
-	{/each}
-</ul>
+{#if bar.kind === "blocks"}
+	<!-- One contiguous bar, each level's label under its segment (a list for screen readers). -->
+	<div class="mapsdk-legend-blocks" aria-hidden="true">
+		{#each items as item, i (i)}
+			<span class="mapsdk-legend-block" style:background={item.color}></span>
+		{/each}
+	</div>
+	<ul class="mapsdk-legend-block-labels text-xs" style:--blocks={items.length}>
+		{#each items as item, i (i)}
+			<li>{item.label}</li>
+		{/each}
+	</ul>
+{:else}
+	<ul class="mapsdk-legend-items text-xs">
+		{#each items as item, i (i)}
+			<li>
+				<span class="mapsdk-legend-swatch" style:background={item.color}></span>
+				<span>{item.label}</span>
+				{#if item.threshold}<span class="mapsdk-legend-threshold">{item.threshold}</span>{/if}
+			</li>
+		{/each}
+	</ul>
+{/if}
 
 <style>
 	.mapsdk-legend-gradient {
@@ -65,6 +79,35 @@
 		outline: var(--swatch-outline-width, 1px) solid
 			var(--swatch-outline-color, color-mix(in srgb, var(--foreground) 75%, var(--background)));
 		outline-offset: 1px;
+	}
+
+	.mapsdk-legend-blocks {
+		display: flex;
+		height: 0.75rem;
+		border-radius: 0.25rem;
+		overflow: hidden;
+		outline: var(--swatch-outline-width, 1px) solid
+			var(--swatch-outline-color, color-mix(in srgb, var(--foreground) 75%, var(--background)));
+		outline-offset: 1px;
+	}
+
+	.mapsdk-legend-block {
+		flex: 1 1 0;
+	}
+
+	/* Equal columns under the equal segments; long labels wrap inside their column. */
+	.mapsdk-legend-block-labels {
+		display: grid;
+		grid-template-columns: repeat(var(--blocks), minmax(0, 1fr));
+		margin: 0.375rem 0 0;
+		padding: 0;
+		list-style: none;
+		text-align: center;
+	}
+
+	.mapsdk-legend-block-labels li {
+		padding: 0 0.125rem;
+		overflow-wrap: anywhere;
 	}
 
 	.mapsdk-legend-ticks {

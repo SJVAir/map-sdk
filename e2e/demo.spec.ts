@@ -148,7 +148,7 @@ test("the monitor-map setup map renders its layers, engine controls and legend",
 	await expect(headings.filter({ hasText: /^Fires/ })).toHaveCount(1);
 	const texts = await headings.allTextContents();
 	const at = (re: RegExp) => texts.findIndex((t) => re.test(t));
-	expect(at(/^Monitors/)).toBeLessThan(at(/^Fires/));
+	expect(at(/^PM2\.5/)).toBeLessThan(at(/^Fires/));
 	expect(at(/^Fires/)).toBeLessThan(at(/^Smoke/));
 });
 
@@ -226,7 +226,7 @@ const LAYERS = [
 ];
 /** Each layer's legend heading: its layer label, then the units if the scale has any. */
 const LEGEND_SECTIONS = [
-	/^Monitors/,
+	/^PM2\.5/,
 	/^Counties/,
 	/^CalHeatScore/,
 	/^Forecast zones/,
@@ -248,7 +248,7 @@ for (const theme of ["light", "dark"] as const) {
 		for (const heading of LEGEND_SECTIONS) {
 			await expect(panel.getByRole("heading", { level: 3, name: heading })).toBeVisible();
 		}
-		for (const heading of [/^Monitors/, /^Fires/, /^Smoke/]) {
+		for (const heading of [/^PM2\.5/, /^Fires/, /^Smoke/]) {
 			await expect(
 				todayPanel(page).getByRole("heading", { level: 3, name: heading })
 			).toBeVisible();
