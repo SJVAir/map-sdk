@@ -35,7 +35,8 @@ describe("MonitorTooltip", () => {
 			timestamp: "2026-11-03T21:00:00Z",
 			scale: pm25Scale,
 			messages: defaultMessages,
-			format
+			format,
+			interval: null
 		});
 		const text = document.body.textContent!.replace(/\s+/g, " ");
 		expect(text).toContain("PM2.5 13");
@@ -53,7 +54,8 @@ describe("MonitorTooltip", () => {
 			timestamp: null,
 			scale: pm25Scale,
 			messages: defaultMessages,
-			format
+			format,
+			interval: null
 		});
 		expect(document.body.textContent!.replace(/\s+/g, " ")).toContain("PM2.5 12.6");
 	});
@@ -64,10 +66,37 @@ describe("MonitorTooltip", () => {
 			timestamp: null,
 			scale: pm25Scale,
 			messages: defaultMessages,
-			format
+			format,
+			interval: null
 		});
 		await expect.element(page.getByText("No reading")).toBeVisible();
 		await expect.element(page.getByText("No level")).toBeVisible();
+	});
+});
+
+describe("MonitorTooltip interval note", () => {
+	it("monitor tooltip shows (1 hour avg) for airnow", async () => {
+		render(MonitorTooltip, {
+			item: item(12.6),
+			timestamp: null,
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			interval: "1 hour"
+		});
+		await expect.element(page.getByText("(1 hour avg)")).toBeVisible();
+	});
+
+	it("no note when the provider lacks monitorTypeInterval", async () => {
+		render(MonitorTooltip, {
+			item: item(12.6),
+			timestamp: null,
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			interval: null
+		});
+		expect(document.body.textContent).not.toContain("avg)");
 	});
 });
 
@@ -79,7 +108,8 @@ describe("MonitorTooltip with an empty-color level", () => {
 			timestamp: null,
 			scale: pm25Scale,
 			messages: defaultMessages,
-			format
+			format,
+			interval: null
 		});
 		await expect.element(page.getByText("Unknown")).toBeVisible();
 		expect(page.getByText("No level").elements()).toHaveLength(0);

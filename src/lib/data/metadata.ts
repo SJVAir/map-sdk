@@ -22,6 +22,11 @@ export interface MetadataProvider {
 	scale(ref: ScaleRef, signal?: AbortSignal): Promise<Scale | "unavailable">;
 	entryType(ref: ScaleRef, signal?: AbortSignal): Promise<EntryTypeInfo | "unavailable">;
 	monitorTypeLabel(type: string, signal?: AbortSignal): Promise<string | "unavailable">;
+	/**
+	 * How often a monitor type reports (e.g. "2 min"), for the tooltip's "(N avg)" note. Optional:
+	 * the note is left out when a host's provider lacks it.
+	 */
+	monitorTypeInterval?(type: string, signal?: AbortSignal): Promise<string | "unavailable">;
 	attribution(dataset: string, signal?: AbortSignal): Promise<string | "unavailable">;
 }
 
@@ -145,6 +150,8 @@ export function createDefaultMetadata(): MetadataProvider {
 			}),
 		monitorTypeLabel: (type, signal) =>
 			guarded(signal, async () => (await monitorsMeta(signal)).monitors[type]?.label),
+		monitorTypeInterval: (type, signal) =>
+			guarded(signal, async () => (await monitorsMeta(signal)).monitors[type]?.expected_interval),
 		attribution: (dataset, signal) =>
 			guarded(
 				signal,

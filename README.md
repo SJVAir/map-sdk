@@ -331,7 +331,10 @@ if (gl) new Marker().setLngLat(lngLat).addTo(gl);
 from:
 
 - `metadata`: scales, entry-type labels and units, monitor type labels, and dataset attribution.
-  The default reads the SJVAir API through `@sjvair/sdk`.
+  The default reads the SJVAir API through `@sjvair/sdk`. `monitorTypeInterval(type)` is an
+  optional method returning how often a monitor type reports (e.g. `"2 min"`); the monitor
+  tooltip shows "(2 min avg)" under the entry-type label when it exists, and omits the note when a
+  host's provider lacks it.
 - `messages`: `(key, params) => string`. The default is the English catalog,
   `@sjvair/map-sdk/messages/en.json`, with `{name}`-style parameters and `_one`/`_other` plurals
   selected by `count`.

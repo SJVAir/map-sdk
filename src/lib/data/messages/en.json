@@ -41,5 +41,6 @@
 	"mapsdk_monitor_cluster_coverage_other": "{count} monitors covering {area} mi²",
 	"mapsdk_monitor_cluster_max": "Max: {value} {units}",
 	"mapsdk_monitor_cluster_min": "Min: {value} {units}",
+	"mapsdk_monitor_interval_avg": "({interval} avg)",
 	"mapsdk_monitor_updated": "Last updated {when}"
 }

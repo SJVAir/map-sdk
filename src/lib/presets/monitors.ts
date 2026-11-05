@@ -1,6 +1,14 @@
 import type { ExpressionSpecification } from "@maptiler/sdk";
-import { createRawSnippet, mount, unmount, type Component, type Snippet } from "svelte";
+import {
+	createRawSnippet,
+	mount,
+	unmount,
+	type Component,
+	type ComponentProps,
+	type Snippet
+} from "svelte";
 import type { MapPlugin } from "../core/plugin.js";
+import type { MetadataProvider } from "../data/metadata.js";
 import type { DataSource, MonitorFeatureProperties } from "../data/types.js";
 import { circle, square, triangle } from "../plugins/icons.js";
 import { pointsPlugin, type ClusterLayerArgs } from "../plugins/points.svelte.js";
@@ -164,17 +172,26 @@ function clusterLayers({
 	];
 }
 
-/** A snippet that mounts `component` with `props` (a tooltip outside the map's component tree). */
-function componentSnippet<Props extends Record<string, unknown>>(
+/**
+ * A snippet that mounts `component` with `props` (a tooltip outside the map's component tree).
+ * Props that are a promise are awaited first; nothing mounts if the tooltip closes meanwhile.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function componentSnippet<Props extends Record<string, any>>(
 	component: Component<Props>,
-	props: Props
+	props: Props | Promise<Props>
 ): Snippet {
 	return createRawSnippet(() => ({
 		render: () => "<div></div>",
 		setup(target) {
-			const instance = mount(component, { target, props });
+			let instance: ReturnType<typeof mount> | undefined;
+			let closed = false;
+			void Promise.resolve(props).then((resolved) => {
+				if (!closed) instance = mount(component, { target, props: resolved });
+			});
 			return () => {
-				void unmount(instance);
+				closed = true;
+				if (instance) void unmount(instance);
 			};
 		}
 	}));
@@ -187,6 +204,24 @@ function componentSnippet<Props extends Record<string, unknown>>(
  */
 export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 	const clustered = options.clustered ?? true;
+	// Per monitor type, so each type's interval is looked up once. Failures are forgotten.
+	const intervals = new Map<string, Promise<string | null>>();
+	function intervalFor(type: string, metadata: MetadataProvider): Promise<string | null> {
+		if (!metadata.monitorTypeInterval) return Promise.resolve(null);
+		let found = intervals.get(type);
+		if (!found) {
+			const lookup = metadata.monitorTypeInterval(type).then(
+				(value) => (value === "unavailable" ? null : value),
+				() => null
+			);
+			found = lookup;
+			intervals.set(type, lookup);
+			void lookup.then((value) => {
+				if (value === null && intervals.get(type) === lookup) intervals.delete(type);
+			});
+		}
+		return found;
+	}
 	return pointsPlugin<MonitorFeatureProperties>({
 		id: options.id ?? "monitors",
 		source: options.source,
@@ -230,12 +265,16 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 				}
 			: undefined,
 		tooltip: (item, props, env) =>
-			componentSnippet(MonitorTooltip, {
-				item,
-				timestamp: props.timestamp ?? null,
-				scale: env.scale,
-				messages: env.messages,
-				format: env.format
-			})
+			componentSnippet<ComponentProps<typeof MonitorTooltip>>(
+				MonitorTooltip,
+				intervalFor(props.type, env.metadata).then((interval) => ({
+					item,
+					timestamp: props.timestamp ?? null,
+					scale: env.scale,
+					messages: env.messages,
+					format: env.format,
+					interval
+				}))
+			)
 	});
 }

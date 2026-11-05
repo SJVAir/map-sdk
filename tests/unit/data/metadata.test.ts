@@ -37,7 +37,7 @@ function legacyMeta() {
 			},
 			o3: { label: "Ozone", units: "ppb", levels: null }
 		},
-		monitors: { airgradient: { label: "AirGradient" } }
+		monitors: { airgradient: { label: "AirGradient", expected_interval: "1 min" } }
 	};
 }
 
@@ -191,6 +191,16 @@ describe("default metadata", () => {
 		const meta = createDefaultMetadata();
 		expect(await meta.monitorTypeLabel("airgradient")).toBe("AirGradient");
 		expect(await meta.monitorTypeLabel("zzz")).toBe("unavailable");
+	});
+
+	it("monitorTypeInterval returns expected_interval", async () => {
+		getMonitorsMeta.mockResolvedValue(legacyMeta());
+		expect(await createDefaultMetadata().monitorTypeInterval!("airgradient")).toBe("1 min");
+	});
+
+	it("unknown type is unavailable for monitorTypeInterval", async () => {
+		getMonitorsMeta.mockResolvedValue(legacyMeta());
+		expect(await createDefaultMetadata().monitorTypeInterval!("zzz")).toBe("unavailable");
 	});
 
 	it("is unavailable after a failed fetch and fetches again next time", async () => {

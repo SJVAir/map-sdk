@@ -17,9 +17,11 @@
 		scale: Scale | null;
 		messages: MessageProvider;
 		format: FormatProvider;
+		/** How often the monitor's type reports (e.g. "1 hour"); null leaves the "(N avg)" note out. */
+		interval: string | null;
 	}
 
-	let { item, timestamp, scale, messages, format }: Props = $props();
+	let { item, timestamp, scale, messages, format, interval }: Props = $props();
 
 	// A level with an empty color shows its label in the neutral box.
 	const level = $derived(item.level !== NO_LEVEL ? item.level : null);
@@ -45,6 +47,7 @@
 		header={scale?.label ?? ""}
 		value={reading ?? messages("mapsdk_no_reading")}
 		large={reading !== null}
+		subheading={interval ? messages("mapsdk_monitor_interval_avg", { interval }) : undefined}
 	/>
 	<div class="mapsdk-monitor-detail">
 		{#if time}
