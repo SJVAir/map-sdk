@@ -154,6 +154,32 @@ describe("MapTooltip", () => {
 		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Gray 12.34 µg/m³ No level");
 	});
 
+	it("shows a detail as plain text in place of the chip", async () => {
+		const ev = { ...item("a", "Fresno Station", NO_LEVEL), value: null, detail: "Level 2 charger" };
+		const map = fakeMap([ev], { focusedKey: "a" });
+		render(MapTooltip, { map, project });
+		const tooltip = page.getByRole("tooltip");
+		await expect.element(tooltip).toHaveTextContent("Fresno Station Level 2 charger");
+		expect(tooltip.element().querySelector(".mapsdk-tooltip-chip")).toBeNull();
+		expect(tooltip.element().querySelector(".mapsdk-tooltip-detail")!.textContent!.trim()).toBe(
+			"Level 2 charger"
+		);
+	});
+
+	it("shows the level's chip, not the detail, when there is a level", async () => {
+		const map = fakeMap(
+			[{ ...item("a", "Fresno", level("Good", "#00e400")), detail: "Level 2 charger" }],
+			{
+				focusedKey: "a"
+			}
+		);
+		render(MapTooltip, { map, project });
+		const tooltip = page.getByRole("tooltip");
+		await expect.element(tooltip).toHaveTextContent("Fresno 12.34 µg/m³ Good");
+		expect(tooltip.element().querySelector(".mapsdk-tooltip-chip")).not.toBeNull();
+		expect(tooltip.element().querySelector(".mapsdk-tooltip-detail")).toBeNull();
+	});
+
 	it("shows the hit name alone when the item is not in the data", async () => {
 		const hit = {
 			pluginId: "points",
