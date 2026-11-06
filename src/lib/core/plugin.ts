@@ -148,8 +148,9 @@ export interface MapPlugin {
 	selectable?: boolean;
 	/**
 	 * Which plugin's feature the hover tooltip shows where several are under the pointer: the
-	 * highest wins, the topmost on a tie. Default 0. A blocking layer on top still hides what is
-	 * beneath it, and clicks ignore this (topmost first).
+	 * highest wins, the topmost on a tie. Default 0. Over a blocking layer (a cluster bubble), a
+	 * feature beneath shows only if its plugin's priority is higher than the blocking plugin's.
+	 * Clicks ignore this (topmost first), and a blocking layer on top still blocks them.
 	 */
 	hoverPriority?: number;
 	displayOptions?: Snippet;

@@ -329,8 +329,10 @@ time), and `movePlugin` moves it with the plugin's other layers.
 
 The cursor is a pointer over any interactive feature or cluster bubble. Where several plugins'
 features are under the pointer, the hover tooltip shows the one whose plugin has the highest
-`hoverPriority` (default 0), the topmost on a tie; a cluster bubble on top still hides what is
-beneath it, and clicks always go to the topmost.
+`hoverPriority` (default 0), the topmost on a tie. Over a cluster bubble, the bubble's tooltip
+shows unless a feature beneath belongs to a plugin with a higher `hoverPriority` than the
+bubble's (collocation sites under monitor clusters). Clicks always go to the topmost, so a click
+on a bubble still zooms into it.
 
 ```ts
 import type { CustomLayerInterface, MapPlugin, PluginContext } from "@sjvair/map-sdk";

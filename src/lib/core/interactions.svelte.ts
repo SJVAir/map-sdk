@@ -16,7 +16,11 @@ interface Registration {
 /** What is under one point. */
 interface Lookup {
 	hits: FeatureHit[];
-	/** The hit hover shows: the highest plugin priority among `hits`, the topmost on a tie. */
+	/**
+	 * The hit hover shows: the highest plugin priority among `hits`, the topmost on a tie. When
+	 * blocked, a feature beneath whose plugin outranks the blocking one (e.g. a collocation site
+	 * under a monitor cluster bubble); otherwise null and the blocker's own hit shows.
+	 */
 	hover: FeatureHit | null;
 	/** True when the topmost feature is on a blocking layer: nothing beneath is hit. */
 	blocked: boolean;
@@ -50,7 +54,8 @@ export interface Hovered {
  * Listens on the map itself (`click`, `mousemove`, `mouseout`) and queries only the registered
  * layers, so registrations can come and go without re-binding listeners. Layers nobody registered
  * are never hit. A blocking layer (e.g. a cluster bubble, which zooms instead) is never hit either,
- * but when it is topmost at a point nothing beneath it is hit or hovered.
+ * and when it is topmost at a point nothing beneath it is hit; only a feature whose plugin
+ * outranks it in `hoverPriority` is hovered through it.
  */
 export class InteractionRouter {
 	// Bookkeeping only; nothing reads these reactively.
@@ -178,9 +183,22 @@ export class InteractionRouter {
 		if (top?.blocking) {
 			const properties = features[0].properties ?? {};
 			const hit = top.toHit(properties);
+			// Clicks stay blocked, but the hover goes to the highest-priority feature beneath that
+			// outranks the blocking plugin.
+			let beneath: FeatureHit | null = null;
+			let beneathPriority = top.priority;
+			for (const feature of features.slice(1)) {
+				const registration = byLayer.get(feature.layer.id);
+				if (!registration || registration.blocking) continue;
+				if (registration.priority <= beneathPriority) continue;
+				const below = registration.toHit(feature.properties ?? {});
+				if (!below) continue;
+				beneath = { ...below, pluginId: registration.pluginId };
+				beneathPriority = registration.priority;
+			}
 			return {
 				hits: [],
-				hover: null,
+				hover: beneath,
 				blocked: true,
 				blocker: hit && { ...hit, pluginId: top.pluginId },
 				blockedBy: { registration: top, feature: { properties, geometry: features[0].geometry } }
@@ -251,7 +269,7 @@ export class InteractionRouter {
 
 	#onMove = (e: PointerEventLike) => {
 		const found = this.#lookup([e.point.x, e.point.y]);
-		const hit = found.blocked ? found.blocker : found.hover;
+		const hit = found.blocked ? (found.hover ?? found.blocker) : found.hover;
 		this.#hovered = hit ? { hit, lngLat: [e.lngLat.lng, e.lngLat.lat] } : null;
 		this.#setPointer(found.blocked || hit !== null);
 	};
