@@ -86,7 +86,8 @@ export function levelText(
 ): { kind: "level" | "detail" | "none"; text: string } {
 	const level = shownLevel(item);
 	if (level) return { kind: "level", text: level.label };
-	if (item.detail) return { kind: "detail", text: item.detail };
+	const detail = item.detail?.trim();
+	if (detail) return { kind: "detail", text: detail };
 	return { kind: "none", text: messages("mapsdk_no_level") };
 }
 

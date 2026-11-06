@@ -331,6 +331,7 @@ describe("pointsPlugin", () => {
 			}).plugin.features!();
 		for (const f of make()) expect(f).not.toHaveProperty("detail");
 		for (const f of make(() => "")) expect(f).not.toHaveProperty("detail");
+		for (const f of make(() => "   ")) expect(f).not.toHaveProperty("detail");
 	});
 
 	it("creates one clustered source per group", () => {

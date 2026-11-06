@@ -226,7 +226,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			const ref = decodeRef(props.refKey);
 			if (!ref) continue;
 			const [lng, lat] = geometry.coordinates;
-			const detail = options.detail?.(props);
+			const detail = options.detail?.(props)?.trim();
 			items.push({
 				refKey: props.refKey,
 				ref,

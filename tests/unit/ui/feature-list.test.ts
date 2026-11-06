@@ -140,6 +140,24 @@ describe("rowLabel", () => {
 		).toBe("Fresno, 1 µg/m³, Good");
 	});
 
+	it("treats a detail of only spaces as none", () => {
+		const extra = { value: null, level: NO_LEVEL, detail: "  " } as const;
+		expect(rowLabel(item("1", "Fresno Station", extra), defaultMessages, format)).toBe(
+			"Fresno Station, no reading"
+		);
+		expect(levelText(item("1", "A", { level: NO_LEVEL, detail: " " }), defaultMessages)).toEqual({
+			kind: "none",
+			text: "No level"
+		});
+	});
+
+	it("trims a detail's spaces", () => {
+		const extra = { value: null, level: NO_LEVEL, detail: " Level 2 charger " } as const;
+		expect(rowLabel(item("1", "Fresno Station", extra), defaultMessages, format)).toBe(
+			"Fresno Station, Level 2 charger"
+		);
+	});
+
 	it("treats an empty detail as none", () => {
 		const extra = { value: null, level: NO_LEVEL, detail: "" } as const;
 		expect(rowLabel(item("1", "Fresno Station", extra), defaultMessages, format)).toBe(
