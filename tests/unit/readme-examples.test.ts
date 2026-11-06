@@ -9,6 +9,7 @@ import {
 	hmsSmokePlugin,
 	maptilerMap,
 	monitorsPlugin,
+	pointsPlugin,
 	regionsPlugin,
 	shapesPlugin,
 	withCrosshair
@@ -90,6 +91,20 @@ describe("README examples", () => {
 		map.movePlugin("sites");
 		expect(map.plugins.map((p) => p.id)).toEqual(["regions", "sites"]);
 		map.destroy();
+	});
+
+	it("a detail for features with no level, and a frameless legend", () => {
+		type Charger = { refKey: string; name: string; value: null; level: 2 | 3 };
+		const plugin = pointsPlugin<Charger>({
+			id: "ev",
+			layerLabel: "EV chargers",
+			circle: { radius: 6 },
+			detail: (p) => `Level ${p.level} charger`,
+			source: staticSource({ type: "FeatureCollection", features: [] }, null)
+		});
+		expect(plugin.id).toBe("ev");
+		const row: Pick<FeatureListItem, "detail"> = { detail: "Level 2 charger" };
+		expect(row.detail).toBe("Level 2 charger");
 	});
 
 	it("writing a plugin: setup through the context, features for the list", () => {

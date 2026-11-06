@@ -78,7 +78,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `createCollocationSitesStore`, the last three on the shared `load-once` core. Each exposes a
   `dataSource`. `cleanFires` is exported from here.
 - **Plugins** (`src/lib/plugins/`): the general `pointsPlugin` (icons, clusters; `selectedStyle`,
-  `icon.mutedColor`, `zoomRange`, `legendDisplay`, `legendTitle`) and `shapesPlugin`
+  `icon.mutedColor`, `zoomRange`, `legendDisplay`, `legendTitle`, `detail` for features with no
+  level) and `shapesPlugin`
   (fill/`outline`/check overlay), plus shared style expressions, scale resolution, and the exported
   marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
 - **Presets** (`src/lib/presets/`): `monitorsPlugin`, `collocationSitesPlugin`, `regionsPlugin`,
@@ -91,7 +92,7 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `featureList` (`boolean` or `{ position, reveal }`; `list-placement.ts`; the button stacks clear
   of the controls in its corner, measured with a `ResizeObserver`). Credits come from the engine's
   AttributionControl, with data credits from `ui/data-credits.svelte.ts`.
-- **UI** (`src/lib/ui/`): Legend (`order`; blocks legends are one labeled bar), FeatureList,
+- **UI** (`src/lib/ui/`): Legend (`order`, `framed`; blocks legends are one labeled bar), FeatureList,
   MapTooltip, SelectionBar, ViewSummary, and MapControls (zoom buttons only; basemap switching is
   `MapContext`, credits are the engine's). `controls.css` holds the focus ring and motion classes.
 - **Entries**: `.` (everything, reaches the map engine), `./data` and `./stores` (must not reach
