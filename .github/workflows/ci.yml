@@ -1,8 +1,13 @@
 name: CI
 
+# Also called by release.yml, so a release runs exactly these checks before it publishes. Pushes
+# of tags don't run it on their own: a release's tag points at a commit main already tested, and
+# release.yml runs these checks itself.
 on:
   push:
+    branches: ["**"]
   pull_request:
+  workflow_call:
 
 jobs:
   test:
