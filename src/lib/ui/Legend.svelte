@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from "svelte";
+	import { onMount, untrack } from "svelte";
 	import "./controls.css";
 	import type { MapContext } from "../core/create-map.svelte.js";
 	import { watchTheme } from "../view/create-gl-map.js";
@@ -8,9 +8,19 @@
 
 	let {
 		map,
-		order = "bottom-first"
+		order = "bottom-first",
+		framed = true
 	}: {
 		map: MapContext;
+		/**
+		 * `true` (default) draws the legend's own card. `false` draws no frame (no border,
+		 * background, padding, or fixed width) so a host's card frames it. Translucent swatches
+		 * then blend over the nearest ancestor with an opaque background (a see-through card is
+		 * skipped), else the `--background` token. The color is read on mount, when `framed`
+		 * changes, and on a theme change; a card that changes color through its own class or
+		 * style isn't re-read.
+		 */
+		framed?: boolean;
 		/**
 		 * `"bottom-first"` (default) lists the bottom plugin's section first; `"top-first"`
 		 * last.
@@ -43,30 +53,50 @@
 		)
 	);
 
-	/** Computed colors can be oklch() or color(); a 1x1 canvas turns any of them into rgb. */
-	function resolveBackground(el: Element): string {
-		const css = getComputedStyle(el).backgroundColor;
+	/**
+	 * A computed color as rgb and whether it's opaque; computed colors can be oklch() or color(),
+	 * and a 1x1 canvas turns any of them into rgb.
+	 */
+	function toRgb(css: string): { rgb: string; opaque: boolean } {
 		const ctx = document.createElement("canvas").getContext("2d");
-		if (!ctx) return css;
+		if (!ctx) return { rgb: css, opaque: true };
 		ctx.clearRect(0, 0, 1, 1);
 		ctx.fillStyle = css;
 		ctx.fillRect(0, 0, 1, 1);
-		const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-		return `rgb(${r}, ${g}, ${b})`;
+		const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+		return { rgb: `rgb(${r}, ${g}, ${b})`, opaque: a === 255 };
 	}
 
-	onMount(() => {
-		const update = () => {
-			if (root) background = resolveBackground(root);
-		};
-		update();
-		return watchTheme(root!, update);
+	/**
+	 * What translucent swatches blend over: the legend's own card, or without a frame the nearest
+	 * ancestor with an opaque background (the host's card), else the `--background` token.
+	 */
+	function resolveBackground(el: HTMLElement, frameless: boolean): string {
+		if (!frameless) return toRgb(getComputedStyle(el).backgroundColor).rgb;
+		for (let at = el.parentElement; at; at = at.parentElement) {
+			const color = toRgb(getComputedStyle(at).backgroundColor);
+			if (color.opaque) return color.rgb;
+		}
+		// A computed custom property has its var() references already substituted.
+		return toRgb(getComputedStyle(el).getPropertyValue("--background").trim()).rgb;
+	}
+
+	function update() {
+		if (root) background = resolveBackground(root, !framed);
+	}
+
+	onMount(() => watchTheme(root!, update));
+
+	// On mount, and again when `framed` changes.
+	$effect(() => {
+		void framed;
+		untrack(update);
 	});
 </script>
 
 <section
 	bind:this={root}
-	class="mapsdk-legend"
+	class={["mapsdk-legend", !framed && "mapsdk-legend-frameless"]}
 	aria-label={map.messages("mapsdk_legend_label")}
 	hidden={entries.length === 0}
 >
@@ -122,6 +152,17 @@
 		color: var(--foreground);
 		box-shadow: var(--shadow-card, none);
 		pointer-events: auto;
+	}
+
+	/* framed={false}: the host's card is the frame. */
+	.mapsdk-legend-frameless {
+		width: auto;
+		max-width: none;
+		padding: 0;
+		border: 0;
+		border-radius: 0;
+		background: none;
+		box-shadow: none;
 	}
 
 	.mapsdk-legend[hidden] {

@@ -307,3 +307,109 @@ describe("Legend", () => {
 		expect(headings()).toEqual(["Bottom", "Middle", "Top"]);
 	});
 });
+
+describe("Legend framed={false}", () => {
+	/** A host card around the legend, 300px wide. */
+	function card(background: string): HTMLElement {
+		const wrapper = document.createElement("div");
+		wrapper.style.width = "300px";
+		wrapper.style.background = background;
+		document.body.append(wrapper);
+		return wrapper;
+	}
+	const legend = () => document.querySelector<HTMLElement>(".mapsdk-legend")!;
+	const block = () => document.querySelectorAll<HTMLElement>(".mapsdk-legend-block")[2];
+	const red = () => rgb(getComputedStyle(block()).backgroundColor)[0];
+
+	afterEach(() => {
+		document.body.replaceChildren();
+	});
+
+	it("draws no frame and fills its container", async () => {
+		applyTheme("light");
+		render(Legend, { target: card("transparent"), props: { map, framed: false } });
+		await expect.element(page.getByRole("region", { name: "Legend" })).toBeVisible();
+		const style = getComputedStyle(legend());
+		expect(style.borderTopWidth).toBe("0px");
+		expect(style.paddingTop).toBe("0px");
+		expect(style.boxShadow).toBe("none");
+		expect(style.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+		expect(legend().getBoundingClientRect().width).toBe(300);
+		await expect.element(page.getByRole("heading", { name: "PM2.5 (µg/m³)" })).toBeVisible();
+	});
+
+	it("blends translucent blocks over the host's card", async () => {
+		applyTheme("dark");
+		render(Legend, { target: card("rgb(255, 255, 255)"), props: { map, framed: false } });
+		await vi.waitFor(() => expect(red()).toBeGreaterThan(0x33));
+	});
+
+	it("falls back to the background token with no opaque card", async () => {
+		applyTheme("dark");
+		const framed = await render(Legend, { map });
+		await vi.waitFor(() => expect(red()).toBeLessThan(0x33));
+		const expected = getComputedStyle(block()).backgroundColor;
+		framed.unmount();
+		render(Legend, { target: card("transparent"), props: { map, framed: false } });
+		await vi.waitFor(() => expect(getComputedStyle(block()).backgroundColor).toBe(expected));
+	});
+
+	it("re-reads the card's color on a theme change", async () => {
+		// The card's color is the opposite of the page's, so only reading the card passes.
+		applyTheme("light");
+		document.documentElement.style.setProperty("--card", "rgb(0, 0, 0)");
+		render(Legend, { target: card("var(--card)"), props: { map, framed: false } });
+		await vi.waitFor(() => expect(red()).toBeLessThan(0x33));
+		applyTheme("dark");
+		document.documentElement.style.setProperty("--card", "rgb(255, 255, 255)");
+		await vi.waitFor(() => expect(red()).toBeGreaterThan(0x33));
+	});
+
+	it("blends over the card once framed turns off, and over its own card again after", async () => {
+		applyTheme("dark");
+		const view = await render(Legend, {
+			target: card("rgb(255, 255, 255)"),
+			props: { map, framed: true }
+		});
+		await vi.waitFor(() => expect(red()).toBeLessThan(0x33));
+		await view.rerender({ framed: false });
+		await vi.waitFor(() => expect(red()).toBeGreaterThan(0x33));
+		await view.rerender({ framed: true });
+		await vi.waitFor(() => expect(red()).toBeLessThan(0x33));
+	});
+
+	it("adds no element to the page to read the background token", async () => {
+		applyTheme("dark");
+		const added: Node[] = [];
+		const observer = new MutationObserver((records) => {
+			for (const r of records) added.push(...r.addedNodes);
+		});
+		observer.observe(document.body, { childList: true, subtree: true });
+		await render(Legend, { target: card("transparent"), props: { map, framed: false } });
+		await vi.waitFor(() => expect(red()).toBeLessThan(0x33));
+		observer.disconnect();
+		const probes = added.filter(
+			(n) => n instanceof HTMLElement && n.style.visibility === "hidden" && !n.closest("[hidden]")
+		);
+		expect(probes).toEqual([]);
+	});
+
+	it("follows framed after mount", async () => {
+		applyTheme("light");
+		const view = await render(Legend, { map });
+		await expect.element(page.getByRole("region", { name: "Legend" })).toBeVisible();
+		expect(getComputedStyle(legend()).borderTopWidth).toBe("1px");
+		await view.rerender({ framed: false });
+		expect(getComputedStyle(legend()).borderTopWidth).toBe("0px");
+		await view.rerender({ framed: true });
+		expect(getComputedStyle(legend()).borderTopWidth).toBe("1px");
+	});
+
+	it("keeps today's card by default", async () => {
+		applyTheme("light");
+		render(Legend, { map });
+		await expect.element(page.getByRole("region", { name: "Legend" })).toBeVisible();
+		expect(getComputedStyle(legend()).width).toBe("336px");
+		expect(getComputedStyle(legend()).borderTopWidth).toBe("1px");
+	});
+});

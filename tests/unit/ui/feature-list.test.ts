@@ -7,6 +7,7 @@ import type { Level } from "../../../src/lib/data/scale-types.js";
 import {
 	inView,
 	optionIdPart,
+	levelText,
 	rowLabel,
 	sortItems,
 	typeaheadIndex
@@ -119,6 +120,51 @@ describe("typeaheadIndex", () => {
 describe("rowLabel", () => {
 	const format = createDefaultFormat();
 
+	it("reads a detail in place of No level, with no reading", () => {
+		const ev = { value: null, level: NO_LEVEL, detail: "Level 2 charger" } as const;
+		expect(rowLabel(item("1", "Fresno Station", ev), defaultMessages, format)).toBe(
+			"Fresno Station, Level 2 charger"
+		);
+	});
+
+	it("reads a detail in the level's place after a value", () => {
+		const extra = { value: 5, level: NO_LEVEL, detail: "Level 2 charger" } as const;
+		expect(rowLabel(item("1", "Fresno Station", extra), defaultMessages, format)).toBe(
+			"Fresno Station, 5 µg/m³, Level 2 charger"
+		);
+	});
+
+	it("reads the level, not the detail, when there is a level", () => {
+		expect(
+			rowLabel(item("1", "Fresno", { detail: "Level 2 charger" }), defaultMessages, format)
+		).toBe("Fresno, 1 µg/m³, Good");
+	});
+
+	it("treats a detail of only spaces as none", () => {
+		const extra = { value: null, level: NO_LEVEL, detail: "  " } as const;
+		expect(rowLabel(item("1", "Fresno Station", extra), defaultMessages, format)).toBe(
+			"Fresno Station, no reading"
+		);
+		expect(levelText(item("1", "A", { level: NO_LEVEL, detail: " " }), defaultMessages)).toEqual({
+			kind: "none",
+			text: "No level"
+		});
+	});
+
+	it("trims a detail's spaces", () => {
+		const extra = { value: null, level: NO_LEVEL, detail: " Level 2 charger " } as const;
+		expect(rowLabel(item("1", "Fresno Station", extra), defaultMessages, format)).toBe(
+			"Fresno Station, Level 2 charger"
+		);
+	});
+
+	it("treats an empty detail as none", () => {
+		const extra = { value: null, level: NO_LEVEL, detail: "" } as const;
+		expect(rowLabel(item("1", "Fresno Station", extra), defaultMessages, format)).toBe(
+			"Fresno Station, no reading"
+		);
+	});
+
 	it("rounds the value to the item's precision", () => {
 		expect(
 			rowLabel(item("1", "Fresno", { value: 7.971, precision: 1 }), defaultMessages, format)
@@ -173,5 +219,21 @@ describe("optionIdPart", () => {
 		expect(optionIdPart("a_3a_", "b")).not.toBe(optionIdPart("a:", "b"));
 		expect(optionIdPart("a--b", "c")).not.toBe(optionIdPart("a", "b--c"));
 		expect(optionIdPart("a-", "-b")).not.toBe(optionIdPart("a", "--b"));
+	});
+});
+
+describe("levelText", () => {
+	it("is the level's label, else a detail, else No level", () => {
+		expect(levelText(item("1", "A", { detail: "x" }), defaultMessages)).toEqual({
+			kind: "level",
+			text: "Good"
+		});
+		expect(
+			levelText(item("1", "A", { level: NO_LEVEL, detail: "Level 2 charger" }), defaultMessages)
+		).toEqual({ kind: "detail", text: "Level 2 charger" });
+		expect(levelText(item("1", "A", { level: NO_LEVEL, detail: "" }), defaultMessages)).toEqual({
+			kind: "none",
+			text: "No level"
+		});
 	});
 });

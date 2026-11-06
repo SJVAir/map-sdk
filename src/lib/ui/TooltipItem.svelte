@@ -3,6 +3,7 @@
 	import type { MessageProvider } from "../data/messages.js";
 	import type { FeatureListItem } from "../core/plugin.js";
 	import { NO_LEVEL } from "../data/scale.js";
+	import { levelText } from "./feature-list.js";
 	import { levelChip } from "./level-chip.js";
 	import { formatValue } from "./value-format.js";
 
@@ -19,7 +20,8 @@
 
 	// A level with an empty color shows its label on the neutral chip.
 	const level = $derived(item.level !== NO_LEVEL ? item.level : null);
-	const levelLabel = $derived(level ? level.label : messages("mapsdk_no_level"));
+	// The level's label, else the item's detail (plain text, no chip), else "No level".
+	const levelPlace = $derived(levelText(item, messages));
 	const chipColors = $derived.by(() => {
 		const chip = levelChip(level?.color);
 		return chip ? `background:${chip.background};color:${chip.text}` : "";
@@ -39,9 +41,13 @@
 			{valueText}{#if item.units}&nbsp;{item.units}{/if}
 		</div>
 	{/if}
-	<span class="mapsdk-tooltip-chip text-xs" class:neutral={!chipColors} style={chipColors}>
-		{levelLabel}
-	</span>
+	{#if levelPlace.kind === "detail"}
+		<span class="mapsdk-tooltip-detail text-xs">{levelPlace.text}</span>
+	{:else}
+		<span class="mapsdk-tooltip-chip text-xs" class:neutral={!chipColors} style={chipColors}>
+			{levelPlace.text}
+		</span>
+	{/if}
 </div>
 
 <style>

@@ -12,12 +12,15 @@
 		Legend,
 		MapView,
 		monitorsPlugin,
+		pointsPlugin,
 		regionsPlugin,
 		type ListPosition
 	} from "../src/lib/index.js";
 	import type { MapPlugin } from "../src/lib/core/plugin.js";
+	import { staticSource } from "../src/lib/data/index.js";
 	import type {
 		DataSource,
+		MapFeatureProperties,
 		MonitorFeatureProperties,
 		SelectionMode,
 		SpatialSelection
@@ -147,6 +150,41 @@
 	// The setup map's List button: monitor-map uses top-right, shown only on keyboard focus.
 	let listPosition = $state<ListPosition>("top-left");
 	let listFocusOnly = $state(false);
+	// A host card around the setup map's legend (framed={false}), and sample EV chargers: a plugin
+	// with no scale whose list rows and tooltips show a detail in place of "No level".
+	let legendInCard = $state(false);
+	let showChargers = $state(false);
+	const chargers = pointsPlugin<MapFeatureProperties & { detail: string }>({
+		id: "ev-sample",
+		layerLabel: "EV chargers (sample)",
+		circle: { radius: 7 },
+		detail: (p) => p.detail,
+		source: staticSource(
+			{
+				type: "FeatureCollection",
+				features: [
+					[-119.79, 36.74, "Fresno Station A", "Level 2 charger"],
+					[-119.77, 36.81, "Fresno Station B", "Level 3 charger"],
+					[-119.72, 36.78, "Clovis Station", "Level 2 charger"]
+				].map(([lng, lat, name, detail], i) => ({
+					type: "Feature" as const,
+					geometry: { type: "Point" as const, coordinates: [lng as number, lat as number] },
+					properties: {
+						refKey: `feature:ev-${i}`,
+						name: name as string,
+						value: null,
+						detail: detail as string
+					}
+				}))
+			},
+			null
+		)
+	});
+	function toggleChargers(on: boolean) {
+		showChargers = on;
+		if (on) today.addPlugin(chargers);
+		else today.removePlugin(chargers.id);
+	}
 	const enabled = $state<Record<SourceKind, boolean>>({
 		monitors: true,
 		regions: false,
@@ -380,6 +418,21 @@
 					Show the List button only on keyboard focus
 				</label>
 			</fieldset>
+			<fieldset>
+				<legend>Host options</legend>
+				<label>
+					<input type="checkbox" bind:checked={legendInCard} />
+					Legend in a host card
+				</label>
+				<label>
+					<input
+						type="checkbox"
+						checked={showChargers}
+						onchange={(e) => toggleChargers(e.currentTarget.checked)}
+					/>
+					Sample EV chargers
+				</label>
+			</fieldset>
 		</div>
 		<MapView
 			map={today}
@@ -390,7 +443,14 @@
 			featureList={{ position: listPosition, reveal: listFocusOnly ? "focus" : "always" }}
 			class="demo-map demo-map-tall"
 		/>
-		<Legend map={today} order="top-first" />
+		{#if legendInCard}
+			<div class="demo-legend-card">
+				<h3 class="text-sm">Legend</h3>
+				<Legend map={today} order="top-first" framed={false} />
+			</div>
+		{:else}
+			<Legend map={today} order="top-first" />
+		{/if}
 	</section>
 
 	<section class="demo-panel" aria-labelledby="left-title">
@@ -576,6 +636,18 @@
 		border: 1px solid var(--card-border, var(--border));
 		border-radius: var(--radius);
 		overflow: hidden;
+	}
+
+	.demo-legend-card {
+		width: 21rem;
+		padding: 0.75rem 1rem;
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		background: var(--card, var(--background));
+	}
+
+	.demo-legend-card h3 {
+		margin: 0 0 0.5rem;
 	}
 
 	:global(.demo-map-tall) {

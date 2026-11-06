@@ -101,6 +101,25 @@ describe("FeatureList", () => {
 		expect(option("Arvin").querySelector(".mapsdk-list-level")!.textContent).toContain("Unknown");
 	});
 
+	it("shows a detail in the level's place, with no swatch", async () => {
+		const { map } = newMap("single", [
+			item("1", "Arvin", { level: NO_LEVEL, value: null, detail: "Level 2 charger" }),
+			item("2", "Bakersfield", { level: NO_LEVEL })
+		]);
+		render(FeatureList, { map });
+		await expect
+			.element(page.getByRole("option", { name: "Arvin, Level 2 charger" }))
+			.toBeInTheDocument();
+		const arvin = option("Arvin");
+		expect(arvin.querySelector(".mapsdk-list-level")!.textContent!.trim()).toBe("Level 2 charger");
+		expect(arvin.querySelector(".mapsdk-list-swatch")).toBeNull();
+		expect(arvin.querySelector(".mapsdk-list-value")!.textContent!.trim()).toBe("");
+		expect(option("Bakersfield").querySelector(".mapsdk-list-swatch.neutral")).not.toBeNull();
+		expect(option("Bakersfield").querySelector(".mapsdk-list-level")!.textContent).toContain(
+			"No level"
+		);
+	});
+
 	it("shows each row's value rounded to its precision", async () => {
 		const { map } = newMap("single", [item("1", "Arvin", { value: 7.971, precision: 1 })]);
 		render(FeatureList, { map });

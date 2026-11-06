@@ -78,7 +78,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `createCollocationSitesStore`, the last three on the shared `load-once` core. Each exposes a
   `dataSource`. `cleanFires` is exported from here.
 - **Plugins** (`src/lib/plugins/`): the general `pointsPlugin` (icons, clusters; `selectedStyle`,
-  `icon.mutedColor`, `zoomRange`, `legendDisplay`, `legendTitle`) and `shapesPlugin`
+  `icon.mutedColor`, `zoomRange`, `legendDisplay`, `legendTitle`, `detail` for features with no
+  level) and `shapesPlugin`
   (fill/`outline`/check overlay), plus shared style expressions, scale resolution, and the exported
   marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
 - **Presets** (`src/lib/presets/`): `monitorsPlugin`, `collocationSitesPlugin`, `regionsPlugin`,
@@ -91,7 +92,7 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `featureList` (`boolean` or `{ position, reveal }`; `list-placement.ts`; the button stacks clear
   of the controls in its corner, measured with a `ResizeObserver`). Credits come from the engine's
   AttributionControl, with data credits from `ui/data-credits.svelte.ts`.
-- **UI** (`src/lib/ui/`): Legend (`order`; blocks legends are one labeled bar), FeatureList,
+- **UI** (`src/lib/ui/`): Legend (`order`, `framed`; blocks legends are one labeled bar), FeatureList,
   MapTooltip, SelectionBar, ViewSummary, and MapControls (zoom buttons only; basemap switching is
   `MapContext`, credits are the engine's). `controls.css` holds the focus ring and motion classes.
 - **Entries**: `.` (everything, reaches the map engine), `./data` and `./stores` (must not reach
@@ -160,7 +161,9 @@ releasing it). Always stop and ask first, and wait for an explicit yes. The same
 and tagging.
 
 The workflow publishes with npm trusted publishing (OIDC, `--provenance`, no token secret), like
-monitor-map. Before the first publish, the user must configure the trusted publisher for
-`@sjvair/map-sdk` on npmjs.com (repository `SJVAir/map-sdk`, workflow `release.yml`); until then
-the publish step fails. The release tag must be the package version (`v0.1.0` or `0.1.0`), and a
+monitor-map. npm only allows a trusted publisher on a package that already exists, so the first
+publish (`0.1.0-beta.1`, 2026-11-05) was run by hand by the user; the trusted publisher for
+`@sjvair/map-sdk` (repository `SJVAir/map-sdk`, workflow `release.yml`) is now configured, and
+later releases go through the workflow. `prepack` builds `dist`, so a hand-run publish never ships
+without it. The release tag must be the package version (`v0.1.0` or `0.1.0`), and a
 prerelease version (one with `-`) publishes to the `next` dist-tag.
