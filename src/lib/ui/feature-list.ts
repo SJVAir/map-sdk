@@ -77,20 +77,37 @@ export function typeaheadIndex(items: FeatureListItem[], query: string, from: nu
 	return -1;
 }
 
-/** A row's accessible name: name, value, units, and level label. */
+/**
+ * What stands in an item's level place: its level's label, else its `detail`, else "No level".
+ */
+export function levelText(
+	item: FeatureListItem,
+	messages: MessageProvider
+): { kind: "level" | "detail" | "none"; text: string } {
+	const level = shownLevel(item);
+	if (level) return { kind: "level", text: level.label };
+	if (item.detail) return { kind: "detail", text: item.detail };
+	return { kind: "none", text: messages("mapsdk_no_level") };
+}
+
+/** A row's accessible name: name, value, units, and level label (or detail). */
 export function rowLabel(
 	item: FeatureListItem,
 	messages: MessageProvider,
 	format: FormatProvider
 ): string {
-	if (item.value === null) return messages("mapsdk_list_row_no_value", { name: item.name });
-	const level = shownLevel(item);
+	const level = levelText(item, messages);
+	if (item.value === null) {
+		return level.kind === "detail"
+			? messages("mapsdk_list_row_detail", { name: item.name, detail: level.text })
+			: messages("mapsdk_list_row_no_value", { name: item.name });
+	}
 	const params = {
 		name: item.name,
 		value:
 			typeof item.value === "number" ? formatValue(item.value, item.precision, format) : item.value,
 		units: item.units,
-		level: level ? level.label : messages("mapsdk_no_level")
+		level: level.text
 	};
 	return messages(item.units ? "mapsdk_list_row" : "mapsdk_list_row_no_units", params);
 }

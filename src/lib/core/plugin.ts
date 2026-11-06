@@ -57,6 +57,12 @@ export interface FeatureListItem {
 	precision?: number;
 	lngLat: [number, number];
 	selectable: boolean;
+	/**
+	 * A short text about a feature with no level (e.g. "Level 2 charger"), shown where its level
+	 * would be: in the feature list, its row's accessible name, and the generic tooltip. Ignored
+	 * when the item has a level.
+	 */
+	detail?: string;
 }
 
 export type LegendData =

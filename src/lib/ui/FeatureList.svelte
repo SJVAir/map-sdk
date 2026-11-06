@@ -9,6 +9,7 @@
 		inView,
 		optionIdPart,
 		rowLabel,
+		levelText,
 		shownLevel,
 		sortItems,
 		typeaheadIndex,
@@ -330,6 +331,7 @@
 			{#each windowRows as row, i (row.key)}
 				{@const index = range.start + i}
 				{@const level = shownLevel(row)}
+				{@const levelPlace = levelText(row, map.messages)}
 				{@const isOn = isSelected(row)}
 				<!-- Options aren't focused: the listbox holds focus and handles keys (aria-activedescendant). -->
 				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_interactive_supports_focus -->
@@ -360,12 +362,14 @@
 						{formatValue(row)}{#if row.units && row.value !== null}&nbsp;{row.units}{/if}
 					</span>
 					<span class="mapsdk-list-level text-xs">
-						<span
-							class="mapsdk-list-swatch"
-							class:neutral={!level?.color}
-							style:background={level?.color || undefined}
-						></span>
-						{level ? level.label : map.messages("mapsdk_no_level")}
+						{#if levelPlace.kind !== "detail"}
+							<span
+								class="mapsdk-list-swatch"
+								class:neutral={!level?.color}
+								style:background={level?.color || undefined}
+							></span>
+						{/if}
+						{levelPlace.text}
 					</span>
 				</div>
 			{/each}
