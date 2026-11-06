@@ -33,7 +33,8 @@ jobs:
       - run: npm test
       - run: npm run test:bundle
       - run: npm run test:licenses
-      - run: npm run test:e2e
+      # Firefox only gets WebGL through a display (as in ci.yml).
+      - run: xvfb-run -a npm run test:e2e
       - run: npm run build
       # No token: npm's trusted publisher for @sjvair/map-sdk authorizes this workflow. A
       # prerelease (a version with "-") goes to the "next" dist-tag, not "latest".
