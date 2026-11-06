@@ -113,6 +113,12 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	 * it loads.
 	 */
 	legendTitle?: "layer" | "entry-type";
+	/**
+	 * A short text for a feature with no level (e.g. "Level 2 charger"), shown in the feature list,
+	 * its accessible name, and the generic tooltip where "No level" would be. Ignored for a
+	 * feature with a level.
+	 */
+	detail?(props: P): string | undefined;
 	/** Whether `features()` lists this plugin's features. Default true. */
 	listed?: boolean;
 	/** Tooltip content for a feature, below its name; `props` are its source properties. */
@@ -220,6 +226,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			const ref = decodeRef(props.refKey);
 			if (!ref) continue;
 			const [lng, lat] = geometry.coordinates;
+			const detail = options.detail?.(props);
 			items.push({
 				refKey: props.refKey,
 				ref,
@@ -229,7 +236,8 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				units: scale?.units ?? "",
 				precision,
 				lngLat: [lng, lat],
-				selectable: selectable && selectionId(ref) !== null
+				selectable: selectable && selectionId(ref) !== null,
+				...(detail ? { detail } : {})
 			});
 		}
 		return items;

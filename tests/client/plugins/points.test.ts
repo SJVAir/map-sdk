@@ -311,6 +311,28 @@ describe("pointsPlugin", () => {
 		expect(gl.listeners.filter((l) => l.type === "zoom")).toEqual([]);
 	});
 
+	it("detail feeds each listed feature", () => {
+		const source = new TestSource<Props>({
+			features: points([
+				{ refKey: "monitor:a", name: "A", value: 1 },
+				{ refKey: "monitor:b", name: "B", value: 2 }
+			]),
+			scale: pm25Scale
+		});
+		const { plugin } = setup({ source, detail: (p) => `detail ${p.name}` });
+		expect(plugin.features!().map((f) => f.detail)).toEqual(["detail A", "detail B"]);
+	});
+
+	it("no detail option, or an empty one, gives no detail", () => {
+		const make = (detail?: (p: Props) => string | undefined) =>
+			setup({
+				source: new TestSource<Props>({ features: points(ROWS), scale: pm25Scale }),
+				detail
+			}).plugin.features!();
+		for (const f of make()) expect(f).not.toHaveProperty("detail");
+		for (const f of make(() => "")) expect(f).not.toHaveProperty("detail");
+	});
+
 	it("creates one clustered source per group", () => {
 		const source = new TestSource<Props>({
 			features: points([
