@@ -1,6 +1,6 @@
 # `@sjvair/map-sdk`: frameless Legend and a detail for unscaled features
 
-Date: 2026-11-05. Status: **awaiting the user's review.**
+Date: 2026-11-05. Status: **approved by the user 2026-11-06.**
 Release 1, step 5 (data-dashboard `TODO.md` → "Release 1, step 5"). Two small, general options
 monitor-map 5.0 asked for; the user put both in one PR, after the List button options (#5).
 
