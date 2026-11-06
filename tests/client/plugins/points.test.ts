@@ -242,7 +242,13 @@ describe("pointsPlugin", () => {
 		expect(plugin.features!()[0].precision).toBe(1);
 	});
 
-	it("zoomRange sets minzoom and maxzoom on every layer", () => {
+	// Shown by the camera zoom, not layer minzoom/maxzoom: on a globe, MapLibre uses the next
+	// zoom's tiles a little before the camera reaches it and leaves a layer out of tiles at or
+	// above its maxzoom, so two ranges meeting at 10 left a gap where neither drew.
+	const visibility = (l: unknown) =>
+		(l as { layout?: { visibility?: string } }).layout?.visibility ?? "visible";
+
+	it("zoomRange shows every layer only while the camera zoom is in range", () => {
 		const source = new TestSource<Props>({
 			features: points([
 				{ refKey: "monitor:a", name: "A", value: 1 },
@@ -256,22 +262,53 @@ describe("pointsPlugin", () => {
 			zoomRange: { min: 4, max: 10 }
 		});
 		expect(gl.layers.length).toBeGreaterThan(2);
-		for (const l of gl.layers) expect(l).toMatchObject({ minzoom: 4, maxzoom: 10 });
-	});
-
-	it("zoomRange with one end sets only that end; none sets neither", () => {
-		const make = (zoomRange?: { min?: number; max?: number }) => {
-			const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
-			return setup({ source, zoomRange }).gl.layers;
-		};
-		for (const l of make({ max: 10 })) {
-			expect(l).toMatchObject({ maxzoom: 10 });
-			expect(l).not.toHaveProperty("minzoom");
-		}
-		for (const l of make()) {
+		const shown = () => gl.layers.map(visibility);
+		for (const l of gl.layers) {
 			expect(l).not.toHaveProperty("minzoom");
 			expect(l).not.toHaveProperty("maxzoom");
 		}
+		expect(new Set(shown())).toEqual(new Set(["visible"]));
+		for (const [zoom, expected] of [
+			[9.99, "visible"],
+			[10, "none"],
+			[12, "none"],
+			[4, "visible"],
+			[3.9, "none"]
+		] as const) {
+			gl.jumpTo({ zoom });
+			gl.emit("zoom", {});
+			expect(new Set(shown()), `zoom ${zoom}`).toEqual(new Set([expected]));
+		}
+	});
+
+	it("zoomRange with one end limits only that end; none leaves layers alone", () => {
+		const make = (zoomRange?: { min?: number; max?: number }) => {
+			const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
+			return setup({ source, zoomRange }).gl;
+		};
+		const capped = make({ max: 10 });
+		expect(new Set(capped.layers.map(visibility))).toEqual(new Set(["visible"]));
+		capped.jumpTo({ zoom: 0 });
+		capped.emit("zoom", {});
+		expect(new Set(capped.layers.map(visibility))).toEqual(new Set(["visible"]));
+		capped.jumpTo({ zoom: 10 });
+		capped.emit("zoom", {});
+		expect(new Set(capped.layers.map(visibility))).toEqual(new Set(["none"]));
+		const open = make();
+		for (const l of open.layers) {
+			expect(l).not.toHaveProperty("minzoom");
+			expect(l).not.toHaveProperty("maxzoom");
+			expect(visibility(l)).toBe("visible");
+		}
+		expect(open.listeners.filter((l) => l.type === "zoom")).toEqual([]);
+	});
+
+	it("zoomRange stops following the zoom once the plugin is removed", () => {
+		const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
+		const { gl, host } = setup({ source, zoomRange: { max: 10 } });
+		expect(gl.listeners.filter((l) => l.type === "zoom")).toHaveLength(1);
+		host.remove("pts");
+		expect(gl.listeners.filter((l) => l.type === "zoom")).toEqual([]);
 	});
 
 	it("creates one clustered source per group", () => {

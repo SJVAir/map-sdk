@@ -100,8 +100,9 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	sortKey?(props: P): number;
 	/**
 	 * Limits every layer the plugin draws (points, clusters, selection) to a zoom range: visible
-	 * from `min` (inclusive) up to `max` (exclusive). Set on the layers, so it switches live while
-	 * zooming. Default: all zooms.
+	 * from `min` (inclusive) up to `max` (exclusive) of the camera zoom, switching live while
+	 * zooming (layer visibility, not layer zoom ranges, so ranges that meet leave no gap on a
+	 * globe). Default: all zooms.
 	 */
 	zoomRange?: { min?: number; max?: number };
 	/** How the legend shows a range scale: a gradient (default) or labeled blocks. */
@@ -343,15 +344,38 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			return spec;
 		}
 
-		/** The spec limited to the plugin's zoom range. */
+		// The zoom range shows and hides the layers by the camera zoom, not with layer
+		// minzoom/maxzoom: on a globe MapLibre uses the next zoom's tiles a little before the camera
+		// gets there and leaves a layer out of tiles at or above its maxzoom, so two plugins whose
+		// ranges meet (fire groups below 10, hotspots from 10) would leave a gap where neither drew.
+		const { min, max } = options.zoomRange ?? {};
+		const ranged = min !== undefined || max !== undefined;
+		const inRange = () => {
+			const zoom = gl.getZoom();
+			return (min === undefined || zoom >= min) && (max === undefined || zoom < max);
+		};
+		let shown = ranged ? inRange() : true;
+
+		/** The spec, hidden while the camera is outside the plugin's zoom range. */
 		function zoomed(spec: LayerSpecWithoutId): LayerSpecWithoutId {
-			const { min, max } = options.zoomRange ?? {};
+			if (!ranged) return spec;
+			const layout = (spec as { layout?: Record<string, unknown> }).layout;
 			return {
 				...spec,
-				...(min !== undefined ? { minzoom: min } : {}),
-				...(max !== undefined ? { maxzoom: max } : {})
+				layout: { ...layout, visibility: shown ? "visible" : "none" }
 			} as LayerSpecWithoutId;
 		}
+
+		const onZoom = () => {
+			if (dead || inRange() === shown) return;
+			shown = !shown;
+			for (const layerId of layers) {
+				if (gl.getLayer(layerId)) {
+					gl.setLayoutProperty(layerId, "visibility", shown ? "visible" : "none");
+				}
+			}
+		};
+		if (ranged) gl.on("zoom", onZoom);
 
 		function removeLayers(): void {
 			for (const layerId of layers.toReversed()) {
@@ -606,6 +630,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 
 		return () => {
 			dead = true;
+			if (ranged) gl.off("zoom", onZoom);
 			providers = null;
 			live = null;
 		};

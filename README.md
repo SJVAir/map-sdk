@@ -165,7 +165,8 @@ in each level's color at the fill's opacity; choropleth only), or `"none"` (no o
 `hmsSmokePlugin` uses `"level"`.
 
 `zoomRange: { min?, max? }` on `pointsPlugin` limits every layer it draws (points, clusters,
-selection) to zooms from `min` (inclusive) up to `max` (exclusive), switching live while zooming.
+selection) to camera zooms from `min` (inclusive) up to `max` (exclusive), switching live while
+zooming. Two plugins whose ranges meet hand over with no gap, on the globe too.
 
 `hmsFirePlugin({ id?, source, hotspots?, layerLabel })` draws fires as flame icons sized and
 colored by FRP. With `hotspots`, it switches by itself while zooming, as sjvair.com's map does:

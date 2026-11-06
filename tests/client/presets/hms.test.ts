@@ -233,14 +233,24 @@ describe("hmsFirePlugin with hotspots", () => {
 		expect(groupLayers.map((l) => l.id)).toContain(id("groups:points"));
 		expect(hotspotLayers.map((l) => l.id)).toContain(id("hotspots:points"));
 		expect(groupLayers.length + hotspotLayers.length).toBe(gl.layers.length);
-		for (const layer of groupLayers) {
-			expect(layer).toMatchObject({ maxzoom: 10 });
+		const shown = (layers: typeof groupLayers) =>
+			new Set(layers.map((l) => (l as { layout?: { visibility?: string } }).layout?.visibility));
+		// By the camera zoom, so the two meet with no gap on a globe: groups below 10, hotspots
+		// from 10.
+		for (const layer of [...groupLayers, ...hotspotLayers]) {
 			expect(layer).not.toHaveProperty("minzoom");
-		}
-		for (const layer of hotspotLayers) {
-			expect(layer).toMatchObject({ minzoom: 10 });
 			expect(layer).not.toHaveProperty("maxzoom");
 		}
+		expect(shown(groupLayers)).toEqual(new Set(["visible"]));
+		expect(shown(hotspotLayers)).toEqual(new Set(["none"]));
+		gl.jumpTo({ zoom: 10 });
+		gl.emit("zoom", {});
+		expect(shown(groupLayers)).toEqual(new Set(["none"]));
+		expect(shown(hotspotLayers)).toEqual(new Set(["visible"]));
+		gl.jumpTo({ zoom: 9.99 });
+		gl.emit("zoom", {});
+		expect(shown(groupLayers)).toEqual(new Set(["visible"]));
+		expect(shown(hotspotLayers)).toEqual(new Set(["none"]));
 		// Each draws from its own source and its own icon images.
 		const hotspotPoints = gl.layers.find((l) => l.id === id("hotspots:points")) as Extract<
 			LayerSpecification,
