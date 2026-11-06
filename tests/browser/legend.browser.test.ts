@@ -365,6 +365,35 @@ describe("Legend framed={false}", () => {
 		await vi.waitFor(() => expect(red()).toBeGreaterThan(0x33));
 	});
 
+	it("blends over the card once framed turns off, and over its own card again after", async () => {
+		applyTheme("dark");
+		const view = await render(Legend, {
+			target: card("rgb(255, 255, 255)"),
+			props: { map, framed: true }
+		});
+		await vi.waitFor(() => expect(red()).toBeLessThan(0x33));
+		await view.rerender({ framed: false });
+		await vi.waitFor(() => expect(red()).toBeGreaterThan(0x33));
+		await view.rerender({ framed: true });
+		await vi.waitFor(() => expect(red()).toBeLessThan(0x33));
+	});
+
+	it("adds no element to the page to read the background token", async () => {
+		applyTheme("dark");
+		const added: Node[] = [];
+		const observer = new MutationObserver((records) => {
+			for (const r of records) added.push(...r.addedNodes);
+		});
+		observer.observe(document.body, { childList: true, subtree: true });
+		await render(Legend, { target: card("transparent"), props: { map, framed: false } });
+		await vi.waitFor(() => expect(red()).toBeLessThan(0x33));
+		observer.disconnect();
+		const probes = added.filter(
+			(n) => n instanceof HTMLElement && n.style.visibility === "hidden" && !n.closest("[hidden]")
+		);
+		expect(probes).toEqual([]);
+	});
+
 	it("follows framed after mount", async () => {
 		applyTheme("light");
 		const view = await render(Legend, { map });

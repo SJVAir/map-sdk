@@ -74,12 +74,8 @@
 			const color = toRgb(getComputedStyle(at).backgroundColor);
 			if (color.opaque) return color.rgb;
 		}
-		const probe = document.createElement("div");
-		probe.style.cssText = "position:absolute;visibility:hidden;background:var(--background)";
-		el.append(probe);
-		const token = toRgb(getComputedStyle(probe).backgroundColor).rgb;
-		probe.remove();
-		return token;
+		// A computed custom property has its var() references already substituted.
+		return toRgb(getComputedStyle(el).getPropertyValue("--background").trim()).rgb;
 	}
 
 	function update() {
