@@ -469,6 +469,35 @@ describe("blocking layers", () => {
 		expect(map.hovered).toBeNull();
 	});
 
+	it("hovers a higher-priority feature beneath a blocking layer, but the click stays blocked", () => {
+		bubbleClicks.length = 0;
+		const map = createMap({ config });
+		map.addPlugin({ ...points("regions", "region"), hoverPriority: 10 });
+		map.addPlugin(bubbles("clusters", true));
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		const handler = vi.fn();
+		map.on("featureclick", handler);
+		gl.setRenderedFeatures([bubble(map, "clusters", 7), rendered(map, "regions", "019", "Fresno")]);
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+		expect(map.hovered?.hit.refKey).toBe("region:county:019");
+		click(gl);
+		expect(handler).not.toHaveBeenCalled();
+		expect(bubbleClicks).toEqual([7]);
+		expect(map.featuresAt({ x: 1, y: 2 })).toEqual([]);
+	});
+
+	it("keeps the blocking layer's hover over a feature of equal priority beneath", () => {
+		const map = createMap({ config });
+		map.addPlugin({ ...points("regions", "region"), hoverPriority: 3 });
+		map.addPlugin({ ...bubbles("clusters", true), hoverPriority: 3 });
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		gl.setRenderedFeatures([bubble(map, "clusters", 7), rendered(map, "regions", "019", "Fresno")]);
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+		expect(map.hovered?.hit.refKey).toBe("feature:cluster:7");
+	});
+
 	it("stops blocking once the plugin is removed", () => {
 		const { map, gl } = blockingSetUp();
 		gl.setRenderedFeatures([bubble(map, "clusters", 7), rendered(map, "regions", "019", "Fresno")]);
@@ -514,7 +543,7 @@ describe("hover priority and cursor", () => {
 		expect(handler).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ pluginId: "low" }));
 	});
 
-	it("a blocking bubble on top still blocks a higher priority beneath", () => {
+	it("a higher priority beneath a blocking bubble takes the hover", () => {
 		const map = createMap({ config });
 		map.addPlugin({
 			id: "clusters",
@@ -540,7 +569,7 @@ describe("hover priority and cursor", () => {
 			rendered(map, "high", "2")
 		]);
 		move(gl);
-		expect(map.hovered).toBeNull();
+		expect(map.hovered?.hit.refKey).toBe("monitor:2");
 		expect(gl.canvas.style.cursor).toBe("pointer");
 	});
 
