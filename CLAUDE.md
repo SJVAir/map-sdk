@@ -161,7 +161,9 @@ releasing it). Always stop and ask first, and wait for an explicit yes. The same
 and tagging.
 
 The workflow publishes with npm trusted publishing (OIDC, `--provenance`, no token secret), like
-monitor-map. Before the first publish, the user must configure the trusted publisher for
-`@sjvair/map-sdk` on npmjs.com (repository `SJVAir/map-sdk`, workflow `release.yml`); until then
-the publish step fails. The release tag must be the package version (`v0.1.0` or `0.1.0`), and a
+monitor-map. npm only allows a trusted publisher on a package that already exists, so the first
+publish (`0.1.0-beta.1`, 2026-11-05) was run by hand by the user; the trusted publisher for
+`@sjvair/map-sdk` (repository `SJVAir/map-sdk`, workflow `release.yml`) is now configured, and
+later releases go through the workflow. `prepack` builds `dist`, so a hand-run publish never ships
+without it. The release tag must be the package version (`v0.1.0` or `0.1.0`), and a
 prerelease version (one with `-`) publishes to the `next` dist-tag.
