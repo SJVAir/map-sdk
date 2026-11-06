@@ -14,8 +14,11 @@
 		map: MapContext;
 		/**
 		 * `true` (default) draws the legend's own card. `false` draws no frame (no border,
-		 * background, padding, or fixed width) so a host's card frames it; translucent swatches
-		 * then blend over that card's color.
+		 * background, padding, or fixed width) so a host's card frames it. Translucent swatches
+		 * then blend over the nearest ancestor with an opaque background (a see-through card is
+		 * skipped), else the `--background` token. The color is read on mount, when `framed`
+		 * changes, and on a theme change; a card that changes color through its own class or
+		 * style isn't re-read.
 		 */
 		framed?: boolean;
 		/**

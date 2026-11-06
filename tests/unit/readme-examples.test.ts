@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ComponentProps } from "svelte";
 import {
 	circle,
 	collocationSitesPlugin,
@@ -7,6 +8,7 @@ import {
 	defaultBasemaps,
 	hmsFirePlugin,
 	hmsSmokePlugin,
+	Legend,
 	maptilerMap,
 	monitorsPlugin,
 	pointsPlugin,
@@ -93,7 +95,14 @@ describe("README examples", () => {
 		map.destroy();
 	});
 
-	it("a detail for features with no level, and a frameless legend", () => {
+	it("a frameless legend inside a host's card", () => {
+		const map = createMap({ config: { maptilerKey: "k" } });
+		const props: ComponentProps<typeof Legend> = { map, framed: false };
+		expect(props.framed).toBe(false);
+		map.destroy();
+	});
+
+	it("a detail for features with no level", () => {
 		type Charger = { refKey: string; name: string; value: null; level: 2 | 3 };
 		const plugin = pointsPlugin<Charger>({
 			id: "ev",

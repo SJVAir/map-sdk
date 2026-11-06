@@ -182,8 +182,17 @@ the legend section's title: `layerLabel` (default) or the entry type's label fro
 provider (`monitorsPlugin` uses the latter, so its section reads "PM2.5"; `layerLabel` still names
 the layer in the list, selection bar and summary). `Legend` takes `order` (`"bottom-first"`,
 default, or `"top-first"`) and `framed` (`true`, default, draws its own card; `false` draws no
-border, background, padding or fixed width, so a host's own card frames it, and translucent
-swatches blend over that card's color).
+border, background, padding or fixed width, so a host's own card frames it). Without a frame,
+translucent swatches blend over the nearest ancestor with an opaque background (a see-through
+card is skipped), else `--background`; that color is read on mount, when `framed` changes, and on
+a theme change, but not when the card changes color through its own class or style.
+
+```svelte
+<div class="w-84 rounded-md bg-white shadow">
+	<h3>Legend</h3>
+	<Legend {map} framed={false} />
+</div>
+```
 
 `detail?(props)` on `pointsPlugin` gives a feature with no level a short text (such as "Level 2
 charger") shown where "No level" would be: in the feature list (plain text, no swatch), the row's
