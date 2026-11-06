@@ -153,7 +153,8 @@ commit as if solely authored by the user.
 ## Releases and publishing — standing restriction
 
 Publishing to npm happens via `.github/workflows/release.yml`, triggered by a GitHub Release being
-published. NEVER create a GitHub release, run `npm publish`, or otherwise trigger this workflow
+published. It runs `ci.yml`'s checks (through `workflow_call`, so there is one copy of them) and
+publishes only if they pass; `ci.yml` doesn't run on tag pushes by itself. NEVER create a GitHub release, run `npm publish`, or otherwise trigger this workflow
 without the user's explicit permission for that specific release — every single time. Approval for
 one release does not carry forward to the next, even later in the same session or as the natural
 next step of a task already in progress (e.g. bumping a dependency and then "finishing" by
