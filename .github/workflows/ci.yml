@@ -1,17 +1,25 @@
 name: CI
 
-# Also called by release.yml, so a release runs exactly these checks before it publishes. Pushes
-# of tags don't run it on their own: a release's tag points at a commit main already tested, and
-# release.yml runs these checks itself.
+# Runs once per change: on pull requests, and on pushes to main (after a merge). Pushes to other
+# branches and tags don't run it on their own, so a PR branch isn't tested twice. Also called by
+# release.yml, so a release runs exactly these checks before it publishes.
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
   workflow_call:
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Playwright's image ships the browsers and every system package they need, so no run installs
+    # them. Installing them per run (`playwright install --with-deps`) downloads about 200 Ubuntu
+    # packages from the runner's mirror, which has stalled jobs for up to an hour. The tag must be
+    # the installed Playwright's version; tests/unit/ci-playwright-image.test.ts checks it.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      # The runner's user, as Playwright's docs advise (Firefox refuses to run as root here).
+      options: --user 1001
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,7 +27,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run lint
       - run: npm run check
       - run: npm test

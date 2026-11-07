@@ -154,7 +154,9 @@ commit as if solely authored by the user.
 
 Publishing to npm happens via `.github/workflows/release.yml`, triggered by a GitHub Release being
 published. It runs `ci.yml`'s checks (through `workflow_call`, so there is one copy of them) and
-publishes only if they pass; `ci.yml` doesn't run on tag pushes by itself. NEVER create a GitHub release, run `npm publish`, or otherwise trigger this workflow
+publishes only if they pass. `ci.yml` runs on pull requests and pushes to `main` only (not on
+other branch or tag pushes), inside Playwright's Docker image, whose tag must match the installed
+Playwright version (`tests/unit/ci-playwright-image.test.ts`). NEVER create a GitHub release, run `npm publish`, or otherwise trigger this workflow
 without the user's explicit permission for that specific release — every single time. Approval for
 one release does not carry forward to the next, even later in the same session or as the natural
 next step of a task already in progress (e.g. bumping a dependency and then "finishing" by
