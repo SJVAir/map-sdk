@@ -10,6 +10,11 @@ export interface PluginHostOptions {
 	router: InteractionRouter;
 	/** Reactive: read inside a plugin's effects. */
 	selectedKeys(pluginId: string): ReadonlySet<string>;
+	/**
+	 * Called after each queued setup run finishes (also when it had nothing to do), never after a
+	 * synchronous one.
+	 */
+	onSettled?: () => void;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- MapLibre's event payloads vary by type */
@@ -56,6 +61,12 @@ interface Running {
  * everything they add through their `PluginContext` is removed on teardown, whatever their own
  * teardown does. The plugin list outlives any one GL map.
  *
+ * Setup never runs inside the caller's code. When `add` or `attach` would set plugins up, they
+ * are queued and set up in one microtask, where no effect is active: Svelte cuts loose the
+ * `$effect.root`s created inside an effect when that effect re-runs, and their effects can stop
+ * (see docs/superpowers/specs/2026-11-07-plugin-setup-outside-effects-design.md). Setup on a
+ * style load or `restyle` comes from map events, not host code, and stays synchronous.
+ *
  * Plugins draw in list order, later on top: each plugin's layers stay together, below the first
  * layer of the next plugin in the list that has any.
  */
@@ -73,6 +84,8 @@ export class PluginHost {
 	 * a style that already loaded while `isStyleLoaded()` is false because sources are loading.
 	 */
 	#onStyleLoad: (() => void) | null = null;
+	/** True from scheduling a queued setup run until it starts. */
+	#setupQueued = false;
 
 	constructor(opts: PluginHostOptions) {
 		this.#opts = opts;
@@ -81,6 +94,11 @@ export class PluginHost {
 	/** In draw order, bottom first. Reactive. */
 	get plugins(): readonly MapPlugin[] {
 		return this.#plugins;
+	}
+
+	/** True while a setup run is queued and has not started. Not reactive. */
+	get pending(): boolean {
+		return this.#setupQueued;
 	}
 
 	/**
@@ -92,8 +110,9 @@ export class PluginHost {
 	}
 
 	/**
-	 * Adds `plugin` on top, or just below the plugin `before` names. Throws when the same plugin
-	 * object is set up on another map at the moment (one plugin object per map).
+	 * Adds `plugin` on top, or just below the plugin `before` names. It is in `plugins` at once;
+	 * on a live map its setup runs in a microtask. Throws when the same plugin object is set up on
+	 * another map at the moment (one plugin object per map).
 	 */
 	add(plugin: MapPlugin, before?: string): void {
 		if (this.#list.some((p) => p.id === plugin.id)) {
@@ -101,7 +120,7 @@ export class PluginHost {
 		}
 		if (ownedElsewhere(plugin, this)) throw ownershipError(plugin);
 		this.#plugins = this.#inserted(this.#list, plugin, before);
-		if (this.#live) this.#setup(plugin);
+		if (this.#live) this.#queueSetup();
 	}
 
 	/**
@@ -160,12 +179,15 @@ export class PluginHost {
 		this.#plugins = this.#list.filter((p) => p.id !== id);
 	}
 
-	/** Uses `gl` from now on, setting up every plugin once its style is loaded. */
+	/**
+	 * Uses `gl` from now on, setting up every plugin once its style is loaded (in a microtask when
+	 * it already is).
+	 */
 	attach(gl: GlMapLike): void {
 		if (this.#gl === gl) return;
 		if (this.#gl) this.detach();
 		this.#gl = gl;
-		this.#whenStyleLoaded();
+		this.#whenStyleLoaded(false);
 	}
 
 	/**
@@ -182,7 +204,7 @@ export class PluginHost {
 	restyle(): void {
 		if (!this.#gl) return;
 		this.#teardownAll();
-		this.#whenStyleLoaded();
+		this.#whenStyleLoaded(true);
 	}
 
 	/** Tears down every plugin. The gl is not touched after this returns. */
@@ -194,11 +216,21 @@ export class PluginHost {
 		this.#gl = null;
 	}
 
-	#whenStyleLoaded(): void {
+	/**
+	 * Sets every plugin up once the style is loaded. On a style that already is, `now` sets them up
+	 * synchronously (only for callers that never run inside an effect); otherwise they are queued.
+	 */
+	#whenStyleLoaded(now: boolean): void {
 		const gl = this.#gl!;
 		this.#cancelStyleWait();
 		if (gl.isStyleLoaded()) {
-			this.#setupAll();
+			if (now) {
+				this.#setupAll();
+			} else {
+				// Live already, so an `add` before the microtask joins the queued run.
+				this.#live = true;
+				this.#queueSetup();
+			}
 			return;
 		}
 		const onStyleLoad = () => {
@@ -209,6 +241,21 @@ export class PluginHost {
 		};
 		this.#onStyleLoad = onStyleLoad;
 		for (const type of STYLE_READY_EVENTS) gl.on(type, onStyleLoad);
+	}
+
+	/**
+	 * Sets every plugin that isn't running up in a microtask, unless the host was detached,
+	 * suspended, or moved to another gl since. One run covers every request made before it starts.
+	 */
+	#queueSetup(): void {
+		if (this.#setupQueued) return;
+		this.#setupQueued = true;
+		const gl = this.#gl;
+		queueMicrotask(() => {
+			this.#setupQueued = false;
+			if (this.#gl === gl && this.#live) this.#setupAll();
+			this.#opts.onSettled?.();
+		});
 	}
 
 	#cancelStyleWait(): void {
@@ -259,7 +306,8 @@ export class PluginHost {
 		const ctx = this.#context(plugin.id, running);
 		let teardown: () => void;
 		try {
-			// Untracked: setup may be called from inside an effect (e.g. MapView's).
+			// Untracked, in case a plugin's setup reads state (setup runs from a microtask or a map
+			// event, never inside the caller's effect).
 			teardown = untrack(() => plugin.setup(ctx));
 		} catch (error) {
 			console.error(`map-sdk: plugin "${plugin.id}" setup failed`, error);
