@@ -156,6 +156,11 @@ create one per map (adding an object that is set up on another map throws). The 
 ones they are built on. Presets don't fetch: the host supplies a `DataSource`. `monitorsPlugin` is
 selectable by default, like the shape presets.
 
+An added plugin is in `map.plugins` (and the legend and selection state) as soon as `addPlugin`
+returns. On a map that is already showing, its `setup` runs just after the current code finishes,
+so its layers aren't there yet on the next line. Code that must see them uses `await tick()`;
+`flushSync()` does not run setup.
+
 Selected points show a highlight ring and check mark by default. `selectedStyle: "enlarge"` on
 `pointsPlugin` or `monitorsPlugin` instead draws the selected icon at 1.3x with no ring (icon
 points only), as sjvair.com's map does today.
@@ -297,8 +302,10 @@ not selectable). `encodeRef`/`decodeRef` convert between refs and keys.
 
 A plugin is an object with an `id` and a `setup(ctx)` that adds sources, layers, and images
 through its `PluginContext` and returns a teardown. The host runs `setup` once the map's style is
-ready and again after a basemap or theme change; everything added through `ctx` is removed on
-teardown, and ids are namespaced per map. `features()` feeds the feature list, tooltip, and
+ready and again after a basemap or theme change. For a plugin added to a ready map, `setup` runs
+just after the current code finishes (a microtask), never inside the caller's code, so adding and
+removing plugins from an `$effect` is safe. Everything added through `ctx` is removed on teardown,
+and ids are namespaced per map. `features()` feeds the feature list, tooltip, and
 summary; `legend()` the legend. A plugin's `tooltip` content sits under the feature's name; set
 `tooltipShowsName` when the content shows the name itself (the monitor and collocation tooltips
 do), and the name header is left out.
@@ -421,9 +428,10 @@ map.easeTo({ center: monitor.lngLat, minZoom: 12 });
 
 ## Ready, and reaching the GL map
 
-`map.ready` is reactive: true once the attached map's style has loaded and the map has gone idle
-for the first time, false again on detach and while a basemap switch reloads the style. Show a load
-screen until it is true. `map.gl` is the attached GL map (or `null`), reactive.
+`map.ready` is reactive: true once the attached map's style has loaded, the map has gone idle
+for the first time, and any queued plugin setups have run; false again on detach and while a
+basemap switch reloads the style. Adding a plugin to a ready map leaves it true. Show a load screen
+until it is true. `map.gl` is the attached GL map (or `null`), reactive.
 
 `maptilerMap(map)` returns it as a MapTiler `Map` (or `null` while detached). It is an escape hatch
 for markers and popups only: never add sources or layers through it, because plugins own those.
