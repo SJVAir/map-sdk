@@ -36,7 +36,8 @@ plugin calls `ctx.effect` several times.
 Evidence: instrumented Svelte in a throwaway monitor-map worktree (release/5.0.0 with `079ee1a`'s
 `syncPlugins`), where `c-reset3.mjs noreset` gives Ozone 0 monitor layers and a control run
 without the clusters toggle gives 15; and a 20-line Svelte-only client test that reproduces it
-with two roots (kept in the session scratchpad, to become the upstream report).
+with two roots (in `.superpowers/c2-repro/svelte-repro/`, untracked, to become the upstream
+report).
 
 A host-owned effect that runs queued setups does **not** fix it: the plugin roots become that
 effect's children, and it re-runs whenever another plugin is queued, cutting the earlier roots
@@ -133,7 +134,10 @@ The setup exists (2026-11-07):
   `.worktrees/5.0-design/.superpowers/sdd/2026-11-05-monitor-map-5/diag/c-reset3.mjs` and
   `common.mjs` (the original folder must not be edited or deleted). Run from the worktree:
   `node diag-local/c-reset3.mjs noreset`, against `npx vite --port 5181 --strictPort` there.
-- Svelte-only repro: `/tmp/claude-1000/-home-alex-workspace-sjvair-map-sdk/ad52517b-f666-419c-914d-9a6602b77fa9/scratchpad/svelte-repro/`.
+- Durable copies (untracked; `.superpowers/` is gitignored): `.superpowers/c2-repro/` in this
+  worktree, with `svelte-repro/` (the Svelte-only repro), `monitor-map-diag/` (unmodified
+  `common.mjs` and `c-reset3.mjs`), and a `README.md` on running both. The scratchpad copies above
+  may not outlive the session that made them.
 
 If they are gone, recreate the worktree the same way (`git -C <monitor-map> worktree add --detach
 <dir> origin/release/5.0.0`, then `git checkout 079ee1a -- src/lib/map/sync-plugins.svelte.ts`).
