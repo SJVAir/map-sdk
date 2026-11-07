@@ -9,10 +9,10 @@ Supported browsers: Chrome/Edge 111+, Safari 16.4+, Firefox 128+. MIT licensed.
 
 ## Install
 
-Once published:
+map-sdk is in beta. Betas are published under the `next` tag:
 
 ```bash
-npm install @sjvair/map-sdk
+npm install @sjvair/map-sdk@next
 ```
 
 Peer dependencies: `svelte` (^5.57) and `@sjvair/sdk`, which is published to
