@@ -92,8 +92,9 @@ export interface MapContext {
 	/** Reactive. */
 	readonly attached: boolean;
 	/**
-	 * Reactive. True once the attached map's style has loaded and the map has gone idle for the
-	 * first time; false again on `detach()` and while a basemap switch reloads the style. A load
+	 * Reactive. True once the attached map's style has loaded, the map has gone idle for the
+	 * first time, and any queued plugin setups have run; false again on `detach()` and while a
+	 * basemap switch reloads the style. Adding a plugin to a ready map leaves it true. A load
 	 * screen can wait for it.
 	 */
 	readonly ready: boolean;
@@ -258,6 +259,8 @@ class MapContextImpl implements MapContext {
 	#bounds = $state.raw<Bounds | null>(null);
 	#attached = $state(false);
 	#ready = $state(false);
+	/** `markReady` came while plugin setups were queued; the queued run sets `ready`. */
+	#readyRequested = false;
 	#glState = $state.raw<GlMapLike | null>(null);
 	#focusedKey = $state<string | null>(null);
 	#focusedPluginId = $state<string | null>(null);
@@ -286,7 +289,13 @@ class MapContextImpl implements MapContext {
 			mapUid: this.uid,
 			providers: { metadata: this.metadata, messages: this.messages, format: this.format },
 			router: this.#router,
-			selectedKeys: (pluginId) => selectionKeys(this.getSelection(pluginId))
+			selectedKeys: (pluginId) => selectionKeys(this.getSelection(pluginId)),
+			onSettled: () => {
+				// A setup that added a plugin queued another run; that run settles it.
+				if (this.#host.pending) return;
+				if (this.#readyRequested && this.#gl) this.#ready = true;
+				this.#readyRequested = false;
+			}
 		});
 		this.#router.onPick((e) => this.#pick(e));
 	}
@@ -316,7 +325,9 @@ class MapContextImpl implements MapContext {
 	}
 
 	markReady(): void {
-		if (this.#gl) this.#ready = true;
+		if (!this.#gl) return;
+		if (this.#host.pending) this.#readyRequested = true;
+		else this.#ready = true;
 	}
 
 	get focusedKey(): string | null {
@@ -491,6 +502,7 @@ class MapContextImpl implements MapContext {
 			() => this.#host.restyle(),
 			() => {
 				this.#ready = false;
+				this.#readyRequested = false;
 				this.#host.suspend();
 			}
 		);
@@ -506,6 +518,7 @@ class MapContextImpl implements MapContext {
 		this.#glState = null;
 		this.#attached = false;
 		this.#ready = false;
+		this.#readyRequested = false;
 	}
 
 	themeChanged(): void {
