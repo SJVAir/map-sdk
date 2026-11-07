@@ -1,11 +1,11 @@
 name: CI
 
-# Also called by release.yml, so a release runs exactly these checks before it publishes. Pushes
-# of tags don't run it on their own: a release's tag points at a commit main already tested, and
-# release.yml runs these checks itself.
+# Runs once per change: on pull requests, and on pushes to main (after a merge). Pushes to other
+# branches and tags don't run it on their own, so a PR branch isn't tested twice. Also called by
+# release.yml, so a release runs exactly these checks before it publishes.
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
   workflow_call:
 
