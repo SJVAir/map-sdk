@@ -162,6 +162,19 @@ describe("ready", () => {
 			expect(map.ready).toBe(true);
 		});
 
+		it("waits for setup on a loaded gl attached in place of another", async () => {
+			const map = createMap({ config });
+			map.addPlugin(layerPlugin("p"));
+			map.attach(createFakeGl({ styleLoaded: true }));
+			const gl = createFakeGl({ styleLoaded: true });
+			map.attach(gl);
+			map.markReady();
+			expect(map.ready).toBe(false);
+			await tick();
+			expect(hasLayer(gl, "p")).toBe(true);
+			expect(map.ready).toBe(true);
+		});
+
 		it("a setup that throws still lets ready turn true", async () => {
 			const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 			try {

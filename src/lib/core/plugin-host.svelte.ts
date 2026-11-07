@@ -244,16 +244,16 @@ export class PluginHost {
 	}
 
 	/**
-	 * Sets every plugin that isn't running up in a microtask, unless the host was detached,
-	 * suspended, or moved to another gl since. One run covers every request made before it starts.
+	 * Sets every plugin that isn't running up in a microtask, on whichever gl is live by then.
+	 * Detach, suspend, and restyle clear `#live`, and only a loaded current gl sets it again, so
+	 * the run never touches a gl that left. One run covers every request made before it starts.
 	 */
 	#queueSetup(): void {
 		if (this.#setupQueued) return;
 		this.#setupQueued = true;
-		const gl = this.#gl;
 		queueMicrotask(() => {
 			this.#setupQueued = false;
-			if (this.#gl === gl && this.#live) this.#setupAll();
+			if (this.#live) this.#setupAll();
 			this.#opts.onSettled?.();
 		});
 	}

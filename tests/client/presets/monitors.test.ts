@@ -118,7 +118,7 @@ describe("monitorShape", () => {
 
 describe("monitorsPlugin legend title", () => {
 	const REF = { dataset: "air-quality", entryType: "pm25" };
-	function titled(entryType: () => Promise<unknown>) {
+	async function titled(entryType: () => Promise<unknown>) {
 		const metadata = {
 			scale: () => Promise.resolve(pm25Scale),
 			entryType: vi.fn(entryType)
@@ -131,7 +131,7 @@ describe("monitorsPlugin legend title", () => {
 		const plugin = monitorsPlugin({ source, layerLabel: "Air monitors" });
 		map.addPlugin(plugin);
 		map.attach(createFakeGl({ styleLoaded: true }));
-		flushSync();
+		await tick();
 		return plugin;
 	}
 	const settle = async () => {
@@ -140,14 +140,16 @@ describe("monitorsPlugin legend title", () => {
 	};
 
 	it("is the entry type's label from the metadata, not layerLabel", async () => {
-		const plugin = titled(() => Promise.resolve({ label: "PM2.5", units: "µg/m³", precision: 1 }));
+		const plugin = await titled(() =>
+			Promise.resolve({ label: "PM2.5", units: "µg/m³", precision: 1 })
+		);
 		await settle();
 		expect(plugin.legend!()).toMatchObject({ title: "PM2.5" });
 		expect(plugin.label).toBe("Air monitors");
 	});
 
 	it("falls back to layerLabel when the metadata has none", async () => {
-		const plugin = titled(() => Promise.resolve("unavailable"));
+		const plugin = await titled(() => Promise.resolve("unavailable"));
 		await settle();
 		expect(plugin.legend!()).toMatchObject({ title: "Air monitors" });
 	});

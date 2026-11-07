@@ -863,6 +863,20 @@ describe("PluginHost", () => {
 			}
 		});
 
+		it("sets up once on a loaded gl attached in place of another before the microtask", async () => {
+			const { host } = makeHost();
+			const log: string[] = [];
+			host.add(resourcePlugin("a", log));
+			const oldGl = createFakeGl({ styleLoaded: true });
+			host.attach(oldGl);
+			const newGl = createFakeGl({ styleLoaded: true });
+			host.attach(newGl);
+			await tick();
+			expect(log).toEqual(["setup:a"]);
+			expect(newGl.layers.length).toBe(2);
+			expect(oldGl.calls.filter((c) => c.startsWith("add"))).toEqual([]);
+		});
+
 		it("sets up a plugin added by another plugin's setup", async () => {
 			const { host } = makeHost();
 			const gl = createFakeGl({ styleLoaded: true });

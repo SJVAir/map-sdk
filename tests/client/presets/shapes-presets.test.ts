@@ -120,7 +120,7 @@ describe.each(PRESETS)("%s", (_name, factory, defaultId, ref) => {
 		map.addPlugin(factory({ source, layerLabel: "Zones" }));
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
-		flushSync();
+		await tick();
 		await Promise.resolve();
 		await Promise.resolve();
 		flushSync();
