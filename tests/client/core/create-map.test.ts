@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { flushSync } from "svelte";
+import { flushSync, tick } from "svelte";
 import { SvelteMap } from "svelte/reactivity";
 import { createMap } from "../../../src/lib/core/create-map.svelte.js";
 import type { FeatureListItem, MapPlugin, PluginContext } from "../../../src/lib/core/plugin.js";
@@ -51,7 +51,7 @@ describe("createMap", () => {
 		expect(map.attached).toBe(false);
 	});
 
-	it("orders plugins with addPlugin's before and movePlugin", () => {
+	it("orders plugins with addPlugin's before and movePlugin", async () => {
 		const map = createMap({ config });
 		const layered = (id: string): MapPlugin => ({
 			id,
@@ -62,8 +62,11 @@ describe("createMap", () => {
 		});
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
+		await tick();
 		map.addPlugin(layered("a"));
+		await tick();
 		map.addPlugin(layered("b"), { before: "a", selectionMode: "single" });
+		await tick();
 		expect(map.plugins.map((p) => p.id)).toEqual(["b", "a"]);
 		expect(map.getSelectionMode("b")).toBe("single");
 		expect(gl.layers.map((l) => l.id)).toEqual([`${map.uid}:b:bg`, `${map.uid}:a:bg`]);
@@ -77,16 +80,18 @@ describe("createMap", () => {
 		expect(map.plugins.map((p) => p.id)).toEqual(["b", "a"]);
 	});
 
-	it("keeps two maps apart", () => {
+	it("keeps two maps apart", async () => {
 		const a = createMap({ config });
 		const b = createMap({ config });
 		expect(a.uid).not.toBe(b.uid);
 
 		a.addPlugin(plugin("monitors"), { selectionMode: "multiple" });
+		await tick();
 		expect(a.plugins.map((p) => p.id)).toEqual(["monitors"]);
 		expect(b.plugins).toEqual([]);
 
 		b.addPlugin(plugin("monitors"));
+		await tick();
 		a.setSelection("monitors", { kind: "monitors", ids: ["1"] });
 		expect(a.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["1"] });
 		expect(b.getSelection("monitors")).toBeNull();
@@ -94,17 +99,21 @@ describe("createMap", () => {
 		const glA = createFakeGl({ styleLoaded: true });
 		const glB = createFakeGl({ styleLoaded: true });
 		a.attach(glA);
+		await tick();
 		b.attach(glB);
+		await tick();
 		expect([...glA.sources.keys()]).toEqual([`${a.uid}:monitors:src`]);
 		expect([...glB.sources.keys()]).toEqual([`${b.uid}:monitors:src`]);
 	});
 
-	it("keeps selection and camera across detach and attach, and sets plugins up again", () => {
+	it("keeps selection and camera across detach and attach, and sets plugins up again", async () => {
 		const map = createMap({ config });
 		const log: string[] = [];
 		map.addPlugin(plugin("monitors", log), { selectionMode: "single" });
+		await tick();
 		const first = createFakeGl({ styleLoaded: true });
 		map.attach(first);
+		await tick();
 		expect(map.attached).toBe(true);
 		map.setSelection("monitors", { kind: "monitors", ids: ["7"] });
 		const camera = { center: [-120, 37] as [number, number], zoom: 9, bearing: 10, pitch: 20 };
@@ -118,7 +127,7 @@ describe("createMap", () => {
 		const second = createFakeGl({ styleLoaded: true });
 		log.length = 0;
 		map.attach(second);
-		flushSync();
+		await tick();
 		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["7"] });
 		expect(map.camera).toEqual(camera);
 		expect(map.bounds).toEqual(bounds);
@@ -126,16 +135,18 @@ describe("createMap", () => {
 		expect([...second.sources.keys()]).toEqual([`${map.uid}:monitors:src`]);
 	});
 
-	it("gives each plugin its own selection, reactively, through selectedKeys", () => {
+	it("gives each plugin its own selection, reactively, through selectedKeys", async () => {
 		const map = createMap({ config });
 		const log: string[] = [];
 		map.addPlugin(plugin("monitors", log), {
 			selectionMode: "multiple",
 			selection: { kind: "monitors", ids: ["1"] }
 		});
+		await tick();
 		map.addPlugin(plugin("regions", log));
+		await tick();
 		map.attach(createFakeGl({ styleLoaded: true }));
-		flushSync();
+		await tick();
 		expect(log).toContain("keys:monitors:monitor:1");
 		expect(log).toContain("keys:regions:");
 
@@ -146,10 +157,12 @@ describe("createMap", () => {
 		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["1"] });
 	});
 
-	it("keeps selected ids that are not in any data", () => {
+	it("keeps selected ids that are not in any data", async () => {
 		const map = createMap({ config });
 		map.addPlugin(plugin("monitors"), { selectionMode: "multiple" });
+		await tick();
 		map.attach(createFakeGl({ styleLoaded: true }));
+		await tick();
 		map.setSelection("monitors", { kind: "monitors", ids: ["no-such-1", "no-such-2"] });
 		flushSync();
 		expect(map.getSelection("monitors")).toEqual({
@@ -158,19 +171,21 @@ describe("createMap", () => {
 		});
 	});
 
-	it("does not call onselectionchange when the host sets the selection", () => {
+	it("does not call onselectionchange when the host sets the selection", async () => {
 		const map = createMap({ config });
 		const onselectionchange = vi.fn();
 		map.addPlugin(plugin("monitors"), { selectionMode: "single", onselectionchange });
+		await tick();
 		map.setSelection("monitors", { kind: "monitors", ids: ["1"] });
 		map.setSelection("monitors", null);
 		expect(onselectionchange).not.toHaveBeenCalled();
 		expect(map.getSelection("monitors")).toBeNull();
 	});
 
-	it("makes getSelection reactive", () => {
+	it("makes getSelection reactive", async () => {
 		const map = createMap({ config });
 		map.addPlugin(plugin("monitors"));
+		await tick();
 		const seen: Array<string[] | null> = [];
 		stops.push(rootEffect(() => seen.push(map.getSelection("monitors")?.ids ?? null)));
 		flushSync();
@@ -179,24 +194,27 @@ describe("createMap", () => {
 		expect(seen).toEqual([null, ["3"]]);
 	});
 
-	it("drops a plugin's selection when it is removed", () => {
+	it("drops a plugin's selection when it is removed", async () => {
 		const map = createMap({ config });
 		map.addPlugin(plugin("monitors"), { selection: { kind: "monitors", ids: ["1"] } });
+		await tick();
 		map.removePlugin("monitors");
 		expect(map.plugins).toEqual([]);
 		expect(map.getSelection("monitors")).toBeNull();
 	});
 
-	it("leaves the first plugin's selection alone when a duplicate id is added", () => {
+	it("leaves the first plugin's selection alone when a duplicate id is added", async () => {
 		const map = createMap({ config });
 		map.addPlugin(plugin("monitors"), { selection: { kind: "monitors", ids: ["1"] } });
+		await tick();
 		expect(() =>
 			map.addPlugin(plugin("monitors"), { selection: { kind: "monitors", ids: ["2"] } })
 		).toThrow(/already added/);
+		await tick();
 		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["1"] });
 	});
 
-	it("focuses a feature: marks it and pans to it", () => {
+	it("focuses a feature: marks it and pans to it", async () => {
 		const map = createMap({ config });
 		map.addPlugin(
 			plugin("monitors", [], {
@@ -214,8 +232,10 @@ describe("createMap", () => {
 				]
 			})
 		);
+		await tick();
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
+		await tick();
 		map.focusFeature("monitor:5");
 		expect(map.focusedKey).toBe("monitor:5");
 		expect(gl.getCenter()).toEqual({ lng: -118.5, lat: 35.25 });
@@ -235,12 +255,14 @@ describe("createMap", () => {
 		expect(easeTo.mock.lastCall![0]).not.toHaveProperty("offset");
 	});
 
-	it("destroy detaches, clears plugins, and refuses new plugins", () => {
+	it("destroy detaches, clears plugins, and refuses new plugins", async () => {
 		const map = createMap({ config });
 		const log: string[] = [];
 		map.addPlugin(plugin("monitors", log), { selection: { kind: "monitors", ids: ["1"] } });
+		await tick();
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
+		await tick();
 		map.destroy();
 		expect(map.attached).toBe(false);
 		expect(log).toContain("teardown:monitors");
@@ -260,11 +282,13 @@ describe("createMap", () => {
 		expect(() => late()).not.toThrow();
 	});
 
-	it("ignores selection changes and focus after destroy", () => {
+	it("ignores selection changes and focus after destroy", async () => {
 		const map = createMap({ config });
 		map.addPlugin(plugin("monitors"), { selectionMode: "multiple" });
+		await tick();
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
+		await tick();
 		map.destroy();
 		map.setSelection("monitors", { kind: "monitors", ids: ["1"] });
 		map.setSelectionMode("monitors", "single");
@@ -274,9 +298,10 @@ describe("createMap", () => {
 		expect(gl.calls).not.toContain("easeTo");
 	});
 
-	it("doesn't make an effect depend on a previous plugin's options in addPlugin", () => {
+	it("doesn't make an effect depend on a previous plugin's options in addPlugin", async () => {
 		const map = createMap({ config });
 		map.addPlugin(plugin("monitors"), { selectionMode: "single" });
+		await tick();
 		let runs = 0;
 		stops.push(
 			rootEffect(() => {
@@ -296,7 +321,7 @@ describe("createMap", () => {
 		expect(runs).toBe(1);
 	});
 
-	it("doesn't make an effect depend on plugin features in focusFeature", () => {
+	it("doesn't make an effect depend on plugin features in focusFeature", async () => {
 		const map = createMap({ config });
 		const names = new SvelteMap([["5", "Site 5"]]);
 		map.addPlugin(
@@ -314,7 +339,9 @@ describe("createMap", () => {
 					}))
 			})
 		);
+		await tick();
 		map.attach(createFakeGl({ styleLoaded: true }));
+		await tick();
 		let runs = 0;
 		stops.push(
 			rootEffect(() => {
@@ -328,15 +355,17 @@ describe("createMap", () => {
 		expect(runs).toBe(1);
 	});
 
-	it("sets every plugin up again on themeChanged, and does nothing while detached", () => {
+	it("sets every plugin up again on themeChanged, and does nothing while detached", async () => {
 		const map = createMap({ config });
 		const log: string[] = [];
 		map.addPlugin(plugin("monitors", log));
+		await tick();
 		map.addPlugin(plugin("regions", log));
+		await tick();
 		map.themeChanged();
 		expect(log).toEqual([]);
 		map.attach(createFakeGl({ styleLoaded: true }));
-		flushSync();
+		await tick();
 		log.length = 0;
 		map.themeChanged();
 		flushSync();
@@ -369,13 +398,14 @@ function listItem(
 }
 
 describe("pickFromList", () => {
-	it("applies the same selection rules as a map click: additive adds, otherwise replaces", () => {
+	it("applies the same selection rules as a map click: additive adds, otherwise replaces", async () => {
 		const map = createMap({ config });
 		const onselectionchange = vi.fn();
 		map.addPlugin(
 			plugin("monitors", [], { features: () => [listItem("1"), listItem("2"), listItem("3")] }),
 			{ selectionMode: "multiple", onselectionchange }
 		);
+		await tick();
 		map.pickFromList("monitors", "monitor:1", true);
 		map.pickFromList("monitors", "monitor:2", true);
 		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["1", "2"] });
@@ -391,24 +421,27 @@ describe("pickFromList", () => {
 		]);
 	});
 
-	it("replaces in single mode even when additive", () => {
+	it("replaces in single mode even when additive", async () => {
 		const map = createMap({ config });
 		map.addPlugin(plugin("monitors", [], { features: () => [listItem("1"), listItem("2")] }), {
 			selectionMode: "single",
 			selection: { kind: "monitors", ids: ["1"] }
 		});
+		await tick();
 		map.pickFromList("monitors", "monitor:2", true);
 		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["2"] });
 	});
 
-	it("ignores items that aren't selectable, unknown refs, and plugins in none mode", () => {
+	it("ignores items that aren't selectable, unknown refs, and plugins in none mode", async () => {
 		const map = createMap({ config });
 		const onselectionchange = vi.fn();
 		map.addPlugin(
 			plugin("monitors", [], { features: () => [listItem("1", undefined, false), listItem("2")] }),
 			{ selectionMode: "multiple", onselectionchange }
 		);
+		await tick();
 		map.addPlugin(plugin("other", [], { features: () => [listItem("2")] }), { onselectionchange });
+		await tick();
 		map.pickFromList("monitors", "monitor:1", false);
 		map.pickFromList("monitors", "monitor:9", false);
 		map.pickFromList("other", "monitor:2", false);
@@ -417,7 +450,7 @@ describe("pickFromList", () => {
 		expect(map.getSelection("monitors")).toBeNull();
 	});
 
-	it("fires featureclick like a map click, before the selection changes", () => {
+	it("fires featureclick like a map click, before the selection changes", async () => {
 		const map = createMap({ config });
 		const order: string[] = [];
 		map.on("featureclick", (e) => {
@@ -428,6 +461,7 @@ describe("pickFromList", () => {
 			plugin("monitors", [], { features: () => [listItem("1"), listItem("2", undefined, false)] }),
 			{ selectionMode: "single" }
 		);
+		await tick();
 		map.pickFromList("monitors", "monitor:1", false);
 		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["1"] });
 		// A feature that can't be selected is still clicked, as on the map.
@@ -444,9 +478,10 @@ describe("pickFromList", () => {
 });
 
 describe("selection mode and focus", () => {
-	it("reads a plugin's selection mode reactively", () => {
+	it("reads a plugin's selection mode reactively", async () => {
 		const map = createMap({ config });
 		map.addPlugin(plugin("monitors"), { selectionMode: "single" });
+		await tick();
 		const seen: string[] = [];
 		stops.push(rootEffect(() => void seen.push(map.getSelectionMode("monitors"))));
 		flushSync();
@@ -456,12 +491,15 @@ describe("selection mode and focus", () => {
 		expect(map.getSelectionMode("missing")).toBe("none");
 	});
 
-	it("pans to the named plugin's item when two plugins list the same key", () => {
+	it("pans to the named plugin's item when two plugins list the same key", async () => {
 		const map = createMap({ config });
 		map.addPlugin(plugin("a", [], { features: () => [listItem("1", [-118, 35])] }));
+		await tick();
 		map.addPlugin(plugin("b", [], { features: () => [listItem("1", [-120, 37])] }));
+		await tick();
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
+		await tick();
 		map.focusFeature("monitor:1", "b");
 		expect(gl.getCenter()).toEqual({ lng: -120, lat: 37 });
 		expect(map.focusedPluginId).toBe("b");
@@ -474,11 +512,13 @@ describe("selection mode and focus", () => {
 		expect(map.focusedPluginId).toBeNull();
 	});
 
-	it("clears the focused key without moving the camera", () => {
+	it("clears the focused key without moving the camera", async () => {
 		const map = createMap({ config });
 		map.addPlugin(plugin("monitors", [], { features: () => [listItem("1")] }));
+		await tick();
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
+		await tick();
 		map.focusFeature("monitor:1");
 		const ease = vi.spyOn(gl, "easeTo");
 		map.focusFeature(null);
@@ -486,11 +526,13 @@ describe("selection mode and focus", () => {
 		expect(ease).not.toHaveBeenCalled();
 	});
 
-	it("pans without animation under reduced motion, and eases otherwise", () => {
+	it("pans without animation under reduced motion, and eases otherwise", async () => {
 		const map = createMap({ config });
 		map.addPlugin(plugin("monitors", [], { features: () => [listItem("1")] }));
+		await tick();
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
+		await tick();
 		const ease = vi.spyOn(gl, "easeTo");
 		let reduce = true;
 		vi.stubGlobal("matchMedia", (query: string) => ({

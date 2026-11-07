@@ -1,7 +1,7 @@
 import { createExpression } from "@maplibre/maplibre-gl-style-spec";
 import type { LayerSpecification } from "@maptiler/sdk";
 import { darken } from "color2k";
-import { flushSync } from "svelte";
+import { tick } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMap } from "../../../src/lib/core/create-map.svelte.js";
 import type {
@@ -47,7 +47,7 @@ function evaluate(expr: unknown, properties: Record<string, unknown>, type = "st
 	return result.value.evaluate({ zoom: 0 }, { type: 1, properties } as never);
 }
 
-function setUp(rows: Props[] = [site("a")], withMonitors = false) {
+async function setUp(rows: Props[] = [site("a")], withMonitors = false) {
 	const map = createMap({ config: { maptilerKey: "test-key" } });
 	const source = new TestSource<Props>({ features: points(rows), scale: pm25Scale });
 	const plugin = collocationSitesPlugin({ source, layerLabel: "Collocation sites" });
@@ -62,7 +62,7 @@ function setUp(rows: Props[] = [site("a")], withMonitors = false) {
 	}
 	const gl = createFakeGl({ styleLoaded: true });
 	map.attach(gl);
-	flushSync();
+	await tick();
 	return { map, gl, plugin, source };
 }
 
@@ -80,7 +80,7 @@ afterEach(() => {
 });
 
 describe("collocationSitesPlugin", () => {
-	it("collocation icon wraps the reference shape in the crosshair color", () => {
+	it("collocation icon wraps the reference shape in the crosshair color", async () => {
 		const svgs: Array<{ svg: string; width: number }> = [];
 		class FakeImage {
 			onload: (() => void) | null = null;
@@ -93,7 +93,10 @@ describe("collocationSitesPlugin", () => {
 			}
 		}
 		vi.stubGlobal("Image", FakeImage);
-		const { gl, map } = setUp([site("a"), site("b", { type: "purpleair", location: "inside" })]);
+		const { gl, map } = await setUp([
+			site("a"),
+			site("b", { type: "purpleair", location: "inside" })
+		]);
 		expect(COLLOCATION_CROSSHAIR_COLOR).toBe("#4A5FC6");
 		const icons = pointLayer(gl, "collocation-sites");
 		const prefix = `${map.uid}:collocation-sites:icon:0:`;
@@ -127,8 +130,8 @@ describe("collocationSitesPlugin", () => {
 		expect(svg).toContain('fill="#123456" stroke="#123456"');
 	});
 
-	it("collocation hover wins over a monitor drawn above", () => {
-		const { map, gl, plugin } = setUp([site("a")], true);
+	it("collocation hover wins over a monitor drawn above", async () => {
+		const { map, gl, plugin } = await setUp([site("a")], true);
 		expect(plugin.hoverPriority).toBe(Number.MAX_SAFE_INTEGER);
 		const monitorLayer = pointLayer(gl, "monitors").id;
 		const siteLayer = pointLayer(gl, "collocation-sites").id;
@@ -156,8 +159,8 @@ describe("collocationSitesPlugin", () => {
 		expect(handler).toHaveBeenCalledWith(expect.objectContaining({ pluginId: "monitors" }));
 	});
 
-	it("not selectable", () => {
-		const { plugin, source } = setUp();
+	it("not selectable", async () => {
+		const { plugin, source } = await setUp();
 		expect(plugin.id).toBe("collocation-sites");
 		expect(plugin.selectable).toBe(false);
 		expect(plugin.label).toBe("Collocation sites");
@@ -167,8 +170,8 @@ describe("collocationSitesPlugin", () => {
 		expect(collocationSitesPlugin({ id: "c", source, layerLabel: "C" }).id).toBe("c");
 	});
 
-	it("has a tooltip for a site, with or without readings", () => {
-		const { plugin } = setUp([site("a"), site("b", { value: null, colocatedValue: null })]);
+	it("has a tooltip for a site, with or without readings", async () => {
+		const { plugin } = await setUp([site("a"), site("b", { value: null, colocatedValue: null })]);
 		for (const item of plugin.features!()) {
 			expect(plugin.tooltip!(item)).toBeTypeOf("function");
 		}
@@ -176,8 +179,8 @@ describe("collocationSitesPlugin", () => {
 });
 
 describe("collocationSitesPlugin legend", () => {
-	it("contributes no legend section, only a loading or failure status", () => {
-		const { plugin, source } = setUp();
+	it("contributes no legend section, only a loading or failure status", async () => {
+		const { plugin, source } = await setUp();
 		expect(plugin.legend!()).toBeNull();
 		const error = { state: "error" as const, error: new Error("x"), retry: () => {} };
 		source.status = error;

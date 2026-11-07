@@ -1,6 +1,6 @@
 import type { LayerSpecification } from "@maptiler/sdk";
 import type { FeatureCollection, Geometry } from "geojson";
-import { flushSync } from "svelte";
+import { flushSync, tick } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMap } from "../../../src/lib/core/create-map.svelte.js";
 import type { MetadataProvider } from "../../../src/lib/data/metadata.js";
@@ -60,7 +60,7 @@ const ZIP: FeatureCollection<Geometry, Props> = {
 	]
 };
 
-function setUp(factory: Factory, id: string, scale: ScaleRef | Scale | null) {
+async function setUp(factory: Factory, id: string, scale: ScaleRef | Scale | null) {
 	const source = new TestSource<Props>({ features: ZIP, scale });
 	const map = createMap({ config: { maptilerKey: "test-key" } });
 	const onselectionchange = vi.fn();
@@ -70,7 +70,7 @@ function setUp(factory: Factory, id: string, scale: ScaleRef | Scale | null) {
 	});
 	const gl = createFakeGl({ styleLoaded: true });
 	map.attach(gl);
-	flushSync();
+	await tick();
 	return { map, gl, onselectionchange, id };
 }
 
@@ -99,8 +99,8 @@ describe.each(PRESETS)("%s", (_name, factory, defaultId, ref) => {
 		expect(factory({ source, layerLabel: "x", selectable: false }).selectable).toBe(false);
 	});
 
-	it("fills by a match expression from the scale", () => {
-		const { gl } = setUp(factory, defaultId, heatScale);
+	it("fills by a match expression from the scale", async () => {
+		const { gl } = await setUp(factory, defaultId, heatScale);
 		const fill = gl.layers.find((l) => l.id.endsWith(":fill")) as Extract<
 			LayerSpecification,
 			{ type: "fill" }
@@ -128,7 +128,7 @@ describe.each(PRESETS)("%s", (_name, factory, defaultId, ref) => {
 	});
 
 	it("picks a ZIP feature as a regions selection", async () => {
-		const { map, gl, onselectionchange } = setUp(factory, defaultId, heatScale);
+		const { map, gl, onselectionchange } = await setUp(factory, defaultId, heatScale);
 		gl.setRenderedFeatures([
 			{
 				layer: { id: `${map.uid}:${defaultId}:fill` },

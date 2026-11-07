@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { flushSync } from "svelte";
+import { flushSync, tick } from "svelte";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { GeoJSONSourceSpecification, LayerSpecification } from "@maptiler/sdk";
 import type { FeatureCollection, Geometry } from "geojson";
@@ -28,9 +28,9 @@ const SMOKE_REF: ScaleRef = { dataset: "smoke", entryType: "density" };
 const metaSpy = vi.fn();
 beforeEach(() => metaSpy.mockClear());
 
-function setup(
+async function setup(
 	options: Partial<ShapesOptions<Props>> & { source: TestSource<Props> },
-	meta: Scale | "unavailable" = smokeScale,
+	meta: Scale | "unavailable" | Promise<Scale> = smokeScale,
 	spy = vi.fn()
 ) {
 	const selected = new SvelteMap<string, ReadonlySet<string>>();
@@ -58,7 +58,7 @@ function setup(
 	host.add(plugin);
 	const gl = createFakeGl({ styleLoaded: true });
 	host.attach(gl);
-	flushSync();
+	await tick();
 	return { host, plugin, gl, selected, router };
 }
 
@@ -115,8 +115,10 @@ afterEach(() => {
 describe("shapesPlugin", () => {
 	it("fills by the scale in choropleth mode, with per-level opacity", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
-		const { gl, plugin } = setup({ source });
+		const scale = Promise.withResolvers<Scale>();
+		const { gl, plugin } = await setup({ source }, scale.promise);
 		expect(gl.layers).toEqual([]);
+		scale.resolve(smokeScale);
 		await settle();
 		expect(layerIds(gl)).toEqual([
 			"m1:shp:fill",
@@ -138,20 +140,20 @@ describe("shapesPlugin", () => {
 		});
 	});
 
-	it("uses fillOpacity when no level sets an opacity", () => {
+	it("uses fillOpacity when no level sets an opacity", async () => {
 		const flat: Scale = {
 			...smokeScale,
 			levels: smokeScale.levels.map((l) => ({ ...l, opacity: null }))
 		};
 		const source = new TestSource<Props>({ features: POLYGONS, scale: flat });
-		const { gl } = setup({ source, fillOpacity: 0.3 });
+		const { gl } = await setup({ source, fillOpacity: 0.3 });
 		const fill = layer(gl, "m1:shp:fill") as Extract<LayerSpecification, { type: "fill" }>;
 		expect(fill.paint!["fill-opacity"]).toBe(0.3);
 	});
 
-	it("draws neutral with no scale in plain mode, and has no legend", () => {
+	it("draws neutral with no scale in plain mode, and has no legend", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
-		const { gl, plugin } = setup({ source, mode: "plain" }, smokeScale, metaSpy);
+		const { gl, plugin } = await setup({ source, mode: "plain" }, smokeScale, metaSpy);
 		expect(layerIds(gl)).toEqual([
 			"m1:shp:fill",
 			"m1:shp:outline",
@@ -165,9 +167,9 @@ describe("shapesPlugin", () => {
 		expect(metaSpy).not.toHaveBeenCalled();
 	});
 
-	it("sets the selected state and draws a thicker highlight outline", () => {
+	it("sets the selected state and draws a thicker highlight outline", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
-		const { gl, selected } = setup({ source, selectable: true });
+		const { gl, selected } = await setup({ source, selectable: true });
 		selected.set("shp", new SvelteSet(["feature:a"]));
 		flushSync();
 		expect(gl.featureStates.get("m1:shp:shapes/feature:a")).toEqual({ selected: true });
@@ -192,9 +194,9 @@ describe("shapesPlugin", () => {
 		]);
 	});
 
-	it("updates data without rebuilding layers", () => {
+	it("updates data without rebuilding layers", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
-		const { gl } = setup({ source });
+		const { gl } = await setup({ source });
 		const before = gl.layers.slice();
 		source.features = collection([POLYGONS.features[0] as never]);
 		flushSync();
@@ -205,7 +207,7 @@ describe("shapesPlugin", () => {
 		expect(gl.calls).toContain("setData:m1:shp:shapes");
 	});
 
-	it("lists features with lngLat inside the largest part of a MultiPolygon", () => {
+	it("lists features with lngLat inside the largest part of a MultiPolygon", async () => {
 		const multi = collection([
 			{
 				props: { refKey: "feature:m", name: "Multi", value: "light" },
@@ -229,7 +231,7 @@ describe("shapesPlugin", () => {
 			}
 		]);
 		const source = new TestSource<Props>({ features: multi, scale: smokeScale });
-		const { plugin } = setup({ source, selectable: true });
+		const { plugin } = await setup({ source, selectable: true });
 		const items = plugin.features!();
 		const [lng, lat] = items[0].lngLat;
 		expect(lng).toBeGreaterThan(10);
@@ -245,14 +247,14 @@ describe("shapesPlugin", () => {
 		});
 	});
 
-	it("omits features() when not listed", () => {
+	it("omits features() when not listed", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
-		expect(setup({ source, listed: false }).plugin.features).toBeUndefined();
+		expect((await setup({ source, listed: false })).plugin.features).toBeUndefined();
 	});
 
 	it("default theme outline unchanged", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
-		const { gl } = setup({ source });
+		const { gl } = await setup({ source });
 		await settle();
 		const outline = layer(gl, "m1:shp:outline") as Extract<LayerSpecification, { type: "line" }>;
 		expect(outline.paint!["line-color"]).toEqual([
@@ -266,7 +268,7 @@ describe("shapesPlugin", () => {
 
 	it("outline level paints line-color from the scale", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
-		const { gl } = setup({ source, outline: "level" });
+		const { gl } = await setup({ source, outline: "level" });
 		await settle();
 		const outline = layer(gl, "m1:shp:outline") as Extract<LayerSpecification, { type: "line" }>;
 		expect(outline.paint!["line-color"]).toEqual(
@@ -281,9 +283,9 @@ describe("shapesPlugin", () => {
 		]);
 	});
 
-	it("outline level in plain mode falls back to the theme outline", () => {
+	it("outline level in plain mode falls back to the theme outline", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
-		const { gl } = setup({ source, mode: "plain", outline: "level" }, smokeScale, metaSpy);
+		const { gl } = await setup({ source, mode: "plain", outline: "level" }, smokeScale, metaSpy);
 		const outline = layer(gl, "m1:shp:outline") as Extract<LayerSpecification, { type: "line" }>;
 		expect(outline.paint!["line-color"]).toBe(FALLBACK_THEME_COLORS.foreground);
 		expect(outline.paint!["line-opacity"]).toBeUndefined();
@@ -291,7 +293,7 @@ describe("shapesPlugin", () => {
 
 	it("outline none adds no outline layer and fill stays interactive", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
-		const { gl, router } = setup({ source, outline: "none" });
+		const { gl, router } = await setup({ source, outline: "none" });
 		await settle();
 		expect(layerIds(gl)).toEqual(["m1:shp:fill", "m1:shp:selected", "m1:shp:check"]);
 		router.attach(gl);
@@ -306,9 +308,9 @@ describe("shapesPlugin", () => {
 		expect(router.hitsAt([0, 0])).toHaveLength(1);
 	});
 
-	it("registers the fill and outline for interaction", () => {
+	it("registers the fill and outline for interaction", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
-		const { gl, router } = setup({ source });
+		const { gl, router } = await setup({ source });
 		router.attach(gl);
 		gl.setRenderedFeatures([
 			{
@@ -329,9 +331,9 @@ describe("shapesPlugin", () => {
 				.data as FeatureCollection<Geometry>
 		).features.map((f) => (f.geometry as GeoJSON.Point).coordinates);
 
-	it("draws a check mark at the label point of each selected feature", () => {
+	it("draws a check mark at the label point of each selected feature", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
-		const { gl, selected } = setup({ source, selectable: true });
+		const { gl, selected } = await setup({ source, selectable: true });
 		const check = layer(gl, "m1:shp:check") as Extract<LayerSpecification, { type: "symbol" }>;
 		expect(check.layout!["icon-image"]).toBe("m1:shp:selected");
 		expect(checkPoints(gl)).toEqual([]);
@@ -343,9 +345,9 @@ describe("shapesPlugin", () => {
 		expect(checkPoints(gl)).toEqual([]);
 	});
 
-	it("moves the check to the new label point when data is replaced", () => {
+	it("moves the check to the new label point when data is replaced", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
-		const { gl, selected } = setup({ source, selectable: true });
+		const { gl, selected } = await setup({ source, selectable: true });
 		selected.set("shp", new SvelteSet(["feature:a"]));
 		flushSync();
 		source.features = collection([
@@ -358,9 +360,9 @@ describe("shapesPlugin", () => {
 		expect(checkPoints(gl)).toEqual([[11, 11]]);
 	});
 
-	it("keeps a selected key absent from the data and shows it once it appears", () => {
+	it("keeps a selected key absent from the data and shows it once it appears", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
-		const { gl, selected } = setup({ source, selectable: true });
+		const { gl, selected } = await setup({ source, selectable: true });
 		selected.set("shp", new SvelteSet(["feature:late"]));
 		flushSync();
 		expect(gl.featureStates.get("m1:shp:shapes/feature:late")).toEqual({ selected: true });
@@ -376,9 +378,9 @@ describe("shapesPlugin", () => {
 		expect(checkPoints(gl)).toEqual([[21, 21]]);
 	});
 
-	it("rebuilds the layers when the scale changes by value", () => {
+	it("rebuilds the layers when the scale changes by value", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
-		const { gl } = setup({ source });
+		const { gl } = await setup({ source });
 		const fillColor = () =>
 			(layer(gl, "m1:shp:fill") as Extract<LayerSpecification, { type: "fill" }>).paint![
 				"fill-color"
@@ -402,7 +404,7 @@ describe("shapesPlugin", () => {
 
 	it("adds no layers when the scale ref resolves to unavailable", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
-		const { gl, plugin } = setup({ source }, "unavailable");
+		const { gl, plugin } = await setup({ source }, "unavailable");
 		await settle();
 		expect(gl.layers).toEqual([]);
 		expect(plugin.legend!()).toEqual({
@@ -411,9 +413,9 @@ describe("shapesPlugin", () => {
 		});
 	});
 
-	it("shows current data and selection after being attached again", () => {
+	it("shows current data and selection after being attached again", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
-		const { host, selected } = setup({ source, selectable: true });
+		const { host, selected } = await setup({ source, selectable: true });
 		host.detach();
 		source.features = collection([
 			{
@@ -425,7 +427,7 @@ describe("shapesPlugin", () => {
 		flushSync();
 		const gl2 = createFakeGl({ styleLoaded: true });
 		host.attach(gl2);
-		flushSync();
+		await tick();
 		const data = (gl2.sources.get("m1:shp:shapes") as GeoJSONSourceSpecification)
 			.data as FeatureCollection;
 		expect(data.features.map((f) => f.properties!.refKey)).toEqual(["feature:z"]);
