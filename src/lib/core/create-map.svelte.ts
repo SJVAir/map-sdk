@@ -200,7 +200,8 @@ export interface MapContext {
 	updateView(camera: CameraState, bounds: Bounds): void;
 	/**
 	 * For MapView only: the host's theme changed, so plugins set up again and re-read the theme
-	 * colors they bake into paint and images. Does nothing while detached.
+	 * colors they bake into paint and images. Does nothing while detached. Sets plugins up
+	 * synchronously, so never call it from inside an effect (see `PluginHost`).
 	 */
 	themeChanged(): void;
 	/** Detaches, removes every plugin, and drops handlers. The context can't be used after. */

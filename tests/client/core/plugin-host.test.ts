@@ -890,6 +890,39 @@ describe("PluginHost", () => {
 			expect(log).toEqual(["setup:a", "setup:other"]);
 		});
 
+		it("refuses a plugin object queued on another live map in the same tick", async () => {
+			const a = makeHost();
+			const b = makeHost();
+			a.host.attach(createFakeGl({ styleLoaded: true }));
+			b.host.attach(createFakeGl({ styleLoaded: true }));
+			await tick();
+			const plugin = resourcePlugin("p");
+			a.host.add(plugin);
+			expect(() => b.host.add(plugin)).toThrow(
+				'map-sdk: plugin "p" is already set up on another map; create one plugin per map'
+			);
+			expect(b.host.plugins).toEqual([]);
+		});
+
+		it("releases a queued plugin object on remove or detach before the microtask", async () => {
+			for (const leave of ["remove", "detach"] as const) {
+				const a = makeHost();
+				const b = makeHost();
+				a.host.attach(createFakeGl({ styleLoaded: true }));
+				b.host.attach(createFakeGl({ styleLoaded: true }));
+				await tick();
+				const log: string[] = [];
+				const plugin = resourcePlugin("p", log);
+				a.host.add(plugin);
+				if (leave === "remove") a.host.remove("p");
+				else a.host.detach();
+				b.host.add(plugin);
+				await tick();
+				expect(log).toEqual(["setup:p"]);
+				expect(errorSpy).not.toHaveBeenCalled();
+			}
+		});
+
 		it("calls onSettled after each queued run", async () => {
 			const onSettled = vi.fn();
 			const host = new PluginHost({

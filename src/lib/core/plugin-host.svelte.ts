@@ -176,6 +176,8 @@ export class PluginHost {
 	remove(id: string): void {
 		if (!this.#list.some((p) => p.id === id)) return;
 		this.#teardown(id);
+		const plugin = this.#list.find((p) => p.id === id);
+		if (plugin) this.#release(plugin);
 		this.#plugins = this.#list.filter((p) => p.id !== id);
 	}
 
@@ -200,7 +202,11 @@ export class PluginHost {
 		this.#teardownAll();
 	}
 
-	/** Tears down and sets up every plugin again (after a basemap change), once the style loads. */
+	/**
+	 * Tears down and sets up every plugin again (after a basemap change), once the style loads.
+	 * On a loaded style the setup is synchronous, so only map events and theme watching call this,
+	 * never code inside an effect: roots created there can stop (see the class comment).
+	 */
 	restyle(): void {
 		if (!this.#gl) return;
 		this.#teardownAll();
@@ -249,6 +255,8 @@ export class PluginHost {
 	 * the run never touches a gl that left. One run covers every request made before it starts.
 	 */
 	#queueSetup(): void {
+		// Claim the queued plugins now, so another map can't take one before the run.
+		for (const plugin of this.#list) this.#claim(plugin);
 		if (this.#setupQueued) return;
 		this.#setupQueued = true;
 		queueMicrotask(() => {
@@ -256,6 +264,19 @@ export class PluginHost {
 			if (this.#live) this.#setupAll();
 			this.#opts.onSettled?.();
 		});
+	}
+
+	/** Marks `plugin` as this host's, unless another map holds it. */
+	#claim(plugin: MapPlugin): void {
+		if (!ownedElsewhere(plugin, this) && Object.isExtensible(plugin)) {
+			(plugin as Owned)[OWNER] = this;
+		}
+	}
+
+	/** Releases a plugin this host claimed but isn't running (queued, then removed or left). */
+	#release(plugin: MapPlugin): void {
+		const owned = plugin as Owned;
+		if (owned[OWNER] === this && !this.#running.has(plugin.id)) delete owned[OWNER];
 	}
 
 	#cancelStyleWait(): void {
@@ -284,7 +305,10 @@ export class PluginHost {
 
 	#teardownAll(): void {
 		this.#live = false;
-		for (const plugin of this.#list) this.#teardown(plugin.id);
+		for (const plugin of this.#list) {
+			this.#teardown(plugin.id);
+			this.#release(plugin);
+		}
 	}
 
 	#setup(plugin: MapPlugin): void {
