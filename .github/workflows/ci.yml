@@ -12,6 +12,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Playwright's image ships the browsers and every system package they need, so no run installs
+    # them. Installing them per run (`playwright install --with-deps`) downloads about 200 Ubuntu
+    # packages from the runner's mirror, which has stalled jobs for up to an hour. The tag must be
+    # the installed Playwright's version; tests/unit/ci-playwright-image.test.ts checks it.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      # The runner's user, as Playwright's docs advise (Firefox refuses to run as root here).
+      options: --user 1001
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,7 +27,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run lint
       - run: npm run check
       - run: npm test
