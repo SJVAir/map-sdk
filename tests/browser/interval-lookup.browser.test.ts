@@ -1,4 +1,4 @@
-import { flushSync } from "svelte";
+import { tick } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page } from "vitest/browser";
@@ -18,7 +18,7 @@ afterEach(() => {
 	errors.mockClear();
 });
 
-function setUp(interval: MetadataProvider["monitorTypeInterval"] | null) {
+async function setUp(interval: MetadataProvider["monitorTypeInterval"] | null) {
 	const base = createDefaultMetadata();
 	const metadata: MetadataProvider = { ...base };
 	if (interval) metadata.monitorTypeInterval = interval;
@@ -31,7 +31,7 @@ function setUp(interval: MetadataProvider["monitorTypeInterval"] | null) {
 	const map = createMap({ config: { maptilerKey: "test-key" }, metadata });
 	map.addPlugin(plugin);
 	map.attach(createFakeGl({ styleLoaded: true }));
-	flushSync();
+	await tick();
 	const items = plugin.features!();
 	const open = (index = 0) => {
 		const snippet = plugin.tooltip!(items[index])!;
@@ -46,7 +46,7 @@ describe("the tooltips' interval lookup", () => {
 	it("shows the card at once and adds the note when the lookup resolves", async () => {
 		let resolve!: (value: string) => void;
 		const lookup = vi.fn(() => new Promise<string>((r) => (resolve = r)));
-		const { open } = setUp(lookup);
+		const { open } = await setUp(lookup);
 		open();
 		await expect.element(page.getByText("Monitor 1")).toBeVisible();
 		expect(text()).not.toContain("avg)");
@@ -55,14 +55,14 @@ describe("the tooltips' interval lookup", () => {
 	});
 
 	it("never leaves an empty card for a provider that never settles", async () => {
-		const { open } = setUp(() => new Promise<string>(() => {}));
+		const { open } = await setUp(() => new Promise<string>(() => {}));
 		open();
 		await expect.element(page.getByText("Monitor 1")).toBeVisible();
 	});
 
 	it("looks a type up once and shares it between tooltips", async () => {
 		const lookup = vi.fn(async () => "2 min");
-		const { open } = setUp(lookup);
+		const { open } = await setUp(lookup);
 		open(0);
 		await expect.poll(text).toContain("(2 min avg)");
 		open(0);
@@ -78,7 +78,7 @@ describe("the tooltips' interval lookup", () => {
 				throw new Error("sync");
 			})
 			.mockResolvedValue("1 hour");
-		const { open } = setUp(lookup);
+		const { open } = await setUp(lookup);
 		open();
 		await expect.element(page.getByText("Monitor 1")).toBeVisible();
 		await vi.waitFor(() => expect(lookup).toHaveBeenCalledTimes(1));
@@ -92,7 +92,7 @@ describe("the tooltips' interval lookup", () => {
 	});
 
 	it("leaves the note out for a provider without the method", async () => {
-		const { open } = setUp(null);
+		const { open } = await setUp(null);
 		open();
 		await expect.element(page.getByText("Monitor 1")).toBeVisible();
 		expect(text()).not.toContain("avg)");
@@ -100,7 +100,7 @@ describe("the tooltips' interval lookup", () => {
 
 	it("does not update a tooltip that closed before the lookup resolved", async () => {
 		let resolve!: (value: string) => void;
-		const { open } = setUp(() => new Promise<string>((r) => (resolve = r)));
+		const { open } = await setUp(() => new Promise<string>((r) => (resolve = r)));
 		const view = await open();
 		await expect.element(page.getByText("Monitor 1")).toBeVisible();
 		view.unmount();

@@ -1,7 +1,7 @@
 import { createExpression } from "@maplibre/maplibre-gl-style-spec";
 import type { LayerSpecification } from "@maptiler/sdk";
 import type { FeatureCollection, Geometry } from "geojson";
-import { flushSync } from "svelte";
+import { flushSync, tick } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMap } from "../../../src/lib/core/create-map.svelte.js";
 import type { MapFeatureProperties } from "../../../src/lib/data/types.js";
@@ -74,13 +74,14 @@ describe("hmsSmokePlugin", () => {
 		expect(hmsSmokePlugin({ id: "x", source, layerLabel: "S" }).id).toBe("x");
 	});
 
-	it("fills by density and uses each level's opacity", () => {
+	it("fills by density and uses each level's opacity", async () => {
 		const source = new TestSource<Props>({ features: SMOKE, scale: smokeScale });
 		const map = createMap({ config: { maptilerKey: "test-key" } });
 		map.addPlugin(hmsSmokePlugin({ source, layerLabel: "Smoke" }));
+		await tick();
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
-		flushSync();
+		await tick();
 		const fill = gl.layers.find((l) => l.id.endsWith(":fill")) as Extract<
 			LayerSpecification,
 			{ type: "fill" }
@@ -96,13 +97,14 @@ describe("hmsSmokePlugin", () => {
 });
 
 describe("hmsSmokePlugin outline", () => {
-	it("hmsSmokePlugin uses level outline", () => {
+	it("hmsSmokePlugin uses level outline", async () => {
 		const source = new TestSource<Props>({ features: SMOKE, scale: smokeScale });
 		const map = createMap({ config: { maptilerKey: "test-key" } });
 		map.addPlugin(hmsSmokePlugin({ source, layerLabel: "Smoke" }));
+		await tick();
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
-		flushSync();
+		await tick();
 		const outline = gl.layers.find((l) => l.id.endsWith(":outline")) as Extract<
 			LayerSpecification,
 			{ type: "line" }
@@ -159,9 +161,10 @@ describe("hmsFirePlugin", () => {
 		});
 		const map = createMap({ config: { maptilerKey: "test-key" } });
 		map.addPlugin(hmsFirePlugin({ source, layerLabel: "Fire" }));
+		await tick();
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
-		flushSync();
+		await tick();
 		await Promise.resolve();
 		await Promise.resolve();
 		const icons = gl.layers.find((l) => l.id === `${map.uid}:hms-fire:points`) as Extract<
@@ -196,7 +199,7 @@ describe("hmsFirePlugin with hotspots", () => {
 		{ refKey: "feature:f3", name: "Fire", value: 200 }
 	];
 
-	function build() {
+	async function build() {
 		const groups = new TestSource<Props>({ features: points(groupRows), scale: fireScale });
 		const hotspots = new TestSource<Props>({ features: points(hotspotRows), scale: fireScale });
 		const plugin = hmsFirePlugin({ source: groups, hotspots, layerLabel: "Fires" });
@@ -204,13 +207,13 @@ describe("hmsFirePlugin with hotspots", () => {
 		map.addPlugin(plugin);
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
-		flushSync();
+		await tick();
 		const id = (local: string) => `${map.uid}:hms-fire:${local}`;
 		return { plugin, map, gl, id };
 	}
 
-	it("is one plugin: one id, not selectable, the groups' legend and list", () => {
-		const { plugin, map } = build();
+	it("is one plugin: one id, not selectable, the groups' legend and list", async () => {
+		const { plugin, map } = await build();
 		expect(map.plugins.map((p) => p.id)).toEqual(["hms-fire"]);
 		expect(plugin.selectable).toBe(false);
 		expect(plugin.legend?.()).toMatchObject({ display: "blocks", title: "Fires" });
@@ -224,8 +227,8 @@ describe("hmsFirePlugin with hotspots", () => {
 		expect(withRefs.dataset).toBe("hms-fire");
 	});
 
-	it("draws groups below zoom 10 and hotspots from zoom 10, on the layers", () => {
-		const { gl, id } = build();
+	it("draws groups below zoom 10 and hotspots from zoom 10, on the layers", async () => {
+		const { gl, id } = await build();
 		expect(gl.sources.has(id("groups:points"))).toBe(true);
 		expect(gl.sources.has(id("hotspots:points"))).toBe(true);
 		const groupLayers = gl.layers.filter((l) => l.id.startsWith(id("groups:")));
@@ -262,8 +265,8 @@ describe("hmsFirePlugin with hotspots", () => {
 		).toBe(id("hotspots:icon:0:fire:md"));
 	});
 
-	it("hit-tests both the groups and the hotspots as the one plugin", () => {
-		const { map, gl, id } = build();
+	it("hit-tests both the groups and the hotspots as the one plugin", async () => {
+		const { map, gl, id } = await build();
 		const rendered = (layer: string, props: Props) => ({
 			layer: { id: id(layer) },
 			source: id(layer),
@@ -280,8 +283,8 @@ describe("hmsFirePlugin with hotspots", () => {
 		]);
 	});
 
-	it("hovering a hotspot gives the same content as a group, without listing it", () => {
-		const { plugin, map } = build();
+	it("hovering a hotspot gives the same content as a group, without listing it", async () => {
+		const { plugin, map } = await build();
 		const hit = (refKey: string) => ({ pluginId: "hms-fire", refKey, name: "Fire" }) as never;
 		expect(plugin.hoverTooltip?.(hit("feature:f3"))).toBeTypeOf("function");
 		// A key no hotspot has gets nothing, and hotspots aren't listed.
@@ -291,8 +294,8 @@ describe("hmsFirePlugin with hotspots", () => {
 		expect(plugin.hoverTooltip?.(hit("feature:f3"))).toBeUndefined();
 	});
 
-	it("teardown removes every layer and source once; a restyle adds them again", () => {
-		const { map, gl } = build();
+	it("teardown removes every layer and source once; a restyle adds them again", async () => {
+		const { map, gl } = await build();
 		const layers = gl.layers.map((l) => l.id);
 		const sources = [...gl.sources.keys()];
 		map.themeChanged();
@@ -311,13 +314,14 @@ describe("hmsFirePlugin with hotspots", () => {
 		}
 	});
 
-	it("without hotspots draws its one source at every zoom", () => {
+	it("without hotspots draws its one source at every zoom", async () => {
 		const source = new TestSource<Props>({ features: points(groupRows), scale: fireScale });
 		const map = createMap({ config: { maptilerKey: "test-key" } });
 		map.addPlugin(hmsFirePlugin({ source, layerLabel: "Fires" }));
+		await tick();
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
-		flushSync();
+		await tick();
 		const pointsLayer = gl.layers.find((l) => l.id === `${map.uid}:hms-fire:points`);
 		expect(pointsLayer).toBeDefined();
 		expect(pointsLayer).not.toHaveProperty("minzoom");

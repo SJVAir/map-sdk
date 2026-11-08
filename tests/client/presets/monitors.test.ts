@@ -5,7 +5,7 @@ import {
 } from "@maplibre/maplibre-gl-style-spec";
 import type { GeoJSONSourceSpecification, LayerSpecification } from "@maptiler/sdk";
 import { darken } from "color2k";
-import { flushSync } from "svelte";
+import { flushSync, tick } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMap } from "../../../src/lib/core/create-map.svelte.js";
 import { applyPick } from "../../../src/lib/data/selection.js";
@@ -61,7 +61,7 @@ function clusterFeature(layerId: string, clusterId: number, props: Record<string
 	};
 }
 
-function setUp(rows: MonitorFeatureProperties[] = MONITORS, clustered?: boolean) {
+async function setUp(rows: MonitorFeatureProperties[] = MONITORS, clustered?: boolean) {
 	const source = new TestSource<MonitorFeatureProperties>({
 		features: points(rows),
 		scale: pm25Scale
@@ -80,7 +80,7 @@ function setUp(rows: MonitorFeatureProperties[] = MONITORS, clustered?: boolean)
 		return found && { ...found, getClusterExpansionZoom: expansionZoom, getClusterLeaves: leaves };
 	};
 	map.attach(gl);
-	flushSync();
+	await tick();
 	const id = (local: string) => `${map.uid}:monitors:${local}`;
 	return { map, gl, plugin, source, onselectionchange, expansionZoom, id };
 }
@@ -118,7 +118,7 @@ describe("monitorShape", () => {
 
 describe("monitorsPlugin legend title", () => {
 	const REF = { dataset: "air-quality", entryType: "pm25" };
-	function titled(entryType: () => Promise<unknown>) {
+	async function titled(entryType: () => Promise<unknown>) {
 		const metadata = {
 			scale: () => Promise.resolve(pm25Scale),
 			entryType: vi.fn(entryType)
@@ -131,7 +131,7 @@ describe("monitorsPlugin legend title", () => {
 		const plugin = monitorsPlugin({ source, layerLabel: "Air monitors" });
 		map.addPlugin(plugin);
 		map.attach(createFakeGl({ styleLoaded: true }));
-		flushSync();
+		await tick();
 		return plugin;
 	}
 	const settle = async () => {
@@ -140,14 +140,16 @@ describe("monitorsPlugin legend title", () => {
 	};
 
 	it("is the entry type's label from the metadata, not layerLabel", async () => {
-		const plugin = titled(() => Promise.resolve({ label: "PM2.5", units: "µg/m³", precision: 1 }));
+		const plugin = await titled(() =>
+			Promise.resolve({ label: "PM2.5", units: "µg/m³", precision: 1 })
+		);
 		await settle();
 		expect(plugin.legend!()).toMatchObject({ title: "PM2.5" });
 		expect(plugin.label).toBe("Air monitors");
 	});
 
 	it("falls back to layerLabel when the metadata has none", async () => {
-		const plugin = titled(() => Promise.resolve("unavailable"));
+		const plugin = await titled(() => Promise.resolve("unavailable"));
 		await settle();
 		expect(plugin.legend!()).toMatchObject({ title: "Air monitors" });
 	});
@@ -171,8 +173,8 @@ describe("monitorsPlugin", () => {
 		expect(monitorsPlugin({ source, layerLabel: "x", selectable: false }).selectable).toBe(false);
 	});
 
-	it("adds one clustered source per monitor type, radius 40 up to zoom 9, summing values", () => {
-		const { gl, id } = setUp();
+	it("adds one clustered source per monitor type, radius 40 up to zoom 9, summing values", async () => {
+		const { gl, id } = await setUp();
 		const clustered = [...gl.sources.keys()].filter((key) => key.startsWith(id("points:")));
 		expect(clustered.sort()).toEqual(
 			[id("points:airgradient"), id("points:airnow"), id("points:purpleair")].sort()
@@ -185,8 +187,8 @@ describe("monitorsPlugin", () => {
 		expect(sourceData(gl, id("points:purpleair")).features).toHaveLength(3);
 	});
 
-	it("counts numbers and numeric strings toward the cluster average, as levels do", () => {
-		const { gl, id } = setUp();
+	it("counts numbers and numeric strings toward the cluster average, as levels do", async () => {
+		const { gl, id } = await setUp();
 		const spec = gl.sources.get(id("points:airnow")) as GeoJSONSourceSpecification;
 		const { sumValues, countValues } = spec.clusterProperties as Record<string, unknown[]>;
 		const each = (value: unknown) => [
@@ -201,8 +203,8 @@ describe("monitorsPlugin", () => {
 		expect(each(null)).toEqual([0, 0]);
 	});
 
-	it("evaluates every layer without expression warnings for null readings and empty clusters", () => {
-		const { gl } = setUp([
+	it("evaluates every layer without expression warnings for null readings and empty clusters", async () => {
+		const { gl } = await setUp([
 			monitor("1", "purpleair", null),
 			monitor("2", "airnow", null, { isActive: false }),
 			monitor("3", "purpleair", "", { location: "inside" }),
@@ -249,8 +251,8 @@ describe("monitorsPlugin", () => {
 		warn.mockRestore();
 	});
 
-	it("draws types in monitor-map's order, SJVAir PurpleAir above other PurpleAir", () => {
-		const { gl, id } = setUp();
+	it("draws types in monitor-map's order, SJVAir PurpleAir above other PurpleAir", async () => {
+		const { gl, id } = await setUp();
 		const points = gl.layers.map((l) => l.id).filter((l) => l.startsWith(id("points:")));
 		// Highest order per type: airnow 2, purpleair 4 (an SJVAir one), airgradient 5.
 		expect(points).toEqual([id("points:airnow"), id("points:purpleair"), id("points:airgradient")]);
@@ -260,8 +262,8 @@ describe("monitorsPlugin", () => {
 		expect(keys).toEqual([4, 1, 1]);
 	});
 
-	it("colors a cluster by its average with the type's shape and shows the rounded average", () => {
-		const { gl, id } = setUp();
+	it("colors a cluster by its average with the type's shape and shows the rounded average", async () => {
+		const { gl, id } = await setUp();
 		const icons = layer(gl, id("cluster-icon:airnow")) as Symbol;
 		const text = layer(gl, id("cluster-average:airnow")) as Symbol;
 		const cluster = { point_count: 3, sumValues: 31, countValues: 3 };
@@ -285,7 +287,7 @@ describe("monitorsPlugin", () => {
 
 	it("zooms into a clicked cluster and never picks through it", async () => {
 		const handler = vi.fn();
-		const { map, gl, id, onselectionchange, expansionZoom } = setUp();
+		const { map, gl, id, onselectionchange, expansionZoom } = await setUp();
 		map.on("featureclick", handler);
 		const bubble = clusterFeature(id("cluster-icon:purpleair"), 7);
 		const beneath = {
@@ -315,7 +317,7 @@ describe("monitorsPlugin", () => {
 
 	it("picks a monitor drawn above a cluster and doesn't zoom", async () => {
 		const handler = vi.fn();
-		const { map, gl, id, expansionZoom } = setUp();
+		const { map, gl, id, expansionZoom } = await setUp();
 		map.on("featureclick", handler);
 		gl.setRenderedFeatures([
 			{
@@ -342,7 +344,7 @@ describe("monitorsPlugin", () => {
 
 	it("zooms into a cluster with no animation under reduced motion", async () => {
 		vi.stubGlobal("matchMedia", () => ({ matches: true }));
-		const { gl, id } = setUp();
+		const { gl, id } = await setUp();
 		const easeTo = vi.spyOn(gl, "easeTo");
 		gl.setRenderedFeatures([clusterFeature(id("cluster-icon:airnow"), 3)]);
 		gl.emit("click", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
@@ -351,8 +353,8 @@ describe("monitorsPlugin", () => {
 		expect(easeTo).toHaveBeenCalledWith({ center: [-119.5, 36.5], zoom: 11, duration: 0 });
 	});
 
-	it("hovers the cluster itself, with its own tooltip, not a feature beneath", () => {
-		const { map, gl, plugin, id } = setUp();
+	it("hovers the cluster itself, with its own tooltip, not a feature beneath", async () => {
+		const { map, gl, plugin, id } = await setUp();
 		gl.setRenderedFeatures([
 			clusterFeature(id("cluster-icon:purpleair"), 7, { sumValues: 44, countValues: 2 }),
 			{
@@ -372,8 +374,8 @@ describe("monitorsPlugin", () => {
 		expect(plugin.tooltip!(plugin.features!()[0])).toBeTypeOf("function");
 	});
 
-	it("gives no cluster content once the data the hover came from is replaced", () => {
-		const { map, gl, plugin, source, id } = setUp();
+	it("gives no cluster content once the data the hover came from is replaced", async () => {
+		const { map, gl, plugin, source, id } = await setUp();
 		gl.setRenderedFeatures([clusterFeature(id("cluster-icon:purpleair"), 7)]);
 		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
 		const stale = map.hovered!.hit;
@@ -386,8 +388,8 @@ describe("monitorsPlugin", () => {
 		expect(plugin.hoverTooltip!(map.hovered!.hit)).toBeTypeOf("function");
 	});
 
-	it("leaves plugin state alone on lookups over a cluster", () => {
-		const { map, gl, plugin, id } = setUp();
+	it("leaves plugin state alone on lookups over a cluster", async () => {
+		const { map, gl, plugin, id } = await setUp();
 		gl.setRenderedFeatures([clusterFeature(id("cluster-icon:purpleair"), 7)]);
 		expect(map.featuresAt({ x: 1, y: 2 })).toEqual([]);
 		expect(map.hovered).toBeNull();
@@ -396,7 +398,7 @@ describe("monitorsPlugin", () => {
 		expect(plugin.hoverTooltip!(map.hovered!.hit)).toBeTypeOf("function");
 	});
 
-	it("inactive monitor image is drawn #969696 whatever the value and the theme", () => {
+	it("inactive monitor image is drawn #969696 whatever the value and the theme", async () => {
 		const svgs: string[] = [];
 		class FakeImage {
 			onload: (() => void) | null = null;
@@ -406,7 +408,7 @@ describe("monitorsPlugin", () => {
 		}
 		vi.stubGlobal("Image", FakeImage);
 		injected.theme = DARK_THEME;
-		const { gl, id } = setUp();
+		const { gl, id } = await setUp();
 		const icons = layer(gl, id("points:airgradient")) as Symbol;
 		const [inactive] = sourceData(gl, id("points:airgradient")).features;
 		expect(inactive.properties!.isActive).toBe(false);
@@ -425,7 +427,7 @@ describe("monitorsPlugin", () => {
 		);
 	});
 
-	it("inside outline is black in a dark theme", () => {
+	it("inside outline is black in a dark theme", async () => {
 		const svgs = new Map<string, string>();
 		class FakeImage {
 			onload: (() => void) | null = null;
@@ -435,7 +437,7 @@ describe("monitorsPlugin", () => {
 		}
 		vi.stubGlobal("Image", FakeImage);
 		injected.theme = DARK_THEME;
-		const { gl, id } = setUp([
+		const { gl, id } = await setUp([
 			monitor("1", "purpleair", 4),
 			monitor("2", "purpleair", 4, { location: "inside" })
 		]);
@@ -458,8 +460,8 @@ describe("monitorsPlugin", () => {
 		expect([...svgs.values()].some((svg) => svg.includes(`stroke="${light}"`))).toBe(false);
 	});
 
-	it("draws unclustered when clustered is false", () => {
-		const { gl, id } = setUp(MONITORS, false);
+	it("draws unclustered when clustered is false", async () => {
+		const { gl, id } = await setUp(MONITORS, false);
 		const spec = gl.sources.get(id("points")) as GeoJSONSourceSpecification;
 		expect(spec.cluster).toBeUndefined();
 		expect(sourceData(gl, id("points")).features).toHaveLength(MONITORS.length);

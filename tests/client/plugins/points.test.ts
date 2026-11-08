@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { flushSync } from "svelte";
+import { flushSync, tick } from "svelte";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import type { GeoJSONSourceSpecification, LayerSpecification } from "@maptiler/sdk";
 import { InteractionRouter } from "../../../src/lib/core/interactions.svelte.js";
@@ -32,7 +32,7 @@ function metadata(result: Scale | "unavailable" | Promise<Scale | "unavailable">
 	} as unknown as MetadataProvider & { scale: ReturnType<typeof vi.fn> };
 }
 
-function setup(
+async function setup(
 	options: Partial<PointsOptions<Props>> & { source: TestSource<Props> },
 	meta: MetadataProvider = metadata(pm25Scale)
 ) {
@@ -58,7 +58,7 @@ function setup(
 	host.add(plugin);
 	const gl = createFakeGl({ styleLoaded: true });
 	host.attach(gl);
-	flushSync();
+	await tick();
 	return { host, plugin, gl, selected, router };
 }
 
@@ -107,9 +107,11 @@ describe("pointsPlugin", () => {
 
 	it("adds no layers and reports the status while the scale is unavailable", async () => {
 		const source = new TestSource<Props>({ features: points(ROWS), scale: PM25_REF });
-		const meta = metadata("unavailable");
-		const { gl, plugin } = setup({ source }, meta);
+		const scale = Promise.withResolvers<"unavailable">();
+		const meta = metadata(scale.promise);
+		const { gl, plugin } = await setup({ source }, meta);
 		expect(plugin.legend!()).toEqual({ pluginId: "pts", status: { state: "loading" } });
+		scale.resolve("unavailable");
 		await settle();
 		expect(meta.scale).toHaveBeenCalledWith(PM25_REF, expect.any(AbortSignal));
 		expect(gl.layers).toEqual([]);
@@ -121,8 +123,10 @@ describe("pointsPlugin", () => {
 
 	it("draws circles colored by the scale once it resolves", async () => {
 		const source = new TestSource<Props>({ features: points(ROWS), scale: PM25_REF });
-		const { gl, plugin } = setup({ source });
+		const scale = Promise.withResolvers<Scale>();
+		const { gl, plugin } = await setup({ source }, metadata(scale.promise));
 		expect(gl.layers).toEqual([]);
+		scale.resolve(pm25Scale);
 		await settle();
 		expect(layerIds(gl)).toEqual(["m1:pts:points", "m1:pts:selected"]);
 		const circles = layer(gl, "m1:pts:points") as Extract<LayerSpecification, { type: "circle" }>;
@@ -139,17 +143,17 @@ describe("pointsPlugin", () => {
 		});
 	});
 
-	it("uses a Scale object as-is without asking the metadata provider", () => {
+	it("uses a Scale object as-is without asking the metadata provider", async () => {
 		const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
 		const meta = metadata("unavailable");
-		const { gl } = setup({ source }, meta);
+		const { gl } = await setup({ source }, meta);
 		expect(meta.scale).not.toHaveBeenCalled();
 		expect(layerIds(gl)).toEqual(["m1:pts:points", "m1:pts:selected"]);
 	});
 
-	it("re-renders new features with setData on the same source, without re-adding layers", () => {
+	it("re-renders new features with setData on the same source, without re-adding layers", async () => {
 		const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
-		const { gl } = setup({ source });
+		const { gl } = await setup({ source });
 		const before = gl.calls.length;
 		source.features = points([{ refKey: "monitor:c", name: "Charlie", value: 100 }]);
 		flushSync();
@@ -160,9 +164,9 @@ describe("pointsPlugin", () => {
 		expect(data.features.map((f) => f.properties!.refKey)).toEqual(["monitor:c"]);
 	});
 
-	it("sets feature-state selected for selected keys and clears it when deselected", () => {
+	it("sets feature-state selected for selected keys and clears it when deselected", async () => {
 		const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
-		const { gl, selected } = setup({ source, selectable: true });
+		const { gl, selected } = await setup({ source, selectable: true });
 		selected.set("pts", new SvelteSet(["monitor:a"]));
 		flushSync();
 		expect(gl.featureStates.get("m1:pts:points/monitor:a")).toEqual({ selected: true });
@@ -181,23 +185,23 @@ describe("pointsPlugin", () => {
 		]);
 	});
 
-	it("shows data and selection replaced while detached once attached again", () => {
+	it("shows data and selection replaced while detached once attached again", async () => {
 		const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
-		const { host, selected } = setup({ source, selectable: true });
+		const { host, selected } = await setup({ source, selectable: true });
 		host.detach();
 		source.features = points([{ refKey: "monitor:z", name: "Zulu", value: 12 }]);
 		selected.set("pts", new SvelteSet(["monitor:z"]));
 		flushSync();
 		const gl2 = createFakeGl({ styleLoaded: true });
 		host.attach(gl2);
-		flushSync();
+		await tick();
 		const data = sourceData(gl2, "m1:pts:points");
 		expect(data.features.map((f) => f.properties!.refKey)).toEqual(["monitor:z"]);
 		expect(gl2.featureStates.get("m1:pts:points/monitor:z")).toEqual({ selected: true });
 		expect(layerIds(gl2)).toEqual(["m1:pts:points", "m1:pts:selected"]);
 	});
 
-	it("lists features with their level, and NO_LEVEL for a null value", () => {
+	it("lists features with their level, and NO_LEVEL for a null value", async () => {
 		const source = new TestSource<Props>({
 			features: points([
 				{ refKey: "monitor:a", name: "Alpha", value: 4, lngLat: [-119.5, 36.2] },
@@ -205,7 +209,7 @@ describe("pointsPlugin", () => {
 			]),
 			scale: pm25Scale
 		});
-		const { plugin } = setup({ source, selectable: true });
+		const { plugin } = await setup({ source, selectable: true });
 		const items = plugin.features!();
 		expect(items[0]).toEqual({
 			refKey: "monitor:a",
@@ -230,7 +234,7 @@ describe("pointsPlugin", () => {
 			features: points([{ refKey: "monitor:a", name: "Alpha", value: 7.971 }]),
 			scale: PM25_REF
 		});
-		const { plugin } = setup({ source }, meta);
+		const { plugin } = await setup({ source }, meta);
 		await settle();
 		expect(plugin.features!()[0].precision).toBe(1);
 		expect(meta.entryType).toHaveBeenCalledWith(PM25_REF, expect.any(AbortSignal));
@@ -248,7 +252,7 @@ describe("pointsPlugin", () => {
 	const visibility = (l: unknown) =>
 		(l as { layout?: { visibility?: string } }).layout?.visibility ?? "visible";
 
-	it("zoomRange shows every layer only while the camera zoom is in range", () => {
+	it("zoomRange shows every layer only while the camera zoom is in range", async () => {
 		const source = new TestSource<Props>({
 			features: points([
 				{ refKey: "monitor:a", name: "A", value: 1 },
@@ -256,7 +260,7 @@ describe("pointsPlugin", () => {
 			]),
 			scale: pm25Scale
 		});
-		const { gl } = setup({
+		const { gl } = await setup({
 			source,
 			cluster: { radius: 40, maxZoom: 9 },
 			zoomRange: { min: 4, max: 10 }
@@ -281,12 +285,12 @@ describe("pointsPlugin", () => {
 		}
 	});
 
-	it("zoomRange with one end limits only that end; none leaves layers alone", () => {
-		const make = (zoomRange?: { min?: number; max?: number }) => {
+	it("zoomRange with one end limits only that end; none leaves layers alone", async () => {
+		const make = async (zoomRange?: { min?: number; max?: number }) => {
 			const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
-			return setup({ source, zoomRange }).gl;
+			return (await setup({ source, zoomRange })).gl;
 		};
-		const capped = make({ max: 10 });
+		const capped = await make({ max: 10 });
 		expect(new Set(capped.layers.map(visibility))).toEqual(new Set(["visible"]));
 		capped.jumpTo({ zoom: 0 });
 		capped.emit("zoom", {});
@@ -294,7 +298,7 @@ describe("pointsPlugin", () => {
 		capped.jumpTo({ zoom: 10 });
 		capped.emit("zoom", {});
 		expect(new Set(capped.layers.map(visibility))).toEqual(new Set(["none"]));
-		const open = make();
+		const open = await make();
 		for (const l of open.layers) {
 			expect(l).not.toHaveProperty("minzoom");
 			expect(l).not.toHaveProperty("maxzoom");
@@ -303,15 +307,15 @@ describe("pointsPlugin", () => {
 		expect(open.listeners.filter((l) => l.type === "zoom")).toEqual([]);
 	});
 
-	it("zoomRange stops following the zoom once the plugin is removed", () => {
+	it("zoomRange stops following the zoom once the plugin is removed", async () => {
 		const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
-		const { gl, host } = setup({ source, zoomRange: { max: 10 } });
+		const { gl, host } = await setup({ source, zoomRange: { max: 10 } });
 		expect(gl.listeners.filter((l) => l.type === "zoom")).toHaveLength(1);
 		host.remove("pts");
 		expect(gl.listeners.filter((l) => l.type === "zoom")).toEqual([]);
 	});
 
-	it("detail feeds each listed feature", () => {
+	it("detail feeds each listed feature", async () => {
 		const source = new TestSource<Props>({
 			features: points([
 				{ refKey: "monitor:a", name: "A", value: 1 },
@@ -319,22 +323,24 @@ describe("pointsPlugin", () => {
 			]),
 			scale: pm25Scale
 		});
-		const { plugin } = setup({ source, detail: (p) => `detail ${p.name}` });
+		const { plugin } = await setup({ source, detail: (p) => `detail ${p.name}` });
 		expect(plugin.features!().map((f) => f.detail)).toEqual(["detail A", "detail B"]);
 	});
 
-	it("no detail option, or an empty one, gives no detail", () => {
-		const make = (detail?: (p: Props) => string | undefined) =>
-			setup({
-				source: new TestSource<Props>({ features: points(ROWS), scale: pm25Scale }),
-				detail
-			}).plugin.features!();
-		for (const f of make()) expect(f).not.toHaveProperty("detail");
-		for (const f of make(() => "")) expect(f).not.toHaveProperty("detail");
-		for (const f of make(() => "   ")) expect(f).not.toHaveProperty("detail");
+	it("no detail option, or an empty one, gives no detail", async () => {
+		const make = async (detail?: (p: Props) => string | undefined) =>
+			(
+				await setup({
+					source: new TestSource<Props>({ features: points(ROWS), scale: pm25Scale }),
+					detail
+				})
+			).plugin.features!();
+		for (const f of await make()) expect(f).not.toHaveProperty("detail");
+		for (const f of await make(() => "")) expect(f).not.toHaveProperty("detail");
+		for (const f of await make(() => "   ")) expect(f).not.toHaveProperty("detail");
 	});
 
-	it("creates one clustered source per group", () => {
+	it("creates one clustered source per group", async () => {
 		const source = new TestSource<Props>({
 			features: points([
 				{ refKey: "monitor:a", name: "A", value: 1, type: "purple" },
@@ -343,7 +349,7 @@ describe("pointsPlugin", () => {
 			]),
 			scale: pm25Scale
 		});
-		const { gl } = setup({
+		const { gl } = await setup({
 			source,
 			cluster: { radius: 40, maxZoom: 9, groupBy: (p) => p.type ?? "" }
 		});
@@ -368,7 +374,7 @@ describe("pointsPlugin", () => {
 			]),
 			scale: pm25Scale
 		});
-		const { gl, router, plugin } = setup({ source, cluster: { radius: 40, maxZoom: 9 } });
+		const { gl, router, plugin } = await setup({ source, cluster: { radius: 40, maxZoom: 9 } });
 		const expansionZoom = vi.fn(async () => 12);
 		const getSource = gl.getSource.bind(gl);
 		gl.getSource = (id: string) => {
@@ -402,7 +408,7 @@ describe("pointsPlugin", () => {
 		expect(gl.getZoom()).toBe(12);
 	});
 
-	it("draws muted images in theme mutedForeground unless icon.mutedColor says otherwise", () => {
+	it("draws muted images in theme mutedForeground unless icon.mutedColor says otherwise", async () => {
 		vi.stubGlobal(
 			"Image",
 			class {
@@ -411,25 +417,25 @@ describe("pointsPlugin", () => {
 			}
 		);
 		try {
-			const run = (mutedColor?: string) => {
+			const run = async (mutedColor?: string) => {
 				const source = new TestSource<Props>({
 					features: points([{ refKey: "monitor:a", name: "A", value: 1, type: "purple" }]),
 					scale: pm25Scale
 				});
 				const draw = vi.fn((category: string, color: string) => `<svg>${category}${color}</svg>`);
-				setup({
+				await setup({
 					source,
 					circle: undefined,
 					icon: { category: (p) => p.type ?? "", draw, size: 24, muted: () => true, mutedColor }
 				});
 				return draw;
 			};
-			expect(run()).toHaveBeenCalledWith(
+			expect(await run()).toHaveBeenCalledWith(
 				"purple",
 				FALLBACK_THEME_COLORS.mutedForeground,
 				FALLBACK_THEME_COLORS
 			);
-			expect(run("#123456")).toHaveBeenCalledWith("purple", "#123456", FALLBACK_THEME_COLORS);
+			expect(await run("#123456")).toHaveBeenCalledWith("purple", "#123456", FALLBACK_THEME_COLORS);
 		} finally {
 			vi.unstubAllGlobals();
 		}
@@ -455,7 +461,7 @@ describe("pointsPlugin", () => {
 				scale: pm25Scale
 			});
 			const draw = vi.fn((category: string, color: string) => `<svg>${category}${color}</svg>`);
-			const { gl } = setup({
+			const { gl } = await setup({
 				source,
 				circle: undefined,
 				icon: { category: (p) => p.type ?? "", draw, size: 24 }
@@ -486,9 +492,9 @@ describe("pointsPlugin", () => {
 		}
 	});
 
-	it("makes hits from the refKey and name", () => {
+	it("makes hits from the refKey and name", async () => {
 		const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
-		const { gl, router } = setup({ source });
+		const { gl, router } = await setup({ source });
 		router.attach(gl);
 		gl.setRenderedFeatures([
 			{
@@ -510,7 +516,7 @@ describe("pointsPlugin", () => {
 			entryType: () => Promise.resolve("unavailable")
 		} as unknown as MetadataProvider;
 		const source = new TestSource<Props>({ features: points(ROWS), scale: PM25_REF });
-		const { host, gl, plugin } = setup({ source }, meta);
+		const { host, gl, plugin } = await setup({ source }, meta);
 		host.detach();
 		resolve(pm25Scale);
 		await settle();
@@ -526,7 +532,7 @@ describe("pointsPlugin", () => {
 			entryType: () => Promise.resolve("unavailable")
 		} as unknown as MetadataProvider;
 		const source = new TestSource<Props>({ features: points(ROWS), scale: PM25_REF });
-		const { gl, plugin } = setup({ source }, meta);
+		const { gl, plugin } = await setup({ source }, meta);
 		await settle();
 		source.scale = { dataset: "hms-fire", entryType: "fire-frp" };
 		flushSync();
@@ -539,7 +545,7 @@ describe("pointsPlugin", () => {
 		expect(plugin.legend!()).toMatchObject({ units: "MW", scale: fireScale });
 	});
 
-	it("draws a level with an empty color in the neutral color", () => {
+	it("draws a level with an empty color in the neutral color", async () => {
 		vi.stubGlobal(
 			"Image",
 			class {
@@ -552,7 +558,7 @@ describe("pointsPlugin", () => {
 				scale: burnScale
 			});
 			const draw = vi.fn(() => "<svg/>");
-			setup({ source, circle: undefined, icon: { category: () => "burn", draw, size: 16 } });
+			await setup({ source, circle: undefined, icon: { category: () => "burn", draw, size: 16 } });
 			expect(draw.mock.calls).toEqual([
 				["burn", FALLBACK_THEME_COLORS.neutral, FALLBACK_THEME_COLORS, 0],
 				["burn", FALLBACK_THEME_COLORS.neutral, FALLBACK_THEME_COLORS, -1]
@@ -562,7 +568,7 @@ describe("pointsPlugin", () => {
 		}
 	});
 
-	it("keeps layers and images when the source hands over an equal fresh scale", () => {
+	it("keeps layers and images when the source hands over an equal fresh scale", async () => {
 		vi.stubGlobal(
 			"Image",
 			class {
@@ -572,7 +578,7 @@ describe("pointsPlugin", () => {
 		try {
 			const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
 			const draw = vi.fn(() => "<svg/>");
-			const { gl } = setup({
+			const { gl } = await setup({
 				source,
 				circle: undefined,
 				icon: { category: () => "c", draw, size: 16 }
@@ -589,12 +595,12 @@ describe("pointsPlugin", () => {
 		}
 	});
 
-	it("shows a selected key that appears later in a group as selected", () => {
+	it("shows a selected key that appears later in a group as selected", async () => {
 		const source = new TestSource<Props>({
 			features: points([{ refKey: "monitor:a", name: "A", value: 1, type: "purple" }]),
 			scale: pm25Scale
 		});
-		const { gl, selected } = setup({
+		const { gl, selected } = await setup({
 			source,
 			selectable: true,
 			cluster: { radius: 40, maxZoom: 9, groupBy: (p) => p.type ?? "" }
@@ -616,9 +622,9 @@ describe("pointsPlugin selectedStyle", () => {
 	const B = { refKey: "monitor:b", name: "B", value: 2, type: "purple" };
 	const draw = (category: string, color: string) => `<svg>${category}${color}</svg>`;
 
-	function enlargeSetup(selectedStyle?: "ring" | "enlarge") {
+	async function enlargeSetup(selectedStyle?: "ring" | "enlarge") {
 		const source = new TestSource<Props>({ features: points([A, B]), scale: pm25Scale });
-		const result = setup({
+		const result = await setup({
 			source,
 			selectable: true,
 			selectedStyle,
@@ -638,22 +644,22 @@ describe("pointsPlugin selectedStyle", () => {
 		1 / 2
 	];
 
-	it("enlarge adds no selected overlay layers", () => {
-		const { gl } = enlargeSetup("enlarge");
+	it("enlarge adds no selected overlay layers", async () => {
+		const { gl } = await enlargeSetup("enlarge");
 		expect(layerIds(gl)).toEqual(["m1:pts:points"]);
 		expect(gl.images.has("m1:pts:selected")).toBe(false);
 	});
 
-	it("enlarge sets icon-size 1.3x for the selected key", () => {
-		const { gl, selected } = enlargeSetup("enlarge");
+	it("enlarge sets icon-size 1.3x for the selected key", async () => {
+		const { gl, selected } = await enlargeSetup("enlarge");
 		expect(iconSize(gl)).toBe(1 / 2);
 		selected.set("pts", new SvelteSet(["monitor:a"]));
 		flushSync();
 		expect(iconSize(gl)).toEqual(sizeFor(["monitor:a"]));
 	});
 
-	it("enlarge follows selection changes", () => {
-		const { gl, selected } = enlargeSetup("enlarge");
+	it("enlarge follows selection changes", async () => {
+		const { gl, selected } = await enlargeSetup("enlarge");
 		selected.set("pts", new SvelteSet(["monitor:a"]));
 		flushSync();
 		selected.set("pts", new SvelteSet(["monitor:b"]));
@@ -664,8 +670,8 @@ describe("pointsPlugin selectedStyle", () => {
 		expect(iconSize(gl)).toBe(1 / 2);
 	});
 
-	it("enlarge keeps the selected size after a data refresh", () => {
-		const { gl, source, selected } = enlargeSetup("enlarge");
+	it("enlarge keeps the selected size after a data refresh", async () => {
+		const { gl, source, selected } = await enlargeSetup("enlarge");
 		selected.set("pts", new SvelteSet(["monitor:a"]));
 		flushSync();
 		// A refresh with new values, as the 2-minute poll does.
@@ -681,8 +687,8 @@ describe("pointsPlugin selectedStyle", () => {
 		expect(layerIds(gl)).toEqual(["m1:pts:points"]);
 	});
 
-	it("enlarge re-applies the size when the layers are rebuilt", () => {
-		const { gl, source, selected } = enlargeSetup("enlarge");
+	it("enlarge re-applies the size when the layers are rebuilt", async () => {
+		const { gl, source, selected } = await enlargeSetup("enlarge");
 		selected.set("pts", new SvelteSet(["monitor:a"]));
 		flushSync();
 		// A new group forces a rebuild only when clustered; a new scale rebuilds either way.
@@ -691,9 +697,9 @@ describe("pointsPlugin selectedStyle", () => {
 		expect(iconSize(gl)).toEqual(sizeFor(["monitor:a"]));
 	});
 
-	it("ring default unchanged", () => {
+	it("ring default unchanged", async () => {
 		for (const style of [undefined, "ring" as const]) {
-			const { gl, selected } = enlargeSetup(style);
+			const { gl, selected } = await enlargeSetup(style);
 			expect(layerIds(gl)).toEqual(["m1:pts:points", "m1:pts:selected"]);
 			selected.set("pts", new SvelteSet(["monitor:a"]));
 			flushSync();

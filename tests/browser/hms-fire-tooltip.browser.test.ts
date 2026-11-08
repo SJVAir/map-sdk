@@ -1,4 +1,4 @@
-import { flushSync } from "svelte";
+import { flushSync, tick } from "svelte";
 import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page } from "vitest/browser";
@@ -21,7 +21,7 @@ describe("hmsFirePlugin hotspot tooltips", () => {
 		map.addPlugin(hmsFirePlugin({ source: groups, hotspots, layerLabel: "Fires" }));
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
-		flushSync();
+		await tick();
 		const id = (local: string) => `${map.uid}:hms-fire:${local}`;
 		gl.setRenderedFeatures([
 			{
