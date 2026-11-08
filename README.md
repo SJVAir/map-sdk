@@ -534,7 +534,7 @@ local sjvair.com stack at `http://localhost:8000`.
 
 ## Changes
 
-### Unreleased (after 0.1.0-beta.3)
+### 0.1.0-beta.4
 
 Defaults from monitor-map 5.0's parity review against sjvair.com's map (4.3.0). Every map gets
 them; none is an option.
