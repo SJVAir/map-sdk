@@ -1,5 +1,6 @@
 import type { ExpressionSpecification } from "@maptiler/sdk";
 import type { Feature, FeatureCollection, Geometry, Position } from "geojson";
+import { geometryBbox, type Bbox } from "../core/shape-view.js";
 import { untrack } from "svelte";
 import type { FeatureListItem, MapPlugin, PluginContext } from "../core/plugin.js";
 import { decodeRef, selectionId } from "../data/refs.js";
@@ -130,6 +131,18 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 	const currentScale = (): Resolved | null => (choropleth ? scales.current() : NO_SCALE);
 	const legend = () => (choropleth ? scales.legend() : null);
 
+	// Each feature's label point and bbox, measured once per feature object (once per data load):
+	// `features()` runs on every move. Per plugin instance, so two maps share nothing.
+	const measured = new WeakMap<Feature, { lngLat: [number, number] | null; bbox: Bbox | null }>();
+	const measure = (feature: Feature<Geometry>) => {
+		let m = measured.get(feature);
+		if (!m) {
+			m = { lngLat: labelPoint(feature.geometry), bbox: geometryBbox(feature.geometry) };
+			measured.set(feature, m);
+		}
+		return m;
+	};
+
 	function features(): FeatureListItem[] {
 		const collection = source.features;
 		if (!collection) return [];
@@ -141,8 +154,9 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 			const props = feature.properties;
 			if (!props || !feature.geometry) continue;
 			const ref = decodeRef(props.refKey);
-			const lngLat = labelPoint(feature.geometry);
-			if (!ref || !lngLat) continue;
+			if (!ref) continue;
+			const { lngLat, bbox } = measure(feature);
+			if (!lngLat) continue;
 			items.push({
 				refKey: props.refKey,
 				ref,
@@ -152,6 +166,8 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 				units: scale?.units ?? "",
 				precision,
 				lngLat,
+				geometry: feature.geometry,
+				...(bbox && { bbox }),
 				selectable: selectable && selectionId(ref) !== null
 			});
 		}
