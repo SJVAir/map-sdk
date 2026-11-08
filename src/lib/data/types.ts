@@ -16,6 +16,12 @@ export interface MapFeatureProperties {
 	value: number | string | null;
 }
 
+/** An HMS fire on the map: a group of nearby detections, or a single detection. */
+export interface FireFeatureProperties extends MapFeatureProperties {
+	/** Set on a group: how many detections it averages. Absent on a single detection. */
+	count?: number;
+}
+
 /** A monitor on the map: what the monitors preset draws and its tooltips show. */
 export interface MonitorFeatureProperties extends MapFeatureProperties {
 	/** The server's monitor type (e.g. "purpleair", "airnow"); picks the marker shape. */

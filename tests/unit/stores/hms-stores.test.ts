@@ -190,9 +190,12 @@ describe("fire store", () => {
 		expect(groups).toHaveLength(2);
 		const merged = groups.find((g) => g.properties.value === 25)!;
 		expect(merged.properties.name).toBe("2 fire detections");
+		expect(merged.properties.count).toBe(2);
 		expect(merged.properties.refKey).toMatch(/^feature:/);
 		const single = groups.find((g) => g.properties.value === 5)!;
-		expect(single.properties.name).toBe("Fire detection");
+		// A group of 1 is still a group: it names its count.
+		expect(single.properties.name).toBe("1 fire detection");
+		expect(single.properties.count).toBe(1);
 	});
 
 	it("empty day is ready with empty collections", async () => {
