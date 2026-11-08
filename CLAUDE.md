@@ -62,30 +62,33 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `featureForElement`, camera moves (`easeTo`/`flyTo`/`fitBounds`), `ready`, `gl`,
   `projection`/`space` config, and the `maptilerMap()` escape hatch (for markers and popups only).
   It has no GL map of its own; `MapView` attaches one. `plugin.ts` defines `MapPlugin`
-  (`hoverPriority`, `tooltipShowsName`) and `PluginContext` (`addCustomLayer`);
+  (`hoverPriority`, `tooltipShowsName`, `hoverable`) and `PluginContext` (`addCustomLayer`);
   `scoped-context.ts`'s internal `scopedContext` lets a preset run a nested plugin under a prefix.
   `plugin-host.svelte.ts` runs plugins' `setup` when the style is ready and tears them down on
   detach or restyle (draw order = registry order); `interactions.svelte.ts` routes clicks, hovers
-  (and the pointer cursor), and blocking layers (cluster bubbles); `basemap.svelte.ts` switches and
-  falls back between styles. Nothing is module-global: two maps on a page never share state, and
-  every source/layer id is namespaced `${mapUid}:${pluginId}:${local}`.
+  (and the pointer cursor), and blocking layers (cluster bubbles); a `hoverable: false` plugin's
+  features are left out of the hover as if not drawn, but still clicked; `basemap.svelte.ts`
+  switches and falls back between styles. Nothing is module-global: two maps on a page never share
+  state, and every source/layer id is namespaced `${mapUid}:${pluginId}:${local}`.
 - **Data** (`src/lib/data/`, entry `./data`): types (`DataSource`, `FeatureRef`,
-  `SpatialSelection`), `Scale` helpers (`levelFor`, `NO_LEVEL`), refs, selection rules, `staticSource`,
-  and the three providers (`metadata`, `messages`, `format`) with defaults. `messages/en.json` holds
-  every `mapsdk_*` UI string.
+  `SpatialSelection`, `FireFeatureProperties`), `Scale` helpers (`levelFor`, `NO_LEVEL`), refs,
+  selection rules, `staticSource`, and the three providers (`metadata`, `messages`, `format`) with
+  defaults (`format.dateTime` gives sjvair.com's "4:00 pm Friday Nov 06, 2026", in Pacific).
+  `messages/en.json` holds every `mapsdk_*` UI string.
 - **Stores** (`src/lib/stores/`, entry `./stores`): `createMonitorsStore()` (live monitors list and
   readings with polling, `meta`), `createHmsSmokeStore`, `createHmsFireStore`, and
   `createCollocationSitesStore`, the last three on the shared `load-once` core. Each exposes a
   `dataSource`. `cleanFires` is exported from here.
 - **Plugins** (`src/lib/plugins/`): the general `pointsPlugin` (icons, clusters; `selectedStyle`,
   `icon.mutedColor`, `zoomRange`, `legendDisplay`, `legendTitle`, `detail` for features with no
-  level) and `shapesPlugin`
-  (fill/`outline`/check overlay), plus shared style expressions, scale resolution, and the exported
-  marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
+  level, `truncateValues` to cut values off instead of rounding) and `shapesPlugin`
+  (fill/`outline`/check overlay, `hoverable`), plus shared style expressions, scale resolution,
+  and the exported marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
 - **Presets** (`src/lib/presets/`): `monitorsPlugin`, `collocationSitesPlugin`, `regionsPlugin`,
   `calHeatScorePlugin`, `forecastZonesPlugin`, `hmsSmokePlugin`, `hmsFirePlugin` (groups, then
-  hotspots from zoom 10), and `groupFires`, with the monitor, cluster, and collocation tooltips
-  (`CollocationTooltip`). Presets never fetch.
+  hotspots from zoom 10), and `groupFires`, with the monitor, cluster (its "within a X mi² area"
+  line from `cluster-area.ts`'s convex hull), collocation (`CollocationTooltip`), and fire
+  (`FireTooltip`, the reading box) tooltips. Smoke takes no hover. Presets never fetch.
 - **View** (`src/lib/view/`): `MapView.svelte` creates the GL map (`create-gl-map.ts`: per-map key
   through `transformRequest`, theme watching, `active` releases WebGL). Props include `controls`
   (`"mapsdk"` | `"engine"` | `"none"`), `selectionBar`, `tooltip` (`"pinned"` | `"pointer"`), and
