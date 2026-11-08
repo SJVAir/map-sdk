@@ -94,13 +94,13 @@
 	const units = $derived(scale?.units ?? "");
 	/** The area to 3 decimals, or null when there is none to show (it would read 0.000). */
 	const area = $derived.by(() => {
-		if (!leaves) return null;
-		const text = format.number(leaves.area, {
+		// Decided on the number, so a host's own number format can't change what's hidden.
+		if (!leaves || Math.round(leaves.area * 1000) === 0) return null;
+		return format.number(leaves.area, {
 			minimumFractionDigits: 3,
 			maximumFractionDigits: 3,
 			useGrouping: false
 		});
-		return Number(text) === 0 ? null : text;
 	});
 	const max = $derived(leaves?.values.length ? Math.max(...leaves.values) : null);
 	const min = $derived(leaves?.values.length ? Math.min(...leaves.values) : null);

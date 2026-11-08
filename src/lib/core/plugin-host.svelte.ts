@@ -449,7 +449,8 @@ export class PluginHost {
 						layerIds,
 						toHover,
 						onClick,
-						running.plugin.hoverPriority ?? 0
+						running.plugin.hoverPriority ?? 0,
+						running.plugin.hoverable ?? true
 					)
 				);
 			},

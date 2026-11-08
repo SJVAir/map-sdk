@@ -340,6 +340,29 @@ describe("MonitorClusterTooltip", () => {
 		expect(document.body.textContent).not.toContain("within");
 	});
 
+	it("hides a zero area with a host format that uses comma decimals", async () => {
+		const three = [1, 2, 3].map((n) => monitor(String(n), "purpleair", 10));
+		const comma = {
+			...format,
+			number: (value: number, options?: Intl.NumberFormatOptions) =>
+				new Intl.NumberFormat("de-DE", options).format(value)
+		};
+		render(MonitorClusterTooltip, {
+			cluster: cluster(three, [
+				[-119.7, 36.7],
+				[-119.70001, 36.7],
+				[-119.7, 36.70001]
+			]),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format: comma,
+			metadata
+		});
+		await expect.element(page.getByText(/^Max:/)).toBeVisible();
+		await expect.element(page.getByText("3 monitors", { exact: true })).toBeVisible();
+		expect(document.body.textContent).not.toContain("within");
+	});
+
 	it("the area belongs to the current cluster", async () => {
 		const three = [1, 2, 3].map((n) => monitor(String(n), "purpleair", 10));
 		const tri: Array<[number, number]> = [

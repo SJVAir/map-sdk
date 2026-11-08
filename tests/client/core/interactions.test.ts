@@ -702,3 +702,51 @@ describe("non-hoverable plugins", () => {
 		expect(handler).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ pluginId: "smoke" }));
 	});
 });
+
+describe("non-hoverable plugins with blocking layers", () => {
+	it("a non-hoverable plugin's bubbles take no hover but still block clicks", async () => {
+		const clicks: unknown[] = [];
+		const map = createMap({ config });
+		map.addPlugin(points("regions", "region"));
+		map.addPlugin({
+			id: "bubbles",
+			hoverable: false,
+			setup(ctx) {
+				const source = ctx.addSource("src", {
+					type: "geojson",
+					data: { type: "FeatureCollection", features: [] }
+				});
+				ctx.blocking(
+					[ctx.addLayer("bubbles", { type: "circle", source })],
+					() => ({
+						pluginId: "bubbles",
+						ref: { kind: "feature", id: "cluster:1" },
+						refKey: "feature:cluster:1",
+						name: ""
+					}),
+					() => clicks.push("bubble")
+				);
+				return () => {};
+			}
+		});
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		const handler = vi.fn();
+		map.on("featureclick", handler);
+		gl.setRenderedFeatures([
+			{
+				layer: { id: `${map.uid}:bubbles:bubbles` },
+				source: `${map.uid}:bubbles:src`,
+				properties: {},
+				geometry: { type: "Point", coordinates: [-119, 36] }
+			},
+			rendered(map, "regions", "2")
+		]);
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+		expect(map.hovered?.hit.pluginId).toBe("regions");
+		click(gl);
+		expect(clicks).toEqual(["bubble"]);
+		expect(handler).not.toHaveBeenCalled();
+	});
+});

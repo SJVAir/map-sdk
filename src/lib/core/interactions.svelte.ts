@@ -112,7 +112,8 @@ export class InteractionRouter {
 		layerIds: string[],
 		toHover?: (props: Record<string, unknown>) => FeatureHit | null,
 		onClick?: (feature: BlockingClick) => void,
-		priority = 0
+		priority = 0,
+		hoverable = true
 	): () => void {
 		return this.#add({
 			pluginId,
@@ -121,7 +122,7 @@ export class InteractionRouter {
 			blocking: true,
 			onClick,
 			priority,
-			hoverable: true
+			hoverable
 		});
 	}
 
