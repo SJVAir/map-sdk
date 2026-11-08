@@ -96,6 +96,13 @@ describe("hmsSmokePlugin", () => {
 	});
 });
 
+describe("hmsSmokePlugin hover", () => {
+	it("takes no hover, so plumes show no hover tooltip", () => {
+		const source = new TestSource({ features: null, scale: smokeScale });
+		expect(hmsSmokePlugin({ source, layerLabel: "Smoke" }).hoverable).toBe(false);
+	});
+});
+
 describe("hmsSmokePlugin outline", () => {
 	it("hmsSmokePlugin uses level outline", async () => {
 		const source = new TestSource<Props>({ features: SMOKE, scale: smokeScale });

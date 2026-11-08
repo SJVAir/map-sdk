@@ -165,6 +165,12 @@ export interface MapPlugin {
 	 * Clicks ignore this (topmost first), and a blocking layer on top still blocks them.
 	 */
 	hoverPriority?: number;
+	/**
+	 * False: the plugin's features never take the hover (so no hover tooltip and no pointer
+	 * cursor) and never hide a feature beneath from it, as if they weren't rendered. Clicks,
+	 * `featuresAt`, and keyboard focus from the list are unchanged. Default true.
+	 */
+	hoverable?: boolean;
 	displayOptions?: Snippet;
 	/** Richer tooltip content for one of this plugin's features, below its name. */
 	tooltip?(item: FeatureListItem): Snippet | undefined;

@@ -13,7 +13,8 @@ export interface HmsSmokePluginOptions {
 /**
  * NOAA HMS smoke plumes: polygons filled and outlined (`outline: "level"`) by density, using each
  * level's opacity. Not selectable; listed (each plume a row with its density level), so plumes
- * can be reached without a mouse.
+ * can be reached without a mouse. Hovering a plume shows no tooltip and never hides another
+ * layer's (`hoverable: false`); focusing one from the list still pins its tooltip.
  *
  * The source's `scale` is expected to be the ScaleRef
  * `{ dataset: "hms-smoke", entryType: "smoke-density" }`, and each feature's `value` its density
@@ -26,6 +27,7 @@ export function hmsSmokePlugin(options: HmsSmokePluginOptions): MapPlugin {
 		layerLabel: options.layerLabel,
 		mode: "choropleth",
 		selectable: false,
-		outline: "level"
+		outline: "level",
+		hoverable: false
 	});
 }

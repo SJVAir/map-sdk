@@ -432,7 +432,13 @@ export class PluginHost {
 			interactive(layerIds, toHit) {
 				if (running.dead) return;
 				running.unregisters.push(
-					router.register(pluginId, layerIds, toHit, running.plugin.hoverPriority ?? 0)
+					router.register(
+						pluginId,
+						layerIds,
+						toHit,
+						running.plugin.hoverPriority ?? 0,
+						running.plugin.hoverable ?? true
+					)
 				);
 			},
 			blocking(layerIds, toHover, onClick) {
