@@ -220,33 +220,41 @@ function openArea(pts: Pt[]): number {
 	return Math.abs(area) / 2;
 }
 
-/** The midpoint of the widest interior span of a horizontal line through the clipped polygon. */
+/**
+ * A point well inside the clipped polygon (outer ring, then holes): the midpoint of the widest
+ * interior span of a horizontal line through its middle. When that line has none (a C shape,
+ * bands around a hole), the widest span among lines between neighboring vertex heights.
+ */
 function polygonInteriorPoint(rings: Pt[][]): Pt | null {
-	const outer = rings[0];
-	let south = Infinity;
-	let north = -Infinity;
-	for (const p of outer) {
-		south = Math.min(south, p[1]);
-		north = Math.max(north, p[1]);
-	}
-	if (!(north > south)) return null;
-	let y = (south + north) / 2;
-	const vertexAt = (yy: number) => rings.some((ring) => ring.some((p) => p[1] === yy));
-	if (vertexAt(y)) y += (north - south) * 1e-9;
-	const xs: number[] = [];
-	for (const ring of rings) {
-		for (let i = 0; i < ring.length; i++) {
-			const [a, b] = [ring[i], ring[(i + 1) % ring.length]];
-			if (a[1] > y !== b[1] > y) xs.push(atY(a, b, y)[0]);
-		}
-	}
-	xs.sort((a, b) => a - b);
+	const ys = [...new Set(rings.flatMap((ring) => ring.map((p) => p[1])))].sort((a, b) => a - b);
+	if (ys.length < 2) return null;
+	const middle = widestSpan(rings, ys, [(ys[0] + ys[ys.length - 1]) / 2]);
+	if (middle) return middle;
+	const gaps: number[] = [];
+	for (let i = 1; i < ys.length; i++) gaps.push((ys[i - 1] + ys[i]) / 2);
+	return widestSpan(rings, ys, gaps);
+}
+
+/** The midpoint of the widest interior span on any of the horizontal `lines`. */
+function widestSpan(rings: Pt[][], ys: number[], lines: number[]): Pt | null {
 	let best: Pt | null = null;
 	let width = 0;
-	for (let i = 0; i + 1 < xs.length; i += 2) {
-		if (xs[i + 1] - xs[i] > width) {
-			width = xs[i + 1] - xs[i];
-			best = [(xs[i] + xs[i + 1]) / 2, y];
+	for (let y of lines) {
+		// On a vertex height the crossings double up; step off it.
+		if (ys.includes(y)) y += (ys[ys.length - 1] - ys[0]) * 1e-9;
+		const xs: number[] = [];
+		for (const ring of rings) {
+			for (let i = 0; i < ring.length; i++) {
+				const [a, b] = [ring[i], ring[(i + 1) % ring.length]];
+				if (a[1] > y !== b[1] > y) xs.push(atY(a, b, y)[0]);
+			}
+		}
+		xs.sort((a, b) => a - b);
+		for (let i = 0; i + 1 < xs.length; i += 2) {
+			if (xs[i + 1] - xs[i] > width) {
+				width = xs[i + 1] - xs[i];
+				best = [(xs[i] + xs[i + 1]) / 2, y];
+			}
 		}
 	}
 	return best;
@@ -293,18 +301,20 @@ export function shapeAnchor(
 	const polygons = polygonsOf(geometry);
 	if (polygons) {
 		if (inRect(center, view) && containsPoint(geometry, center)) return center;
-		let best: Pt[][] | null = null;
-		let bestArea = 0;
+		// Visible parts, largest first; the first that yields a point wins.
+		const parts: Array<{ rings: Pt[][]; area: number }> = [];
 		for (const polygon of polygons) {
 			if (!polygon[0] || ringEdges(polygon[0]).length === 0) continue;
 			const rings = polygon.map((ring) => clipRing(ring, view));
 			const area = rings[0].length >= 3 ? openArea(rings[0]) : 0;
-			if (area > bestArea) {
-				bestArea = area;
-				best = rings.filter((ring, i) => i === 0 || ring.length >= 3);
-			}
+			if (area > 0) parts.push({ rings: rings.filter((r, i) => i === 0 || r.length >= 3), area });
 		}
-		return best ? polygonInteriorPoint(best) : null;
+		parts.sort((a, b) => b.area - a.area);
+		for (const { rings } of parts) {
+			const at = polygonInteriorPoint(rings);
+			if (at) return at;
+		}
+		return null;
 	}
 	const lines = linesOf(geometry);
 	if (lines) {

@@ -190,6 +190,35 @@ describe("shapeAnchor", () => {
 		expect(containsPoint(holed, at)).toBe(true);
 	});
 
+	it("finds a point when the visible part misses the middle line (a C shape)", () => {
+		const c = polygon([
+			[0, 0],
+			[10, 0],
+			[10, 2],
+			[2, 2],
+			[2, 8],
+			[10, 8],
+			[10, 10],
+			[0, 10],
+			[0, 0]
+		]);
+		const view = { west: 5, south: 0, east: 9, north: 10 };
+		expect(intersectsBounds(shape(c), view)).toBe(true);
+		const at = shapeAnchor(c, view, [7, 5])!;
+		expect(at).not.toBeNull();
+		expect(inside(at, view)).toBe(true);
+		expect(containsPoint(c, at)).toBe(true);
+	});
+
+	it("finds a point in the bands around a hole that fills the middle line", () => {
+		const holed = polygon(rect(0, 0, 10, 10), rect(1, 3, 9, 7));
+		const view = { west: 2, south: 2, east: 8, north: 8 };
+		const at = shapeAnchor(holed, view, [5, 5])!;
+		expect(at).not.toBeNull();
+		expect(inside(at, view)).toBe(true);
+		expect(containsPoint(holed, at)).toBe(true);
+	});
+
 	it("is on the visible piece of a line", () => {
 		const line: Geometry = {
 			type: "LineString",
