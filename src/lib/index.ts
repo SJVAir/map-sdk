@@ -18,6 +18,8 @@ export { legendSection } from "./ui/legend-data.js";
 export type { LegendBar as LegendBarData, LegendSection } from "./ui/legend-data.js";
 export { rowLabel } from "./ui/feature-list.js";
 export type { SortBy } from "./ui/feature-list.js";
+export { geometryBbox, intersectsBounds } from "./core/shape-view.js";
+export type { Bbox } from "./core/shape-view.js";
 export { pointsPlugin } from "./plugins/points.svelte.js";
 export type {
 	ClusterInfo,

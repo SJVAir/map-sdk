@@ -49,6 +49,26 @@ const names = (items: FeatureListItem[]) => items.map((i) => i.name);
 describe("inView", () => {
 	const bounds = { west: -120, south: 36, east: -119, north: 37 };
 
+	it("keeps a shape that covers the bounds though its label point is outside", () => {
+		const cover = item("6", "Cover", {
+			lngLat: [-121, 32],
+			geometry: {
+				type: "Polygon",
+				coordinates: [
+					[
+						[-122, 30],
+						[-118, 30],
+						[-118, 38],
+						[-122, 38],
+						[-122, 30]
+					]
+				]
+			}
+		});
+		const away = item("7", "Away", { lngLat: [-121, 32] });
+		expect(names(inView([cover, away], bounds))).toEqual(["Cover"]);
+	});
+
 	it("keeps only items inside the bounds", () => {
 		const items = [
 			item("1", "In", { lngLat: [-119.5, 36.5] }),
