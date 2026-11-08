@@ -35,6 +35,11 @@ export interface ShapesOptions<P extends MapFeatureProperties> {
 	 * (so LineString geometries are not drawn either).
 	 */
 	outline?: "theme" | "level" | "none";
+	/**
+	 * False: hovering a shape shows no tooltip and doesn't hide what is beneath it
+	 * (`MapPlugin.hoverable`); list focus still shows it. Default true.
+	 */
+	hoverable?: boolean;
 }
 
 /** The check image is drawn at this multiple of its size and scaled down, for sharp HiDPI. */
@@ -344,5 +349,6 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 		selectable
 	};
 	if (options.listed ?? true) plugin.features = features;
+	if (options.hoverable === false) plugin.hoverable = false;
 	return plugin;
 }

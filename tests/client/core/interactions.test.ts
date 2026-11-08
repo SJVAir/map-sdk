@@ -627,3 +627,126 @@ describe("hover priority and cursor", () => {
 		expect(canvas.style.cursor).toBe("");
 	});
 });
+
+describe("non-hoverable plugins", () => {
+	const move = (gl: FakeGl) =>
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+
+	/** A plugin with a blocking bubbles layer whose hover hit is the bubble itself. */
+	const clusters: MapPlugin = {
+		id: "clusters",
+		setup(ctx) {
+			const source = ctx.addSource("src", {
+				type: "geojson",
+				data: { type: "FeatureCollection", features: [] }
+			});
+			ctx.blocking([ctx.addLayer("bubbles", { type: "circle", source })], () => ({
+				pluginId: "clusters",
+				ref: { kind: "feature", id: "cluster:1" },
+				refKey: "feature:cluster:1",
+				name: ""
+			}));
+			return () => {};
+		}
+	};
+
+	async function withSmoke(...others: MapPlugin[]) {
+		const map = createMap({ config });
+		// Drawn last and with a higher priority, so only `hoverable: false` keeps it from the hover.
+		for (const plugin of others) map.addPlugin(plugin);
+		map.addPlugin({ ...points("smoke", "region"), hoverable: false, hoverPriority: 5 });
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		return { map, gl };
+	}
+
+	it("a hover over only a non-hoverable feature hovers nothing and sets no pointer cursor", async () => {
+		const { map, gl } = await withSmoke();
+		gl.setRenderedFeatures([rendered(map, "smoke", "1")]);
+		move(gl);
+		expect(map.hovered).toBeNull();
+		expect(gl.canvas.style.cursor).not.toBe("pointer");
+	});
+
+	it("a feature beneath a non-hoverable one takes the hover, whatever the priorities", async () => {
+		const { map, gl } = await withSmoke(points("regions", "region"));
+		gl.setRenderedFeatures([rendered(map, "smoke", "1"), rendered(map, "regions", "2")]);
+		move(gl);
+		expect(map.hovered?.hit.pluginId).toBe("regions");
+		expect(gl.canvas.style.cursor).toBe("pointer");
+	});
+
+	it("a blocking bubble beneath a non-hoverable feature gives its own hover", async () => {
+		const { map, gl } = await withSmoke(clusters);
+		gl.setRenderedFeatures([
+			rendered(map, "smoke", "1"),
+			{
+				layer: { id: `${map.uid}:clusters:bubbles` },
+				source: `${map.uid}:clusters:src`,
+				properties: {},
+				geometry: { type: "Point", coordinates: [-119, 36] }
+			}
+		]);
+		move(gl);
+		expect(map.hovered?.hit.refKey).toBe("feature:cluster:1");
+	});
+
+	it("clicks and featuresAt still include non-hoverable hits", async () => {
+		const { map, gl } = await withSmoke(points("regions", "region"));
+		const handler = vi.fn();
+		map.on("featureclick", handler);
+		gl.setRenderedFeatures([rendered(map, "smoke", "1"), rendered(map, "regions", "2")]);
+		expect(map.featuresAt({ x: 1, y: 2 }).map((h) => h.pluginId)).toEqual(["smoke", "regions"]);
+		click(gl);
+		expect(handler).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ pluginId: "smoke" }));
+	});
+});
+
+describe("non-hoverable plugins with blocking layers", () => {
+	it("a non-hoverable plugin's bubbles take no hover but still block clicks", async () => {
+		const clicks: unknown[] = [];
+		const map = createMap({ config });
+		map.addPlugin(points("regions", "region"));
+		map.addPlugin({
+			id: "bubbles",
+			hoverable: false,
+			setup(ctx) {
+				const source = ctx.addSource("src", {
+					type: "geojson",
+					data: { type: "FeatureCollection", features: [] }
+				});
+				ctx.blocking(
+					[ctx.addLayer("bubbles", { type: "circle", source })],
+					() => ({
+						pluginId: "bubbles",
+						ref: { kind: "feature", id: "cluster:1" },
+						refKey: "feature:cluster:1",
+						name: ""
+					}),
+					() => clicks.push("bubble")
+				);
+				return () => {};
+			}
+		});
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		const handler = vi.fn();
+		map.on("featureclick", handler);
+		gl.setRenderedFeatures([
+			{
+				layer: { id: `${map.uid}:bubbles:bubbles` },
+				source: `${map.uid}:bubbles:src`,
+				properties: {},
+				geometry: { type: "Point", coordinates: [-119, 36] }
+			},
+			rendered(map, "regions", "2")
+		]);
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+		expect(map.hovered?.hit.pluginId).toBe("regions");
+		click(gl);
+		expect(clicks).toEqual(["bubble"]);
+		expect(handler).not.toHaveBeenCalled();
+	});
+});

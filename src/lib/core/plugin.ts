@@ -55,6 +55,12 @@ export interface FeatureListItem {
 	 * metadata's display hint). Without it the value is formatted as given.
 	 */
 	precision?: number;
+	/**
+	 * Cut a numeric `value` off at `precision` instead of rounding it, so the number never reads
+	 * as the next level (e.g. fire power: 9.96 MW shows "9.9", not "10.0", beside "<10"). Default
+	 * false.
+	 */
+	truncate?: boolean;
 	lngLat: [number, number];
 	selectable: boolean;
 	/**
@@ -159,6 +165,12 @@ export interface MapPlugin {
 	 * Clicks ignore this (topmost first), and a blocking layer on top still blocks them.
 	 */
 	hoverPriority?: number;
+	/**
+	 * False: the plugin's features never take the hover (so no hover tooltip and no pointer
+	 * cursor) and never hide a feature beneath from it, as if they weren't rendered. Clicks,
+	 * `featuresAt`, and keyboard focus from the list are unchanged. Default true.
+	 */
+	hoverable?: boolean;
 	displayOptions?: Snippet;
 	/** Richer tooltip content for one of this plugin's features, below its name. */
 	tooltip?(item: FeatureListItem): Snippet | undefined;

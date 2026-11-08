@@ -127,6 +127,13 @@ describe("rowLabel", () => {
 		);
 	});
 
+	it("reads a cut-off value when the item asks for one", () => {
+		const extra = { value: 9.96, precision: 1, truncate: true, units: "MW" } as const;
+		const label = rowLabel(item("1", "3 fire detections", extra), defaultMessages, format);
+		expect(label).toContain("9.9 MW");
+		expect(label).not.toContain("10.0");
+	});
+
 	it("reads a detail in the level's place after a value", () => {
 		const extra = { value: 5, level: NO_LEVEL, detail: "Level 2 charger" } as const;
 		expect(rowLabel(item("1", "Fresno Station", extra), defaultMessages, format)).toBe(

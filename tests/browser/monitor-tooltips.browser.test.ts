@@ -1,3 +1,5 @@
+import area from "@turf/area";
+import { convertArea, polygon } from "@turf/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page } from "vitest/browser";
@@ -45,12 +47,24 @@ describe("MonitorTooltip", () => {
 		const text = document.body.textContent!.replace(/\s+/g, " ");
 		expect(text).toContain("PM2.5 12");
 		expect(text).toContain("Fresno Garland");
-		expect(text).toContain("Nov 3, 2026, 1:00 PM");
+		expect(text).toContain("1:00 pm Tuesday Nov 03, 2026");
 		expect(text).toContain("Moderate");
 		expect(text).toMatch(/Last updated \d+ (minutes|hours|days?) ago/);
 		const box = page.getByText("12").element().parentElement!;
 		expect(getComputedStyle(box).backgroundColor).toBe("rgb(255, 255, 0)");
 		expect(getComputedStyle(box).color).toBe("rgb(0, 0, 0)");
+	});
+
+	it("adds PT after the time on a device outside Pacific", async () => {
+		render(MonitorTooltip, {
+			item: item(12.6),
+			timestamp: "2026-07-01T19:30:00Z",
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format: createDefaultFormat("America/New_York"),
+			interval: null
+		});
+		expect(document.body.textContent).toContain("12:30 pm Wednesday Jul 01, 2026 PT");
 	});
 
 	it("shows a whole number whatever the item's precision, as monitor-map does", async () => {
@@ -92,7 +106,7 @@ describe("MonitorTooltip", () => {
 		});
 		const detail = document.querySelector(".mapsdk-monitor-detail")!;
 		const texts = [...detail.children].map((c) => c.textContent!.trim());
-		expect(texts[0]).toContain("Nov 3, 2026");
+		expect(texts[0]).toContain("Tuesday Nov 03, 2026");
 		expect(texts[1]).toBe("Fresno Garland");
 		expect(texts[2]).toBe("Moderate");
 		expect(texts[3]).toMatch(/^Last updated/);
@@ -276,12 +290,97 @@ describe("MonitorClusterTooltip", () => {
 		});
 		await expect.element(page.getByText("SJVAir PurpleAir Monitors")).toBeVisible();
 		const text = document.body.textContent!.replace(/\s+/g, " ");
-		expect(text).toContain("3 monitors");
+		const tri: Array<[number, number]> = [
+			[-119.7, 36.7],
+			[-119.6, 36.7],
+			[-119.6, 36.8]
+		];
+		const expected = convertArea(area(polygon([[...tri, tri[0]]])), "meters", "miles").toFixed(3);
+		expect(text).toContain(`3 monitors within a ${expected} mi² area`);
 		expect(text).not.toContain("covering");
 		expect(text).toContain("PM2.5 15 (cluster avg)");
 		expect(text).toContain("Moderate");
 		expect(text).toContain("Max: 20 µg/m³");
 		expect(text).toContain("Min: 10 µg/m³");
+	});
+
+	it("collinear leaves show just the count", async () => {
+		const three = [1, 2, 3].map((n) => monitor(String(n), "purpleair", 10));
+		render(MonitorClusterTooltip, {
+			cluster: cluster(three, [
+				[-119.7, 36.7],
+				[-119.6, 36.7],
+				[-119.5, 36.7]
+			]),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			metadata
+		});
+		await expect.element(page.getByText(/^Max:/)).toBeVisible();
+		await expect.element(page.getByText("3 monitors", { exact: true })).toBeVisible();
+		expect(document.body.textContent).not.toContain("within");
+	});
+
+	it("leaves a few metres apart show just the count", async () => {
+		const three = [1, 2, 3].map((n) => monitor(String(n), "purpleair", 10));
+		render(MonitorClusterTooltip, {
+			cluster: cluster(three, [
+				[-119.7, 36.7],
+				[-119.70001, 36.7],
+				[-119.7, 36.70001]
+			]),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			metadata
+		});
+		await expect.element(page.getByText(/^Max:/)).toBeVisible();
+		await expect.element(page.getByText("3 monitors", { exact: true })).toBeVisible();
+		expect(document.body.textContent).not.toContain("within");
+	});
+
+	it("hides a zero area with a host format that uses comma decimals", async () => {
+		const three = [1, 2, 3].map((n) => monitor(String(n), "purpleair", 10));
+		const comma = {
+			...format,
+			number: (value: number, options?: Intl.NumberFormatOptions) =>
+				new Intl.NumberFormat("de-DE", options).format(value)
+		};
+		render(MonitorClusterTooltip, {
+			cluster: cluster(three, [
+				[-119.7, 36.7],
+				[-119.70001, 36.7],
+				[-119.7, 36.70001]
+			]),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format: comma,
+			metadata
+		});
+		await expect.element(page.getByText(/^Max:/)).toBeVisible();
+		await expect.element(page.getByText("3 monitors", { exact: true })).toBeVisible();
+		expect(document.body.textContent).not.toContain("within");
+	});
+
+	it("the area belongs to the current cluster", async () => {
+		const three = [1, 2, 3].map((n) => monitor(String(n), "purpleair", 10));
+		const tri: Array<[number, number]> = [
+			[-119.7, 36.7],
+			[-119.6, 36.7],
+			[-119.6, 36.8]
+		];
+		const screen = await render(MonitorClusterTooltip, {
+			cluster: cluster(three, tri),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			metadata
+		});
+		await expect.element(page.getByText(/within a/)).toBeVisible();
+		await screen.rerender({ cluster: cluster(three, tri, () => new Promise(() => {})) });
+		await expect.element(page.getByText("3 monitors", { exact: true })).toBeVisible();
+		expect(document.body.textContent).not.toContain("within");
 	});
 
 	it("falls back to the type id", async () => {
@@ -336,8 +435,8 @@ describe("CollocationTooltip", () => {
 		const text = document.body.textContent!.replace(/\s+/g, " ");
 		expect(text).toContain("PM2.5 12 (1 hour avg)");
 		expect(text).toContain("PM2.5 40 (2 min avg)");
-		expect(text).toContain("Nov 3, 2026, 1:00 PM");
-		expect(text).toContain("Nov 3, 2026, 1:02 PM");
+		expect(text).toContain("1:00 pm Tuesday Nov 03, 2026");
+		expect(text).toContain("1:02 pm Tuesday Nov 03, 2026");
 		// The reference monitor's own name, not the site's.
 		expect(text).toContain("Garland Reference");
 		expect(text).not.toContain("Fresno Garland");

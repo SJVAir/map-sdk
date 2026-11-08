@@ -167,7 +167,22 @@ points only), as sjvair.com's map does today.
 
 `outline` on `shapesPlugin` is `"theme"` (default, a 1px `--foreground` edge), `"level"` (the edge
 in each level's color at the fill's opacity; choropleth only), or `"none"` (no outline layer).
-`hmsSmokePlugin` uses `"level"`.
+`hmsSmokePlugin` uses `"level"`. `hoverable: false` on `shapesPlugin` sets the plugin's
+`hoverable` (see [Writing a plugin](#writing-a-plugin)): hovering a shape shows no tooltip and
+doesn't hide what is beneath it, while focusing it from the feature list still pins its tooltip.
+`hmsSmokePlugin` uses it, so a plume, which can cover much of the map, never pops up a tooltip.
+
+```ts
+map.addPlugin(
+	shapesPlugin({
+		id: "plumes",
+		source: staticSource(plumes, { dataset: "hms-smoke", entryType: "smoke-density" }),
+		layerLabel: "Plumes",
+		mode: "choropleth",
+		hoverable: false
+	})
+);
+```
 
 `zoomRange: { min?, max? }` on `pointsPlugin` limits every layer it draws (points, clusters,
 selection) to camera zooms from `min` (inclusive) up to `max` (exclusive), switching live while
@@ -177,7 +192,12 @@ zooming. Two plugins whose ranges meet hand over with no gap, on the globe too.
 colored by FRP. With `hotspots`, it switches by itself while zooming, as sjvair.com's map does:
 `source` (the fire store's `groups`) below zoom 10 and `hotspots` from zoom 10. It stays one
 layer: one legend section, one feature list (the groups, so keyboard users reach every fire;
-hotspots aren't listed), and tooltips for both.
+hotspots aren't listed), and tooltips for both. The tooltip is the monitors' reading box: "Fire
+(MW)", the power in its level's color, beside the name ("3 fire detections", "1 fire detection"
+for a group, "Fire detection" for one detection) and the level ("50–149 MW"); a group of two or
+more says "Average". A feature with a `count` (`FireFeatureProperties`, which the fire store's
+groups carry) is a group. Fire values are cut off at the display precision, not rounded, in the
+tooltip, the list and its accessible names, so 9.96 MW reads "9.9" beside "<10".
 
 `legendDisplay: "gradient" | "blocks"` on `pointsPlugin` sets how the legend draws a range scale
 (default a gradient; `hmsFirePlugin` uses `"blocks"`, labeled with the levels' own labels). A blocks
@@ -204,6 +224,10 @@ charger") shown where "No level" would be: in the feature list (plain text, no s
 accessible name ("Fresno Station, Level 2 charger"), and the tooltip. A feature with a level
 always shows its level. A plugin of your own sets the same `detail` on its `FeatureListItem`s.
 
+`truncateValues: true` on `pointsPlugin` cuts values off at the display precision instead of
+rounding them (`truncate` on each `FeatureListItem`), in the list, its accessible names, and the
+generic tooltip, so a value never reads as the next level up. `hmsFirePlugin` uses it.
+
 `collocationSitesPlugin({ id?, source, layerLabel })` draws collocation sites as sjvair.com does:
 each at its reference monitor, in that monitor's shape and level color (inactive gray, inside
 outlined), wrapped in a crosshair of `COLLOCATION_CROSSHAIR_COLOR` (`#4A5FC6`, a fixed color on
@@ -229,7 +253,12 @@ and reads "No level"; a level with an empty color draws neutral with its own lab
 source loads, fails, or is unavailable, the legend says so (a failure offers "Try again", which
 calls `status.retry()`). Values are shown with the metadata's display precision, except in the
 monitor, cluster, and collocation tooltips, which match monitor-map: the reading and a cluster's
-average are whole numbers, and a cluster's max and min are as reported.
+average are whole numbers, and a cluster's max and min are as reported. Fire values are cut off
+rather than rounded (see `truncateValues`). Times in the tooltips read like sjvair.com's map, in
+Pacific time: "4:00 pm Friday Nov 06, 2026", with " PT" after them on a device in another zone.
+The monitor cluster tooltip's count line gives the area the monitors are within, "3 monitors
+within a 22.619 mi² area": the area of their convex hull, left out when it would read 0.000 (two
+monitors, or all on one line or one spot).
 
 `createMonitorsStore()` (from `@sjvair/map-sdk/stores`) loads the monitors list and latest readings
 for an entry type, polls every two minutes, and exposes `dataSource`. `init()`, `update()`,
@@ -356,7 +385,10 @@ features are under the pointer, the hover tooltip shows the one whose plugin has
 `hoverPriority` (default 0), the topmost on a tie. Over a cluster bubble, the bubble's tooltip
 shows unless a feature beneath belongs to a plugin with a higher `hoverPriority` than the
 bubble's (collocation sites under monitor clusters). Clicks always go to the topmost, so a click
-on a bubble still zooms into it.
+on a bubble still zooms into it. A plugin with `hoverable: false` never takes the hover: its
+features show no hover tooltip or pointer cursor and are passed over as if they weren't drawn, so
+whatever is beneath gets the hover. They are still clicked, returned by `featuresAt`, and pin
+their tooltip when focused from the feature list.
 
 ```ts
 import type { CustomLayerInterface, MapPlugin, PluginContext } from "@sjvair/map-sdk";
@@ -499,6 +531,34 @@ local sjvair.com stack at `http://localhost:8000`.
    ```bash
    podman exec sjvaircom_web_1 python manage.py loaddata default-calibrations.yaml
    ```
+
+## Changes
+
+### Unreleased (after 0.1.0-beta.3)
+
+Defaults from monitor-map 5.0's parity review against sjvair.com's map (4.3.0). Every map gets
+them; none is an option.
+
+- **Tooltip times** read like sjvair.com's map, in Pacific time: "4:00 pm Friday Nov 06, 2026"
+  (was "Nov 6, 2026, 4:00 PM"). A device in another zone still gets " PT" after the time.
+- **The cluster area line is back.** The monitor cluster tooltip's count line reads "3 monitors
+  within a 22.619 mi² area". This reverses the 2026-11-04 parity decision of "no area line". The
+  wording is new (sjvair.com said "covering"), and the area is the convex hull of the cluster's
+  monitors, so clusters of four or more can differ from sjvair.com's number, which followed the
+  monitors' order and could cross itself. No line when the area would read 0.000.
+- **Fire tooltips are the reading box**: "Fire (MW)", the power in its level's color, beside the
+  name and level; "Average" for a group of two or more. Fire values are cut off, not rounded, in
+  the tooltip, the list and its accessible names. Every group names its count, a group of 1
+  included ("1 fire detection").
+- **Smoke plumes show no hover tooltip** and never take the hover from what is beneath them;
+  focusing a plume from the feature list still pins its tooltip. This reverses part of milestone
+  2's accessibility additions ("tooltips on smoke and fire"): fire keeps a tooltip.
+- **Breaking for hosts with their own message catalog:** `mapsdk_hms_fire_detections` is now
+  `mapsdk_hms_fire_detections_one` / `_other`. New keys: `mapsdk_hms_fire_box_header`,
+  `mapsdk_hms_fire_box_header_no_units`, `mapsdk_hms_fire_average`, `mapsdk_level_with_units`,
+  and `mapsdk_monitor_cluster_count_area_one` / `_other`.
+- **New API:** `MapPlugin.hoverable`, `shapesPlugin`'s `hoverable`, `pointsPlugin`'s
+  `truncateValues`, `FeatureListItem.truncate`, and `FireFeatureProperties`.
 
 ## Development
 

@@ -11,6 +11,8 @@ interface Registration {
 	onClick?: (feature: BlockingClick) => void;
 	/** The plugin's `hoverPriority`. */
 	priority: number;
+	/** False: its features are left out of the hover and cursor, as if not rendered. */
+	hoverable: boolean;
 }
 
 /** What is under one point. */
@@ -55,7 +57,9 @@ export interface Hovered {
  * layers, so registrations can come and go without re-binding listeners. Layers nobody registered
  * are never hit. A blocking layer (e.g. a cluster bubble, which zooms instead) is never hit either,
  * and when it is topmost at a point nothing beneath it is hit; only a feature whose plugin
- * outranks it in `hoverPriority` is hovered through it.
+ * outranks it in `hoverPriority` is hovered through it. A non-hoverable plugin's features (e.g.
+ * smoke plumes) are left out of the hover and cursor as if they weren't rendered, but are still
+ * clicked and returned by lookups.
  */
 export class InteractionRouter {
 	// Bookkeeping only; nothing reads these reactively.
@@ -84,9 +88,17 @@ export class InteractionRouter {
 		pluginId: string,
 		layerIds: string[],
 		toHit: (props: Record<string, unknown>) => FeatureHit | null,
-		priority = 0
+		priority = 0,
+		hoverable = true
 	): () => void {
-		return this.#add({ pluginId, layerIds: [...layerIds], toHit, blocking: false, priority });
+		return this.#add({
+			pluginId,
+			layerIds: [...layerIds],
+			toHit,
+			blocking: false,
+			priority,
+			hoverable
+		});
 	}
 
 	/**
@@ -100,7 +112,8 @@ export class InteractionRouter {
 		layerIds: string[],
 		toHover?: (props: Record<string, unknown>) => FeatureHit | null,
 		onClick?: (feature: BlockingClick) => void,
-		priority = 0
+		priority = 0,
+		hoverable = true
 	): () => void {
 		return this.#add({
 			pluginId,
@@ -108,7 +121,8 @@ export class InteractionRouter {
 			toHit: toHover ?? (() => null),
 			blocking: true,
 			onClick,
-			priority
+			priority,
+			hoverable
 		});
 	}
 
@@ -159,7 +173,8 @@ export class InteractionRouter {
 		return found.blocked ? [] : found.hits;
 	}
 
-	#lookup(point: [number, number]): Lookup {
+	/** What is under one point; with `forHover`, non-hoverable features are left out first. */
+	#lookup(point: [number, number], forHover = false): Lookup {
 		const none: Lookup = { hits: [], hover: null, blocked: false, blocker: null, blockedBy: null };
 		const gl = this.#gl;
 		if (!gl) return none;
@@ -167,6 +182,7 @@ export class InteractionRouter {
 		/* eslint-disable svelte/prefer-svelte-reactivity */
 		const byLayer = new Map<string, Registration>();
 		for (const registration of this.#registrations) {
+			if (forHover && !registration.hoverable) continue;
 			for (const id of registration.layerIds) {
 				// MapLibre errors on querying a missing layer (e.g. mid basemap change).
 				if (!byLayer.has(id) && gl.getLayer(id)) byLayer.set(id, registration);
@@ -268,7 +284,7 @@ export class InteractionRouter {
 	};
 
 	#onMove = (e: PointerEventLike) => {
-		const found = this.#lookup([e.point.x, e.point.y]);
+		const found = this.#lookup([e.point.x, e.point.y], true);
 		const hit = found.blocked ? (found.hover ?? found.blocker) : found.hover;
 		this.#hovered = hit ? { hit, lngLat: [e.lngLat.lng, e.lngLat.lat] } : null;
 		this.#setPointer(found.blocked || hit !== null);

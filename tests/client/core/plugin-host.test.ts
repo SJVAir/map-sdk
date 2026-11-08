@@ -336,7 +336,7 @@ describe("PluginHost", () => {
 		host.add(resourcePlugin("a", [], (ctx) => ctx.interactive(["m1:a:fill"], toHit)));
 		host.attach(createFakeGl({ styleLoaded: true }));
 		await tick();
-		expect(register).toHaveBeenCalledWith("a", ["m1:a:fill"], toHit, 0);
+		expect(register).toHaveBeenCalledWith("a", ["m1:a:fill"], toHit, 0, true);
 		expect(unregister).not.toHaveBeenCalled();
 		host.detach();
 		expect(unregister).toHaveBeenCalledOnce();

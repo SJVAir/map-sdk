@@ -270,7 +270,7 @@
 	function formatValue(row: Row): string {
 		if (row.value === null) return "";
 		return typeof row.value === "number"
-			? formatNumber(row.value, row.precision, map.format)
+			? formatNumber(row.value, row.precision, map.format, row.truncate)
 			: row.value;
 	}
 

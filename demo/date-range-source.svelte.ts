@@ -189,8 +189,9 @@ const loaders: Record<SourceKind, Loader> = {
 				geometry: { type: "Point", coordinates: g.coordinates },
 				properties: {
 					refKey: encodeRef({ kind: "feature", id: g.id }),
-					name: g.count === 1 ? "Fire detection" : `${g.count} fire detections`,
-					value: g.avgFrp
+					name: g.count === 1 ? "1 fire detection" : `${g.count} fire detections`,
+					value: g.avgFrp,
+					count: g.count
 				}
 			}))
 		);

@@ -96,6 +96,13 @@ describe("hmsSmokePlugin", () => {
 	});
 });
 
+describe("hmsSmokePlugin hover", () => {
+	it("takes no hover, so plumes show no hover tooltip", () => {
+		const source = new TestSource({ features: null, scale: smokeScale });
+		expect(hmsSmokePlugin({ source, layerLabel: "Smoke" }).hoverable).toBe(false);
+	});
+});
+
 describe("hmsSmokePlugin outline", () => {
 	it("hmsSmokePlugin uses level outline", async () => {
 		const source = new TestSource<Props>({ features: SMOKE, scale: smokeScale });
@@ -281,6 +288,17 @@ describe("hmsFirePlugin with hotspots", () => {
 			["hms-fire", "feature:f1"],
 			["hms-fire", "feature:hms-fire-group-cluster-1"]
 		]);
+	});
+
+	it("groups have the box tooltip, which shows the name, and list cut-off values", async () => {
+		const { plugin } = await build();
+		expect(plugin.tooltipShowsName).toBe(true);
+		const items = plugin.features?.() ?? [];
+		expect(items.length).toBeGreaterThan(0);
+		for (const item of items) {
+			expect(item.truncate).toBe(true);
+			expect(plugin.tooltip?.(item)).toBeTypeOf("function");
+		}
 	});
 
 	it("hovering a hotspot gives the same content as a group, without listing it", async () => {

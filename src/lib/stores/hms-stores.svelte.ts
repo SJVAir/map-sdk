@@ -3,7 +3,12 @@ import { getHMSFire, getHMSSmoke } from "@sjvair/sdk";
 import { encodeRef } from "../data/refs.js";
 import { defaultMessages, type MessageProvider } from "../data/messages.js";
 import type { ScaleRef } from "../data/scale-types.js";
-import type { DataSource, DataStatus, MapFeatureProperties } from "../data/types.js";
+import type {
+	DataSource,
+	DataStatus,
+	FireFeatureProperties,
+	MapFeatureProperties
+} from "../data/types.js";
 import { cleanFires, groupFires, type FireDetection } from "../presets/fire-groups.js";
 import type { SignalOptions } from "./abort.js";
 import { createLoadOnce, type LoadOnce } from "./load-once.svelte.js";
@@ -33,8 +38,11 @@ export interface HmsSmokeStore {
 export interface HmsFireStore {
 	/** `loading` until loaded, then `ready` (also when today has no fires) or `error`. */
 	readonly status: DataStatus;
-	/** Nearby detections merged (`groupFires`), for `hmsFirePlugin`; `value` is the mean FRP. */
-	readonly groups: DataSource;
+	/**
+	 * Nearby detections merged (`groupFires`), for `hmsFirePlugin`; `value` is the mean FRP and
+	 * `count` how many detections it merges.
+	 */
+	readonly groups: DataSource<FireFeatureProperties>;
 	/** Each detection (`cleanFires`), for `hmsFirePlugin`; `value` is its FRP. */
 	readonly hotspots: DataSource;
 	/** As `HmsSmokeStore.init`. */
@@ -46,16 +54,19 @@ export interface HmsFireStore {
 const SMOKE_SCALE: ScaleRef = { dataset: "hms-smoke", entryType: "smoke-density" };
 const FIRE_SCALE: ScaleRef = { dataset: "hms-fire", entryType: "fire-frp" };
 
-type Collection<G extends Geometry> = FeatureCollection<G, MapFeatureProperties>;
+type Collection<
+	G extends Geometry,
+	P extends MapFeatureProperties = MapFeatureProperties
+> = FeatureCollection<G, P>;
 
 /** A source over a loader's value; `features` stays null until it loads. */
-function sourceOf<T>(
+function sourceOf<T, P extends MapFeatureProperties = MapFeatureProperties>(
 	loader: LoadOnce<T>,
 	scale: ScaleRef,
-	pick: (value: T) => Collection<Geometry>
-): DataSource {
+	pick: (value: T) => Collection<Geometry, P>
+): DataSource<P> {
 	// Built once per loaded value, so every reader shares one object.
-	let cached: { value: T; features: Collection<Geometry> } | null = null;
+	let cached: { value: T; features: Collection<Geometry, P> } | null = null;
 	return {
 		get status() {
 			return loader.status;
@@ -98,7 +109,7 @@ export function createHmsSmokeStore(options: HmsStoreOptions = {}): HmsSmokeStor
 
 interface Fires {
 	hotspots: Collection<Point>;
-	groups: Collection<Point>;
+	groups: Collection<Point, FireFeatureProperties>;
 }
 
 export function createHmsFireStore(options: HmsStoreOptions = {}): HmsFireStore {
@@ -121,16 +132,15 @@ export function createHmsFireStore(options: HmsStoreOptions = {}): HmsFireStore 
 				value: fire.frp
 			}
 		}));
-		const groups: Feature<Point, MapFeatureProperties>[] = groupFires(detections).map((group) => ({
+		// Every group names its count, a group of 1 included ("1 fire detection").
+		const groups: Feature<Point, FireFeatureProperties>[] = groupFires(detections).map((group) => ({
 			type: "Feature",
 			geometry: { type: "Point", coordinates: group.coordinates },
 			properties: {
 				refKey: encodeRef({ kind: "feature", id: group.id }),
-				name:
-					group.count === 1
-						? detection
-						: messages("mapsdk_hms_fire_detections", { count: group.count }),
-				value: group.avgFrp
+				name: messages("mapsdk_hms_fire_detections", { count: group.count }),
+				value: group.avgFrp,
+				count: group.count
 			}
 		}));
 		return {
