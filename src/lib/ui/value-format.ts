@@ -15,8 +15,9 @@ export function formatValue(
 	if (precision === undefined) return format.number(value);
 	if (truncate) {
 		const factor = 10 ** precision;
-		// toPrecision drops float noise first (4.35 * 100 is 434.99999999999994).
-		value = Math.trunc(Number((value * factor).toPrecision(12))) / factor;
+		// toPrecision drops float noise first (4.35 * 100 is 434.99999999999994); 15 digits keep
+		// any real value from rounding up.
+		value = Math.trunc(Number((value * factor).toPrecision(15))) / factor;
 	}
 	return format.number(value, {
 		minimumFractionDigits: precision,

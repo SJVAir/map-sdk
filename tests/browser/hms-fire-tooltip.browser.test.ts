@@ -114,6 +114,16 @@ describe("FireTooltip", () => {
 		expect(text()).toBe("Fire (MW) 9.9 Average 2 fire detections <10 MW");
 	});
 
+	it("a level with no units has no trailing space", async () => {
+		render(FireTooltip, {
+			item: fire(5, "Fire detection", { units: "" }),
+			count: null,
+			messages: defaultMessages,
+			format
+		});
+		expect(page.getByText("<10").element().textContent).toBe("<10");
+	});
+
 	it("without a scale yet: neutral box, header Fire, No level", async () => {
 		render(FireTooltip, {
 			item: fire(12, "Fire detection", { level: NO_LEVEL, units: "", precision: undefined }),

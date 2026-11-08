@@ -172,6 +172,18 @@ in each level's color at the fill's opacity; choropleth only), or `"none"` (no o
 doesn't hide what is beneath it, while focusing it from the feature list still pins its tooltip.
 `hmsSmokePlugin` uses it, so a plume, which can cover much of the map, never pops up a tooltip.
 
+```ts
+map.addPlugin(
+	shapesPlugin({
+		id: "plumes",
+		source: staticSource(plumes, { dataset: "hms-smoke", entryType: "smoke-density" }),
+		layerLabel: "Plumes",
+		mode: "choropleth",
+		hoverable: false
+	})
+);
+```
+
 `zoomRange: { min?, max? }` on `pointsPlugin` limits every layer it draws (points, clusters,
 selection) to camera zooms from `min` (inclusive) up to `max` (exclusive), switching live while
 zooming. Two plugins whose ranges meet hand over with no gap, on the globe too.

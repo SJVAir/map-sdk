@@ -18,6 +18,8 @@ describe("formatValue", () => {
 	it("cuts off without floating-point error", () => {
 		expect(formatValue(4.35, 2, format, true)).toBe("4.35");
 		expect(formatValue(1.15, 2, format, true)).toBe("1.15");
+		// 13 significant digits must not round up to the next level.
+		expect(formatValue(9.999999999999, 1, format, true)).toBe("9.9");
 	});
 
 	it("without a precision, truncate changes nothing", () => {

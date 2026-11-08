@@ -44,7 +44,9 @@
 		<span class="mapsdk-fire-name text-lg">{item.name}</span>
 		<span>
 			{level
-				? messages("mapsdk_level_with_units", { level: level.label, units: item.units })
+				? item.units
+					? messages("mapsdk_level_with_units", { level: level.label, units: item.units })
+					: level.label
 				: messages("mapsdk_no_level")}
 		</span>
 	</div>

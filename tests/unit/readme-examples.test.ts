@@ -95,6 +95,26 @@ describe("README examples", () => {
 		map.destroy();
 	});
 
+	it("a shapes layer that takes no hover", () => {
+		const plumes: FeatureCollection<Point, { refKey: string; name: string; value: string }> = {
+			type: "FeatureCollection",
+			features: []
+		};
+		const map = createMap({ config: { maptilerKey: "k" } });
+		const source = staticSource(plumes, { dataset: "hms-smoke", entryType: "smoke-density" });
+		map.addPlugin(
+			shapesPlugin({
+				id: "plumes",
+				source,
+				layerLabel: "Plumes",
+				mode: "choropleth",
+				hoverable: false
+			})
+		);
+		expect(map.plugins[0].hoverable).toBe(false);
+		map.destroy();
+	});
+
 	it("a frameless legend inside a host's card", () => {
 		const map = createMap({ config: { maptilerKey: "k" } });
 		const props: ComponentProps<typeof Legend> = { map, framed: false };
