@@ -1,3 +1,5 @@
+import area from "@turf/area";
+import { convertArea, polygon } from "@turf/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page } from "vitest/browser";
@@ -288,12 +290,74 @@ describe("MonitorClusterTooltip", () => {
 		});
 		await expect.element(page.getByText("SJVAir PurpleAir Monitors")).toBeVisible();
 		const text = document.body.textContent!.replace(/\s+/g, " ");
-		expect(text).toContain("3 monitors");
+		const tri: Array<[number, number]> = [
+			[-119.7, 36.7],
+			[-119.6, 36.7],
+			[-119.6, 36.8]
+		];
+		const expected = convertArea(area(polygon([[...tri, tri[0]]])), "meters", "miles").toFixed(3);
+		expect(text).toContain(`3 monitors within a ${expected} mi² area`);
 		expect(text).not.toContain("covering");
 		expect(text).toContain("PM2.5 15 (cluster avg)");
 		expect(text).toContain("Moderate");
 		expect(text).toContain("Max: 20 µg/m³");
 		expect(text).toContain("Min: 10 µg/m³");
+	});
+
+	it("collinear leaves show just the count", async () => {
+		const three = [1, 2, 3].map((n) => monitor(String(n), "purpleair", 10));
+		render(MonitorClusterTooltip, {
+			cluster: cluster(three, [
+				[-119.7, 36.7],
+				[-119.6, 36.7],
+				[-119.5, 36.7]
+			]),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			metadata
+		});
+		await expect.element(page.getByText(/^Max:/)).toBeVisible();
+		await expect.element(page.getByText("3 monitors", { exact: true })).toBeVisible();
+		expect(document.body.textContent).not.toContain("within");
+	});
+
+	it("leaves a few metres apart show just the count", async () => {
+		const three = [1, 2, 3].map((n) => monitor(String(n), "purpleair", 10));
+		render(MonitorClusterTooltip, {
+			cluster: cluster(three, [
+				[-119.7, 36.7],
+				[-119.70001, 36.7],
+				[-119.7, 36.70001]
+			]),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			metadata
+		});
+		await expect.element(page.getByText(/^Max:/)).toBeVisible();
+		await expect.element(page.getByText("3 monitors", { exact: true })).toBeVisible();
+		expect(document.body.textContent).not.toContain("within");
+	});
+
+	it("the area belongs to the current cluster", async () => {
+		const three = [1, 2, 3].map((n) => monitor(String(n), "purpleair", 10));
+		const tri: Array<[number, number]> = [
+			[-119.7, 36.7],
+			[-119.6, 36.7],
+			[-119.6, 36.8]
+		];
+		const screen = await render(MonitorClusterTooltip, {
+			cluster: cluster(three, tri),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			metadata
+		});
+		await expect.element(page.getByText(/within a/)).toBeVisible();
+		await screen.rerender({ cluster: cluster(three, tri, () => new Promise(() => {})) });
+		await expect.element(page.getByText("3 monitors", { exact: true })).toBeVisible();
+		expect(document.body.textContent).not.toContain("within");
 	});
 
 	it("falls back to the type id", async () => {

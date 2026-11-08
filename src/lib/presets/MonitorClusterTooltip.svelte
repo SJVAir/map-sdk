@@ -7,12 +7,14 @@
 	import type { MonitorFeatureProperties } from "../data/types.js";
 	import type { ClusterInfo } from "../plugins/points-clusters.js";
 	import { formatValue } from "../ui/value-format.js";
+	import { clusterAreaSqMiles } from "./cluster-area.js";
 	import MonitorReadingBox from "./MonitorReadingBox.svelte";
 
 	// Ported from monitor-map's MonitorClusterTooltip: the cluster's average in a level-colored
 	// box beside its monitor type, count, and highest and lowest readings. The count and average
 	// come from the bubble itself, so they show at once; the rest fills in from the cluster's
 	// monitors. The average is a whole number and max and min are as reported, as monitor-map's.
+	// The count line adds the area the monitors are within (their convex hull) once they load.
 
 	interface Props {
 		cluster: ClusterInfo<MonitorFeatureProperties>;
@@ -29,6 +31,8 @@
 		isSjvair: boolean;
 		/** Readings only; monitors without one are left out. */
 		values: number[];
+		/** Square miles of the monitors' convex hull, every monitor included. */
+		area: number;
 	}
 
 	let leaves = $state.raw<Leaves | null>(null);
@@ -60,7 +64,8 @@
 					values: found.flatMap(({ props }) => {
 						const n = numericValue(props.value);
 						return n === null ? [] : [n];
-					})
+					}),
+					area: clusterAreaSqMiles(found.map(({ lngLat }) => lngLat))
 				};
 			},
 			() => {
@@ -87,6 +92,16 @@
 		return found !== NO_LEVEL ? found : null;
 	});
 	const units = $derived(scale?.units ?? "");
+	/** The area to 3 decimals, or null when there is none to show (it would read 0.000). */
+	const area = $derived.by(() => {
+		if (!leaves) return null;
+		const text = format.number(leaves.area, {
+			minimumFractionDigits: 3,
+			maximumFractionDigits: 3,
+			useGrouping: false
+		});
+		return Number(text) === 0 ? null : text;
+	});
 	const max = $derived(leaves?.values.length ? Math.max(...leaves.values) : null);
 	const min = $derived(leaves?.values.length ? Math.min(...leaves.values) : null);
 </script>
@@ -108,7 +123,11 @@
 				)}
 			</span>
 		{/if}
-		<span>{messages("mapsdk_monitor_cluster_count", { count: cluster.pointCount })}</span>
+		<span>
+			{area
+				? messages("mapsdk_monitor_cluster_count_area", { count: cluster.pointCount, area })
+				: messages("mapsdk_monitor_cluster_count", { count: cluster.pointCount })}
+		</span>
 		<span>{level ? level.label : messages("mapsdk_no_level")}</span>
 		{#if max !== null && min !== null}
 			<span class="mapsdk-monitor-extremes text-base">

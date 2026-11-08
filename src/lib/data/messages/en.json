@@ -38,6 +38,8 @@
 	"mapsdk_monitor_cluster_title_sjvair": "SJVAir {type} Monitors",
 	"mapsdk_monitor_cluster_count_one": "{count} monitor",
 	"mapsdk_monitor_cluster_count_other": "{count} monitors",
+	"mapsdk_monitor_cluster_count_area_one": "{count} monitor within a {area} mi² area",
+	"mapsdk_monitor_cluster_count_area_other": "{count} monitors within a {area} mi² area",
 	"mapsdk_monitor_cluster_max": "Max: {value} {units}",
 	"mapsdk_monitor_cluster_min": "Min: {value} {units}",
 	"mapsdk_monitor_interval_avg": "({interval} avg)",
