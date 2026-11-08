@@ -55,6 +55,12 @@ export interface FeatureListItem {
 	 * metadata's display hint). Without it the value is formatted as given.
 	 */
 	precision?: number;
+	/**
+	 * Cut a numeric `value` off at `precision` instead of rounding it, so the number never reads
+	 * as the next level (e.g. fire power: 9.96 MW shows "9.9", not "10.0", beside "<10"). Default
+	 * false.
+	 */
+	truncate?: boolean;
 	lngLat: [number, number];
 	selectable: boolean;
 	/**

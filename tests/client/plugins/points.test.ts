@@ -327,6 +327,18 @@ describe("pointsPlugin", () => {
 		expect(plugin.features!().map((f) => f.detail)).toEqual(["detail A", "detail B"]);
 	});
 
+	it("truncateValues marks every listed item to be cut off; without it, none are", async () => {
+		const make = async (truncateValues?: boolean) =>
+			(
+				await setup({
+					source: new TestSource<Props>({ features: points(ROWS), scale: pm25Scale }),
+					truncateValues
+				})
+			).plugin.features!();
+		for (const f of await make(true)) expect(f.truncate).toBe(true);
+		for (const f of await make()) expect(f).not.toHaveProperty("truncate");
+	});
+
 	it("no detail option, or an empty one, gives no detail", async () => {
 		const make = async (detail?: (p: Props) => string | undefined) =>
 			(

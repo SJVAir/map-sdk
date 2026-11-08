@@ -106,7 +106,9 @@ export function rowLabel(
 	const params = {
 		name: item.name,
 		value:
-			typeof item.value === "number" ? formatValue(item.value, item.precision, format) : item.value,
+			typeof item.value === "number"
+				? formatValue(item.value, item.precision, format, item.truncate)
+				: item.value,
 		units: item.units,
 		level: level.text
 	};

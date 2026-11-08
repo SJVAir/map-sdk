@@ -119,6 +119,11 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	 * feature with a level.
 	 */
 	detail?(props: P): string | undefined;
+	/**
+	 * Cut values off at the display precision instead of rounding them, in the list, its
+	 * accessible names, and the generic tooltip (`FeatureListItem.truncate`). Default false.
+	 */
+	truncateValues?: boolean;
 	/** Whether `features()` lists this plugin's features. Default true. */
 	listed?: boolean;
 	/** Tooltip content for a feature, below its name; `props` are its source properties. */
@@ -237,7 +242,8 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				precision,
 				lngLat: [lng, lat],
 				selectable: selectable && selectionId(ref) !== null,
-				...(detail ? { detail } : {})
+				...(detail ? { detail } : {}),
+				...(options.truncateValues ? { truncate: true } : {})
 			});
 		}
 		return items;

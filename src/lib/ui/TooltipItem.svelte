@@ -30,7 +30,7 @@
 		item.value == null
 			? null
 			: typeof item.value === "number"
-				? formatValue(item.value, item.precision, format)
+				? formatValue(item.value, item.precision, format, item.truncate)
 				: item.value
 	);
 </script>
