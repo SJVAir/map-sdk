@@ -4,12 +4,25 @@ import { createDefaultFormat } from "../../../src/lib/data/format.js";
 describe("default format", () => {
 	const format = createDefaultFormat("America/Los_Angeles");
 
-	it("shows summer instants in Pacific daylight time", () => {
-		expect(format.dateTime("2026-07-01T19:30:00Z")).toContain("12:30 PM");
+	it("formats like the old map, in Pacific time", () => {
+		expect(format.dateTime("2026-11-07T00:00:00Z")).toBe("4:00 pm Friday Nov 06, 2026");
 	});
 
-	it("shows winter instants in Pacific standard time", () => {
-		expect(format.dateTime(new Date("2026-01-15T20:30:00Z"))).toContain("12:30 PM");
+	it("shows noon as 12:00 pm and midnight as 12:00 am", () => {
+		expect(format.dateTime("2026-11-06T20:00:00Z")).toBe("12:00 pm Friday Nov 06, 2026");
+		expect(format.dateTime("2026-11-06T08:00:00Z")).toBe("12:00 am Friday Nov 06, 2026");
+	});
+
+	it("uses daylight time in summer", () => {
+		expect(format.dateTime(new Date("2026-07-01T19:30:00Z"))).toBe(
+			"12:30 pm Wednesday Jul 01, 2026"
+		);
+	});
+
+	it("stays in Pacific time on a device elsewhere", () => {
+		const elsewhere = createDefaultFormat("America/New_York");
+		expect(elsewhere.dateTime("2026-11-07T00:00:00Z")).toBe("4:00 pm Friday Nov 06, 2026");
+		expect(elsewhere.zoneLabel()).toBe("PT");
 	});
 
 	it("labels the zone only when the device isn't Pacific", () => {
