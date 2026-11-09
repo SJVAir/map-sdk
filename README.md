@@ -555,9 +555,11 @@ local sjvair.com stack at `http://localhost:8000`.
   counted. Points are unchanged.
 - **Focusing such a shape doesn't move the map.** Before, focusing a row panned to center the
   shape's label point (a plume's could be off Baja). Now the camera stays, and the tooltip pins at
-  a point of the shape in view. A shape whose label point is on screen still pans to it.
+  a point of the shape in view, with no move event. A shape whose label point is on screen still
+  pans to it.
 - **Hover tooltips** in `"pinned"` mode follow the same rule: a hovered shape whose label point is
-  off-screen pins its tooltip inside the view instead of at the map's edge.
+  off-screen pins its tooltip inside the view instead of at the map's edge. If the map moves while
+  the pointer rests on the shape, the pin is found again when the map settles.
 - **New API (all optional):** `FeatureListItem.geometry` and `.bbox`, `MapContext.focusedAnchor`
   and `.anchorFor(item)`, `geometryBbox`, `intersectsBounds`, and the `Bbox` type.
 

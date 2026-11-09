@@ -72,11 +72,14 @@
 	// pinned).
 	// A hovered shape whose point is off-screen pins at a point of it in view, found once per
 	// hovered feature (keyed on primitives), so pointer moves within it don't move the tooltip.
+	// It's found again when the map settles (`bounds`), so a pan or zoom under a resting pointer
+	// doesn't leave it off-screen.
 	const hoverKey = $derived(
 		!map.focusedKey && item && hitPluginId ? `${hitPluginId}\n${item.refKey}` : null
 	);
 	const hoverAnchor = $derived.by(() => {
 		if (hoverKey === null) return null;
+		void map.bounds;
 		return untrack(() => (item?.geometry ? map.anchorFor(item) : null));
 	});
 	const anchor = $derived.by((): [number, number] | null => {

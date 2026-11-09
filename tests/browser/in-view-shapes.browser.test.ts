@@ -205,6 +205,25 @@ describe("hovering a shape in pinned mode", () => {
 		map.destroy();
 	});
 
+	it("a map move during the hover finds the pin point again when the map settles", async () => {
+		const { map, gl, geometry } = await regionsMap(square(-124, 20, -110, 40));
+		render(MapTooltip, { map, project, width: W, height: H });
+		hover(gl, map.uid, geometry);
+		await expect.element(page.getByRole("tooltip")).toBeVisible();
+		// The pointer rests on the shape while the map pans; MapView reports the new view on moveend.
+		gl.jumpTo({ center: [-121, 37.5] });
+		const b = gl.getBounds();
+		map.updateView(
+			{ ...map.camera, center: [-121, 37.5] },
+			{ west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() }
+		);
+		flushSync();
+		const expected = project([-121, 37.5]);
+		await expect.poll(() => Math.abs(tipAnchor().x - expected.x)).toBeLessThan(1);
+		expect(Math.abs(tipAnchor().y - expected.y)).toBeLessThan(100);
+		map.destroy();
+	});
+
 	it("a shape with its label point on screen anchors there, as today", async () => {
 		const { map, gl, geometry } = await regionsMap(square(-119.1, 36.9, -118.9, 37.1));
 		render(MapTooltip, { map, project, width: W, height: H });
