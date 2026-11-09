@@ -63,7 +63,10 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `projection`/`space` config, and the `maptilerMap()` escape hatch (for markers and popups only).
   It has no GL map of its own; `MapView` attaches one. `plugin.ts` defines `MapPlugin`
   (`hoverPriority`, `tooltipShowsName`, `hoverable`) and `PluginContext` (`addCustomLayer`);
-  `scoped-context.ts`'s internal `scopedContext` lets a preset run a nested plugin under a prefix.
+  `scoped-context.ts`'s internal `scopedContext` lets a preset run a nested plugin under a prefix. `shape-view.ts` is the shape-aware
+  in-view test (`intersectsBounds`, `geometryBbox`) and the in-view anchor (`shapeAnchor`); focusing
+  a shape that overlaps the view with its label point off-screen keeps the camera and sets
+  `focusedAnchor` (`anchorFor` gives the same point for hover).
   `plugin-host.svelte.ts` runs plugins' `setup` when the style is ready and tears them down on
   detach or restyle (draw order = registry order); `interactions.svelte.ts` routes clicks, hovers
   (and the pointer cursor), and blocking layers (cluster bubbles); a `hoverable: false` plugin's

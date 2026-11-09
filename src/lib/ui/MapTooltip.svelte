@@ -70,11 +70,24 @@
 	// A found item anchors the tooltip at its point (stable while the pointer moves over it).
 	// In pointer mode a hovered hit is anchored at the pointer instead (a focused item stays
 	// pinned).
-	const anchor = $derived(
-		mode === "pointer" && !map.focusedKey
-			? (map.hovered?.lngLat ?? null)
-			: (item?.lngLat ?? map.hovered?.lngLat ?? null)
+	// A hovered shape whose point is off-screen pins at a point of it in view, found once per
+	// hovered feature (keyed on primitives), so pointer moves within it don't move the tooltip.
+	// It's found again when the map settles (`bounds`), so a pan or zoom under a resting pointer
+	// doesn't leave it off-screen.
+	const hoverKey = $derived(
+		!map.focusedKey && item && hitPluginId ? `${hitPluginId}\n${item.refKey}` : null
 	);
+	const hoverAnchor = $derived.by(() => {
+		if (hoverKey === null) return null;
+		void map.bounds;
+		return untrack(() => (item?.geometry ? map.anchorFor(item) : null));
+	});
+	const anchor = $derived.by((): [number, number] | null => {
+		if (mode === "pointer" && !map.focusedKey) return map.hovered?.lngLat ?? null;
+		// A focused feature that left the data has no item, so no tooltip.
+		if (map.focusedKey) return item ? (map.focusedAnchor ?? item.lngLat) : null;
+		return hoverAnchor ?? item?.lngLat ?? map.hovered?.lngLat ?? null;
+	});
 	const projected = $derived(anchor ? project(anchor) : null);
 	// Centered above the point; flipped below it near the top edge; inside the container.
 	const position = $derived.by(() => {

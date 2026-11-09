@@ -10,6 +10,7 @@ import type { GlMapLike } from "./gl.js";
 import { InteractionRouter, type Hovered } from "./interactions.svelte.js";
 import type { ClickEvent, FeatureHit, FeatureListItem, MapPlugin } from "./plugin.js";
 import { PluginHost } from "./plugin-host.svelte.js";
+import { intersectsBounds, shapeAnchor } from "./shape-view.js";
 
 export interface CameraState {
 	center: [number, number];
@@ -60,7 +61,10 @@ export interface PluginOptions {
 export type FeatureClickHandler = (e: {
 	pluginId: string;
 	ref: FeatureRef;
-	/** The click point; for a pick in the feature list, the item's position. */
+	/**
+	 * The click point. For a pick in the feature list, where the item's tooltip pins: its position,
+	 * or for a shape whose label point is off-screen, a point of the shape in view.
+	 */
 	lngLat: [number, number];
 }) => void;
 
@@ -187,6 +191,18 @@ export interface MapContext {
 	readonly focusedKey: string | null;
 	/** Reactive. The plugin `focusFeature` was given with `focusedKey`, or `null`. */
 	readonly focusedPluginId: string | null;
+	/**
+	 * Reactive. Where the focused feature's tooltip pins, set by `focusFeature` (`null` without
+	 * focus): its `lngLat`, or for a shape that overlaps the view with its `lngLat` off-screen, a
+	 * point of the shape in the part of the view the list panel leaves clear. Fixed at focus
+	 * time, so it stays on the feature if the map then moves.
+	 */
+	readonly focusedAnchor: [number, number] | null;
+	/**
+	 * Where `item`'s tooltip pins in the current view, without moving the camera: its `lngLat`,
+	 * or for a shape (`geometry`) with its `lngLat` off-screen, a point of the shape in view.
+	 */
+	anchorFor(item: FeatureListItem): [number, number];
 	/** For MapView only: uses `gl` from now on. */
 	attach(gl: GlMapLike): void;
 	/** For MapView only: stops using the current GL map. */
@@ -244,6 +260,9 @@ function sameSelection(a: SpatialSelection | null, b: SpatialSelection | null): 
 	);
 }
 
+const inRect = (p: [number, number], b: Bounds) =>
+	p[0] >= b.west && p[0] <= b.east && p[1] >= b.south && p[1] <= b.north;
+
 function prefersReducedMotion(): boolean {
 	return globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
@@ -265,6 +284,7 @@ class MapContextImpl implements MapContext {
 	#glState = $state.raw<GlMapLike | null>(null);
 	#focusedKey = $state<string | null>(null);
 	#focusedPluginId = $state<string | null>(null);
+	#focusedAnchor = $state.raw<[number, number] | null>(null);
 	#selections = new SvelteMap<string, PluginSelection>();
 	#featureClickHandlers = new Set<FeatureClickHandler>();
 	#router = new InteractionRouter();
@@ -273,6 +293,11 @@ class MapContextImpl implements MapContext {
 	#destroyed = false;
 	#listInset = 0;
 	#listInsetSide: "left" | "right" = "left";
+	/** An animated ease that `focusFeature` started is still running (cleared on `moveend`). */
+	#focusEasing = false;
+	#onMoveEnd = () => {
+		this.#focusEasing = false;
+	};
 
 	constructor(options: CreateMapOptions) {
 		const initialView = copyView(options.config.initialView ?? DEFAULT_VIEW);
@@ -339,6 +364,10 @@ class MapContextImpl implements MapContext {
 		return this.#focusedPluginId;
 	}
 
+	get focusedAnchor(): [number, number] | null {
+		return this.#focusedAnchor;
+	}
+
 	get hovered(): Hovered | null {
 		return this.#router.hovered;
 	}
@@ -394,8 +423,15 @@ class MapContextImpl implements MapContext {
 		if (this.#destroyed) return;
 		const found = untrack(() => this.#findItem(refKey, pluginId));
 		if (!found) return;
-		this.#emitClick(pluginId, found.item.ref, found.item.lngLat);
-		if (found.item.selectable) this.#applyPick(pluginId, found.item.ref, additive);
+		const { item } = found;
+		// Where the row's tooltip pins: the focused anchor for the focused row, else a point of a
+		// shape in view (a point's own position for points and on-screen label points).
+		const focused =
+			untrack(() => this.#focusedKey) === refKey &&
+			(untrack(() => this.#focusedPluginId) ?? pluginId) === pluginId;
+		const anchor = (focused && untrack(() => this.#focusedAnchor)) || this.anchorFor(item);
+		this.#emitClick(pluginId, item.ref, anchor);
+		if (item.selectable) this.#applyPick(pluginId, item.ref, additive);
 	}
 
 	clearSelection(pluginId: string): void {
@@ -440,17 +476,98 @@ class MapContextImpl implements MapContext {
 		if (this.#destroyed) return;
 		this.#focusedKey = refKey;
 		this.#focusedPluginId = refKey === null ? null : (pluginId ?? null);
+		this.#focusedAnchor = null;
 		const gl = this.#gl;
 		if (!gl || refKey === null) return;
 		const found = untrack(() => this.#findItem(refKey, pluginId));
 		if (!found) return;
+		const { item } = found;
+		const place = this.#placeFor(item, gl);
+		this.#focusedAnchor = place.anchor;
+		if (!place.pan) {
+			// Stays where it is now: an earlier focus's ease that is still running stops here.
+			// With nothing running, no move at all.
+			if (this.#focusEasing) {
+				const { lng, lat } = gl.getCenter();
+				gl.easeTo({ center: [lng, lat], duration: 0 });
+				this.#focusEasing = false;
+			}
+			return;
+		}
+		const reduce = prefersReducedMotion();
 		gl.easeTo({
-			center: found.item.lngLat,
+			center: place.anchor,
 			// The middle of the part the panel leaves clear. An offset, not padding: MapLibre keeps
 			// padding for later moves (zooms, the reported center), an offset applies to this one.
 			...(this.#listInset > 0 && { offset: [this.#listOffsetX(), 0] as [number, number] }),
-			...(prefersReducedMotion() && { duration: 0 })
+			...(reduce && { duration: 0 })
 		});
+		// Set after the call: stopping an earlier move fires its `moveend` inside `easeTo`.
+		this.#focusEasing = !reduce;
+	}
+
+	anchorFor(item: FeatureListItem): [number, number] {
+		const gl = this.#gl;
+		if (!gl || !item.geometry) return item.lngLat;
+		const { live, clear, liveCenter, clearCenter } = this.#views(gl);
+		if (inRect(item.lngLat, live) || !intersectsBounds(item, live)) return item.lngLat;
+		return (
+			shapeAnchor(item.geometry, clear, clearCenter) ??
+			shapeAnchor(item.geometry, live, liveCenter) ??
+			item.lngLat
+		);
+	}
+
+	/** The live view, and the part of it the list panel leaves clear, with their centers. */
+	#views(gl: GlMapLike) {
+		const b = gl.getBounds();
+		const live: Bounds = {
+			west: b.getWest(),
+			south: b.getSouth(),
+			east: b.getEast(),
+			north: b.getNorth()
+		};
+		const center = gl.getCenter();
+		const width = untrack(() => gl.getCanvas().clientWidth) || 0;
+		const share = width > 0 ? Math.min(Math.max(this.#listInset / width, 0), 0.99) : 0;
+		const cut = share * (live.east - live.west);
+		const clear =
+			this.#listInsetSide === "left"
+				? { ...live, west: live.west + cut }
+				: { ...live, east: live.east - cut };
+		return {
+			live,
+			clear,
+			liveCenter: [center.lng, center.lat] as [number, number],
+			clearCenter: [(clear.west + clear.east) / 2, center.lat] as [number, number]
+		};
+	}
+
+	/**
+	 * Where focus puts `item`: `pan: false` keeps the camera (a shape in view whose `lngLat` is
+	 * off-screen, with a point in the clear part); otherwise ease to center `anchor`.
+	 */
+	#placeFor(item: FeatureListItem, gl: GlMapLike): { anchor: [number, number]; pan: boolean } {
+		const { geometry, lngLat } = item;
+		if (!geometry) return { anchor: lngLat, pan: true };
+		const { live, clear, liveCenter, clearCenter } = this.#views(gl);
+		if (inRect(lngLat, live)) return { anchor: lngLat, pan: true };
+		if (intersectsBounds(item, live)) {
+			const inClear = shapeAnchor(geometry, clear, clearCenter);
+			if (inClear) return { anchor: inClear, pan: false };
+			const inLive = shapeAnchor(geometry, live, liveCenter);
+			if (inLive) return { anchor: inLive, pan: true };
+		}
+		const settled = untrack(() => this.#bounds);
+		if (settled && intersectsBounds(item, settled)) {
+			const middle: [number, number] = [
+				(settled.west + settled.east) / 2,
+				(settled.south + settled.north) / 2
+			];
+			const inSettled = shapeAnchor(geometry, settled, middle);
+			if (inSettled) return { anchor: inSettled, pan: true };
+		}
+		return { anchor: lngLat, pan: true };
 	}
 
 	#cameraOptions(target: CameraTarget, gl: GlMapLike) {
@@ -498,6 +615,7 @@ class MapContextImpl implements MapContext {
 		this.#glState = gl;
 		this.#host.attach(gl);
 		this.#router.attach(gl);
+		gl.on("moveend", this.#onMoveEnd);
 		this.basemap.attach(
 			gl,
 			() => this.#host.restyle(),
@@ -512,6 +630,8 @@ class MapContextImpl implements MapContext {
 
 	detach(): void {
 		if (!this.#gl) return;
+		this.#gl.off("moveend", this.#onMoveEnd);
+		this.#focusEasing = false;
 		this.#router.detach();
 		this.basemap.detach();
 		this.#host.detach();
@@ -549,6 +669,7 @@ class MapContextImpl implements MapContext {
 		this.#featureClickHandlers.clear();
 		this.#focusedKey = null;
 		this.#focusedPluginId = null;
+		this.#focusedAnchor = null;
 		this.#destroyed = true;
 	}
 

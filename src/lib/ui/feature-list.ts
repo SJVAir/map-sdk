@@ -1,4 +1,5 @@
 import type { Bounds } from "../core/create-map.svelte.js";
+import { intersectsBounds } from "../core/shape-view.js";
 import type { FeatureListItem } from "../core/plugin.js";
 import type { FormatProvider } from "../data/format.js";
 import type { MessageProvider } from "../data/messages.js";
@@ -26,11 +27,12 @@ export function optionIdPart(pluginId: string, refKey: string): string {
 	return `${escape(pluginId)}--${escape(refKey)}`;
 }
 
-/** Items whose point is inside `bounds`, edges included. No antimeridian handling (the Valley). */
+/**
+ * Items in `bounds`, edges included: a shape (`geometry`) when it overlaps them, anything else when
+ * its point is inside. No antimeridian handling (the Valley).
+ */
 export function inView(items: FeatureListItem[], bounds: Bounds): FeatureListItem[] {
-	return items.filter(({ lngLat: [lng, lat] }) => {
-		return lng >= bounds.west && lng <= bounds.east && lat >= bounds.south && lat <= bounds.north;
-	});
+	return items.filter((item) => intersectsBounds(item, bounds));
 }
 
 /**

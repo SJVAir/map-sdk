@@ -62,6 +62,19 @@ export interface FeatureListItem {
 	 */
 	truncate?: boolean;
 	lngLat: [number, number];
+	/**
+	 * The feature's shape. When given, the item is in view (the feature list, the view summary)
+	 * when the shape overlaps the view, not only when `lngLat` is inside it, and focusing or
+	 * hovering it while `lngLat` is off-screen pins its tooltip at a point of the shape in view
+	 * (focus then leaves the camera where it is).
+	 */
+	geometry?: Geometry;
+	/**
+	 * `geometry`'s bounding box, `[west, south, east, north]` (`geometryBbox`). Optional; computed
+	 * from `geometry` when missing. A plugin listing many shapes should measure it once per data
+	 * load, since the list and summary test every item on every move.
+	 */
+	bbox?: [number, number, number, number];
 	selectable: boolean;
 	/**
 	 * A short text about a feature with no level (e.g. "Level 2 charger"), shown where its level

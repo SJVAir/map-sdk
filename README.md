@@ -374,6 +374,19 @@ function sitesPlugin(sites: Sites): MapPlugin {
 }
 ```
 
+An item for a shape (a polygon or line) can carry its `geometry` and, optionally, its `bbox`
+(`[west, south, east, north]`, from `geometryBbox(geometry)`). The list and the summary then count
+it as in view when the shape overlaps the view, not only when its `lngLat` is inside it: a smoke
+plume that fills the screen is listed even though its center is off-screen. Measure `bbox` once per
+data load (both are tested on every move); without it the box is computed each time. Focusing such
+a shape from the list while its `lngLat` is off-screen leaves the camera where it is, and its
+tooltip pins at a point of the shape in view: the view's center (beside the list panel) when the
+shape covers it, else a point inside its visible part. `map.focusedAnchor` is where the focused
+tooltip pins, and `map.anchorFor(item)` gives that point for any item without moving the camera
+(the hover tooltip uses it). `intersectsBounds(item, bounds)` is the in-view test. `shapesPlugin`
+and the presets built on it set `geometry` and `bbox` already. Bounds across the antimeridian are
+not handled.
+
 A plugin can also add a MapLibre custom layer, such as a wind layer from a library you add
 yourself, with `ctx.addCustomLayer(local, create)`. The host calls `create` with the namespaced id
 (the layer must use it) and adds the object it returns as is, in the plugin's draw-order slot. It is
@@ -440,7 +453,8 @@ and `getSelectionMode(id)` are reactive.
 
 `map.on("featureclick", ({ pluginId, ref, lngLat }) => …)` fires for every click on a feature,
 whatever the mode, and also for a pick in the feature list, so keyboard users get the same event;
-`lngLat` is the click point (the item's position for a list pick). It returns an unsubscribe
+`lngLat` is the click point. For a list pick it's where the item's tooltip pins: the item's
+position, or for a shape whose label point is off-screen, a point of the shape in view. It returns an unsubscribe
 function. For your own context menu, `map.featuresAt({ x, y })` returns the hits under
 a canvas point, topmost first, and `map.featureForElement(element)` returns the hit for a row of
 the feature list (an element with `data-mapsdk-ref`). Both return nothing while the map is
@@ -533,6 +547,26 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.5
+
+- **Shapes that cover the view are in view.** The feature list and the view summary count a shape
+  when it overlaps the view, not only when its center (label point) is inside it. A smoke plume or
+  a big region that fills the screen, with its center off-screen, now has a list row and is
+  counted. Points are unchanged.
+- **Focusing such a shape doesn't move the map.** Before, focusing a row panned to center the
+  shape's label point (a plume's could be off Baja). Now the camera stays, and the tooltip pins at
+  a point of the shape in view, with no move event. A shape whose label point is on screen still
+  pans to it.
+- **Hover tooltips** in `"pinned"` mode follow the same rule: a hovered shape whose label point is
+  off-screen pins its tooltip inside the view instead of at the map's edge. If the map moves while
+  the pointer rests on the shape, the pin is found again when the map settles.
+- **`featureclick` from the list** (Enter on a row) reports that same in-view point for such a
+  shape, instead of its off-screen label point. A handler that pans to `lngLat` no longer sends
+  the map off to the shape's far-away center. Points and on-screen label points report their
+  position, as before.
+- **New API (all optional):** `FeatureListItem.geometry` and `.bbox`, `MapContext.focusedAnchor`
+  and `.anchorFor(item)`, `geometryBbox`, `intersectsBounds`, and the `Bbox` type.
 
 ### 0.1.0-beta.4
 

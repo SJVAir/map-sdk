@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushSync, tick } from "svelte";
 import { SvelteMap } from "svelte/reactivity";
-import { createMap } from "../../../src/lib/core/create-map.svelte.js";
+import { createMap, type MapContext } from "../../../src/lib/core/create-map.svelte.js";
 import type { FeatureListItem, MapPlugin, PluginContext } from "../../../src/lib/core/plugin.js";
 import { defaultMessages } from "../../../src/lib/data/messages.js";
 import { NO_LEVEL } from "../../../src/lib/data/scale.js";
+import type { Geometry } from "geojson";
+import { labelPoint } from "../../../src/lib/plugins/shapes.svelte.js";
 import { rootEffect } from "../../fixtures/effects.svelte.js";
+import { plumeFeature } from "../../fixtures/plume.js";
 import { createFakeGl } from "../../fixtures/fake-gl.js";
 
 const config = { maptilerKey: "test-key" };
@@ -253,6 +256,199 @@ describe("createMap", () => {
 		map.setListInset(0);
 		map.focusFeature("monitor:5");
 		expect(easeTo.mock.lastCall![0]).not.toHaveProperty("offset");
+	});
+
+	describe("focusing a shape", () => {
+		// The fake GL map starts at (-119.7, 36.7), zoom 7: its view spans lng -122.5125 to
+		// -116.8875 and lat 35.29375 to 38.10625.
+		const square = (west: number, south: number, east: number, north: number): Geometry => ({
+			type: "Polygon",
+			coordinates: [
+				[
+					[west, south],
+					[east, south],
+					[east, north],
+					[west, north],
+					[west, south]
+				]
+			]
+		});
+		const shapeItem = (
+			refKey: string,
+			geometry: Geometry | undefined,
+			lngLat: [number, number]
+		): FeatureListItem => ({
+			refKey,
+			ref: { kind: "feature", id: refKey },
+			name: refKey,
+			value: null,
+			level: NO_LEVEL,
+			units: "",
+			lngLat,
+			...(geometry && { geometry }),
+			selectable: false
+		});
+		const plume = plumeFeature().geometry;
+
+		async function shapesMap(items: FeatureListItem[]) {
+			const map = createMap({ config });
+			map.addPlugin(plugin("shapes", [], { features: () => items }));
+			await tick();
+			const gl = createFakeGl({ styleLoaded: true });
+			map.attach(gl);
+			await tick();
+			return { map, gl };
+		}
+
+		it("focusing a covering plume doesn't move the camera", async () => {
+			const { map, gl } = await shapesMap([shapeItem("p", plume, labelPoint(plume)!)]);
+			map.focusFeature("p");
+			expect(gl.getCenter()).toEqual({ lng: -119.7, lat: 36.7 });
+			// Nothing was moving, so nothing is stopped: no move at all.
+			expect(gl.moves).toEqual([]);
+			expect(map.focusedAnchor).toEqual([-119.7, 36.7]);
+		});
+
+		it("a no-move focus stops an earlier focus's ease that is still running", async () => {
+			const point = shapeItem("m", undefined, [-119.5, 36.6]);
+			const { map, gl } = await shapesMap([point, shapeItem("p", plume, labelPoint(plume)!)]);
+			map.focusFeature("m");
+			map.focusFeature("p");
+			expect(gl.moves).toHaveLength(2);
+			expect(gl.moves[1].options).toEqual({ center: [-119.5, 36.6], duration: 0 });
+		});
+
+		describe("picking it from the list (Enter)", () => {
+			const clicks = (map: MapContext) => {
+				const seen: Array<[number, number]> = [];
+				map.on("featureclick", ({ lngLat }) => seen.push(lngLat));
+				return seen;
+			};
+
+			it("reports where the focused row's tooltip pins", async () => {
+				const big = square(-125, 30, -110, 40);
+				const { map, gl } = await shapesMap([shapeItem("b", big, [-117.5, 31])]);
+				Object.defineProperty(gl.canvas, "clientWidth", { value: 800 });
+				map.setListInset(240);
+				const seen = clicks(map);
+				map.focusFeature("b", "shapes");
+				map.pickFromList("shapes", "b", false);
+				expect(seen).toEqual([map.focusedAnchor]);
+				expect(seen[0][0]).toBeCloseTo(-119.7 + 0.15 * 5.625);
+			});
+
+			it("reports a point of the shape in view when the row isn't focused", async () => {
+				const { map } = await shapesMap([shapeItem("p", plume, labelPoint(plume)!)]);
+				const seen = clicks(map);
+				map.pickFromList("shapes", "p", false);
+				expect(seen).toEqual([[-119.7, 36.7]]);
+			});
+
+			it("still reports a point's own position", async () => {
+				const { map } = await shapesMap([shapeItem("m", undefined, [-119.5, 36.6])]);
+				const seen = clicks(map);
+				map.focusFeature("m", "shapes");
+				map.pickFromList("shapes", "m", false);
+				expect(seen).toEqual([[-119.5, 36.6]]);
+			});
+		});
+
+		it("once that ease has ended, a no-move focus sends no move", async () => {
+			const point = shapeItem("m", undefined, [-119.5, 36.6]);
+			const { map, gl } = await shapesMap([point, shapeItem("p", plume, labelPoint(plume)!)]);
+			map.focusFeature("m");
+			gl.emit("moveend");
+			map.focusFeature("p");
+			expect(gl.moves).toHaveLength(1);
+		});
+
+		it("an ease that ended before a later map is attached doesn't carry over", async () => {
+			const point = shapeItem("m", undefined, [-119.5, 36.6]);
+			const { map, gl } = await shapesMap([point, shapeItem("p", plume, labelPoint(plume)!)]);
+			map.focusFeature("m");
+			const next = createFakeGl({ styleLoaded: true });
+			map.attach(next);
+			await tick();
+			map.focusFeature("p");
+			expect(gl.moves).toHaveLength(1);
+			expect(next.moves).toEqual([]);
+		});
+
+		it("with the list panel open, the anchor is the clear part's center", async () => {
+			const big = square(-125, 30, -110, 40);
+			const { map, gl } = await shapesMap([shapeItem("b", big, [-117.5, 31])]);
+			Object.defineProperty(gl.canvas, "clientWidth", { value: 800 });
+			map.setListInset(240);
+			map.focusFeature("b");
+			expect(map.focusedAnchor![0]).toBeCloseTo(-119.7 + 0.15 * 5.625);
+			expect(map.focusedAnchor![1]).toBeCloseTo(36.7);
+			expect(gl.getCenter()).toEqual({ lng: -119.7, lat: 36.7 });
+		});
+
+		it("a shape whose label point is on screen pans as today", async () => {
+			const { map, gl } = await shapesMap([
+				shapeItem("s", square(-119.1, 36.9, -118.9, 37.1), [-119, 37])
+			]);
+			map.focusFeature("s");
+			expect(gl.getCenter()).toEqual({ lng: -119, lat: 37 });
+			expect(map.focusedAnchor).toEqual([-119, 37]);
+		});
+
+		it("a shape visible only under the panel eases a little", async () => {
+			const west = square(-130, 36, -121.5, 37);
+			const { map, gl } = await shapesMap([shapeItem("w", west, [-125.75, 36.5])]);
+			Object.defineProperty(gl.canvas, "clientWidth", { value: 800 });
+			map.setListInset(240);
+			map.focusFeature("w");
+			const { center, offset } = gl.moves.at(-1)!.options;
+			expect(center[0]).toBeGreaterThan(-122.5125);
+			expect(center[0]).toBeLessThan(-121.5);
+			expect(center[1]).toBeCloseTo(36.5);
+			expect(offset).toEqual([120, 0]);
+			expect(map.focusedAnchor).toEqual(center);
+		});
+
+		it("a shape off the live view eases to its part in the settled view", async () => {
+			const far = square(-100, 36, -90, 37);
+			const { map, gl } = await shapesMap([shapeItem("f", far, [-95, 36.5])]);
+			map.updateView(map.camera, { west: -101, south: 35, east: -98.5, north: 38 });
+			map.focusFeature("f");
+			expect(gl.moves.at(-1)!.options.center).toEqual([-99.75, 36.5]);
+			expect(map.focusedAnchor).toEqual([-99.75, 36.5]);
+		});
+
+		it("no settled bounds and no canvas width: falls back to the label point", async () => {
+			const far = square(-100, 36, -90, 37);
+			const { map, gl } = await shapesMap([shapeItem("f", far, [-95, 36.5])]);
+			expect(() => map.focusFeature("f")).not.toThrow();
+			expect(gl.getCenter()).toEqual({ lng: -95, lat: 36.5 });
+			expect(map.focusedAnchor).toEqual([-95, 36.5]);
+		});
+
+		it("a point's anchor is its lngLat", async () => {
+			const { map } = await shapesMap([shapeItem("pt", undefined, [-118.5, 35.5])]);
+			map.focusFeature("pt");
+			expect(map.focusedAnchor).toEqual([-118.5, 35.5]);
+		});
+
+		it("focus(null) and destroy clear focusedAnchor", async () => {
+			const { map } = await shapesMap([shapeItem("p", plume, labelPoint(plume)!)]);
+			map.focusFeature("p");
+			map.focusFeature(null);
+			expect(map.focusedAnchor).toBeNull();
+			map.focusFeature("p");
+			map.destroy();
+			expect(map.focusedAnchor).toBeNull();
+		});
+
+		it("anchorFor never moves the camera", async () => {
+			const point = shapeItem("pt", undefined, [-118.5, 35.5]);
+			const covering = shapeItem("p", plume, labelPoint(plume)!);
+			const { map, gl } = await shapesMap([point, covering]);
+			expect(map.anchorFor(covering)).toEqual([-119.7, 36.7]);
+			expect(map.anchorFor(point)).toEqual([-118.5, 35.5]);
+			expect(gl.moves).toEqual([]);
+		});
 	});
 
 	it("destroy detaches, clears plugins, and refuses new plugins", async () => {

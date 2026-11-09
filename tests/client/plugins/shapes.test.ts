@@ -11,6 +11,7 @@ import { defaultMessages } from "../../../src/lib/data/messages.js";
 import type { MetadataProvider } from "../../../src/lib/data/metadata.js";
 import type { Scale, ScaleRef } from "../../../src/lib/data/scale-types.js";
 import type { MapFeatureProperties } from "../../../src/lib/data/types.js";
+import { geometryBbox } from "../../../src/lib/core/shape-view.js";
 import { shapesPlugin, type ShapesOptions } from "../../../src/lib/plugins/shapes.svelte.js";
 import {
 	colorExpression,
@@ -245,6 +246,37 @@ describe("shapesPlugin", () => {
 			level: smokeScale.levels[0],
 			selectable: false
 		});
+	});
+
+	it("items carry geometry and bbox", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({ source });
+		const [first] = plugin.features!();
+		expect(first.geometry).toBe(POLYGONS.features[0].geometry);
+		expect(first.bbox).toEqual(geometryBbox(POLYGONS.features[0].geometry));
+	});
+
+	it("measures each feature once", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({ source });
+		const [a] = plugin.features!();
+		const [b] = plugin.features!();
+		expect(b.bbox).toBe(a.bbox);
+		expect(b.lngLat).toBe(a.lngLat);
+	});
+
+	it("a reload measures the new features", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({ source });
+		expect(plugin.features!()[0].bbox).toEqual([0, 0, 2, 2]);
+		source.features = collection([
+			{
+				props: { refKey: "feature:a", name: "Alpha", value: 1 },
+				geometry: { type: "Polygon", coordinates: [square(5, 5, 1)] }
+			}
+		]);
+		flushSync();
+		expect(plugin.features!()[0].bbox).toEqual([5, 5, 6, 6]);
 	});
 
 	it("omits features() when not listed", async () => {
