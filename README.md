@@ -254,7 +254,9 @@ source loads, fails, or is unavailable, the legend says so (a failure offers "Tr
 calls `status.retry()`). Values are shown with the metadata's display precision, except in the
 monitor, cluster, and collocation tooltips, which match monitor-map: the reading and a cluster's
 average are whole numbers, and a cluster's max and min are as reported. Fire values are cut off
-rather than rounded (see `truncateValues`). Times in the tooltips read like sjvair.com's map, in
+rather than rounded (see `truncateValues`). On a category scale, a value that is its level's code
+(smoke's `"light"`, the heat score's `2`) isn't shown: the list row, the tooltip, and the row's
+accessible name give only the level label. Times in the tooltips read like sjvair.com's map, in
 Pacific time: "4:00 pm Friday Nov 06, 2026", with " PT" after them on a device in another zone.
 The monitor cluster tooltip's count line gives the area the monitors are within, "3 monitors
 within a 22.619 mi² area": the area of their convex hull, left out when it would read 0.000 (two
