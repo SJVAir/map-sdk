@@ -304,10 +304,39 @@ describe("createMap", () => {
 			const { map, gl } = await shapesMap([shapeItem("p", plume, labelPoint(plume)!)]);
 			map.focusFeature("p");
 			expect(gl.getCenter()).toEqual({ lng: -119.7, lat: 36.7 });
-			expect(gl.moves).toEqual([
-				{ method: "easeTo", options: { center: [-119.7, 36.7], duration: 0 } }
-			]);
+			// Nothing was moving, so nothing is stopped: no move at all.
+			expect(gl.moves).toEqual([]);
 			expect(map.focusedAnchor).toEqual([-119.7, 36.7]);
+		});
+
+		it("a no-move focus stops an earlier focus's ease that is still running", async () => {
+			const point = shapeItem("m", undefined, [-119.5, 36.6]);
+			const { map, gl } = await shapesMap([point, shapeItem("p", plume, labelPoint(plume)!)]);
+			map.focusFeature("m");
+			map.focusFeature("p");
+			expect(gl.moves).toHaveLength(2);
+			expect(gl.moves[1].options).toEqual({ center: [-119.5, 36.6], duration: 0 });
+		});
+
+		it("once that ease has ended, a no-move focus sends no move", async () => {
+			const point = shapeItem("m", undefined, [-119.5, 36.6]);
+			const { map, gl } = await shapesMap([point, shapeItem("p", plume, labelPoint(plume)!)]);
+			map.focusFeature("m");
+			gl.emit("moveend");
+			map.focusFeature("p");
+			expect(gl.moves).toHaveLength(1);
+		});
+
+		it("an ease that ended before a later map is attached doesn't carry over", async () => {
+			const point = shapeItem("m", undefined, [-119.5, 36.6]);
+			const { map, gl } = await shapesMap([point, shapeItem("p", plume, labelPoint(plume)!)]);
+			map.focusFeature("m");
+			const next = createFakeGl({ styleLoaded: true });
+			map.attach(next);
+			await tick();
+			map.focusFeature("p");
+			expect(gl.moves).toHaveLength(1);
+			expect(next.moves).toEqual([]);
 		});
 
 		it("with the list panel open, the anchor is the clear part's center", async () => {

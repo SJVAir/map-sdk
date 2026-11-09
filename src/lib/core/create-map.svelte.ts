@@ -290,6 +290,11 @@ class MapContextImpl implements MapContext {
 	#destroyed = false;
 	#listInset = 0;
 	#listInsetSide: "left" | "right" = "left";
+	/** An animated ease that `focusFeature` started is still running (cleared on `moveend`). */
+	#focusEasing = false;
+	#onMoveEnd = () => {
+		this.#focusEasing = false;
+	};
 
 	constructor(options: CreateMapOptions) {
 		const initialView = copyView(options.config.initialView ?? DEFAULT_VIEW);
@@ -470,18 +475,25 @@ class MapContextImpl implements MapContext {
 		const place = this.#placeFor(item, gl);
 		this.#focusedAnchor = place.anchor;
 		if (!place.pan) {
-			// Stays where it is now: a running ease (an earlier focus) stops here.
-			const { lng, lat } = gl.getCenter();
-			gl.easeTo({ center: [lng, lat], duration: 0 });
+			// Stays where it is now: an earlier focus's ease that is still running stops here.
+			// With nothing running, no move at all.
+			if (this.#focusEasing) {
+				const { lng, lat } = gl.getCenter();
+				gl.easeTo({ center: [lng, lat], duration: 0 });
+				this.#focusEasing = false;
+			}
 			return;
 		}
+		const reduce = prefersReducedMotion();
 		gl.easeTo({
 			center: place.anchor,
 			// The middle of the part the panel leaves clear. An offset, not padding: MapLibre keeps
 			// padding for later moves (zooms, the reported center), an offset applies to this one.
 			...(this.#listInset > 0 && { offset: [this.#listOffsetX(), 0] as [number, number] }),
-			...(prefersReducedMotion() && { duration: 0 })
+			...(reduce && { duration: 0 })
 		});
+		// Set after the call: stopping an earlier move fires its `moveend` inside `easeTo`.
+		this.#focusEasing = !reduce;
 	}
 
 	anchorFor(item: FeatureListItem): [number, number] {
@@ -593,6 +605,7 @@ class MapContextImpl implements MapContext {
 		this.#glState = gl;
 		this.#host.attach(gl);
 		this.#router.attach(gl);
+		gl.on("moveend", this.#onMoveEnd);
 		this.basemap.attach(
 			gl,
 			() => this.#host.restyle(),
@@ -607,6 +620,8 @@ class MapContextImpl implements MapContext {
 
 	detach(): void {
 		if (!this.#gl) return;
+		this.#gl.off("moveend", this.#onMoveEnd);
+		this.#focusEasing = false;
 		this.#router.detach();
 		this.basemap.detach();
 		this.#host.detach();
