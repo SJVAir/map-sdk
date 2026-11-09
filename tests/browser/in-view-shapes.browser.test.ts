@@ -162,6 +162,72 @@ describe("a plume that covers the view", () => {
 	});
 });
 
+describe("several plumes that overlap and cover the view", () => {
+	// The saved light plume, and a heavy one over it whose centroid (-119.5, 30) is off-screen.
+	async function twoPlumesMap() {
+		const light = plumeFeature();
+		const heavy = {
+			geometry: square(-124, 20, -115, 40),
+			properties: { refKey: "feature:heavy", name: "Smoke", value: "heavy" }
+		};
+		const source = new TestSource<Props>({
+			features: collection([light, heavy]),
+			scale: smokeScale
+		});
+		const map = createMap({ config: { maptilerKey: "test-key" } });
+		const smoke = hmsSmokePlugin({ source, layerLabel: "Smoke" });
+		map.addPlugin(smoke);
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		map.updateView(map.camera, VIEW);
+		flushSync();
+		return { map, gl, smoke };
+	}
+
+	it("each gets a list row", async () => {
+		const { map } = await twoPlumesMap();
+		render(FeatureList, { map });
+		await expect.poll(() => page.getByRole("option", { name: /Smoke/ }).elements().length).toBe(2);
+		map.destroy();
+	});
+
+	it("the summary counts each", async () => {
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		const { map, smoke } = await twoPlumesMap();
+		render(ViewSummary, { map });
+		map.updateView(map.camera, { ...VIEW, west: VIEW.west + 0.01 });
+		await vi.advanceTimersByTimeAsync(SUMMARY_DEBOUNCE_MS);
+		await Promise.resolve();
+		const expected = summaryText("Smoke", smoke.features!(), smokeScale, map.messages);
+		expect(expected).toMatch(/Light/);
+		expect(expected).toMatch(/Heavy/);
+		const lines = [...document.querySelectorAll(".mapsdk-summary p")].map((p) => p.textContent);
+		expect(lines).toContain(expected);
+		map.destroy();
+	});
+
+	it("focusing each row in turn keeps the map still and pins mid-map", async () => {
+		const { map, gl } = await twoPlumesMap();
+		render(FeatureList, { map });
+		render(MapTooltip, { map, project, width: W, height: H });
+		await focusList();
+		const seen = new Set<string>();
+		for (const key of ["{Home}", "{ArrowDown}"]) {
+			await userEvent.keyboard(key);
+			await expect.element(page.getByRole("tooltip")).toBeVisible();
+			seen.add(map.focusedKey!);
+			const at = tipAnchor();
+			expect(Math.abs(at.x - W / 2)).toBeLessThan(1);
+			expect(Math.abs(at.y - H / 2)).toBeLessThan(100);
+		}
+		expect(seen.size).toBe(2);
+		expect(gl.getCenter()).toEqual({ lng: -119.7, lat: 36.7 });
+		expect(gl.moves).toEqual([]);
+		map.destroy();
+	});
+});
+
 describe("hovering a shape in pinned mode", () => {
 	async function regionsMap(geometry: Geometry) {
 		const source = new TestSource<Props>({
