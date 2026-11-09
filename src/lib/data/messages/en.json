@@ -8,6 +8,7 @@
 	"mapsdk_list_row": "{name}, {value} {units}, {level}",
 	"mapsdk_list_row_no_units": "{name}, {value}, {level}",
 	"mapsdk_list_row_no_value": "{name}, no reading",
+	"mapsdk_list_row_level": "{name}, {level}",
 	"mapsdk_list_row_detail": "{name}, {detail}",
 	"mapsdk_list_empty": "Nothing on the map in this view",
 	"mapsdk_selected_count_one": "{count} selected",

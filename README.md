@@ -548,6 +548,16 @@ local sjvair.com stack at `http://localhost:8000`.
 
 ## Changes
 
+### 0.1.0-beta.6
+
+- **A category reading is shown once.** When a feature's value is its category level's code, the
+  list row, the tooltip, and the row's accessible name show only the level label. Smoke rows read
+  "Smoke, Light" (was "light Light"), burn status "Burning Discouraged", and heat score
+  "Moderate" (the 0–4 number is no longer shown). Number scales such as PM2.5 and fire power are
+  unchanged, and a category value that matches no level is still shown.
+- **New message key for hosts with their own catalog:** `mapsdk_list_row_level`
+  (`"{name}, {level}"`).
+
 ### 0.1.0-beta.5
 
 - **Shapes that cover the view are in view.** The feature list and the view summary count a shape

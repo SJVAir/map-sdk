@@ -4,11 +4,13 @@ import { createDefaultFormat } from "../../../src/lib/data/format.js";
 import { defaultMessages } from "../../../src/lib/data/messages.js";
 import { NO_LEVEL } from "../../../src/lib/data/scale.js";
 import type { Level } from "../../../src/lib/data/scale-types.js";
+import { burnScale, heatScale, smokeScale } from "../../fixtures/scales.js";
 import {
 	inView,
 	optionIdPart,
 	levelText,
 	rowLabel,
+	shownValue,
 	sortItems,
 	typeaheadIndex
 } from "../../../src/lib/ui/feature-list.js";
@@ -262,5 +264,44 @@ describe("levelText", () => {
 			kind: "none",
 			text: "No level"
 		});
+	});
+});
+
+describe("a category reading shows its level label once", () => {
+	const format = createDefaultFormat();
+	const smoke = (value: string) =>
+		item("p", "Smoke", {
+			value,
+			level: smokeScale.levels.find((l) => l.value === value) ?? NO_LEVEL,
+			units: ""
+		});
+
+	it("hides a value that is its category level's code", () => {
+		expect(shownValue(smoke("light"), format)).toBeNull();
+		const burn = item("b", "Kern", {
+			value: burnScale.levels[0].value,
+			level: burnScale.levels[0],
+			units: ""
+		});
+		expect(shownValue(burn, format)).toBeNull();
+	});
+
+	it("hides a numeric category code too (the heat score's 0 to 4)", () => {
+		const heat = item("z", "93721", { value: 2, level: heatScale.levels[2], units: "" });
+		expect(shownValue(heat, format)).toBeNull();
+	});
+
+	it("keeps a category value that matches no level", () => {
+		expect(shownValue(smoke("extreme"), format)).toBe("extreme");
+	});
+
+	it("keeps a number on a range scale", () => {
+		expect(shownValue(item("1", "Arvin", { value: 12.34, precision: 1 }), format)).toBe("12.3");
+	});
+
+	it("reads the row as its name and level", () => {
+		expect(rowLabel(smoke("light"), defaultMessages, format)).toBe("Smoke, Light");
+		const heat = item("z", "93721", { value: 2, level: heatScale.levels[2], units: "" });
+		expect(rowLabel(heat, defaultMessages, format)).toBe("93721, Moderate");
 	});
 });
