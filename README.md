@@ -453,7 +453,8 @@ and `getSelectionMode(id)` are reactive.
 
 `map.on("featureclick", ({ pluginId, ref, lngLat }) => …)` fires for every click on a feature,
 whatever the mode, and also for a pick in the feature list, so keyboard users get the same event;
-`lngLat` is the click point (the item's position for a list pick). It returns an unsubscribe
+`lngLat` is the click point. For a list pick it's where the item's tooltip pins: the item's
+position, or for a shape whose label point is off-screen, a point of the shape in view. It returns an unsubscribe
 function. For your own context menu, `map.featuresAt({ x, y })` returns the hits under
 a canvas point, topmost first, and `map.featureForElement(element)` returns the hit for a row of
 the feature list (an element with `data-mapsdk-ref`). Both return nothing while the map is
@@ -560,6 +561,10 @@ local sjvair.com stack at `http://localhost:8000`.
 - **Hover tooltips** in `"pinned"` mode follow the same rule: a hovered shape whose label point is
   off-screen pins its tooltip inside the view instead of at the map's edge. If the map moves while
   the pointer rests on the shape, the pin is found again when the map settles.
+- **`featureclick` from the list** (Enter on a row) reports that same in-view point for such a
+  shape, instead of its off-screen label point. A handler that pans to `lngLat` no longer sends
+  the map off to the shape's far-away center. Points and on-screen label points report their
+  position, as before.
 - **New API (all optional):** `FeatureListItem.geometry` and `.bbox`, `MapContext.focusedAnchor`
   and `.anchorFor(item)`, `geometryBbox`, `intersectsBounds`, and the `Bbox` type.
 

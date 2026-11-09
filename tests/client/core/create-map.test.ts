@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushSync, tick } from "svelte";
 import { SvelteMap } from "svelte/reactivity";
-import { createMap } from "../../../src/lib/core/create-map.svelte.js";
+import { createMap, type MapContext } from "../../../src/lib/core/create-map.svelte.js";
 import type { FeatureListItem, MapPlugin, PluginContext } from "../../../src/lib/core/plugin.js";
 import { defaultMessages } from "../../../src/lib/data/messages.js";
 import { NO_LEVEL } from "../../../src/lib/data/scale.js";
@@ -316,6 +316,41 @@ describe("createMap", () => {
 			map.focusFeature("p");
 			expect(gl.moves).toHaveLength(2);
 			expect(gl.moves[1].options).toEqual({ center: [-119.5, 36.6], duration: 0 });
+		});
+
+		describe("picking it from the list (Enter)", () => {
+			const clicks = (map: MapContext) => {
+				const seen: Array<[number, number]> = [];
+				map.on("featureclick", ({ lngLat }) => seen.push(lngLat));
+				return seen;
+			};
+
+			it("reports where the focused row's tooltip pins", async () => {
+				const big = square(-125, 30, -110, 40);
+				const { map, gl } = await shapesMap([shapeItem("b", big, [-117.5, 31])]);
+				Object.defineProperty(gl.canvas, "clientWidth", { value: 800 });
+				map.setListInset(240);
+				const seen = clicks(map);
+				map.focusFeature("b", "shapes");
+				map.pickFromList("shapes", "b", false);
+				expect(seen).toEqual([map.focusedAnchor]);
+				expect(seen[0][0]).toBeCloseTo(-119.7 + 0.15 * 5.625);
+			});
+
+			it("reports a point of the shape in view when the row isn't focused", async () => {
+				const { map } = await shapesMap([shapeItem("p", plume, labelPoint(plume)!)]);
+				const seen = clicks(map);
+				map.pickFromList("shapes", "p", false);
+				expect(seen).toEqual([[-119.7, 36.7]]);
+			});
+
+			it("still reports a point's own position", async () => {
+				const { map } = await shapesMap([shapeItem("m", undefined, [-119.5, 36.6])]);
+				const seen = clicks(map);
+				map.focusFeature("m", "shapes");
+				map.pickFromList("shapes", "m", false);
+				expect(seen).toEqual([[-119.5, 36.6]]);
+			});
 		});
 
 		it("once that ease has ended, a no-move focus sends no move", async () => {

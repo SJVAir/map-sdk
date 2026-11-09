@@ -61,7 +61,10 @@ export interface PluginOptions {
 export type FeatureClickHandler = (e: {
 	pluginId: string;
 	ref: FeatureRef;
-	/** The click point; for a pick in the feature list, the item's position. */
+	/**
+	 * The click point. For a pick in the feature list, where the item's tooltip pins: its position,
+	 * or for a shape whose label point is off-screen, a point of the shape in view.
+	 */
 	lngLat: [number, number];
 }) => void;
 
@@ -420,8 +423,15 @@ class MapContextImpl implements MapContext {
 		if (this.#destroyed) return;
 		const found = untrack(() => this.#findItem(refKey, pluginId));
 		if (!found) return;
-		this.#emitClick(pluginId, found.item.ref, found.item.lngLat);
-		if (found.item.selectable) this.#applyPick(pluginId, found.item.ref, additive);
+		const { item } = found;
+		// Where the row's tooltip pins: the focused anchor for the focused row, else a point of a
+		// shape in view (a point's own position for points and on-screen label points).
+		const focused =
+			untrack(() => this.#focusedKey) === refKey &&
+			(untrack(() => this.#focusedPluginId) ?? pluginId) === pluginId;
+		const anchor = (focused && untrack(() => this.#focusedAnchor)) || this.anchorFor(item);
+		this.#emitClick(pluginId, item.ref, anchor);
+		if (item.selectable) this.#applyPick(pluginId, item.ref, additive);
 	}
 
 	clearSelection(pluginId: string): void {
