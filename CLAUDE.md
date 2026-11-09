@@ -101,6 +101,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 - **UI** (`src/lib/ui/`): Legend (`order`, `framed`; blocks legends are one labeled bar), FeatureList,
   MapTooltip, SelectionBar, ViewSummary, and MapControls (zoom buttons only; basemap switching is
   `MapContext`, credits are the engine's). `controls.css` holds the focus ring and motion classes.
+  `feature-list.ts`'s `shownValue` is the one place a row's or tooltip's value text is made; it
+  hides a category reading's code, since the level label already says it.
 - **Entries**: `.` (everything, reaches the map engine), `./data` and `./stores` (must not reach
   maplibre or MapTiler; `test:bundle` enforces it), `./messages/en.json`, `./theme.css`.
   `theme.css` maps the family tokens to Tailwind utilities with fallbacks.
