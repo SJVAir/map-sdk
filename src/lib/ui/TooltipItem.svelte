@@ -3,9 +3,8 @@
 	import type { MessageProvider } from "../data/messages.js";
 	import type { FeatureListItem } from "../core/plugin.js";
 	import { NO_LEVEL } from "../data/scale.js";
-	import { levelText } from "./feature-list.js";
+	import { levelText, shownValue } from "./feature-list.js";
 	import { levelChip } from "./level-chip.js";
-	import { formatValue } from "./value-format.js";
 
 	// The generic tooltip body under a feature's name: its value and a chip with its level. Shared
 	// by MapTooltip and by plugins that show it for features they don't list.
@@ -26,13 +25,8 @@
 		const chip = levelChip(level?.color);
 		return chip ? `background:${chip.background};color:${chip.text}` : "";
 	});
-	const valueText = $derived(
-		item.value == null
-			? null
-			: typeof item.value === "number"
-				? formatValue(item.value, item.precision, format, item.truncate)
-				: item.value
-	);
+	// A category reading shows only its level chip: its value is the level's code.
+	const valueText = $derived(shownValue(item, format));
 </script>
 
 <div class="mapsdk-tooltip-item">

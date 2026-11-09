@@ -43,6 +43,19 @@ export function shownLevel(item: FeatureListItem): Level | null {
 	return item.level !== NO_LEVEL ? item.level : null;
 }
 
+/**
+ * The value as shown, or `null` for none. A category reading, whose value is its level's code
+ * (smoke's "light", the heat score's 2), shows no value: its level label already says it.
+ */
+export function shownValue(item: FeatureListItem, format: FormatProvider): string | null {
+	if (item.value === null) return null;
+	const level = shownLevel(item);
+	if (level && level.value !== null && level.value === item.value) return null;
+	return typeof item.value === "number"
+		? formatValue(item.value, item.precision, format, item.truncate)
+		: item.value;
+}
+
 const collator = new Intl.Collator("en-US");
 
 /** A value's sort weight; `null` sorts last. Category values sort by their level's tier. */
@@ -100,17 +113,18 @@ export function rowLabel(
 	format: FormatProvider
 ): string {
 	const level = levelText(item, messages);
-	if (item.value === null) {
+	const value = shownValue(item, format);
+	if (value === null) {
+		// A category reading: its level is its value.
+		if (item.value !== null && level.kind === "level")
+			return messages("mapsdk_list_row_level", { name: item.name, level: level.text });
 		return level.kind === "detail"
 			? messages("mapsdk_list_row_detail", { name: item.name, detail: level.text })
 			: messages("mapsdk_list_row_no_value", { name: item.name });
 	}
 	const params = {
 		name: item.name,
-		value:
-			typeof item.value === "number"
-				? formatValue(item.value, item.precision, format, item.truncate)
-				: item.value,
+		value,
 		units: item.units,
 		level: level.text
 	};

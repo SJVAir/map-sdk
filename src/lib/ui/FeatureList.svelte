@@ -11,11 +11,11 @@
 		rowLabel,
 		levelText,
 		shownLevel,
+		shownValue,
 		sortItems,
 		typeaheadIndex,
 		type SortBy
 	} from "./feature-list.js";
-	import { formatValue as formatNumber } from "./value-format.js";
 
 	interface Props {
 		map: MapContext;
@@ -267,13 +267,6 @@
 		pick(rows[index], e.shiftKey || e.metaKey || e.ctrlKey);
 	}
 
-	function formatValue(row: Row): string {
-		if (row.value === null) return "";
-		return typeof row.value === "number"
-			? formatNumber(row.value, row.precision, map.format, row.truncate)
-			: row.value;
-	}
-
 	onDestroy(() => {
 		clearTimeout(typeaheadTimer);
 		clearTimeout(menuSentTimer);
@@ -332,6 +325,7 @@
 				{@const index = range.start + i}
 				{@const level = shownLevel(row)}
 				{@const levelPlace = levelText(row, map.messages)}
+				{@const value = shownValue(row, map.format)}
 				{@const isOn = isSelected(row)}
 				<!-- Options aren't focused: the listbox holds focus and handles keys (aria-activedescendant). -->
 				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_interactive_supports_focus -->
@@ -359,7 +353,7 @@
 					</span>
 					<span class="mapsdk-list-name">{row.name}</span>
 					<span class="mapsdk-list-value">
-						{formatValue(row)}{#if row.units && row.value !== null}&nbsp;{row.units}{/if}
+						{value ?? ""}{#if row.units && value !== null}&nbsp;{row.units}{/if}
 					</span>
 					<span class="mapsdk-list-level text-xs">
 						{#if levelPlace.kind !== "detail"}
