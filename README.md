@@ -212,7 +212,9 @@ the legend section's title: `layerLabel` (default) or the entry type's label fro
 provider (`monitorsPlugin` uses the latter, so its section reads "PM2.5"; `layerLabel` still names
 the layer in the list, selection bar and summary). `Legend` takes `order` (`"bottom-first"`,
 default, or `"top-first"`) and `framed` (`true`, default, draws its own card; `false` draws no
-border, background, padding or fixed width, so a host's own card frames it). Without a frame,
+border, background, padding or fixed width, so a host's own card frames it). The framed legend
+and the feature list panel are 21rem wide at most, and never wider than the map less 2rem (the
+window less 2rem outside a `MapView`), so they fit a small map on a wide screen. Without a frame,
 translucent swatches blend over the nearest ancestor with an opaque background (a see-through
 card is skipped), else `--background`; that color is read on mount, when `framed` changes, and on
 a theme change, but not when the card changes color through its own class or style.

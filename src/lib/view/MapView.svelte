@@ -250,6 +250,7 @@
 	role="region"
 	aria-label={label ?? map.messages("mapsdk_map_label")}
 	data-mapsdk-map={map.uid}
+	style:--mapsdk-map-width={width > 0 ? `${width}px` : undefined}
 >
 	<div class="mapsdk-gl" bind:this={glContainer}></div>
 	<MapTooltip {map} {project} {width} {height} mode={tooltip} gl={projector} />

@@ -11,6 +11,7 @@ import {
 	maptilerKeyTransform
 } from "../../src/lib/view/create-gl-map.js";
 import { NO_LEVEL } from "../../src/lib/data/scale.js";
+import MapViewNarrowPanels from "../fixtures/MapViewNarrowPanels.svelte";
 import MapViewWithOverlay from "../fixtures/MapViewWithOverlay.svelte";
 
 // The browser project resolves with the "browser" condition only, so esm-env's DEV would be
@@ -57,7 +58,8 @@ function whenLoaded(gl: GlMapLike): Promise<void> {
 
 const sized = document.createElement("style");
 sized.textContent =
-	".test-map { width: 320px; height: 240px; } .wide-map { width: 600px; height: 400px; }";
+	".test-map { width: 320px; height: 240px; } .wide-map { width: 600px; height: 400px; }" +
+	" .narrow-map { width: 300px; height: 240px; }";
 
 /** Every request made, which must stay empty: the tests run offline, with no key. */
 const requests: string[] = [];
@@ -572,6 +574,24 @@ describe("MapView list button", () => {
 		const center = gl.getCenter();
 		expect(center.lng).toBeCloseTo(visual.lng, 6);
 		expect(center.lat).toBeCloseTo(visual.lat, 6);
+	});
+
+	it("sizes the list panel and the framed legend by the map, not the window", async () => {
+		await page.viewport(1440, 900);
+		const map = newMap();
+		map.addPlugin({ id: "probe", setup: () => () => {}, features: () => [] });
+		const { container, unmount } = await render(MapViewNarrowPanels, { map });
+		await page.getByRole("button", { name: "List of features on the map" }).click();
+		const maxWidth = (selector: string) => {
+			const el = container.querySelector(selector);
+			if (!el) throw new Error(`no ${selector}`);
+			return getComputedStyle(el).maxWidth;
+		};
+		// 300px map less 2rem.
+		await vi.waitFor(() => expect(maxWidth(".mapsdk-list")).toBe("268px"));
+		expect(maxWidth(".mapsdk-legend")).toBe("268px");
+		await unmount();
+		await page.viewport(414, 896);
 	});
 
 	it("leaves the button out when featureList is false", async () => {
