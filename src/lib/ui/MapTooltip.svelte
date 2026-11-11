@@ -24,9 +24,17 @@
 		mode?: "pinned" | "pointer";
 		/** The GL map, for `zoomstart` in `"pointer"` mode. */
 		gl?: Pick<GlMapLike, "on" | "off"> | null;
+		/**
+		 * The pinned reading card: `map.pinned` and a focused list item show as an interactive card
+		 * (pointer events, a Close button, Esc), and the hover doesn't show while one is pinned.
+		 */
+		card?: boolean;
 	}
 
-	let { map, project, width, height, mode = "pinned", gl = null }: Props = $props();
+	let { map, project, width, height, mode = "pinned", gl = null, card = false }: Props = $props();
+
+	// Ignored without the card, so a host's map never pins.
+	const pinned = $derived(card ? map.pinned : null);
 
 	// Pointer mode only: set by a zoom, cleared by the next pointer move over a hit.
 	let zoomHidden = $state(false);
@@ -45,11 +53,15 @@
 	let tipHeight = $state(0);
 	const GAP = 12;
 
-	// The keyboard-focused list item wins over the pointer.
-	const key = $derived(map.focusedKey ?? map.hovered?.hit.refKey ?? null);
+	// The keyboard-focused list item wins, then the pinned card, then the pointer (which shows
+	// nothing while a card is pinned).
+	const shownHit = $derived(map.focusedKey ? null : (pinned ?? map.hovered));
+	const key = $derived(map.focusedKey ?? shownHit?.hit.refKey ?? null);
 	// Primitives, so moving the pointer within one feature doesn't recompute the content.
-	const hitPluginId = $derived(map.focusedKey ? null : (map.hovered?.hit.pluginId ?? null));
-	const hitName = $derived(map.focusedKey ? null : (map.hovered?.hit.name ?? null));
+	const hitPluginId = $derived(shownHit?.hit.pluginId ?? null);
+	const hitName = $derived(shownHit?.hit.name ?? null);
+	// The card shows (interactive) for a focused item or a pinned feature.
+	const interactive = $derived(card && (map.focusedKey !== null || pinned !== null));
 
 	// Reads only the shown feature's plugin (or all plugins for a focused key), and only while
 	// something is shown, so an idle map doesn't subscribe to any plugin's data.
@@ -83,12 +95,20 @@
 		return untrack(() => (item?.geometry ? map.anchorFor(item) : null));
 	});
 	const anchor = $derived.by((): [number, number] | null => {
-		if (mode === "pointer" && !map.focusedKey) return map.hovered?.lngLat ?? null;
+		if (mode === "pointer" && !map.focusedKey && !pinned) return map.hovered?.lngLat ?? null;
 		// A focused feature that left the data has no item, so no tooltip.
 		if (map.focusedKey) return item ? (map.focusedAnchor ?? item.lngLat) : null;
-		return hoverAnchor ?? item?.lngLat ?? map.hovered?.lngLat ?? null;
+		return hoverAnchor ?? item?.lngLat ?? shownHit?.lngLat ?? null;
 	});
 	const projected = $derived(anchor ? project(anchor) : null);
+	// A card whose anchor is out of the map's box hides until it's back.
+	const offScreen = $derived(
+		interactive &&
+			projected !== null &&
+			width !== undefined &&
+			height !== undefined &&
+			(projected.x < 0 || projected.y < 0 || projected.x > width || projected.y > height)
+	);
 	// Centered above the point; flipped below it near the top edge; inside the container.
 	const position = $derived.by(() => {
 		if (!projected) return null;
@@ -105,7 +125,7 @@
 		// A hovered hit no plugin lists (e.g. a cluster bubble): its plugin's hover content.
 		if (key === null || hitPluginId === null) return undefined;
 		const plugin = map.plugins.find((p) => p.id === hitPluginId);
-		const hit = untrack(() => map.hovered?.hit);
+		const hit = untrack(() => shownHit?.hit);
 		return hit && plugin?.hoverTooltip?.(hit);
 	});
 
@@ -116,10 +136,81 @@
 		const plugin = found?.plugin ?? map.plugins.find((p) => p.id === hitPluginId);
 		return !plugin?.tooltipShowsName;
 	});
+
+	let cardEl: HTMLDivElement | undefined = $state();
+	/** Where focus came from when it moved into the card, to return it on close. */
+	let origin: HTMLElement | null = null;
+
+	function onfocusin(e: FocusEvent) {
+		const from = e.relatedTarget;
+		if (from instanceof HTMLElement && !cardEl?.contains(from)) origin = from;
+	}
+
+	/** Unpins. Focus inside the card goes back where it came from, else to the map region. */
+	function close() {
+		const hadFocus = cardEl?.contains(document.activeElement) ?? false;
+		const back = origin;
+		origin = null;
+		if (hadFocus) {
+			if (back?.isConnected) back.focus();
+			else {
+				const region = cardEl?.closest<HTMLElement>("[data-mapsdk-map]");
+				if (region && !region.hasAttribute("tabindex")) region.setAttribute("tabindex", "-1");
+				region?.focus();
+			}
+		}
+		map.unpin();
+	}
+
+	function onkeydown(e: KeyboardEvent) {
+		if (e.key !== "Escape") return;
+		e.preventDefault();
+		e.stopPropagation();
+		close();
+	}
+
+	// A pinned feature that left its plugin's data (a poll dropped it) closes its card.
+	$effect(() => {
+		if (!pinned || map.focusedKey) return;
+		const { pluginId, refKey } = pinned.hit;
+		const plugin = map.plugins.find((p) => p.id === pluginId);
+		if (!plugin?.features) return;
+		if (!plugin.features().some((f) => f.refKey === refKey)) untrack(close);
+	});
 </script>
 
 <!-- Only with something to show: a hit with no name, item, or content gets no empty box. -->
-{#if (name || item || custom) && position && !(zoomHidden && !map.focusedKey)}
+{#if interactive && (name || item || custom) && position && !offScreen}
+	<div
+		bind:this={cardEl}
+		class="mapsdk-tooltip mapsdk-card text-sm"
+		role="group"
+		aria-label={name ?? undefined}
+		bind:offsetWidth={tipWidth}
+		bind:offsetHeight={tipHeight}
+		style:left="{position.left}px"
+		style:top="{position.top}px"
+		{onfocusin}
+		{onkeydown}
+	>
+		{#if showName}
+			<div class="mapsdk-tooltip-name">{name}</div>
+		{/if}
+		{#if custom}
+			{@render custom()}
+		{:else if item}
+			<TooltipItem {item} messages={map.messages} format={map.format} />
+		{/if}
+		<button
+			type="button"
+			class="mapsdk-card-close mapsdk-focus"
+			aria-label={map.messages("mapsdk_card_close")}
+			onclick={close}
+		>
+			<span aria-hidden="true">×</span>
+		</button>
+	</div>
+{:else if !interactive && (name || item || custom) && position && !(zoomHidden && !map.focusedKey)}
 	<div
 		class="mapsdk-tooltip text-sm"
 		role="tooltip"
@@ -167,5 +258,37 @@
 
 	.mapsdk-tooltip-name {
 		font-weight: 600;
+	}
+
+	/* The pinned card: takes the pointer, and sits above the feature list panel. Room on the
+	   right for the Close button. */
+	.mapsdk-card {
+		z-index: 3;
+		padding-right: 2rem;
+		pointer-events: auto;
+	}
+
+	.mapsdk-card-close {
+		position: absolute;
+		top: 0.25rem;
+		right: 0.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.5rem;
+		height: 1.5rem;
+		padding: 0;
+		border: 0;
+		border-radius: var(--radius-control, var(--radius));
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		font-size: 1.125rem;
+		line-height: 1;
+		cursor: pointer;
+	}
+
+	.mapsdk-card-close:hover {
+		background: var(--accent, var(--muted));
 	}
 </style>
