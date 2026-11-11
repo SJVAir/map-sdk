@@ -750,3 +750,65 @@ describe("non-hoverable plugins with blocking layers", () => {
 		expect(handler).not.toHaveBeenCalled();
 	});
 });
+
+describe("misses", () => {
+	async function routerSetUp() {
+		const router = new InteractionRouter();
+		const gl = createFakeGl({ styleLoaded: true });
+		gl.addSource("s", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+		gl.addLayer({ id: "a", type: "circle", source: "s" });
+		gl.addLayer({ id: "bubbles", type: "circle", source: "s" });
+		router.register("p", ["a"], () => ({
+			pluginId: "p",
+			ref: { kind: "feature", id: "x" },
+			refKey: "feature:x",
+			name: "X"
+		}));
+		const onBlockedClick = vi.fn();
+		router.registerBlocking("p", ["bubbles"], undefined, onBlockedClick);
+		router.attach(gl);
+		await tick();
+		const feature = (layer: string) => ({
+			layer: { id: layer },
+			source: "s",
+			properties: {},
+			geometry: { type: "Point" as const, coordinates: [-119, 36] }
+		});
+		return { router, gl, feature, onBlockedClick };
+	}
+
+	it("calls onMiss for a click that hits nothing", async () => {
+		const { router, gl } = await routerSetUp();
+		const onMiss = vi.fn();
+		router.onMiss(onMiss);
+		click(gl);
+		expect(onMiss).toHaveBeenCalledTimes(1);
+	});
+
+	it("calls onMiss after a blocking layer's onClick", async () => {
+		const { router, gl, feature, onBlockedClick } = await routerSetUp();
+		const order: string[] = [];
+		onBlockedClick.mockImplementation(() => order.push("blocked"));
+		router.onMiss(() => order.push("miss"));
+		gl.setRenderedFeatures([feature("bubbles")]);
+		click(gl);
+		expect(order).toEqual(["blocked", "miss"]);
+	});
+
+	it("doesn't call onMiss for a click with hits", async () => {
+		const { router, gl, feature } = await routerSetUp();
+		const onMiss = vi.fn();
+		router.onMiss(onMiss);
+		gl.setRenderedFeatures([feature("a")]);
+		click(gl);
+		expect(onMiss).not.toHaveBeenCalled();
+	});
+
+	it("stops calling after unsubscribe", async () => {
+		const { router, gl } = await routerSetUp();
+		const onMiss = vi.fn();
+		router.onMiss(onMiss)();
+		click(gl);
+		expect(onMiss).not.toHaveBeenCalled();
+	});
+});

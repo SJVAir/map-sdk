@@ -66,6 +66,7 @@ export class InteractionRouter {
 	/* eslint-disable svelte/prefer-svelte-reactivity */
 	#registrations = new Set<Registration>();
 	#pickHandlers = new Set<(e: ClickEvent) => void>();
+	#missHandlers = new Set<() => void>();
 	/* eslint-enable svelte/prefer-svelte-reactivity */
 	#gl: GlMapLike | null = null;
 	#canvas: HTMLCanvasElement | null = null;
@@ -248,6 +249,27 @@ export class InteractionRouter {
 		};
 	}
 
+	/**
+	 * Called for a click that picks nothing: one with no hits, or one on a blocking layer (after
+	 * that layer's own click handler). Returns an unsubscribe function.
+	 */
+	onMiss(handler: () => void): () => void {
+		this.#missHandlers.add(handler);
+		return () => {
+			this.#missHandlers.delete(handler);
+		};
+	}
+
+	#emitMiss(): void {
+		for (const handler of [...this.#missHandlers]) {
+			try {
+				handler();
+			} catch (error) {
+				console.error("map-sdk: a miss handler failed", error);
+			}
+		}
+	}
+
 	#onPointerDown = (e: Event) => {
 		this.#lastPointerType = (e as PointerEvent).pointerType || null;
 	};
@@ -263,10 +285,14 @@ export class InteractionRouter {
 			} catch (error) {
 				console.error("map-sdk: a blocking layer's click handler failed", error);
 			}
+			this.#emitMiss();
 			return;
 		}
 		const { hits } = found;
-		if (hits.length === 0) return;
+		if (hits.length === 0) {
+			this.#emitMiss();
+			return;
+		}
 		const o = e.originalEvent;
 		const pointerType = o?.pointerType || recorded;
 		const event: ClickEvent = {
