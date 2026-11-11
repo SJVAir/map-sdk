@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from "svelte";
+	import type { Attachment } from "svelte/attachments";
 	import type { MapContext } from "../core/create-map.svelte.js";
 	import type { GlMapLike } from "../core/gl.js";
 	import type { FeatureListItem, MapPlugin } from "../core/plugin.js";
@@ -143,22 +144,46 @@
 
 	function onfocusin(e: FocusEvent) {
 		const from = e.relatedTarget;
+		focusInside = true;
+		region = cardEl?.closest<HTMLElement>("[data-mapsdk-map]") ?? region;
 		if (from instanceof HTMLElement && !cardEl?.contains(from)) origin = from;
 	}
 
-	/** Unpins. Focus inside the card goes back where it came from, else to the map region. */
-	function close() {
-		const hadFocus = cardEl?.contains(document.activeElement) ?? false;
+	/** Focus is inside the card (kept by focusin/focusout, since a removed card no longer says). */
+	let focusInside = false;
+	/** The map region the card is in, found while it's in the document. */
+	let region: HTMLElement | null = null;
+
+	function onfocusout(e: FocusEvent) {
+		const to = e.relatedTarget;
+		if (to instanceof Node && cardEl?.contains(to)) return;
+		// Later, not now: removing the focused card fires focusout too, and its teardown (which
+		// runs first) still has to see that focus was inside.
+		queueMicrotask(() => {
+			if (!cardEl?.contains(document.activeElement)) focusInside = false;
+		});
+	}
+
+	/** Focus inside the card goes back where it came from, else to the map region. */
+	function handBack() {
+		if (!focusInside) return;
+		focusInside = false;
 		const back = origin;
 		origin = null;
-		if (hadFocus) {
-			if (back?.isConnected) back.focus();
-			else {
-				const region = cardEl?.closest<HTMLElement>("[data-mapsdk-map]");
-				if (region && !region.hasAttribute("tabindex")) region.setAttribute("tabindex", "-1");
-				region?.focus();
-			}
+		if (back?.isConnected) back.focus();
+		else if (region?.isConnected) {
+			if (!region.hasAttribute("tabindex")) region.setAttribute("tabindex", "-1");
+			region.focus();
 		}
+	}
+
+	// However the card goes (Close, a host's unpin, its plugin removed, its anchor off-screen),
+	// focus inside it isn't left on a removed node.
+	const handBackOnRemove: Attachment<HTMLElement> = () => () => handBack();
+
+	/** Unpins, handing focus back first. */
+	function close() {
+		handBack();
 		map.unpin();
 		// Focus back on a list row focuses (and so shows) that row again; the card stays closed
 		// until the next row move, as with Esc in the list.
@@ -172,13 +197,20 @@
 		close();
 	}
 
-	// A pinned feature that left its plugin's data (a poll dropped it) closes its card.
+	// A pinned feature that left its plugin's data (a poll dropped it) closes its card. Only one
+	// its plugin listed while pinned: some hits are never listed (HMS fire hotspots), and keep it.
+	let listedKey: string | null = null;
 	$effect(() => {
 		if (!pinned || map.focusedKey) return;
 		const { pluginId, refKey } = pinned.hit;
 		const plugin = map.plugins.find((p) => p.id === pluginId);
 		if (!plugin?.features) return;
-		if (!plugin.features().some((f) => f.refKey === refKey)) untrack(close);
+		const id = `${pluginId}\n${refKey}`;
+		if (plugin.features().some((f) => f.refKey === refKey)) listedKey = id;
+		else if (listedKey === id) {
+			listedKey = null;
+			untrack(close);
+		}
 	});
 </script>
 
@@ -187,6 +219,7 @@
 	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div
 		bind:this={cardEl}
+		{@attach handBackOnRemove}
 		class="mapsdk-tooltip mapsdk-card text-sm"
 		role="group"
 		aria-label={name ?? undefined}
@@ -195,6 +228,7 @@
 		style:left="{position.left}px"
 		style:top="{position.top}px"
 		{onfocusin}
+		{onfocusout}
 		{onkeydown}
 	>
 		{#if showName}

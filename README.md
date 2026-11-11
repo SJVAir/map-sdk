@@ -568,9 +568,10 @@ local sjvair.com stack at `http://localhost:8000`.
 - **The pinned reading card.** `MapView`'s new `card` prop: a click or tap on a feature pins its
   card, which takes the pointer, has a Close button, and closes with Esc, Close, or a click
   elsewhere on the map. Focusing a feature-list row shows the same card, and Tab reaches it; closing
-  it returns focus where it came from. A tap now always shows the reading: before, a tap's
-  emulated `mouseout` (Chromium, WebKit) hid the hover card right after the tap. Nothing changes
-  without `card`, and with it, selection and `featureclick` behave as before.
+  it returns focus where it came from. With `card`, a tap always shows the reading: without
+  it, a tap's emulated `mouseout` (Chromium, WebKit) still hides the hover card right after the
+  tap, as before. Nothing changes without `card`, and with it, selection and `featureclick` behave
+  as before.
 - **New API:** `MapView`'s `card`, `MapContext.pinned` and `unpin()`. New message key for hosts
   with their own catalog: `mapsdk_card_close` ("Close").
 
