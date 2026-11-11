@@ -652,3 +652,75 @@ describe("createMap", () => {
 		}
 	});
 });
+
+describe("MapView card", () => {
+	/** A map with one plugin listing one monitor at the view's center. */
+	async function cardMap(props: Record<string, unknown> = {}) {
+		const map = newMap();
+		map.addPlugin({
+			id: "pts",
+			setup: () => () => {},
+			features: () => [
+				{
+					refKey: "monitor:a",
+					ref: { kind: "monitor", id: "a" },
+					name: "Site A",
+					value: null,
+					level: NO_LEVEL,
+					units: "",
+					lngLat: map.config.initialView!.center,
+					selectable: true
+				}
+			]
+		});
+		const view = await render(MapView, { map, class: "wide-map", ...props });
+		await vi.waitFor(() => expect(map.ready).toBe(true));
+		return { map, view };
+	}
+
+	it("card off by default: focus doesn't pin", async () => {
+		const { map } = await cardMap();
+		map.focusFeature("monitor:a", "pts");
+		expect(map.pinned).toBeNull();
+	});
+
+	it("card: Escape in the list closes the card first, then the panel", async () => {
+		const { map } = await cardMap({ card: true });
+		await page.getByRole("button", { name: "List of features on the map" }).click();
+		const listbox = page.getByRole("listbox", { name: "Features on the map" });
+		(listbox.element() as HTMLElement).focus();
+		await userEvent.keyboard("{ArrowDown}");
+		await expect.element(page.getByRole("group", { name: "Site A" })).toBeVisible();
+		await userEvent.keyboard("{Escape}");
+		expect(map.pinned).toBeNull();
+		await expect.element(page.getByRole("group", { name: "Site A" })).not.toBeInTheDocument();
+		await expect.element(listbox).toBeVisible();
+		await userEvent.keyboard("{Escape}");
+		await expect.element(listbox).not.toBeInTheDocument();
+	});
+
+	it("card: Tab from the focused list row reaches the card's Close button", async () => {
+		await cardMap({ card: true });
+		await page.getByRole("button", { name: "List of features on the map" }).click();
+		const listbox = page.getByRole("listbox", { name: "Features on the map" });
+		(listbox.element() as HTMLElement).focus();
+		await userEvent.keyboard("{ArrowDown}");
+		await userEvent.keyboard("{Tab}");
+		await expect.element(page.getByRole("button", { name: "Close" })).toHaveFocus();
+	});
+
+	it("card: Escape with focus in another map leaves this card open", async () => {
+		const one = await cardMap({ card: true });
+		const two = await cardMap({ card: true });
+		one.map.focusFeature("monitor:a", "pts");
+		one.map.focusFeature(null);
+		expect(one.map.pinned?.hit.refKey).toBe("monitor:a");
+		const otherButton = two.view.container.querySelector<HTMLElement>(".mapsdk-list-button")!;
+		otherButton.focus();
+		await userEvent.keyboard("{Escape}");
+		expect(one.map.pinned?.hit.refKey).toBe("monitor:a");
+		(document.activeElement as HTMLElement).blur();
+		await userEvent.keyboard("{Escape}");
+		expect(one.map.pinned).toBeNull();
+	});
+});
