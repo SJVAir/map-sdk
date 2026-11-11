@@ -177,6 +177,17 @@ export interface MapContext {
 	 */
 	readonly hovered: Hovered | null;
 	/**
+	 * Reactive. The feature whose reading card is pinned, and where, while `MapView`'s `card` is
+	 * on; `null` otherwise. A click on a feature pins it (selection and `featureclick` are
+	 * unchanged), focusing a feature-list row pins that row's feature, and a click on nothing (or
+	 * on a cluster bubble or a feature without a hover card) unpins.
+	 */
+	readonly pinned: Hovered | null;
+	/** Closes the pinned card. Does nothing when nothing is pinned. */
+	unpin(): void;
+	/** @internal For `MapView` only: turns pinning on or off. Off also unpins. */
+	setCardEnabled(on: boolean): void;
+	/**
 	 * Marks the feature focused and pans to it (no animation under reduced motion): the item in
 	 * `pluginId`'s features when given, else the first plugin listing `refKey`. `null` clears the
 	 * focus without moving the camera. Sets `focusedPluginId` to `pluginId` (or `null`). The pan
@@ -293,6 +304,8 @@ class MapContextImpl implements MapContext {
 	#focusedKey = $state<string | null>(null);
 	#focusedPluginId = $state<string | null>(null);
 	#focusedAnchor = $state.raw<[number, number] | null>(null);
+	#pinned = $state.raw<Hovered | null>(null);
+	#cardEnabled = false;
 	#selections = new SvelteMap<string, PluginSelection>();
 	#featureClickHandlers = new Set<FeatureClickHandler>();
 	#router = new InteractionRouter();
@@ -332,6 +345,7 @@ class MapContextImpl implements MapContext {
 			}
 		});
 		this.#router.onPick((e) => this.#pick(e));
+		this.#router.onMiss(() => this.unpin());
 	}
 
 	get camera(): CameraState {
@@ -380,6 +394,19 @@ class MapContextImpl implements MapContext {
 		return this.#router.hovered;
 	}
 
+	get pinned(): Hovered | null {
+		return this.#pinned;
+	}
+
+	unpin(): void {
+		if (untrack(() => this.#pinned) !== null) this.#pinned = null;
+	}
+
+	setCardEnabled(on: boolean): void {
+		this.#cardEnabled = on;
+		if (!on) this.unpin();
+	}
+
 	addPlugin(plugin: MapPlugin, options: PluginOptions = {}): void {
 		this.#assertAlive();
 		const previous = untrack(() => this.#selections.get(plugin.id));
@@ -412,6 +439,7 @@ class MapContextImpl implements MapContext {
 	removePlugin(id: string): void {
 		this.#host.remove(id);
 		this.#selections.delete(id);
+		if (untrack(() => this.#pinned)?.hit.pluginId === id) this.unpin();
 	}
 
 	setSelection(pluginId: string, selection: SpatialSelection | null): void {
@@ -489,9 +517,15 @@ class MapContextImpl implements MapContext {
 		if (!gl || refKey === null) return;
 		const found = untrack(() => this.#findItem(refKey, pluginId));
 		if (!found) return;
-		const { item } = found;
+		const { plugin, item } = found;
 		const place = this.#placeFor(item, gl);
 		this.#focusedAnchor = place.anchor;
+		if (this.#cardEnabled) {
+			this.#pinned = {
+				hit: { pluginId: plugin.id, ref: item.ref, refKey: item.refKey, name: item.name },
+				lngLat: place.anchor
+			};
+		}
 		if (!place.pan) {
 			// Stays where it is now: an earlier focus's ease that is still running stops here.
 			// With nothing running, no move at all.
@@ -641,6 +675,7 @@ class MapContextImpl implements MapContext {
 		if (!this.#gl) return;
 		this.#gl.off("moveend", this.#onMoveEnd);
 		this.#focusEasing = false;
+		this.unpin();
 		this.#router.detach();
 		this.basemap.detach();
 		this.#host.detach();
@@ -685,9 +720,15 @@ class MapContextImpl implements MapContext {
 	/** A click on a feature: report it, then apply it to the top hit's plugin's selection. */
 	#pick(e: ClickEvent): void {
 		if (this.#destroyed) return;
-		const [{ pluginId, ref }] = e.hits;
+		const [hit] = e.hits;
+		const { pluginId, ref } = hit;
 		this.#emitClick(pluginId, ref, e.lngLat);
 		this.#applyPick(pluginId, ref, e.additive);
+		if (!this.#cardEnabled || this.#destroyed) return;
+		// A feature with no hover card (e.g. a smoke plume) gets no pinned card either.
+		const plugin = untrack(() => this.plugins).find((p) => p.id === pluginId);
+		if (!plugin || plugin.hoverable === false) this.unpin();
+		else this.#pinned = { hit, lngLat: e.lngLat };
 	}
 
 	#emitClick(pluginId: string, ref: FeatureRef, lngLat: [number, number]): void {

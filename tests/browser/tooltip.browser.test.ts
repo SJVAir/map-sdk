@@ -1,7 +1,7 @@
 import { createRawSnippet } from "svelte";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import type { MapContext } from "../../src/lib/core/create-map.svelte.js";
 import type { FeatureListItem, MapPlugin } from "../../src/lib/core/plugin.js";
 import { createDefaultFormat } from "../../src/lib/data/format.js";
@@ -371,5 +371,252 @@ describe("MapTooltip", () => {
 			await new Promise((r) => setTimeout(r, 50));
 			expect(document.querySelector("[role=tooltip]")).not.toBeNull();
 		});
+	});
+});
+
+describe("MapTooltip card", () => {
+	const good = level("Good", "#00e400");
+
+	function hit(refKey: string, name: string) {
+		return {
+			hit: { pluginId: "points", ref: { kind: "monitor", id: refKey }, refKey, name },
+			lngLat: [-119.7, 36.7] as [number, number]
+		};
+	}
+
+	function cardMap(
+		items: FeatureListItem[],
+		state: { pinned?: unknown; hovered?: unknown; focusedKey?: string | null } = {},
+		unpin = vi.fn()
+	): MapContext {
+		const plugin: MapPlugin = { id: "points", setup: () => () => {}, features: () => items };
+		return {
+			plugins: [plugin],
+			messages: defaultMessages,
+			format: createDefaultFormat(),
+			focusedKey: state.focusedKey ?? null,
+			focusedPluginId: null,
+			hovered: state.hovered ?? null,
+			pinned: state.pinned ?? null,
+			bounds: null,
+			unpin
+		} as never;
+	}
+
+	const sites = () => [item("a", "Site A", good), item("b", "Site B", good)];
+
+	it("shows a pinned feature with a Close button, and takes the pointer", async () => {
+		await render(MapTooltip, {
+			map: cardMap(sites(), { pinned: hit("a", "Site A") }),
+			project,
+			card: true
+		});
+		const card = page.getByRole("group", { name: "Site A" });
+		await expect.element(card).toBeVisible();
+		await expect.element(card.getByRole("button", { name: "Close" })).toBeVisible();
+		expect(getComputedStyle(card.element()).pointerEvents).toBe("auto");
+	});
+
+	it("hides the hover while something is pinned", async () => {
+		await render(MapTooltip, {
+			map: cardMap(sites(), { pinned: hit("a", "Site A"), hovered: hit("b", "Site B") }),
+			project,
+			card: true
+		});
+		await expect.element(page.getByRole("group", { name: "Site A" })).toBeVisible();
+		expect(document.body.textContent).not.toContain("Site B");
+	});
+
+	it("prefers the focused item over the pinned one", async () => {
+		await render(MapTooltip, {
+			map: cardMap(sites(), { pinned: hit("a", "Site A"), focusedKey: "b" }),
+			project,
+			card: true
+		});
+		await expect.element(page.getByRole("group", { name: "Site B" })).toBeVisible();
+	});
+
+	it("close button unpins and returns focus to where it came from", async () => {
+		const before = document.createElement("button");
+		before.textContent = "Before";
+		document.body.prepend(before);
+		const unpin = vi.fn();
+		await render(MapTooltip, {
+			map: cardMap(sites(), { pinned: hit("a", "Site A") }, unpin),
+			project,
+			card: true
+		});
+		before.focus();
+		await userEvent.keyboard("{Tab}");
+		const close = page.getByRole("button", { name: "Close" });
+		await expect.element(close).toHaveFocus();
+		await userEvent.keyboard("{Enter}");
+		expect(unpin).toHaveBeenCalledTimes(1);
+		expect(document.activeElement).toBe(before);
+		before.remove();
+	});
+
+	it("returns focus to the map region when the origin is gone", async () => {
+		const before = document.createElement("button");
+		document.body.prepend(before);
+		const { container } = await render(MapTooltip, {
+			map: cardMap(sites(), { pinned: hit("a", "Site A") }),
+			project,
+			card: true
+		});
+		container.setAttribute("data-mapsdk-map", "m1");
+		before.focus();
+		await userEvent.keyboard("{Tab}");
+		before.remove();
+		await userEvent.keyboard("{Enter}");
+		expect(document.activeElement).toBe(container);
+	});
+
+	it("Escape inside the card closes it and doesn't bubble", async () => {
+		const unpin = vi.fn();
+		const outer = vi.fn();
+		document.addEventListener("keydown", outer);
+		await render(MapTooltip, {
+			map: cardMap(sites(), { pinned: hit("a", "Site A") }, unpin),
+			project,
+			card: true
+		});
+		(page.getByRole("button", { name: "Close" }).element() as HTMLElement).focus();
+		await userEvent.keyboard("{Escape}");
+		expect(unpin).toHaveBeenCalledTimes(1);
+		expect(outer).not.toHaveBeenCalled();
+		document.removeEventListener("keydown", outer);
+	});
+
+	it("hides while its anchor is off-screen", async () => {
+		const map = cardMap(sites(), { pinned: hit("a", "Site A") });
+		const { rerender } = await render(MapTooltip, {
+			map,
+			project: () => ({ x: -50, y: 100 }),
+			width: 400,
+			height: 300,
+			card: true
+		});
+		await new Promise((r) => setTimeout(r, 50));
+		expect(document.querySelector(".mapsdk-tooltip")).toBeNull();
+		await rerender({ project: () => ({ x: 100, y: 100 }) });
+		await expect.element(page.getByRole("group", { name: "Site A" })).toBeVisible();
+	});
+
+	it("unpins when the pinned item leaves the plugin's features", async () => {
+		const unpin = vi.fn();
+		const pinned = hit("a", "Site A");
+		const { rerender } = await render(MapTooltip, {
+			map: cardMap(sites(), { pinned }, unpin),
+			project,
+			card: true
+		});
+		await expect.element(page.getByRole("group", { name: "Site A" })).toBeVisible();
+		expect(unpin).not.toHaveBeenCalled();
+		await rerender({ map: cardMap([item("b", "Site B", good)], { pinned }, unpin) });
+		await vi.waitFor(() => expect(unpin).toHaveBeenCalledTimes(1));
+	});
+
+	it("keeps a pinned hit its plugin never listed (an HMS fire hotspot)", async () => {
+		const unpin = vi.fn();
+		const content = createRawSnippet(() => ({ render: () => "<span>Hotspot box</span>" }));
+		const map = {
+			...cardMap(sites(), { pinned: hit("hot", "Hotspot") }, unpin),
+			plugins: [
+				{
+					id: "points",
+					setup: () => () => {},
+					features: () => sites(),
+					hoverTooltip: () => content
+				}
+			]
+		} as never;
+		await render(MapTooltip, { map, project, card: true });
+		await expect.element(page.getByText("Hotspot box")).toBeVisible();
+		await new Promise((r) => setTimeout(r, 50));
+		expect(unpin).not.toHaveBeenCalled();
+	});
+
+	it("hands focus back when the card goes away without Close (host unpin, plugin removed)", async () => {
+		const before = document.createElement("button");
+		document.body.prepend(before);
+		const pinned = hit("a", "Site A");
+		const { rerender } = await render(MapTooltip, {
+			map: cardMap(sites(), { pinned }),
+			project,
+			card: true
+		});
+		before.focus();
+		await userEvent.keyboard("{Tab}");
+		await expect.element(page.getByRole("button", { name: "Close" })).toHaveFocus();
+		await rerender({ map: cardMap(sites(), { pinned: null }) });
+		await expect.element(page.getByRole("group", { name: "Site A" })).not.toBeInTheDocument();
+		expect(document.activeElement).toBe(before);
+		before.remove();
+	});
+
+	it("hands focus to the map region when the card hides off-screen with focus inside", async () => {
+		const before = document.createElement("button");
+		document.body.prepend(before);
+		const { container, rerender } = await render(MapTooltip, {
+			map: cardMap(sites(), { pinned: hit("a", "Site A") }),
+			project,
+			width: 400,
+			height: 300,
+			card: true
+		});
+		container.setAttribute("data-mapsdk-map", "m1");
+		before.focus();
+		await userEvent.keyboard("{Tab}");
+		before.remove();
+		await rerender({ project: () => ({ x: -50, y: 100 }) });
+		await vi.waitFor(() => expect(document.querySelector(".mapsdk-card")).toBeNull());
+		expect(document.activeElement).toBe(container);
+	});
+
+	it("unpins a pinned hit with nothing to show", async () => {
+		const unpin = vi.fn();
+		await render(MapTooltip, {
+			map: cardMap(sites(), { pinned: hit("nothing", "") }, unpin),
+			project,
+			card: true
+		});
+		await vi.waitFor(() => expect(unpin).toHaveBeenCalledTimes(1));
+	});
+
+	it("doesn't return focus to an origin from an earlier card", async () => {
+		const before = document.createElement("button");
+		before.textContent = "Before";
+		const after = document.createElement("button");
+		after.textContent = "After";
+		document.body.prepend(before);
+		const { container, rerender } = await render(MapTooltip, {
+			map: cardMap(sites(), { pinned: hit("a", "Site A") }),
+			project,
+			card: true
+		});
+		container.setAttribute("data-mapsdk-map", "m1");
+		document.body.append(after);
+		before.focus();
+		await userEvent.keyboard("{Tab}");
+		await expect.element(page.getByRole("button", { name: "Close" })).toHaveFocus();
+		after.focus();
+		await rerender({ map: cardMap(sites(), { pinned: hit("b", "Site B") }) });
+		after.blur();
+		(page.getByRole("button", { name: "Close" }).element() as HTMLElement).focus();
+		await userEvent.keyboard("{Enter}");
+		expect(document.activeElement).not.toBe(before);
+		expect(document.activeElement).toBe(container);
+		before.remove();
+		after.remove();
+	});
+
+	it("with card off, a pinned value is ignored and the tooltip keeps role=tooltip", async () => {
+		await render(MapTooltip, {
+			map: cardMap(sites(), { pinned: hit("a", "Site A"), focusedKey: "b" }),
+			project
+		});
+		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Site B 12.34 µg/m³ Good");
+		expect(document.querySelector("[role=group]")).toBeNull();
 	});
 });

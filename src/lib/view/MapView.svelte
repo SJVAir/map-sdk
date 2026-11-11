@@ -56,6 +56,12 @@
 		 * Keyboard focus from the feature list always shows it pinned.
 		 */
 		tooltip?: "pinned" | "pointer";
+		/**
+		 * `true`: a click or tap on a feature pins its reading card, which takes the pointer and
+		 * closes with Esc, its Close button, or a click elsewhere on the map; focusing a
+		 * feature-list row shows the same card. Selection and `featureclick` are unchanged.
+		 */
+		card?: boolean;
 	}
 
 	let {
@@ -67,8 +73,45 @@
 		featureList = true,
 		selectionBar = true,
 		controls = "mapsdk",
-		tooltip = "pinned"
+		tooltip = "pinned",
+		card = false
 	}: Props = $props();
+
+	// Pinning only, no plugin setup, so it's safe in an effect.
+	$effect(() => {
+		map.setCardEnabled(card);
+		return () => map.setCardEnabled(false);
+	});
+
+	/**
+	 * Esc outside the card closes it when focus is in this map or nowhere (the body), so a key
+	 * pressed in another map, or elsewhere on the page, leaves this card alone.
+	 */
+	function onWindowKeydown(e: KeyboardEvent) {
+		if (e.key !== "Escape" || e.defaultPrevented || !map.pinned) return;
+		const active = document.activeElement;
+		if (active && active !== document.body && !root.contains(active)) return;
+		// Focus nowhere: only the most recently pinned card on the page closes.
+		if (!active || active === document.body) {
+			let latest: HTMLElement | null = null;
+			for (const el of document.querySelectorAll<HTMLElement>("[data-mapsdk-pinned-at]")) {
+				if (!latest || Number(el.dataset.mapsdkPinnedAt) > Number(latest.dataset.mapsdkPinnedAt)) {
+					latest = el;
+				}
+			}
+			if (latest && latest !== root) return;
+		}
+		e.preventDefault();
+		map.unpin();
+	}
+
+	// When this map's card was pinned, so Esc with focus nowhere closes the latest card only.
+	$effect(() => {
+		const pinned = map.pinned;
+		if (!root) return;
+		if (pinned) root.dataset.mapsdkPinnedAt = String(performance.now());
+		else delete root.dataset.mapsdkPinnedAt;
+	});
 
 	const list = $derived(resolveFeatureList(featureList));
 	const sides = $derived(list ? cornerSides(list.position) : null);
@@ -148,6 +191,12 @@
 	function onListKeydown(e: KeyboardEvent) {
 		if (e.key !== "Escape") return;
 		e.preventDefault();
+		// The card closes first (and the focused row's card with it); the next Esc closes the panel.
+		if (card && (map.pinned || map.focusedKey)) {
+			map.unpin();
+			map.focusFeature(null);
+			return;
+		}
 		listOpen = false;
 		listButton?.focus();
 	}
@@ -242,6 +291,8 @@
 	});
 </script>
 
+<svelte:window onkeydown={onWindowKeydown} />
+
 <div
 	bind:this={root}
 	bind:clientWidth={width}
@@ -253,7 +304,6 @@
 	style:--mapsdk-map-width={width > 0 ? `${width}px` : undefined}
 >
 	<div class="mapsdk-gl" bind:this={glContainer}></div>
-	<MapTooltip {map} {project} {width} {height} mode={tooltip} gl={projector} />
 	{#if list && sides}
 		<div
 			class="mapsdk-list-panel"
@@ -283,6 +333,8 @@
 			{/if}
 		</div>
 	{/if}
+	<!-- After the list, so Tab from a list row reaches the pinned card's Close button. -->
+	<MapTooltip {map} {project} {width} {height} mode={tooltip} gl={projector} {card} />
 	<!-- After the list, so Tab reaches the List button first. -->
 	{#if selectionBar}
 		<SelectionBar {map} clearRight={list?.position === "top-right" && controls === "none"} />
