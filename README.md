@@ -557,6 +557,19 @@ local sjvair.com stack at `http://localhost:8000`.
 
 ## Changes
 
+### 0.1.0-beta.7
+
+- **Plugins come back at once after a basemap switch.** After picking another basemap, monitors,
+  fire, smoke and the other layers were missing until every tile of the new basemap had loaded
+  and drawn (4–10 s on a slow connection). They are now added as soon as the new style loads, as
+  sjvair.com's map does. A theme change while tiles are loading no longer waits either.
+- **`config.telemetry: false`** turns off MapTiler's telemetry and its session id (`mtsid`) for
+  the page, before the map is created. Without sessions MapTiler's persistent tile cache is off
+  too. By default nothing changes.
+- **The feature list panel and the framed legend fit the map.** They were capped at the window's
+  width less 2rem; inside a `MapView` they are now capped at the map's width less 2rem, so a small
+  map on a wide screen doesn't overflow. MapView sets `--mapsdk-map-width` for this.
+
 ### 0.1.0-beta.6
 
 - **A category reading is shown once.** When a feature's value is its category level's code, the
