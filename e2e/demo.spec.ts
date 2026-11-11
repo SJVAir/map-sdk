@@ -62,6 +62,73 @@ const selectionBox = (page: Page) =>
 const ALPHA = "AIHbqnQjQ0WkZi1a5_gEug";
 const BRAVO = "B2_v7UeGR1iInmEDYv25dg";
 
+/** Fixture Alpha's position (`e2e/fixtures/monitors.json`). */
+const ALPHA_LNGLAT: [number, number] = [-119.74726, 36.874092];
+
+type DemoMap = "left" | "right" | "today";
+
+/** The parts of the demo's `MapContext`s (`window.__mapsdkDemo`) the card tests use. */
+interface DemoContext {
+	ready: boolean;
+	plugins: Array<{ id: string }>;
+	getSelection(id: string): unknown;
+	gl: {
+		getCanvas(): HTMLCanvasElement;
+		project(at: [number, number]): { x: number; y: number };
+		once(type: string, listener: () => void): void;
+		jumpTo(options: { center: [number, number]; zoom: number }): void;
+	};
+}
+
+/** A position on one of the demo's maps, in page coordinates, with the map scrolled into view. */
+async function monitorPoint(page: Page, map: DemoMap, lngLat: [number, number]) {
+	await page.waitForFunction((m) => {
+		const demo = (window as unknown as { __mapsdkDemo?: Record<string, { ready: boolean }> })
+			.__mapsdkDemo;
+		return demo?.[m]?.ready;
+	}, map);
+	await page.evaluate((m) => {
+		const demo = (window as unknown as { __mapsdkDemo: Record<string, DemoContext> }).__mapsdkDemo;
+		demo[m].gl.getCanvas().scrollIntoView({ block: "center" });
+	}, map);
+	return page.evaluate(
+		([m, at]) => {
+			const demo = (window as unknown as { __mapsdkDemo: Record<string, DemoContext> })
+				.__mapsdkDemo;
+			const gl = demo[m].gl;
+			const p = gl.project(at);
+			const box = gl.getCanvas().getBoundingClientRect();
+			return { x: box.left + p.x, y: box.top + p.y };
+		},
+		[map, lngLat] as const
+	);
+}
+
+/** Centers `map` on `lngLat` at zoom 14, past clustering, and waits for it to settle. */
+async function zoomTo(page: Page, map: DemoMap, lngLat: [number, number]) {
+	await monitorPoint(page, map, lngLat);
+	await page.evaluate(
+		([m, at]) =>
+			new Promise<void>((resolve) => {
+				const demo = (window as unknown as { __mapsdkDemo: Record<string, DemoContext> })
+					.__mapsdkDemo;
+				const gl = demo[m].gl;
+				gl.once("idle", () => resolve());
+				gl.jumpTo({ center: at, zoom: 14 });
+			}),
+		[map, lngLat] as const
+	);
+}
+
+async function clickMonitor(page: Page, map: DemoMap, lngLat: [number, number]) {
+	const { x, y } = await monitorPoint(page, map, lngLat);
+	await page.mouse.move(x, y);
+	await page.mouse.click(x, y);
+}
+
+/** The Live map's pinned card for Fixture Alpha. */
+const card = (page: Page) => rightMap(page).getByRole("group", { name: /Fixture Alpha/ });
+
 async function openList(map: Locator): Promise<Locator> {
 	const button = map.getByRole("button", { name: "List of features on the map" });
 	if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
@@ -255,6 +322,10 @@ for (const theme of ["light", "dark"] as const) {
 		}
 		const list = await openList(leftMap(page));
 		await list.getByRole("option", { name: /Fixture Alpha/ }).click();
+		// A pinned card on the Live map, so the scan covers it.
+		await zoomTo(page, "right", ALPHA_LNGLAT);
+		await clickMonitor(page, "right", ALPHA_LNGLAT);
+		await expect(card(page)).toBeVisible();
 		const results = await new AxeBuilder({ page })
 			.withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
 			.analyze();
@@ -338,4 +409,73 @@ test("keyboard only: monitor-map's focus-revealed List button top right", async 
 	await page.keyboard.press(tab);
 	await expect(button).not.toBeFocused();
 	await expect.poll(width).toBeLessThanOrEqual(1);
+});
+
+test.describe("pinned card, touch", () => {
+	test.use({ hasTouch: true });
+
+	test("a tap on a monitor pins its card, and it stays", async ({ page }) => {
+		await zoomTo(page, "right", ALPHA_LNGLAT);
+		const { x, y } = await monitorPoint(page, "right", ALPHA_LNGLAT);
+		await page.touchscreen.tap(x, y);
+		await expect(card(page)).toBeVisible();
+		await page.waitForTimeout(500);
+		await expect(card(page)).toBeVisible();
+	});
+});
+
+test("pinned card: a click pins it; a click on empty map closes it", async ({ page }) => {
+	await zoomTo(page, "right", ALPHA_LNGLAT);
+	await clickMonitor(page, "right", ALPHA_LNGLAT);
+	await expect(card(page)).toBeVisible();
+	// 100px left of Alpha, on the canvas, with no monitor there at zoom 14.
+	const { x, y } = await monitorPoint(page, "right", ALPHA_LNGLAT);
+	await page.mouse.click(x - 100, y);
+	await expect(card(page)).toHaveCount(0);
+});
+
+test("pinned card: Escape closes it", async ({ page }) => {
+	await zoomTo(page, "right", ALPHA_LNGLAT);
+	await clickMonitor(page, "right", ALPHA_LNGLAT);
+	await expect(card(page)).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(card(page)).toHaveCount(0);
+});
+
+test("pinned card: Close closes it and the selection is unchanged", async ({ page }) => {
+	await zoomTo(page, "right", ALPHA_LNGLAT);
+	await clickMonitor(page, "right", ALPHA_LNGLAT);
+	await expect(card(page)).toBeVisible();
+	const selections = () =>
+		page.evaluate(() => {
+			const right = (window as unknown as { __mapsdkDemo: Record<string, DemoContext> })
+				.__mapsdkDemo.right;
+			return JSON.stringify(right.plugins.map((p: { id: string }) => right.getSelection(p.id)));
+		});
+	const before = await selections();
+	await card(page).getByRole("button", { name: "Close" }).click();
+	await expect(card(page)).toHaveCount(0);
+	expect(await selections()).toBe(before);
+});
+
+test("pinned card, keyboard: a list row shows it; Tab reaches Close; Escape returns to the row", async ({
+	page
+}) => {
+	const list = await openList(rightMap(page));
+	await list.focus();
+	await page.keyboard.press("Home");
+	// Sorted by name, so the first row is Fixture Alpha.
+	const rowCard = card(page);
+	await expect(rowCard).toBeVisible();
+	await page.keyboard.press("Tab");
+	await expect(rowCard.getByRole("button", { name: "Close" })).toBeFocused();
+	await page.keyboard.press("Escape");
+	await expect(rowCard).toHaveCount(0);
+	await expect(list).toBeFocused();
+});
+
+test("the monitor-map setup map doesn't pin on click", async ({ page }) => {
+	await zoomTo(page, "today", ALPHA_LNGLAT);
+	await clickMonitor(page, "today", ALPHA_LNGLAT);
+	await expect(todayMap(page).getByRole("group", { name: /Fixture Alpha/ })).toHaveCount(0);
 });

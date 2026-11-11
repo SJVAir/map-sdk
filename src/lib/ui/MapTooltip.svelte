@@ -160,6 +160,9 @@
 			}
 		}
 		map.unpin();
+		// Focus back on a list row focuses (and so shows) that row again; the card stays closed
+		// until the next row move, as with Esc in the list.
+		if (map.focusedKey !== null) map.focusFeature(null);
 	}
 
 	function onkeydown(e: KeyboardEvent) {
@@ -181,6 +184,7 @@
 
 <!-- Only with something to show: a hit with no name, item, or content gets no empty box. -->
 {#if interactive && (name || item || custom) && position && !offScreen}
+	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<div
 		bind:this={cardEl}
 		class="mapsdk-tooltip mapsdk-card text-sm"

@@ -313,6 +313,10 @@
 	});
 
 	onMount(() => {
+		// For e2e only: the maps, so a test can project a monitor to a screen point.
+		if (import.meta.env.DEV) {
+			(window as unknown as { __mapsdkDemo: object }).__mapsdkDemo = { left, right, today };
+		}
 		// Bottom to top, as monitor-map draws: smoke, fire (groups below zoom 10, hotspots from
 		// it), collocation sites, monitors.
 		today.addPlugin(
@@ -530,7 +534,7 @@
 				<output data-testid="live-status" class="demo-muted">{liveStatus}</output>
 			</fieldset>
 		</div>
-		<MapView map={right} label="Live map" class="demo-map" />
+		<MapView map={right} label="Live map" class="demo-map" card />
 		<Legend map={right} />
 	</section>
 </main>
