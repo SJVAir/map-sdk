@@ -574,6 +574,43 @@ describe("MapTooltip card", () => {
 		expect(document.activeElement).toBe(container);
 	});
 
+	it("unpins a pinned hit with nothing to show", async () => {
+		const unpin = vi.fn();
+		await render(MapTooltip, {
+			map: cardMap(sites(), { pinned: hit("nothing", "") }, unpin),
+			project,
+			card: true
+		});
+		await vi.waitFor(() => expect(unpin).toHaveBeenCalledTimes(1));
+	});
+
+	it("doesn't return focus to an origin from an earlier card", async () => {
+		const before = document.createElement("button");
+		before.textContent = "Before";
+		const after = document.createElement("button");
+		after.textContent = "After";
+		document.body.prepend(before);
+		const { container, rerender } = await render(MapTooltip, {
+			map: cardMap(sites(), { pinned: hit("a", "Site A") }),
+			project,
+			card: true
+		});
+		container.setAttribute("data-mapsdk-map", "m1");
+		document.body.append(after);
+		before.focus();
+		await userEvent.keyboard("{Tab}");
+		await expect.element(page.getByRole("button", { name: "Close" })).toHaveFocus();
+		after.focus();
+		await rerender({ map: cardMap(sites(), { pinned: hit("b", "Site B") }) });
+		after.blur();
+		(page.getByRole("button", { name: "Close" }).element() as HTMLElement).focus();
+		await userEvent.keyboard("{Enter}");
+		expect(document.activeElement).not.toBe(before);
+		expect(document.activeElement).toBe(container);
+		before.remove();
+		after.remove();
+	});
+
 	it("with card off, a pinned value is ignored and the tooltip keeps role=tooltip", async () => {
 		await render(MapTooltip, {
 			map: cardMap(sites(), { pinned: hit("a", "Site A"), focusedKey: "b" }),

@@ -91,9 +91,27 @@
 		if (e.key !== "Escape" || e.defaultPrevented || !map.pinned) return;
 		const active = document.activeElement;
 		if (active && active !== document.body && !root.contains(active)) return;
+		// Focus nowhere: only the most recently pinned card on the page closes.
+		if (!active || active === document.body) {
+			let latest: HTMLElement | null = null;
+			for (const el of document.querySelectorAll<HTMLElement>("[data-mapsdk-pinned-at]")) {
+				if (!latest || Number(el.dataset.mapsdkPinnedAt) > Number(latest.dataset.mapsdkPinnedAt)) {
+					latest = el;
+				}
+			}
+			if (latest && latest !== root) return;
+		}
 		e.preventDefault();
 		map.unpin();
 	}
+
+	// When this map's card was pinned, so Esc with focus nowhere closes the latest card only.
+	$effect(() => {
+		const pinned = map.pinned;
+		if (!root) return;
+		if (pinned) root.dataset.mapsdkPinnedAt = String(performance.now());
+		else delete root.dataset.mapsdkPinnedAt;
+	});
 
 	const list = $derived(resolveFeatureList(featureList));
 	const sides = $derived(list ? cornerSides(list.position) : null);

@@ -146,7 +146,11 @@
 		const from = e.relatedTarget;
 		focusInside = true;
 		region = cardEl?.closest<HTMLElement>("[data-mapsdk-map]") ?? region;
-		if (from instanceof HTMLElement && !cardEl?.contains(from)) origin = from;
+		// Focus from outside sets the origin afresh, even from nowhere, so an earlier card's
+		// origin is never reused.
+		if (!(from instanceof Node && cardEl?.contains(from))) {
+			origin = from instanceof HTMLElement ? from : null;
+		}
 	}
 
 	/** Focus is inside the card (kept by focusin/focusout, since a removed card no longer says). */
@@ -196,6 +200,12 @@
 		e.stopPropagation();
 		close();
 	}
+
+	// A pinned hit with nothing to show (no name, listed item, or hover content) would be an
+	// invisible card that still hides the hover and takes Esc: unpin it.
+	$effect(() => {
+		if (pinned && !map.focusedKey && !(name || item || custom)) untrack(() => map.unpin());
+	});
 
 	// A pinned feature that left its plugin's data (a poll dropped it) closes its card. Only one
 	// its plugin listed while pinned: some hits are never listed (HMS fire hotspots), and keep it.

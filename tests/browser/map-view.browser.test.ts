@@ -709,6 +709,28 @@ describe("MapView card", () => {
 		await expect.element(page.getByRole("button", { name: "Close" })).toHaveFocus();
 	});
 
+	it("card: with focus nowhere, Escape closes only the latest card, then the other", async () => {
+		const one = await cardMap({ card: true });
+		const two = await cardMap({ card: true });
+		one.map.focusFeature("monitor:a", "pts");
+		one.map.focusFeature(null);
+		await new Promise((r) => setTimeout(r, 5));
+		two.map.focusFeature("monitor:a", "pts");
+		two.map.focusFeature(null);
+		await vi.waitFor(() =>
+			expect(document.querySelectorAll("[data-mapsdk-pinned-at]")).toHaveLength(2)
+		);
+		(document.activeElement as HTMLElement | null)?.blur();
+		await userEvent.keyboard("{Escape}");
+		expect(two.map.pinned).toBeNull();
+		expect(one.map.pinned?.hit.refKey).toBe("monitor:a");
+		await vi.waitFor(() =>
+			expect(document.querySelectorAll("[data-mapsdk-pinned-at]")).toHaveLength(1)
+		);
+		await userEvent.keyboard("{Escape}");
+		expect(one.map.pinned).toBeNull();
+	});
+
 	it("card: Escape with focus in another map leaves this card open", async () => {
 		const one = await cardMap({ card: true });
 		const two = await cardMap({ card: true });

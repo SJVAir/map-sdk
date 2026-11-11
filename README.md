@@ -132,7 +132,8 @@ feature) or `"pointer"` (shown at the pointer, as sjvair.com's map does, and hid
 the pointer moves again); a feature focused from the list is always pinned. `card` (default
 `false`) pins the reading card on a click or tap: the card takes the pointer, has a Close button,
 and closes with Esc, Close, or a click elsewhere on the map; focusing a feature-list row shows the
-same card, and Tab from the row reaches it. One card shows at a time, and no hover card shows while
+same card, and Tab from the row reaches it. Esc closes the card of the map that has focus; with
+focus nowhere, it closes the page's most recently pinned card. One card shows at a time, and no hover card shows while
 one is pinned. Selection and `featureclick` are unchanged: a click still selects as before and
 also pins. `map.pinned` is the pinned feature (reactive), and `map.unpin()` closes it. Anything else goes in
 the `overlays` snippet, where `getMapContext()` returns the map. `config.basemaps` replaces the
