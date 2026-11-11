@@ -323,10 +323,10 @@ describe("MapView", () => {
 			return createGlMap(container, map);
 		}
 
-		it("telemetry: false turns MapTiler's telemetry and session id off", () => {
+		it("telemetry: false turns MapTiler's telemetry off and keeps sessions (billing) on", () => {
 			const gl = create({ telemetry: false });
 			expect(maptilerConfig.telemetry).toBe(false);
-			expect(maptilerConfig.session).toBe(false);
+			expect(maptilerConfig.session).toBe(true);
 			gl.remove();
 		});
 

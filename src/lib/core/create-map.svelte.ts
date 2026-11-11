@@ -39,12 +39,11 @@ export interface MapConfig {
 	 */
 	space?: false | { preset: string };
 	/**
-	 * Default `true`: MapTiler's own defaults. `false` turns off MapTiler's telemetry (a report of
-	 * the SDK version, the API key, and the session id, sent about 2 s after each map is created)
-	 * and its session id (`mtsid` on MapTiler Cloud requests) before the GL map is created. Both
-	 * are page-wide settings in MapTiler's SDK, so once one map turns them off they stay off for
-	 * every map on the page. Without sessions MapTiler also skips its persistent tile and font
-	 * cache (Cache Storage), so tiles are fetched again on each visit.
+	 * Default `true`: MapTiler's own default. `false` turns off MapTiler's telemetry (a usage
+	 * report of the SDK version, the API key, and the session id, sent about 2 s after each map is
+	 * created) before the GL map is created. It is a page-wide setting in MapTiler's SDK, so once
+	 * one map turns it off it stays off for every map on the page. MapTiler's session id (`mtsid`)
+	 * stays on: MapTiler bills SDK maps by session, and its tile cache needs sessions.
 	 */
 	telemetry?: boolean;
 }

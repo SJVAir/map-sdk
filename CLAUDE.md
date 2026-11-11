@@ -61,7 +61,7 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   reactive camera, bounds, basemap, plugin list, selection per plugin, `featureclick`, `featuresAt`,
   `featureForElement`, camera moves (`easeTo`/`flyTo`/`fitBounds`), `ready`, `gl`,
   `projection`/`space`/`telemetry` config (`telemetry: false` turns MapTiler's page-wide telemetry
-  and session id off before the GL map is made), and the `maptilerMap()` escape hatch (for markers
+  off before the GL map is made; sessions stay on, as MapTiler bills by them), and the `maptilerMap()` escape hatch (for markers
   and popups only).
   It has no GL map of its own; `MapView` attaches one. `plugin.ts` defines `MapPlugin`
   (`hoverPriority`, `tooltipShowsName`, `hoverable`) and `PluginContext` (`addCustomLayer`);
