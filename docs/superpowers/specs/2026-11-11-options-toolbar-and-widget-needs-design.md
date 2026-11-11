@@ -223,6 +223,14 @@ These are the starting values. The builder may tune them, and says so in the PR.
 - **The label** of a point is the host's text, drawn beside the ring in `--foreground` with a
   `--background` halo. The builder picks a GL symbol layer (stays under the interactive layers) or
   a DOM overlay.
+- **The point's label replaces the dashboard's own pin** (the user, 2026-11-11, through the
+  coordinator). The widget's spec 1 labels its pin ("Your location", "Shared location", or a
+  school's name) with its own MapTiler `Marker` (data-dashboard `step-5-spec-1`,
+  `src/lib/widgets/map/pin-label.svelte.ts`), which costs it a direct `@maptiler/sdk` dependency.
+  Part 3 covers everything that does, so the dashboard can drop both: a host-given text label
+  beside the pin; theme tokens; hidden from screen readers when the feature list already names the
+  place (a host option); and kept across detach and remount (`active` off and on, a basemap or
+  theme change). Read that file before building part 3.
 - Polygon and MultiPolygon geometries, and Point. Anything else throws a clear error.
 - It reads colors with `themeColors` and re-reads them on a theme change like the other plugins.
 - With `projection` set to globe, the world polygon must still cover the visible earth. The

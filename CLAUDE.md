@@ -59,6 +59,7 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 
 - **Core** (`src/lib/core/`): `createMap()` returns a `MapContext` (`create-map.svelte.ts`):
   reactive camera, bounds, basemap, plugin list, selection per plugin, `featureclick`, `featuresAt`,
+  `pinned`/`unpin()` (the card pinned by a click, a tap, or list focus while `MapView`'s `card` is on),
   `featureForElement`, camera moves (`easeTo`/`flyTo`/`fitBounds`), `ready`, `gl`,
   `projection`/`space`/`telemetry` config (`telemetry: false` turns MapTiler's page-wide telemetry
   off before the GL map is made; sessions stay on, as MapTiler bills by them), and the `maptilerMap()` escape hatch (for markers
@@ -96,7 +97,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   (`FireTooltip`, the reading box) tooltips. Smoke takes no hover. Presets never fetch.
 - **View** (`src/lib/view/`): `MapView.svelte` creates the GL map (`create-gl-map.ts`: per-map key
   through `transformRequest`, theme watching, `active` releases WebGL). Props include `controls`
-  (`"mapsdk"` | `"engine"` | `"none"`), `selectionBar`, `tooltip` (`"pinned"` | `"pointer"`), and
+  (`"mapsdk"` | `"engine"` | `"none"`), `selectionBar`, `tooltip` (`"pinned"` | `"pointer"`), `card`
+  (the pinned reading card, drawn by `MapTooltip` after the list so Tab reaches it), and
   `featureList` (`boolean` or `{ position, reveal }`; `list-placement.ts`; the button stacks clear
   of the controls in its corner, measured with a `ResizeObserver`). It sets `--mapsdk-map-width`,
   which caps the list panel and framed legend at the map's width. Credits come from the engine's

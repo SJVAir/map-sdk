@@ -129,7 +129,12 @@ buttons, `"engine"` the MapTiler SDK's default zoom/compass and locate-me contro
 monitor-map uses today), and `"none"` none; the credits show in every case. Choose `controls` up
 front: changing it after mount recreates the map. `tooltip` is `"pinned"` (default: anchored to the
 feature) or `"pointer"` (shown at the pointer, as sjvair.com's map does, and hidden on zoom until
-the pointer moves again); a feature focused from the list is always pinned. Anything else goes in
+the pointer moves again); a feature focused from the list is always pinned. `card` (default
+`false`) pins the reading card on a click or tap: the card takes the pointer, has a Close button,
+and closes with Esc, Close, or a click elsewhere on the map; focusing a feature-list row shows the
+same card, and Tab from the row reaches it. One card shows at a time, and no hover card shows while
+one is pinned. Selection and `featureclick` are unchanged: a click still selects as before and
+also pins. `map.pinned` is the pinned feature (reactive), and `map.unpin()` closes it. Anything else goes in
 the `overlays` snippet, where `getMapContext()` returns the map. `config.basemaps` replaces the
 default MapTiler Streets v4 variants (build on `defaultBasemaps()`, which `createMap` uses: today's
 sjvair.com setup is `{ ...defaultBasemaps(), excludedLayers: [] }`); `config.initialView` and
@@ -557,6 +562,17 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.8
+
+- **The pinned reading card.** `MapView`'s new `card` prop: a click or tap on a feature pins its
+  card, which takes the pointer, has a Close button, and closes with Esc, Close, or a click
+  elsewhere on the map. Focusing a feature-list row shows the same card, and Tab reaches it; closing
+  it returns focus where it came from. A tap now always shows the reading: before, a tap's
+  emulated `mouseout` (Chromium, WebKit) hid the hover card right after the tap. Nothing changes
+  without `card`, and with it, selection and `featureclick` behave as before.
+- **New API:** `MapView`'s `card`, `MapContext.pinned` and `unpin()`. New message key for hosts
+  with their own catalog: `mapsdk_card_close` ("Close").
 
 ### 0.1.0-beta.7
 
