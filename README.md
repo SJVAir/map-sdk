@@ -135,7 +135,12 @@ default MapTiler Streets v4 variants (build on `defaultBasemaps()`, which `creat
 sjvair.com setup is `{ ...defaultBasemaps(), excludedLayers: [] }`); `config.initialView` and
 `config.cooperativeGestures` set the camera and gesture handling. `config.projection` (`"mercator"`
 by default, or `"globe"`) and `config.space` (`false` by default, or `{ preset: "milkyway" }` for a
-space background behind the globe) are passed to MapTiler only when set.
+space background behind the globe) are passed to MapTiler only when set. `config.telemetry: false`
+turns off MapTiler's telemetry (the SDK version, API key, and session id, sent about 2 s after each
+map is created) and its session id (`mtsid` on MapTiler Cloud requests) before the map is created.
+Both are page-wide settings in MapTiler's SDK: once one map turns them off, they stay off for every
+map on the page. Without sessions MapTiler also skips its persistent tile and font cache, so tiles
+are fetched again on each visit. By default (`true`) MapTiler's own defaults apply.
 
 Without `createMonitorsStore`, build a `DataSource` yourself (below).
 

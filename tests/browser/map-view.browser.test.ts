@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
 import { config as maptilerConfig } from "@maptiler/sdk";
@@ -297,6 +297,42 @@ describe("MapView", () => {
 			const off = await glFor({ space: false });
 			expect("space" in off.options).toBe(false);
 			off.remove();
+		});
+	});
+
+	describe("telemetry option", () => {
+		const saved = { telemetry: false, session: true };
+		beforeEach(() => {
+			saved.telemetry = maptilerConfig.telemetry;
+			saved.session = maptilerConfig.session;
+			// MapTiler's defaults, which the suite's beforeAll changed for telemetry.
+			maptilerConfig.telemetry = true;
+			maptilerConfig.session = true;
+		});
+		afterEach(() => {
+			maptilerConfig.telemetry = saved.telemetry;
+			maptilerConfig.session = saved.session;
+		});
+		function create(config: Partial<Parameters<typeof createMap>[0]["config"]>) {
+			const container = document.createElement("div");
+			container.className = "test-map";
+			document.body.append(container);
+			const map = createMap({ config: { maptilerKey: "test-key", basemaps, ...config } });
+			return createGlMap(container, map);
+		}
+
+		it("telemetry: false turns MapTiler's telemetry and session id off", () => {
+			const gl = create({ telemetry: false });
+			expect(maptilerConfig.telemetry).toBe(false);
+			expect(maptilerConfig.session).toBe(false);
+			gl.remove();
+		});
+
+		it("leaves MapTiler's settings alone by default", () => {
+			const gl = create({});
+			expect(maptilerConfig.telemetry).toBe(true);
+			expect(maptilerConfig.session).toBe(true);
+			gl.remove();
 		});
 	});
 
