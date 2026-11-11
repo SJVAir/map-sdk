@@ -60,7 +60,9 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 - **Core** (`src/lib/core/`): `createMap()` returns a `MapContext` (`create-map.svelte.ts`):
   reactive camera, bounds, basemap, plugin list, selection per plugin, `featureclick`, `featuresAt`,
   `featureForElement`, camera moves (`easeTo`/`flyTo`/`fitBounds`), `ready`, `gl`,
-  `projection`/`space` config, and the `maptilerMap()` escape hatch (for markers and popups only).
+  `projection`/`space`/`telemetry` config (`telemetry: false` turns MapTiler's page-wide telemetry
+  and session id off before the GL map is made), and the `maptilerMap()` escape hatch (for markers
+  and popups only).
   It has no GL map of its own; `MapView` attaches one. `plugin.ts` defines `MapPlugin`
   (`hoverPriority`, `tooltipShowsName`, `hoverable`) and `PluginContext` (`addCustomLayer`);
   `scoped-context.ts`'s internal `scopedContext` lets a preset run a nested plugin under a prefix. `shape-view.ts` is the shape-aware
@@ -96,7 +98,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   through `transformRequest`, theme watching, `active` releases WebGL). Props include `controls`
   (`"mapsdk"` | `"engine"` | `"none"`), `selectionBar`, `tooltip` (`"pinned"` | `"pointer"`), and
   `featureList` (`boolean` or `{ position, reveal }`; `list-placement.ts`; the button stacks clear
-  of the controls in its corner, measured with a `ResizeObserver`). Credits come from the engine's
+  of the controls in its corner, measured with a `ResizeObserver`). It sets `--mapsdk-map-width`,
+  which caps the list panel and framed legend at the map's width. Credits come from the engine's
   AttributionControl, with data credits from `ui/data-credits.svelte.ts`.
 - **UI** (`src/lib/ui/`): Legend (`order`, `framed`; blocks legends are one labeled bar), FeatureList,
   MapTooltip, SelectionBar, ViewSummary, and MapControls (zoom buttons only; basemap switching is
