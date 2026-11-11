@@ -205,6 +205,68 @@ describe("BasemapState with the plugin host", () => {
 		map.destroy();
 	});
 
+	it("sets plugins up on the new style's style.load while its tiles still load", () => {
+		const map = createMap({ config: { maptilerKey: "k", basemaps: config } });
+		const setupFn = vi.fn();
+		map.addPlugin(plugin(setupFn));
+		const gl = createFakeGl({ styleLoaded: false });
+		map.attach(gl);
+		gl.fireStyleLoad();
+		expect(setupFn).toHaveBeenCalledTimes(1);
+
+		map.basemap.select("dark");
+		gl.tilesLoading = true;
+		gl.fireStyleLoad();
+		// No wait for idle: the style is loaded, only its tiles are pending.
+		expect(setupFn).toHaveBeenCalledTimes(2);
+		expect(gl.listeners.filter((l) => l.type === "idle")).toEqual([]);
+		gl.tilesLoading = false;
+		gl.emit("idle");
+		expect(setupFn).toHaveBeenCalledTimes(2);
+		map.destroy();
+	});
+
+	it("sets plugins up on the first style.load while its tiles still load", () => {
+		const map = createMap({ config: { maptilerKey: "k", basemaps: config } });
+		const setupFn = vi.fn();
+		map.addPlugin(plugin(setupFn));
+		const gl = createFakeGl({ styleLoaded: false });
+		map.attach(gl);
+		gl.tilesLoading = true;
+		gl.fireStyleLoad();
+		expect(setupFn).toHaveBeenCalledTimes(1);
+		map.destroy();
+	});
+
+	it("sets plugins up at once on a theme change while tiles load", () => {
+		const map = createMap({ config: { maptilerKey: "k", basemaps: config } });
+		const setupFn = vi.fn();
+		map.addPlugin(plugin(setupFn));
+		const gl = createFakeGl({ styleLoaded: false });
+		map.attach(gl);
+		gl.fireStyleLoad();
+		gl.tilesLoading = true;
+		map.themeChanged();
+		expect(setupFn).toHaveBeenCalledTimes(2);
+		map.destroy();
+	});
+
+	it("a theme change during a basemap switch waits for the new style", () => {
+		const map = createMap({ config: { maptilerKey: "k", basemaps: config } });
+		const setupFn = vi.fn();
+		map.addPlugin(plugin(setupFn));
+		const gl = createFakeGl({ styleLoaded: false });
+		map.attach(gl);
+		gl.fireStyleLoad();
+		map.basemap.select("dark");
+		map.themeChanged();
+		expect(setupFn).toHaveBeenCalledTimes(1);
+		gl.tilesLoading = true;
+		gl.fireStyleLoad();
+		expect(setupFn).toHaveBeenCalledTimes(2);
+		map.destroy();
+	});
+
 	it("tears plugins down before the new style loads, so data and selection changes wait", async () => {
 		type Props = MapFeatureProperties;
 		const square = (x: number): number[][] => [

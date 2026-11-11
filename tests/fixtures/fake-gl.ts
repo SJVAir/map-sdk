@@ -7,6 +7,11 @@ type Rendered = ReturnType<GlMapLike["queryRenderedFeatures"]>[number];
 
 export interface FakeGl extends GlMapLike {
 	styleLoaded: boolean;
+	/**
+	 * Basemap tiles still loading: `isStyleLoaded()` says false although the style itself is
+	 * loaded (adding sources and layers works), as MapLibre's does right after `style.load`.
+	 */
+	tilesLoading: boolean;
 	/** Specs as added; a `setData` through `getSource(id)` replaces the spec's `data`. */
 	readonly sources: Map<string, SourceSpecification>;
 	/** In draw order. */
@@ -60,6 +65,7 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 
 	const gl: FakeGl = {
 		styleLoaded: opts.styleLoaded ?? false,
+		tilesLoading: false,
 		sources,
 		layers,
 		images,
@@ -176,7 +182,7 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 		},
 		isStyleLoaded() {
 			log("isStyleLoaded");
-			return gl.styleLoaded;
+			return gl.styleLoaded && !gl.tilesLoading;
 		},
 		setStyle(_style, options) {
 			log("setStyle", options?.diff === false ? "nodiff" : "diff");

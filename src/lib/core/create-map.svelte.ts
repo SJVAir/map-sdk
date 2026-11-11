@@ -618,7 +618,8 @@ class MapContextImpl implements MapContext {
 		gl.on("moveend", this.#onMoveEnd);
 		this.basemap.attach(
 			gl,
-			() => this.#host.restyle(),
+			// Called from style.load: the style is loaded, though its tiles may not be.
+			() => this.#host.restyle(true),
 			() => {
 				this.#ready = false;
 				this.#readyRequested = false;
