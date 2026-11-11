@@ -203,14 +203,24 @@ export class PluginHost {
 	}
 
 	/**
-	 * Tears down and sets up every plugin again (after a basemap change), once the style loads.
-	 * On a loaded style the setup is synchronous, so only map events and theme watching call this,
-	 * never code inside an effect: roots created there can stop (see the class comment).
+	 * Tears down and sets up every plugin again (after a basemap or theme change), once the style
+	 * loads. Pass `styleLoaded` from a `style.load` listener: `isStyleLoaded()` stays false there
+	 * until every tile has loaded, and `style.load` has already fired, so waiting would last until
+	 * `idle`. A live host's style is loaded too (`suspend` comes before every `setStyle`), so a theme
+	 * change sets up at once as well. On a loaded style the setup is synchronous, so only map events
+	 * and theme watching call this, never code inside an effect: roots created there can stop (see
+	 * the class comment).
 	 */
-	restyle(): void {
+	restyle(styleLoaded = false): void {
 		if (!this.#gl) return;
+		const loaded = styleLoaded || this.#live;
 		this.#teardownAll();
-		this.#whenStyleLoaded(true);
+		if (loaded) {
+			this.#cancelStyleWait();
+			this.#setupAll();
+		} else {
+			this.#whenStyleLoaded(true);
+		}
 	}
 
 	/** Tears down every plugin. The gl is not touched after this returns. */

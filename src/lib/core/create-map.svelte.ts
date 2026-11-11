@@ -38,6 +38,15 @@ export interface MapConfig {
 	 * globe.
 	 */
 	space?: false | { preset: string };
+	/**
+	 * Default `true`: MapTiler's own defaults. `false` turns off MapTiler's telemetry (a report of
+	 * the SDK version, the API key, and the session id, sent about 2 s after each map is created)
+	 * and its session id (`mtsid` on MapTiler Cloud requests) before the GL map is created. Both
+	 * are page-wide settings in MapTiler's SDK, so once one map turns them off they stay off for
+	 * every map on the page. Without sessions MapTiler also skips its persistent tile and font
+	 * cache (Cache Storage), so tiles are fetched again on each visit.
+	 */
+	telemetry?: boolean;
 }
 
 export interface CreateMapOptions {
@@ -618,7 +627,8 @@ class MapContextImpl implements MapContext {
 		gl.on("moveend", this.#onMoveEnd);
 		this.basemap.attach(
 			gl,
-			() => this.#host.restyle(),
+			// Called from style.load: the style is loaded, though its tiles may not be.
+			() => this.#host.restyle(true),
 			() => {
 				this.#ready = false;
 				this.#readyRequested = false;

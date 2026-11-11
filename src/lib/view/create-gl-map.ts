@@ -164,6 +164,11 @@ export function createGlMap(
 	engineControls = false
 ): GlMapLike {
 	const { camera, style } = untrack(() => ({ camera: ctx.camera, style: styleOf(ctx) }));
+	// Before the map exists: its telemetry timer and its first requests read these.
+	if (ctx.config.telemetry === false) {
+		maptilerConfig.telemetry = false;
+		maptilerConfig.session = false;
+	}
 	const gl = new GlMap({
 		container,
 		style,

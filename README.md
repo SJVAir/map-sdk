@@ -135,7 +135,12 @@ default MapTiler Streets v4 variants (build on `defaultBasemaps()`, which `creat
 sjvair.com setup is `{ ...defaultBasemaps(), excludedLayers: [] }`); `config.initialView` and
 `config.cooperativeGestures` set the camera and gesture handling. `config.projection` (`"mercator"`
 by default, or `"globe"`) and `config.space` (`false` by default, or `{ preset: "milkyway" }` for a
-space background behind the globe) are passed to MapTiler only when set.
+space background behind the globe) are passed to MapTiler only when set. `config.telemetry: false`
+turns off MapTiler's telemetry (the SDK version, API key, and session id, sent about 2 s after each
+map is created) and its session id (`mtsid` on MapTiler Cloud requests) before the map is created.
+Both are page-wide settings in MapTiler's SDK: once one map turns them off, they stay off for every
+map on the page. Without sessions MapTiler also skips its persistent tile and font cache, so tiles
+are fetched again on each visit. By default (`true`) MapTiler's own defaults apply.
 
 Without `createMonitorsStore`, build a `DataSource` yourself (below).
 
@@ -207,7 +212,9 @@ the legend section's title: `layerLabel` (default) or the entry type's label fro
 provider (`monitorsPlugin` uses the latter, so its section reads "PM2.5"; `layerLabel` still names
 the layer in the list, selection bar and summary). `Legend` takes `order` (`"bottom-first"`,
 default, or `"top-first"`) and `framed` (`true`, default, draws its own card; `false` draws no
-border, background, padding or fixed width, so a host's own card frames it). Without a frame,
+border, background, padding or fixed width, so a host's own card frames it). The framed legend
+and the feature list panel are 21rem wide at most, and never wider than the map less 2rem (the
+window less 2rem outside a `MapView`), so they fit a small map on a wide screen. Without a frame,
 translucent swatches blend over the nearest ancestor with an opaque background (a see-through
 card is skipped), else `--background`; that color is read on mount, when `framed` changes, and on
 a theme change, but not when the card changes color through its own class or style.
@@ -549,6 +556,19 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.7
+
+- **Plugins come back at once after a basemap switch.** After picking another basemap, monitors,
+  fire, smoke and the other layers were missing until every tile of the new basemap had loaded
+  and drawn (4–10 s on a slow connection). They are now added as soon as the new style loads, as
+  sjvair.com's map does. A theme change while tiles are loading no longer waits either.
+- **`config.telemetry: false`** turns off MapTiler's telemetry and its session id (`mtsid`) for
+  the page, before the map is created. Without sessions MapTiler's persistent tile cache is off
+  too. By default nothing changes.
+- **The feature list panel and the framed legend fit the map.** They were capped at the window's
+  width less 2rem; inside a `MapView` they are now capped at the map's width less 2rem, so a small
+  map on a wide screen doesn't overflow. MapView sets `--mapsdk-map-width` for this.
 
 ### 0.1.0-beta.6
 

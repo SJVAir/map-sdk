@@ -143,7 +143,8 @@
 		flex-direction: column;
 		gap: 0.75rem;
 		width: 21rem;
-		max-width: calc(100vw - 2rem);
+		/* The map's width inside a MapView (set there), else the window's. */
+		max-width: calc(var(--mapsdk-map-width, 100vw) - 2rem);
 		box-sizing: border-box;
 		padding: 0.75rem 1rem;
 		border: 1px solid var(--card-border, var(--border));

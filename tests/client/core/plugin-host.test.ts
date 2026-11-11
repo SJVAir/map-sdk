@@ -271,6 +271,7 @@ describe("PluginHost", () => {
 		host.attach(gl);
 		await tick();
 		log.length = 0;
+		host.suspend();
 		gl.setStyle({});
 		host.restyle();
 		expect(log).toEqual(["teardown:a"]);
@@ -642,9 +643,10 @@ describe("PluginHost", () => {
 			host.add(resourcePlugin("b"));
 			host.add(resourcePlugin("c"), "a");
 			host.move("b", "c");
+			host.suspend();
 			gl.setStyle({});
-			host.restyle();
 			gl.fireStyleLoad();
+			host.restyle(true);
 			expect(ids(gl)).toEqual([
 				"m1:b:fill",
 				"m1:b:line",
@@ -713,14 +715,17 @@ describe("PluginHost", () => {
 				host.add(customPlugin("a", made));
 				host.add(resourcePlugin("b"));
 				await tick();
+				host.suspend();
 				gl.setStyle({});
-				host.restyle();
 				gl.fireStyleLoad();
+				host.restyle(true);
 				expect(made).toHaveLength(2);
 				expect(ids(gl)).toEqual(["m1:a:fill", "m1:a:wind", "m1:a:line", "m1:b:fill", "m1:b:line"]);
 				expect(gl.layers[1]).toBe(made[1]);
+				const from = gl.calls.length;
 				host.detach();
-				expect(gl.calls.filter((c) => c === "removeLayer:m1:a:wind")).toHaveLength(1);
+				const removes = gl.calls.slice(from).filter((c) => c === "removeLayer:m1:a:wind");
+				expect(removes).toHaveLength(1);
 				expect(ids(gl)).toEqual([]);
 				expect(errorSpy).not.toHaveBeenCalled();
 			});
@@ -808,6 +813,54 @@ describe("PluginHost", () => {
 			expect(log).toEqual(["setup:a", "teardown:a", "setup:a"]);
 			expect(gl.layers.length).toBe(2);
 			expect(host.pending).toBe(false);
+		});
+
+		it("restyle(true) from style.load sets up at once while tiles load", async () => {
+			const { host } = makeHost();
+			const log: string[] = [];
+			host.add(resourcePlugin("a", log));
+			const gl = createFakeGl({ styleLoaded: true });
+			host.attach(gl);
+			await tick();
+			host.suspend();
+			gl.setStyle({});
+			gl.tilesLoading = true;
+			gl.fireStyleLoad();
+			host.restyle(true);
+			expect(log).toEqual(["setup:a", "teardown:a", "setup:a"]);
+			expect(gl.layers.length).toBe(2);
+			expect(gl.listeners).toEqual([]);
+			expect(errorSpy).not.toHaveBeenCalled();
+		});
+
+		it("restyle on a live host sets up at once while tiles load", async () => {
+			const { host } = makeHost();
+			const log: string[] = [];
+			host.add(resourcePlugin("a", log));
+			const gl = createFakeGl({ styleLoaded: true });
+			host.attach(gl);
+			await tick();
+			gl.tilesLoading = true;
+			host.restyle();
+			expect(log).toEqual(["setup:a", "teardown:a", "setup:a"]);
+			expect(gl.listeners).toEqual([]);
+		});
+
+		it("restyle(true) drops a wait from an earlier restyle", () => {
+			const { host } = makeHost();
+			const log: string[] = [];
+			host.add(resourcePlugin("a", log));
+			const gl = createFakeGl();
+			host.attach(gl);
+			host.restyle();
+			gl.styleLoaded = true;
+			gl.tilesLoading = true;
+			host.restyle(true);
+			expect(log).toEqual(["setup:a"]);
+			gl.emit("style.load");
+			gl.emit("idle");
+			expect(log).toEqual(["setup:a"]);
+			expect(gl.listeners).toEqual([]);
 		});
 
 		it("sets up a plugin re-added under the same id once", async () => {

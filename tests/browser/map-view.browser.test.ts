@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
 import { config as maptilerConfig } from "@maptiler/sdk";
@@ -11,6 +11,7 @@ import {
 	maptilerKeyTransform
 } from "../../src/lib/view/create-gl-map.js";
 import { NO_LEVEL } from "../../src/lib/data/scale.js";
+import MapViewNarrowPanels from "../fixtures/MapViewNarrowPanels.svelte";
 import MapViewWithOverlay from "../fixtures/MapViewWithOverlay.svelte";
 
 // The browser project resolves with the "browser" condition only, so esm-env's DEV would be
@@ -57,7 +58,8 @@ function whenLoaded(gl: GlMapLike): Promise<void> {
 
 const sized = document.createElement("style");
 sized.textContent =
-	".test-map { width: 320px; height: 240px; } .wide-map { width: 600px; height: 400px; }";
+	".test-map { width: 320px; height: 240px; } .wide-map { width: 600px; height: 400px; }" +
+	" .narrow-map { width: 300px; height: 240px; }";
 
 /** Every request made, which must stay empty: the tests run offline, with no key. */
 const requests: string[] = [];
@@ -300,6 +302,42 @@ describe("MapView", () => {
 		});
 	});
 
+	describe("telemetry option", () => {
+		const saved = { telemetry: false, session: true };
+		beforeEach(() => {
+			saved.telemetry = maptilerConfig.telemetry;
+			saved.session = maptilerConfig.session;
+			// MapTiler's defaults, which the suite's beforeAll changed for telemetry.
+			maptilerConfig.telemetry = true;
+			maptilerConfig.session = true;
+		});
+		afterEach(() => {
+			maptilerConfig.telemetry = saved.telemetry;
+			maptilerConfig.session = saved.session;
+		});
+		function create(config: Partial<Parameters<typeof createMap>[0]["config"]>) {
+			const container = document.createElement("div");
+			container.className = "test-map";
+			document.body.append(container);
+			const map = createMap({ config: { maptilerKey: "test-key", basemaps, ...config } });
+			return createGlMap(container, map);
+		}
+
+		it("telemetry: false turns MapTiler's telemetry and session id off", () => {
+			const gl = create({ telemetry: false });
+			expect(maptilerConfig.telemetry).toBe(false);
+			expect(maptilerConfig.session).toBe(false);
+			gl.remove();
+		});
+
+		it("leaves MapTiler's settings alone by default", () => {
+			const gl = create({});
+			expect(maptilerConfig.telemetry).toBe(true);
+			expect(maptilerConfig.session).toBe(true);
+			gl.remove();
+		});
+	});
+
 	it("never sets MapTiler's global key", async () => {
 		const before = maptilerConfig.apiKey;
 		await render(MapView, { map: newMap(), class: "test-map" });
@@ -536,6 +574,24 @@ describe("MapView list button", () => {
 		const center = gl.getCenter();
 		expect(center.lng).toBeCloseTo(visual.lng, 6);
 		expect(center.lat).toBeCloseTo(visual.lat, 6);
+	});
+
+	it("sizes the list panel and the framed legend by the map, not the window", async () => {
+		await page.viewport(1440, 900);
+		const map = newMap();
+		map.addPlugin({ id: "probe", setup: () => () => {}, features: () => [] });
+		const { container, unmount } = await render(MapViewNarrowPanels, { map });
+		await page.getByRole("button", { name: "List of features on the map" }).click();
+		const maxWidth = (selector: string) => {
+			const el = container.querySelector(selector);
+			if (!el) throw new Error(`no ${selector}`);
+			return getComputedStyle(el).maxWidth;
+		};
+		// 300px map less 2rem.
+		await vi.waitFor(() => expect(maxWidth(".mapsdk-list")).toBe("268px"));
+		expect(maxWidth(".mapsdk-legend")).toBe("268px");
+		await unmount();
+		await page.viewport(414, 896);
 	});
 
 	it("leaves the button out when featureList is false", async () => {
