@@ -136,11 +136,12 @@ sjvair.com setup is `{ ...defaultBasemaps(), excludedLayers: [] }`); `config.ini
 `config.cooperativeGestures` set the camera and gesture handling. `config.projection` (`"mercator"`
 by default, or `"globe"`) and `config.space` (`false` by default, or `{ preset: "milkyway" }` for a
 space background behind the globe) are passed to MapTiler only when set. `config.telemetry: false`
-turns off MapTiler's telemetry (the SDK version, API key, and session id, sent about 2 s after each
-map is created) and its session id (`mtsid` on MapTiler Cloud requests) before the map is created.
-Both are page-wide settings in MapTiler's SDK: once one map turns them off, they stay off for every
-map on the page. Without sessions MapTiler also skips its persistent tile and font cache, so tiles
-are fetched again on each visit. By default (`true`) MapTiler's own defaults apply.
+turns off MapTiler's telemetry (a usage report of the SDK version, API key, and session id, sent
+about 2 s after each map is created) before the map is created. It is a page-wide setting in
+MapTiler's SDK: once one map turns it off, it stays off for every map on the page. MapTiler's
+session id (`mtsid`) stays on either way, since MapTiler bills SDK maps by session (without one,
+every tile request counts on its own) and its tile cache needs it. By default (`true`) MapTiler's
+own default applies.
 
 Without `createMonitorsStore`, build a `DataSource` yourself (below).
 
@@ -563,9 +564,9 @@ local sjvair.com stack at `http://localhost:8000`.
   fire, smoke and the other layers were missing until every tile of the new basemap had loaded
   and drawn (4–10 s on a slow connection). They are now added as soon as the new style loads, as
   sjvair.com's map does. A theme change while tiles are loading no longer waits either.
-- **`config.telemetry: false`** turns off MapTiler's telemetry and its session id (`mtsid`) for
-  the page, before the map is created. Without sessions MapTiler's persistent tile cache is off
-  too. By default nothing changes.
+- **`config.telemetry: false`** turns off MapTiler's telemetry (its usage report) for the page,
+  before the map is created. Sessions stay on, so billing by session and the tile cache are
+  unchanged. By default nothing changes.
 - **The feature list panel and the framed legend fit the map.** They were capped at the window's
   width less 2rem; inside a `MapView` they are now capped at the map's width less 2rem, so a small
   map on a wide screen doesn't overflow. MapView sets `--mapsdk-map-width` for this.
