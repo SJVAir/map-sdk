@@ -185,6 +185,11 @@ export interface MapPlugin {
 	setup(ctx: PluginContext): () => void;
 	legend?(): LegendData | null;
 	features?(): FeatureListItem[];
+	/**
+	 * A feature's source properties by its `refKey`, for `featureclick` (e.g. a school's
+	 * `external_id`); `undefined` when the plugin has none for it.
+	 */
+	properties?(refKey: string): Readonly<Record<string, unknown>> | undefined;
 	selectable?: boolean;
 	/**
 	 * Which plugin's feature the hover tooltip shows where several are under the pointer: the

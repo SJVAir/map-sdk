@@ -90,6 +90,28 @@ describe("picking", () => {
 		expect(map.getSelection("monitors")).toBeNull();
 	});
 
+	it("adds the plugin's properties for the clicked feature to featureclick", async () => {
+		const map = createMap({ config });
+		const lookup = vi.fn((refKey: string) =>
+			refKey === "monitor:7" ? { refKey, external_id: "X7" } : undefined
+		);
+		map.addPlugin({ ...points("monitors"), properties: lookup });
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		const handler = vi.fn();
+		map.on("featureclick", handler);
+		gl.setRenderedFeatures([rendered(map, "monitors", "7")]);
+		click(gl);
+		expect(handler).toHaveBeenCalledExactlyOnceWith({
+			pluginId: "monitors",
+			ref: { kind: "monitor", id: "7" },
+			lngLat: [-119, 36],
+			properties: { refKey: "monitor:7", external_id: "X7" }
+		});
+		expect(lookup).toHaveBeenCalledWith("monitor:7");
+	});
+
 	it("replaces the selection on a plain click", async () => {
 		const { map, gl, onselectionchange } = await setUp("multiple", ["1"]);
 		gl.setRenderedFeatures([rendered(map, "monitors", "2")]);
