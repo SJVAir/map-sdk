@@ -16,6 +16,15 @@ export interface ThemeColors {
 	foreground: string;
 	/** Markers drawn muted by default (see `icon.mutedColor`): `--muted-foreground`. */
 	mutedForeground: string;
+	/**
+	 * The focus area's line, point ring, and label: `--focus-area`, else a fixed slate. Fixed, not
+	 * the theme's: the basemap under it doesn't follow the theme.
+	 */
+	focusArea: string;
+	/** The casing under the line and ring, and the label's halo: `--focus-area-casing`, else white. */
+	focusAreaCasing: string;
+	/** The wash outside a focus area: `--focus-area-wash`, else white. */
+	focusAreaWash: string;
 }
 
 /**
@@ -27,7 +36,14 @@ export const FALLBACK_THEME_COLORS: Readonly<ThemeColors> = {
 	highlight: "#2563eb",
 	highlightForeground: "#ffffff",
 	foreground: "#111827",
-	mutedForeground: "#6b7280"
+	mutedForeground: "#6b7280",
+	// The user's decision (2026-11-11), an exception to the theme-token rule: the focus area's
+	// colors are fixed (sjvair.com's explorers' white casing and wash, their county-line slate),
+	// since they sit on a basemap that doesn't follow the theme. Hosts override them with the
+	// `--focus-area*` tokens.
+	focusArea: "#1f2d3d",
+	focusAreaCasing: "#ffffff",
+	focusAreaWash: "#ffffff"
 };
 
 const THEME_TOKENS: Record<keyof ThemeColors, string[]> = {
@@ -35,7 +51,10 @@ const THEME_TOKENS: Record<keyof ThemeColors, string[]> = {
 	highlight: ["--highlight", "--primary"],
 	highlightForeground: ["--highlight-foreground", "--primary-foreground"],
 	foreground: ["--foreground"],
-	mutedForeground: ["--muted-foreground"]
+	mutedForeground: ["--muted-foreground"],
+	focusArea: ["--focus-area"],
+	focusAreaCasing: ["--focus-area-casing"],
+	focusAreaWash: ["--focus-area-wash"]
 };
 
 /**

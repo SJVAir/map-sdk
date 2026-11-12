@@ -96,7 +96,10 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   and the exported marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
 - **Presets** (`src/lib/presets/`): `monitorsPlugin`, `collocationSitesPlugin`, `regionsPlugin`,
   `calHeatScorePlugin`, `forecastZonesPlugin`, `hmsSmokePlugin`, `hmsFirePlugin` (groups, then
-  hotspots from zoom 10), and `groupFires`, with the monitor, cluster (its "within a X mi² area"
+  hotspots from zoom 10), `focusAreaPlugin` (`focus-area.svelte.ts`: an area's slate outline and
+  white wash outside it, from `focus-geometry.ts`'s `worldMask`; or a point's ring and canvas label,
+  listed as one `noReading` row and clickable, never selectable; `set()` changes it in place), and
+  `groupFires`, with the monitor, cluster (its "within a X mi² area"
   line from `cluster-area.ts`'s convex hull), collocation (`CollocationTooltip`), and fire
   (`FireTooltip`, the reading box) tooltips. Smoke takes no hover. Presets never fetch.
 - **View** (`src/lib/view/`): `MapView.svelte` creates the GL map (`create-gl-map.ts`: per-map key
@@ -111,6 +114,7 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 - **UI** (`src/lib/ui/`): Legend (`order`, `framed`; blocks legends are one labeled bar), FeatureList,
   MapTooltip, SelectionBar, ViewSummary, and MapControls (zoom buttons only; basemap switching is
   `MapContext`, credits are the engine's). `controls.css` holds the focus ring and motion classes.
+  A `FeatureListItem` with `noReading` (the focus point) shows its name alone everywhere.
   `feature-list.ts`'s `shownValue` is the one place a row's or tooltip's value text is made; it
   hides a category reading's code, since the level label already says it.
 - **Entries**: `.` (everything, reaches the map engine), `./data` and `./stores` (must not reach
@@ -123,7 +127,10 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   README.md). `--highlight` is never for text. Never assume a `.dark` class. Type sizes are
   Tailwind `text-*` classes, so hosts add the `@source` line. The user's fixed-color exceptions
   (decided 2026-11-04, never "fix" them back to tokens): inactive monitors `#969696`, the
-  inside-monitor outline `#000000`, and the collocation crosshair `#4A5FC6`.
+  inside-monitor outline `#000000`, and the collocation crosshair `#4A5FC6`. And (2026-11-11) the
+  focus area's defaults: line, ring and label `#1f2d3d`, casing, halo and wash `#ffffff`, which the
+  `--focus-area*` tokens override but which never fall back to theme tokens (the basemap under
+  them doesn't follow the theme).
 - No hardcoded labels, units, breakpoints, colors, or scales: they come from a `Scale` or the
   metadata provider. Every UI string is a `mapsdk_*` message key in `en.json`; no concatenated
   sentences. Dates and times are formatted in America/Los_Angeles through the `format` provider.

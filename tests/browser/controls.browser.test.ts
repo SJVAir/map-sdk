@@ -207,6 +207,39 @@ describe("ViewSummary", () => {
 		expect(lines(region)).toEqual(["monitors: 2 Good, 1 Moderate", "monitors: 2 selected"]);
 	});
 
+	it("says nothing for a summarizeEmpty: false plugin with nothing in view", async () => {
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		const map = newMap();
+		const place = { ...item("p"), name: "Home", lngLat: [-100, 36.5] as [number, number] };
+		map.addPlugin(
+			plugin([place], { id: "focus", label: "Places", legend: undefined, summarizeEmpty: false })
+		);
+		map.addPlugin(plugin([item("1")]));
+		render(ViewSummary, { map });
+		const region = document.querySelector(".mapsdk-summary")!;
+		map.updateView(camera, bounds);
+		await settle();
+		expect(lines(region)).toEqual(["monitors: 1 Good"]);
+	});
+
+	it("still summarizes a summarizeEmpty: false plugin with something in view", async () => {
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		const map = newMap();
+		map.addPlugin(
+			plugin([item("p")], {
+				id: "focus",
+				label: "Places",
+				legend: undefined,
+				summarizeEmpty: false
+			})
+		);
+		render(ViewSummary, { map });
+		const region = document.querySelector(".mapsdk-summary")!;
+		map.updateView(camera, bounds);
+		await settle();
+		expect(lines(region)).toHaveLength(1);
+	});
+
 	it("leaves out features outside the view", async () => {
 		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
 		const map = newMap();

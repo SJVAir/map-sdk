@@ -155,6 +155,14 @@ describe("MapTooltip", () => {
 		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Gray 12.34 µg/m³ No level");
 	});
 
+	it("shows a place with no reading by its name alone", async () => {
+		const place = { ...item("a", "Your location", NO_LEVEL), value: null, noReading: true };
+		const map = fakeMap([place], { focusedKey: "a" });
+		render(MapTooltip, { map, project });
+		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Your location");
+		expect(document.querySelector(".mapsdk-tooltip-chip")).toBeNull();
+	});
+
 	it("shows a detail as plain text in place of the chip", async () => {
 		const ev = { ...item("a", "Fresno Station", NO_LEVEL), value: null, detail: "Level 2 charger" };
 		const map = fakeMap([ev], { focusedKey: "a" });
@@ -405,6 +413,19 @@ describe("MapTooltip card", () => {
 	}
 
 	const sites = () => [item("a", "Site A", good), item("b", "Site B", good)];
+
+	it("pins a place with no reading as a card with its name alone", async () => {
+		const place = { ...item("a", "Your location", NO_LEVEL), value: null, noReading: true };
+		await render(MapTooltip, {
+			map: cardMap([place], { pinned: hit("a", "Your location") }),
+			project,
+			card: true
+		});
+		const card = page.getByRole("group", { name: "Your location" });
+		await expect.element(card).toBeVisible();
+		expect(card.element().textContent).not.toContain("No level");
+		expect(document.querySelector(".mapsdk-tooltip-chip")).toBeNull();
+	});
 
 	it("shows a pinned feature with a Close button, and takes the pointer", async () => {
 		await render(MapTooltip, {

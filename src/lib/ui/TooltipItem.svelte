@@ -29,20 +29,22 @@
 	const valueText = $derived(shownValue(item, format));
 </script>
 
-<div class="mapsdk-tooltip-item">
-	{#if valueText !== null}
-		<div class="mapsdk-tooltip-value">
-			{valueText}{#if item.units}&nbsp;{item.units}{/if}
-		</div>
-	{/if}
-	{#if levelPlace.kind === "detail"}
-		<span class="mapsdk-tooltip-detail text-xs">{levelPlace.text}</span>
-	{:else}
-		<span class="mapsdk-tooltip-chip text-xs" class:neutral={!chipColors} style={chipColors}>
-			{levelPlace.text}
-		</span>
-	{/if}
-</div>
+{#if levelPlace.kind !== "omit"}
+	<div class="mapsdk-tooltip-item">
+		{#if valueText !== null}
+			<div class="mapsdk-tooltip-value">
+				{valueText}{#if item.units}&nbsp;{item.units}{/if}
+			</div>
+		{/if}
+		{#if levelPlace.kind === "detail"}
+			<span class="mapsdk-tooltip-detail text-xs">{levelPlace.text}</span>
+		{:else}
+			<span class="mapsdk-tooltip-chip text-xs" class:neutral={!chipColors} style={chipColors}>
+				{levelPlace.text}
+			</span>
+		{/if}
+	</div>
+{/if}
 
 <style>
 	.mapsdk-tooltip-item {

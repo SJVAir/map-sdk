@@ -82,6 +82,11 @@ export interface FeatureListItem {
 	 * when the item has a level.
 	 */
 	detail?: string;
+	/**
+	 * A place with no reading (a focus point): its row, accessible name, and tooltip show its name
+	 * alone, with no value, level, or "No level". Default false.
+	 */
+	noReading?: boolean;
 }
 
 export type LegendData =
@@ -194,6 +199,12 @@ export interface MapPlugin {
 	 * `featuresAt`, and keyboard focus from the list are unchanged. Default true.
 	 */
 	hoverable?: boolean;
+	/**
+	 * False: the view summary (the map's live region) has no line for this plugin while none of
+	 * its features is in view, instead of "0 <layer>" (the focus area, which is often an area or
+	 * nothing). Default true.
+	 */
+	summarizeEmpty?: boolean;
 	displayOptions?: Snippet;
 	/** Richer tooltip content for one of this plugin's features, below its name. */
 	tooltip?(item: FeatureListItem): Snippet | undefined;

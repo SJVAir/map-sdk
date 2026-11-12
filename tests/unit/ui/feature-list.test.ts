@@ -305,3 +305,16 @@ describe("a category reading shows its level label once", () => {
 		expect(rowLabel(heat, defaultMessages, format)).toBe("93721, Moderate");
 	});
 });
+
+describe("a place with no reading", () => {
+	const format = createDefaultFormat();
+	const place = item("1", "Your location", { value: null, level: NO_LEVEL, noReading: true });
+
+	it("has nothing in its level place", () => {
+		expect(levelText(place, defaultMessages)).toEqual({ kind: "omit", text: "" });
+	});
+
+	it("is read by its name alone", () => {
+		expect(rowLabel(place, defaultMessages, format)).toBe("Your location");
+	});
+});

@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import { levelFor, NO_LEVEL, numericValue as readingOf } from "../../../src/lib/data/scale.js";
 import {
 	colorExpression,
+	FALLBACK_THEME_COLORS,
 	hasNumericValue,
 	levelKeyExpression,
 	NEUTRAL_COLOR_VAR,
-	opacityExpression
+	opacityExpression,
+	themeColors
 } from "../../../src/lib/plugins/style.js";
 import { burnScale, fireScale, heatScale, pm25Scale, smokeScale } from "../../fixtures/scales.js";
 
@@ -211,5 +213,21 @@ describe("hasNumericValue", () => {
 				expected
 			);
 		}
+	});
+});
+
+describe("focus-area colors", () => {
+	it("default to fixed colors (the user's exception, 2026-11-11)", () => {
+		expect(FALLBACK_THEME_COLORS.focusArea).toBe("#1f2d3d");
+		expect(FALLBACK_THEME_COLORS.focusAreaCasing).toBe("#ffffff");
+		expect(FALLBACK_THEME_COLORS.focusAreaWash).toBe("#ffffff");
+		expect("background" in FALLBACK_THEME_COLORS).toBe(false);
+	});
+
+	it("are the defaults with no container", () => {
+		const colors = themeColors(null);
+		expect(colors.focusArea).toBe("#1f2d3d");
+		expect(colors.focusAreaCasing).toBe("#ffffff");
+		expect(colors.focusAreaWash).toBe("#ffffff");
 	});
 });

@@ -452,4 +452,15 @@ describe("FeatureList", () => {
 		result = await axe.run(document.querySelector(".mapsdk-list")!);
 		expect(result.violations).toEqual([]);
 	});
+
+	it("shows a place with no reading by its name alone", async () => {
+		const place = item("9", "Your location", { value: null, level: NO_LEVEL, noReading: true });
+		const { map } = newMap("single", [place]);
+		render(FeatureList, { map });
+		const row = page.getByRole("option", { name: "Your location", exact: true });
+		await expect.element(row).toBeInTheDocument();
+		expect(option("Your location").querySelector(".mapsdk-list-swatch")).toBeNull();
+		expect(option("Your location").textContent).not.toContain("No level");
+		expect(option("Your location").textContent!.trim()).toBe("Your location");
+	});
 });
