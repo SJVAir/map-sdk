@@ -297,7 +297,13 @@ brainstorm with the user on 2026-11-12.
 - **Count bubbles when zoomed out** (the user, 2026-11-12): schools and child care gather into
   count bubbles that split apart as you zoom in, as monitors do, with schools (public and private
   together) and child care counted in separate bubbles so their colors stay apart. Clicking a
-  bubble zooms in (the existing cluster behavior).
+  bubble zooms in (the existing cluster behavior). **Each bubble is a school-house outline with
+  the count inside** (the user, after seeing the screenshots): circles with a number read as
+  monitor clusters, whose number is a reading.
+- **Legend: one row per badge** (the user, 2026-11-12): "School" (a `mapsdk_*` message, since
+  the metadata has no combined label) for public and private together, and "Child care" from
+  the metadata. A filter that keeps only one school type names that row by its type's label.
+- **No enrollment or capacity on the card** (the user, 2026-11-12).
 - **No point-and-radius mode** (unchanged): map-sdk never takes coordinates to look schools up.
 
 ### From the dashboard (`data-dashboard-d8`, 2026-11-12)
@@ -346,15 +352,12 @@ the preset to an SDK version.
   `child_care`), all three by default. Unknown types in the data are not drawn when a filter is set
   (a filter is an allow-list). A host that offers "schools vs. child care" passes both school types
   for its one choice.
-- **Card:** name; type label; address and city; school district; grade span; enrollment (schools)
-  or capacity (child care) when present. Every line a `mapsdk_*` message key; a missing value's
-  line is left out.
+- **Card:** name; type label; address and city; school district; grade span. Every line a
+  `mapsdk_*` message key; a missing value's line is left out.
 - **List row:** the name, with the type label where a reading would be (`pointsPlugin`'s `detail`).
-- **Legend:** one entry per type that the filter draws, badge and label. Public and private show
-  the same badge with different labels; that's expected, since only the label tells them apart.
-- **Count bubbles:** a bubble in the group's token color with its count, and a tooltip giving the
-  count per type label. The exact radius and the zoom where bubbles stop are the builder's,
-  starting from the monitors preset's.
+- **Count bubbles:** a 32px school-house outline in the group's token color with the count in
+  white, and a tooltip giving the count per type label. Single badges stay 20px, centered in the
+  same 32px image box.
 - **Not selectable in map-sdk.** `SpatialSelection` stays monitors or regions. `featureclick` gives
   the host the feature with its properties, including `source` and `external_id`.
 - **Order:** the preset draws wherever it's registered (the demo and docs register it

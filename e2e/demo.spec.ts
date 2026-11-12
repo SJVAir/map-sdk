@@ -653,12 +653,8 @@ test("schools: a focus point on a school is listed once", async ({ page }) => {
 	).toHaveCount(0);
 });
 
-test("schools: the legend lists the three types", async ({ page }) => {
+test("schools: the legend has a School row and a Child care row", async ({ page }) => {
 	await schoolsToggle(page).check();
 	const legend = page.getByRole("list", { name: "Schools and child care" });
-	await expect(legend.getByRole("listitem")).toHaveText([
-		"Public school",
-		"Private school",
-		"Child care"
-	]);
+	await expect(legend.getByRole("listitem")).toHaveText(["School", "Child care"]);
 });

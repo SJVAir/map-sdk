@@ -370,6 +370,7 @@
 				right,
 				today,
 				schools,
+				rightFocus,
 				get lastClick() {
 					return lastClick;
 				}

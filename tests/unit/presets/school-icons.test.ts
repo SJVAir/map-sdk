@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	badgeKindOf,
+	schoolBubble,
 	SCHOOL_BADGE_SIZE,
 	schoolBadge,
 	schoolBadgeMarkup
@@ -53,5 +54,14 @@ describe("schoolBadgeMarkup", () => {
 		expect(markup).toContain('focusable="false"');
 		expect(markup).toContain('width="16"');
 		expect(schoolBadgeMarkup("school", 16)).toContain("var(--school-marker, #5a6b7b)");
+	});
+});
+
+describe("schoolBubble", () => {
+	it("is the school-house outline with no glyph, room for a count", () => {
+		const svg = schoolBubble("#5a6b7b");
+		expect(svg).toContain(`d="${PENTAGON}"`);
+		expect(svg).toContain('fill="#5a6b7b"');
+		expect(svg.match(/<(path|circle) /g)).toHaveLength(2);
 	});
 });

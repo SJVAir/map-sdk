@@ -9,7 +9,6 @@ import type { FormatProvider } from "../../../src/lib/data/format.js";
 import { defaultMessages } from "../../../src/lib/data/messages.js";
 import type { MetadataProvider } from "../../../src/lib/data/metadata.js";
 import type { LocationType, SchoolsSource } from "../../../src/lib/data/types.js";
-import { FALLBACK_THEME_COLORS } from "../../../src/lib/plugins/style.js";
 import { schoolsPlugin } from "../../../src/lib/presets/schools.svelte.js";
 import { createFakeGl, type FakeGl } from "../../fixtures/fake-gl.js";
 import { schoolRows, SchoolsTestSource } from "../../fixtures/sources.svelte.js";
@@ -152,16 +151,21 @@ describe("schoolsPlugin", () => {
 		expect(gl.layers.some((l) => l.id === "m1:schools:points:school")).toBe(true);
 	});
 
-	it("clusters each kind in its own bubbles, colored by kind", async () => {
+	it("clusters each kind in its own school-house bubbles with the count", async () => {
 		const { gl } = await setup(new Source([{}, { type: "child_care" }]));
 		const spec = gl.sources.get("m1:schools:points:school") as GeoJSONSourceSpecification;
 		expect(spec.cluster).toBe(true);
 		const bubble = (group: string) =>
 			gl.layers.find((l) => l.id === `m1:schools:clusters:${group}`) as unknown as {
-				paint: Record<string, unknown>;
+				type: string;
+				layout: Record<string, unknown>;
 			};
-		expect(bubble("school").paint["circle-color"]).toBe(FALLBACK_THEME_COLORS.schoolMarker);
-		expect(bubble("child-care").paint["circle-color"]).toBe(FALLBACK_THEME_COLORS.childCareMarker);
+		for (const group of ["school", "child-care"]) {
+			expect(bubble(group).type).toBe("symbol");
+			expect(JSON.stringify(bubble(group).layout["icon-image"])).toContain(`bubble-${group}`);
+			expect(bubble(group).layout["text-field"]).toEqual(["get", "point_count_abbreviated"]);
+		}
+		expect(gl.layers.some((l) => l.id.includes("cluster-count"))).toBe(false);
 	});
 
 	it("shows at every zoom by default", async () => {
@@ -172,19 +176,31 @@ describe("schoolsPlugin", () => {
 		expect(layer.layout?.visibility).toBeUndefined();
 	});
 
-	it("lists the filtered types in the legend, in order, with labels", async () => {
-		const meta = metadata({ child_care: "Child care", private_school: "Private school" });
-		const { plugin } = await setup(
-			new Source([{ type: "child_care" }]),
-			{ types: ["child_care", "private_school"] },
-			meta
-		);
+	it("has one legend row per badge: School, then Child care from the metadata", async () => {
+		const meta = metadata({ child_care: "Child care", public_school: "Public school" });
+		const { plugin } = await setup(new Source([{ type: "child_care" }]), {}, meta);
 		await settle();
 		const data = plugin.legend!() as Extract<LegendData, { symbols: unknown }>;
 		expect(data.title).toBe("Schools");
-		expect(data.symbols.map((s) => s.label)).toEqual(["Private school", "Child care"]);
+		expect(data.symbols.map((s) => s.label)).toEqual(["School", "Child care"]);
 		expect(data.symbols[0].markup).toContain("--school-marker");
 		expect(data.symbols[1].markup).toContain("--child-care-marker");
+	});
+
+	it("names the school row by its one type when the filter keeps only one", async () => {
+		const meta = metadata({ private_school: "Private school" });
+		const { plugin } = await setup(new Source([]), { types: ["private_school"] }, meta);
+		await settle();
+		const data = plugin.legend!() as Extract<LegendData, { symbols: unknown }>;
+		expect(data.symbols.map((s) => s.label)).toEqual(["Private school"]);
+	});
+
+	it("leaves out the school row when the filter keeps only child care", async () => {
+		const meta = metadata({ child_care: "Child care" });
+		const { plugin } = await setup(new Source([]), { types: ["child_care"] }, meta);
+		await settle();
+		const data = plugin.legend!() as Extract<LegendData, { symbols: unknown }>;
+		expect(data.symbols.map((s) => s.label)).toEqual(["Child care"]);
 	});
 
 	it("reports a loading source's status in the legend", async () => {

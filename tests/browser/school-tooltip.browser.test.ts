@@ -2,7 +2,6 @@ import { tick } from "svelte";
 import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { createMap } from "../../src/lib/core/create-map.svelte.js";
-import { createDefaultFormat } from "../../src/lib/data/format.js";
 import { defaultMessages } from "../../src/lib/data/messages.js";
 import type { SchoolLocationProperties } from "../../src/lib/data/types.js";
 import SchoolTooltip from "../../src/lib/presets/SchoolTooltip.svelte";
@@ -10,8 +9,6 @@ import MapTooltip from "../../src/lib/ui/MapTooltip.svelte";
 import { schoolsPlugin } from "../../src/lib/presets/schools.svelte.js";
 import { createFakeGl } from "../fixtures/fake-gl.js";
 import { schoolRows, SchoolsTestSource } from "../fixtures/sources.svelte.js";
-
-const format = createDefaultFormat();
 
 function lines(): string[] {
 	return [...document.querySelectorAll(".mapsdk-school-line")].map(
@@ -35,26 +32,24 @@ describe("SchoolTooltip", () => {
 				capacity: 99
 			}),
 			typeLabel: "Public school",
-			messages: defaultMessages,
-			format
+			messages: defaultMessages
 		});
 		expect(lines()).toEqual([
 			"Public school",
 			"1 Main St, Fresno",
 			"District: Fresno Unified",
-			"Grades: K-6",
-			"Enrollment: 1,234"
+			"Grades: K-6"
 		]);
 	});
 
-	it("shows child care's capacity, including 0, and never enrollment", () => {
+	it("shows neither enrollment nor capacity (the user, 2026-11-12)", () => {
 		render(SchoolTooltip, {
 			site: site({ type: "child_care", address: "2 Elm St", capacity: 0, enrollment: 50 }),
 			typeLabel: "Child care",
-			messages: defaultMessages,
-			format
+			messages: defaultMessages
 		});
-		expect(lines()).toEqual(["Child care", "2 Elm St", "Capacity: 0"]);
+		expect(lines()).toEqual(["Child care", "2 Elm St"]);
+		expect(document.body.textContent).not.toMatch(/Capacity|Enrollment/);
 	});
 
 	it("leaves out missing, null, and blank values", () => {
@@ -67,8 +62,7 @@ describe("SchoolTooltip", () => {
 				enrollment: null
 			}),
 			typeLabel: "Public school",
-			messages: defaultMessages,
-			format
+			messages: defaultMessages
 		});
 		expect(lines()).toEqual(["Public school", "1 Main St"]);
 		expect(document.body.textContent).not.toMatch(/null|undefined/);

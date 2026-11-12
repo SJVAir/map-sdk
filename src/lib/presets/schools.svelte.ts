@@ -1,4 +1,5 @@
 import { untrack } from "svelte";
+import type { ExpressionSpecification } from "@maptiler/sdk";
 import type { FeatureCollection, Geometry, Point } from "geojson";
 import type { ClusterLayers } from "../plugins/points-clusters.js";
 import { CLUSTERED } from "../plugins/points-clusters.js";
@@ -16,7 +17,15 @@ import type {
 import { pointsPlugin } from "../plugins/points.svelte.js";
 import { CLUSTER_MAX_ZOOM, CLUSTER_RADIUS, componentSnippet } from "./monitors.js";
 import SchoolClusterTooltip from "./SchoolClusterTooltip.svelte";
-import { badgeKindOf, SCHOOL_BADGE_SIZE, schoolBadge, schoolBadgeMarkup } from "./school-icons.js";
+import {
+	badgeKindOf,
+	inBox,
+	SCHOOL_BADGE_SIZE,
+	SCHOOL_ICON_BOX,
+	schoolBadge,
+	schoolBadgeMarkup,
+	schoolBubble
+} from "./school-icons.js";
 import SchoolTooltip from "./SchoolTooltip.svelte";
 
 export interface SchoolsPluginOptions {
@@ -41,7 +50,8 @@ const TYPES: readonly LocationType[] = ["public_school", "private_school", "chil
 /** What the points plugin draws: the host's properties plus a ref key, name, and no value. */
 type SchoolPointProperties = SchoolLocationProperties & MapFeatureProperties;
 
-const BUBBLE_RADIUS = 14;
+/** The neutral image's level key: the preset has no scale, so every image is the neutral one. */
+const NEUTRAL_LEVEL = ["literal", ""] as unknown as ExpressionSpecification;
 
 /** The host's source as points: allowed types only, each with its `refKey`. */
 class SchoolPoints implements DataSource<SchoolPointProperties> {
@@ -120,11 +130,15 @@ export function schoolsPlugin(options: SchoolsPluginOptions): MapPlugin {
 		zoomRange: options.zoomRange,
 		icon: {
 			category: (props) => badgeKindOf(props.type),
-			draw: (category, _color, theme) =>
-				category === "child-care"
-					? schoolBadge("child-care", theme.childCareMarker)
-					: schoolBadge("school", theme.schoolMarker),
-			size: SCHOOL_BADGE_SIZE
+			// "school" and "child-care" are the badges; "bubble-…" the count bubbles' outlines.
+			draw: (category, _color, theme) => {
+				const kind = category.endsWith("child-care") ? "child-care" : "school";
+				const fill = kind === "child-care" ? theme.childCareMarker : theme.schoolMarker;
+				return category.startsWith("bubble-")
+					? schoolBubble(fill)
+					: inBox(schoolBadge(kind, fill), SCHOOL_BADGE_SIZE);
+			},
+			size: SCHOOL_ICON_BOX
 		},
 		detail: (props) => labelOf(props.type, props.type_label),
 		cluster: {
@@ -134,31 +148,24 @@ export function schoolsPlugin(options: SchoolsPluginOptions): MapPlugin {
 			properties: Object.fromEntries(
 				TYPES.map((type) => [type, ["+", ["case", ["==", ["get", "type"], type], 1, 0]]])
 			),
-			layers: ({ group, sourceId, theme }): ClusterLayers => [
+			layers: ({ group, sourceId, iconImage, iconSizeScale }): ClusterLayers => [
 				{
 					local: "clusters",
-					spec: {
-						type: "circle",
-						source: sourceId,
-						filter: CLUSTERED,
-						paint: {
-							"circle-radius": BUBBLE_RADIUS,
-							"circle-color": group === "child-care" ? theme.childCareMarker : theme.schoolMarker,
-							"circle-stroke-color": "#ffffff",
-							"circle-stroke-width": 1.5
-						}
-					}
-				},
-				{
-					local: "cluster-count",
 					spec: {
 						type: "symbol",
 						source: sourceId,
 						filter: CLUSTERED,
 						layout: {
+							"icon-image": iconImage(`bubble-${group}`, NEUTRAL_LEVEL),
+							"icon-size": iconSizeScale,
+							"icon-allow-overlap": true,
+							"icon-ignore-placement": true,
 							"text-field": ["get", "point_count_abbreviated"],
 							"text-size": 12,
-							"text-allow-overlap": true
+							// Into the house's body, under its roof.
+							"text-offset": [0, 0.3],
+							"text-allow-overlap": true,
+							"text-ignore-placement": true
 						},
 						paint: { "text-color": "#ffffff" }
 					}
@@ -178,8 +185,7 @@ export function schoolsPlugin(options: SchoolsPluginOptions): MapPlugin {
 			componentSnippet(SchoolTooltip, {
 				site: props,
 				typeLabel: labelOf(props.type, props.type_label),
-				messages: env.messages,
-				format: env.format
+				messages: env.messages
 			})
 	});
 
@@ -198,10 +204,15 @@ export function schoolsPlugin(options: SchoolsPluginOptions): MapPlugin {
 		return {
 			pluginId,
 			title: layerLabel,
-			symbols: shownTypes.map((type) => ({
-				label: labelOfType(type),
-				markup: schoolBadgeMarkup(badgeKindOf(type), 16)
-			}))
+			// One row per badge: public and private share one, so they share a row ("School"),
+			// unless the filter keeps only one of them, which then names it.
+			symbols: (["school", "child-care"] as const).flatMap((kind) => {
+				const types = shownTypes.filter((t) => badgeKindOf(t) === kind);
+				if (types.length === 0) return [];
+				const label =
+					types.length === 1 ? labelOfType(types[0]) : messages("mapsdk_schools_legend_school");
+				return [{ label, markup: schoolBadgeMarkup(kind, 16) }];
+			})
 		};
 	};
 

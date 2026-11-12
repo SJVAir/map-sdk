@@ -57,11 +57,18 @@ const TOKENS: Record<BadgeKind, string> = {
 	"child-care": "var(--child-care-marker, #1c9099)"
 };
 
-/** The badge's shapes after its fill: white outline, faint dark edge, then the white glyph. */
-function inner(kind: BadgeKind, fill: string): string {
+/** The school-house outline: its fill, a white outline, and a faint dark edge. */
+function outline(fill: string): string {
 	return (
 		`<path d="${BADGE_PATH}" ${fill} stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>` +
-		`<path d="${BADGE_PATH}" fill="none" stroke="rgba(0,0,0,.35)" stroke-width=".6" stroke-linejoin="round"/>` +
+		`<path d="${BADGE_PATH}" fill="none" stroke="rgba(0,0,0,.35)" stroke-width=".6" stroke-linejoin="round"/>`
+	);
+}
+
+/** The badge's shapes: the outline, then the white glyph. */
+function inner(kind: BadgeKind, fill: string): string {
+	return (
+		outline(fill) +
 		`<g transform="translate(4 7) scale(${16 / 24})" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">` +
 		GLYPHS[kind].join("") +
 		"</g>"
@@ -79,4 +86,22 @@ export function schoolBadge(kind: BadgeKind, fill: string, size = SCHOOL_BADGE_S
  */
 export function schoolBadgeMarkup(kind: BadgeKind, size: number): string {
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="-1 -1 26 26" aria-hidden="true" focusable="false">${inner(kind, `style="fill: ${TOKENS[kind]}"`)}</svg>`;
+}
+
+/** The images' box: a count bubble fills it; a single badge sits centered in it at its size. */
+export const SCHOOL_ICON_BOX = 32;
+
+/** `svg` (`size` pixels square) centered in a transparent `box`-pixel square. */
+export function inBox(svg: string, size: number, box = SCHOOL_ICON_BOX): string {
+	const at = (box - size) / 2;
+	const inner = svg.replace("<svg ", `<svg x="${at}" y="${at}" `);
+	return `<svg xmlns="http://www.w3.org/2000/svg" width="${box}" height="${box}" viewBox="0 0 ${box} ${box}">${inner}</svg>`;
+}
+
+/**
+ * A count bubble: the school-house outline with no glyph, filled with `fill`, so it reads as
+ * "this many sites here" and never as a monitor cluster's reading (those are circles).
+ */
+export function schoolBubble(fill: string, size = SCHOOL_ICON_BOX): string {
+	return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="-1 -1 26 26">${outline(`fill="${fill}"`)}</svg>`;
 }
