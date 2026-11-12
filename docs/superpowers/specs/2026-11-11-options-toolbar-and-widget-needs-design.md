@@ -392,6 +392,16 @@ Firm needs; anything about which rows the widget shows is for the dashboard's ow
 - Several maps per page, each with its own toolbar and values; nothing page-wide.
 - Layout from the map's box, including in the widget's fullscreen.
 - Dropdowns and the panel stay inside the tile, which clips its contents.
+- **Declarations buildable from the dashboard's data-set entries** (the user, 2026-11-12, in the
+  dashboard's step 5 spec 2). The dashboard keeps one entry per map data set: how it loads, its
+  refresh rule, its conversion to a `DataSource`, and which plugin draws it with what settings. The
+  toolbar's declarations (groups, rows, defaults) must be buildable from those entries, so a
+  preset's option declarations take what the entry knows and never a request function.
+- **map-sdk stays a drawing library** (the user, 2026-11-12): it is never given request functions,
+  and every preset (`monitorsPlugin`, `hmsSmokePlugin`, `hmsFirePlugin`, `focusAreaPlugin`, the
+  schools preset) stays usable from a plain host `DataSource`. Spec 2's data sets are monitors,
+  and smoke and fire; schools wait on part 4, and pesticides come in dashboard spec 5. Only
+  monitors can be selected in the dashboard.
 
 ### My calls
 
