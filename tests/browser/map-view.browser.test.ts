@@ -184,6 +184,27 @@ describe("MapView", () => {
 		expect(gl.getPitch()).toBeCloseTo(10);
 	});
 
+	it('releases and rebuilds the GL map with tooltip="pointer" (no error on detach)', async () => {
+		const map = newMap();
+		const attached = trackAttach(map);
+		const uncaught: unknown[] = [];
+		const onError = (e: ErrorEvent) => uncaught.push(e.error);
+		window.addEventListener("error", onError);
+		const { container, rerender } = await render(MapView, {
+			map,
+			class: "test-map",
+			tooltip: "pointer"
+		});
+		await whenLoaded(attached[0]);
+		await rerender({ active: false });
+		expect(map.attached).toBe(false);
+		await rerender({ active: true });
+		expect(container.querySelectorAll("canvas")).toHaveLength(1);
+		await vi.waitFor(() => expect(map.ready).toBe(true));
+		window.removeEventListener("error", onError);
+		expect(uncaught).toEqual([]);
+	});
+
 	it("starts at the context's camera and records it once loaded", async () => {
 		const map = createMap({
 			config: {

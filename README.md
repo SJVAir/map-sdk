@@ -564,6 +564,13 @@ local sjvair.com stack at `http://localhost:8000`.
 
 ## Changes
 
+### 0.1.0-beta.9
+
+- **A map with `tooltip="pointer"` comes back after releasing WebGL.** Setting `MapView`'s
+  `active` to `false` threw "Cannot read properties of null (reading 'off')" from the tooltip's
+  zoom listener, and the map never drew again until a reload. It now releases and rebuilds cleanly.
+  In 0.1.0-beta.7 and 0.1.0-beta.8; maps with the default `tooltip="pinned"` weren't affected.
+
 ### 0.1.0-beta.8
 
 - **The pinned reading card.** `MapView`'s new `card` prop: a click or tap on a feature pins its

@@ -40,10 +40,12 @@
 	// Pointer mode only: set by a zoom, cleared by the next pointer move over a hit.
 	let zoomHidden = $state(false);
 	$effect(() => {
-		if (mode !== "pointer" || !gl) return;
+		// Captured: props are live, and the cleanup runs after MapView has set `gl` to null.
+		const g = gl;
+		if (mode !== "pointer" || !g) return;
 		const onZoomStart = () => (zoomHidden = true);
-		gl.on("zoomstart", onZoomStart);
-		return () => gl.off("zoomstart", onZoomStart);
+		g.on("zoomstart", onZoomStart);
+		return () => g.off("zoomstart", onZoomStart);
 	});
 	$effect(() => {
 		// A new hovered object comes with every pointer move over a hit.
