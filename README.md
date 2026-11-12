@@ -82,9 +82,12 @@ Standard (no fallback, must exist): `--background`, `--foreground`, `--card`, `-
 | `--focus-area`           | `#1f2d3d` (fixed)            | The focus area's line, point ring, and label                 |
 | `--focus-area-casing`    | `#ffffff` (fixed)            | The casing under them, and the label's halo                  |
 | `--focus-area-wash`      | `#ffffff` (fixed)            | The wash outside a focus area                                |
+| `--school-marker`        | `#5a6b7b` (fixed)            | School badges and count bubbles                              |
+| `--child-care-marker`    | `#1c9099` (fixed)            | Child care badges and count bubbles                          |
 
-The focus area's tokens fall back to fixed colors, not to theme tokens: they're drawn on a basemap,
-which doesn't follow the page's theme. Set them only to override the defaults.
+The focus area's and the school markers' tokens fall back to fixed colors, not to theme tokens:
+they're drawn on a basemap, which doesn't follow the page's theme. Set them only to override the
+defaults.
 
 `theme.css` exposes the family tokens as Tailwind utilities (`bg-highlight`, `border-card-border`,
 `text-link`, `ring-ring-edge`, `shadow-card`, `rounded-control`, `shadow-lifted`).
@@ -292,6 +295,60 @@ focus.set({ geometry: { type: "Point", coordinates: [-119.79, 36.74] }, label: "
 A list item's `noReading: true` (set on the focus point's) shows the item by its name alone: no
 value, level, or "No level" in its row, its accessible name, or its card.
 
+### Schools and child care
+
+`schoolsPlugin({ id?, source, layerLabel, types?, zoomRange? })` draws public schools, private
+schools, and child care sites as school-house badges: a school glyph in `--school-marker` for both
+kinds of school, a baby glyph in `--child-care-marker` for child care. Zoomed out, each kind
+gathers into school-house count bubbles; clicking one zooms in. It's never selectable.
+
+- **`source`** is `{ status, features }`, with `features` exactly what `@sjvair/sdk`'s
+  `getPesticideLocations` returns, passed through unchanged (a `SchoolsSource`). The preset never
+  fetches: the host picks the area (a `bbox`, or a `region`), never a person's own location.
+  A plain `{ status: { state: "ready" }, features }` works, as does any `DataSource` holding these
+  features. Each feature's properties (`SchoolLocationProperties`, from `./data`):
+
+  | Property                                                              | Used for                                          |
+  | --------------------------------------------------------------------- | ------------------------------------------------- |
+  | `id`                                                                  | Its ref, `{ kind: "feature", id }`                |
+  | `name`                                                                | The list row and card                             |
+  | `type`                                                                | `public_school`, `private_school`, `child_care`   |
+  | `type_label`                                                          | The type's label until the metadata has one       |
+  | `address`, `city`                                                     | The card                                          |
+  | `school_district`, `grade_span`                                       | The card                                          |
+  | `source`, `external_id`                                               | Not shown: `featureclick`'s `properties` has them |
+  | `school_district_id`, `school_district_url`, `enrollment`, `capacity` | Not shown                                         |
+
+  A null, missing, or blank value leaves its card line out.
+
+- **`types`** is the types to draw (an allow-list); all three by default.
+- **`zoomRange`**: every zoom by default.
+- **Labels:** each type's label comes from the metadata provider's optional
+  `locationTypeLabel(type, signal?)` (the default reads `getRegionsMeta`'s `location_types`), then
+  the feature's `type_label`, then "Location". The legend has a "School" row (both kinds of
+  school share a badge) and a "Child care" row; with a filter that keeps one school type, that
+  row has its label.
+- **Clicks:** `featureclick` carries the site's own `properties`, so a host can resolve it as a
+  place with `getLocationsByCode(source, [external_id])`. Card buttons work as on any card.
+- **On the focus point:** when the focus point sits at exactly a site's coordinates (take them
+  from the feature itself), the site's badge stays inside the focus ring and takes the click, and
+  the focus point's own list row is left out while the badge is drawn, so the place is listed
+  once. Inside a count bubble, it isn't drawn on its own, so the row is back until it splits.
+
+```ts
+const schools = schoolsPlugin({
+	source: { status: { state: "ready" }, features: await getPesticideLocations({ region }) },
+	layerLabel: "Schools and child care",
+	types: ["public_school", "private_school"]
+});
+map.addPlugin(schools, { before: "monitors" });
+map.on("featureclick", (e) => {
+	if (e.pluginId === "schools") console.log(e.properties?.external_id);
+});
+```
+
+The badges' glyphs are Lucide's `school` and `baby` icons (lucide.dev, ISC license).
+
 ## Data sources
 
 A `DataSource` is `{ status, features, scale }`: a load status (`loading`, `ready`, `error` with
@@ -457,6 +514,12 @@ their tooltip when focused from the feature list. A plugin with `summarizeEmpty:
 line in the view summary (the map's live region) while none of its features is in view, instead
 of "0 <layer>"; `focusAreaPlugin` uses it.
 
+A plugin's optional `drawnAt(lngLat)` says whether one of its markers is drawn exactly there (in
+its zoom range and not in a cluster); `pointsPlugin({ marksPlaces: true })` provides it, and
+`ctx.coveredAt(lngLat)` asks every other plugin on the map. The focus area uses it to leave out
+its row under a school. `legend()` may also return `{ pluginId, title, symbols }`, a row per
+symbol: `markup` (map-sdk's own inline SVG) beside its `label`.
+
 ```ts
 import type { CustomLayerInterface, MapPlugin, PluginContext } from "@sjvair/map-sdk";
 
@@ -530,11 +593,12 @@ map.addPlugin(plugin, {
 `map.togglePick(pluginId, ref)` is a user's toggle for your own controls (the card's Select or
 Remove): the same rule, `canSelect`, and `onselectionchange` as a modifier-click.
 
-`map.on("featureclick", ({ pluginId, ref, lngLat }) => …)` fires for every click on a feature,
+`map.on("featureclick", ({ pluginId, ref, lngLat, properties }) => …)` fires for every click on a feature,
 whatever the mode, and also for a pick in the feature list, so keyboard users get the same event;
 `lngLat` is the click point. For a list pick it's where the item's tooltip pins: the item's
-position, or for a shape whose label point is off-screen, a point of the shape in view. It returns an unsubscribe
-function. For your own context menu, `map.featuresAt({ x, y })` returns the hits under
+position, or for a shape whose label point is off-screen, a point of the shape in view.
+`properties` is the feature's own data when its plugin gives it (`MapPlugin.properties(refKey)`;
+`schoolsPlugin` does), and absent otherwise. It returns an unsubscribe function. For your own context menu, `map.featuresAt({ x, y })` returns the hits under
 a canvas point, topmost first, and `map.featureForElement(element)` returns the hit for a row of
 the feature list (an element with `data-mapsdk-ref`). Both return nothing while the map is
 detached.
@@ -573,8 +637,9 @@ if (gl) new Marker().setLngLat(lngLat).addTo(gl);
 `createMap` takes three optional providers, so a host controls where its labels and metadata come
 from:
 
-- `metadata`: scales, entry-type labels and units, monitor type labels, and dataset attribution.
-  The default reads the SJVAir API through `@sjvair/sdk`. `monitorTypeInterval(type)` is an
+- `metadata`: scales, entry-type labels and units, monitor type labels, location type labels
+  (optional `locationTypeLabel`), and dataset attribution. The default reads the SJVAir API
+  through `@sjvair/sdk`. `monitorTypeInterval(type)` is an
   optional method returning how often a monitor type reports (e.g. `"2 min"`); the monitor
   tooltip shows "(2 min avg)" under the entry-type label when it exists, and omits the note when a
   host's provider lacks it.
@@ -626,6 +691,29 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.12
+
+- **Schools and child care.** `schoolsPlugin` draws public schools, private schools, and child
+  care sites from `getPesticideLocations`' features, passed through as they are: school-house
+  badges with Lucide's school and baby glyphs, school-house count bubbles when zoomed out, a card
+  (type, address, district, grades), a legend, and a `types` filter. Never selectable.
+- **A focus point on a school** gives way to it: the school's badge stays inside the ring, and
+  the focus point's list row is left out while the badge is drawn.
+- **`featureclick`** carries `properties` when the clicked feature's plugin gives them
+  (`schoolsPlugin`: the site's own, with `source` and `external_id`). Other plugins' events are
+  unchanged.
+- **New theme tokens:** `--school-marker` and `--child-care-marker`, fixed colors like the focus
+  area's.
+- **New message keys:** `mapsdk_location_type_unknown`, `mapsdk_school_address`,
+  `mapsdk_school_district`, `mapsdk_school_grades`, `mapsdk_schools_cluster_line`,
+  `mapsdk_schools_legend_school`.
+- **New API:** `schoolsPlugin`, `SchoolsPluginOptions`, and in `./data` `SchoolsSource`,
+  `SchoolLocationProperties`, `LocationType`; `MetadataProvider.locationTypeLabel` (optional);
+  `MapPlugin.properties`, `MapPlugin.drawnAt`, `PointsOptions.marksPlaces`,
+  `PluginContext.coveredAt`; a `symbols` form of `LegendData`; and two new `ThemeColors` keys
+  (`schoolMarker`, `childCareMarker`). Code that builds a `ThemeColors` or a `PluginContext`
+  object needs them.
 
 ### 0.1.0-beta.11
 

@@ -14,6 +14,7 @@ import {
 	monitorsPlugin,
 	pointsPlugin,
 	regionsPlugin,
+	schoolsPlugin,
 	shapesPlugin,
 	withCrosshair
 } from "../../src/lib/index.js";
@@ -33,6 +34,7 @@ import {
 	type MessageKey,
 	type MessageParams,
 	type MessageProvider,
+	type SchoolsSource,
 	type SpatialSelection
 } from "../../src/lib/data/index.js";
 import {
@@ -321,6 +323,40 @@ describe("README examples", () => {
 		});
 		expect(map.plugins.map((p) => p.id)).toEqual(["focus-area", "monitors"]);
 		expect(focus.features!()[0].name).toBe("Your location");
+		map.destroy();
+	});
+
+	it("schools: getPesticideLocations' features as they are, a type filter, featureclick properties", async () => {
+		// Stands in for @sjvair/sdk's getPesticideLocations({ region }): one site in any region.
+		const site: NonNullable<SchoolsSource["features"]>["features"][number] = {
+			type: "Feature",
+			geometry: { type: "Point", coordinates: [-119.8, 36.75] },
+			properties: {
+				id: "s1",
+				source: "cde-public",
+				external_id: "10621666006068",
+				name: "Addams Elementary",
+				type: "public_school",
+				type_label: "Public school"
+			}
+		};
+		const getPesticideLocations = async (params: { region: string }) =>
+			({ type: "FeatureCollection", features: params.region ? [site] : [] }) as const;
+		const region = "rb2rf";
+		const map = createMap({ config: { maptilerKey: "your-maptiler-key" } });
+		map.addPlugin(monitorsPlugin({ source: createMonitorsStore().dataSource, layerLabel: "M" }));
+		const schools = schoolsPlugin({
+			source: { status: { state: "ready" }, features: await getPesticideLocations({ region }) },
+			layerLabel: "Schools and child care",
+			types: ["public_school", "private_school"]
+		});
+		map.addPlugin(schools, { before: "monitors" });
+		const seen: unknown[] = [];
+		map.on("featureclick", (e) => {
+			if (e.pluginId === "schools") seen.push(e.properties?.external_id);
+		});
+		map.pickFromList("schools", "feature:s1", false);
+		expect(seen).toEqual(["10621666006068"]);
 		map.destroy();
 	});
 });
