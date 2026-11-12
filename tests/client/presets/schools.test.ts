@@ -164,6 +164,8 @@ describe("schoolsPlugin", () => {
 			expect(bubble(group).type).toBe("symbol");
 			expect(JSON.stringify(bubble(group).layout["icon-image"])).toContain(`bubble-${group}`);
 			expect(bubble(group).layout["text-field"]).toEqual(["get", "point_count_abbreviated"]);
+			// Bold, for contrast on the teal (the user, 2026-11-12): the basemap's own bold stack.
+			expect(bubble(group).layout["text-font"]).toEqual(["Roboto Bold", "Noto Sans Bold"]);
 		}
 		expect(gl.layers.some((l) => l.id.includes("cluster-count"))).toBe(false);
 	});

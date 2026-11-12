@@ -162,6 +162,9 @@ export function schoolsPlugin(options: SchoolsPluginOptions): MapPlugin {
 							"icon-ignore-placement": true,
 							"text-field": ["get", "point_count_abbreviated"],
 							"text-size": 12,
+							// Bold, for contrast on the teal (the user, 2026-11-12); MapTiler's
+							// basemaps' own bold stack.
+							"text-font": ["Roboto Bold", "Noto Sans Bold"],
 							// Into the house's body, under its roof.
 							"text-offset": [0, 0.3],
 							"text-allow-overlap": true,
