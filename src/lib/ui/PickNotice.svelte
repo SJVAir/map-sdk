@@ -23,7 +23,7 @@
 
 <!-- Always present: a live region must exist before its text changes to be announced. -->
 <div class="mapsdk-pick-notice" role="status" aria-live="polite" aria-atomic="true">
-	{#if map.notice}
+	{#if map.notice?.message}
 		{#key map.notice.id}
 			<span class="mapsdk-pick-notice-text text-sm">{map.notice.message}</span>
 		{/key}
@@ -31,13 +31,16 @@
 </div>
 
 <style>
+	/* Spans the map less 1rem a side, centering its text box, so a long message wraps at the
+	   map's width rather than at half of it. */
 	.mapsdk-pick-notice {
 		position: absolute;
+		right: 1rem;
 		bottom: 2.5rem;
-		left: 50%;
+		left: 1rem;
 		z-index: 3;
-		max-width: calc(100% - 2rem);
-		transform: translateX(-50%);
+		display: flex;
+		justify-content: center;
 		pointer-events: none;
 	}
 

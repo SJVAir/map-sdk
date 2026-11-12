@@ -64,3 +64,20 @@ describe("PickNotice", () => {
 		expect(b.container.querySelector("[role=status]")?.textContent?.trim()).toBe("");
 	});
 });
+
+describe("PickNotice layout", () => {
+	it("a long message uses the map's width, less the margins, before wrapping", async () => {
+		const map = refusingMap(
+			"You can compare up to three monitors at a time; remove one from the selection first."
+		);
+		const host = document.createElement("div");
+		host.style.cssText = "position: relative; width: 600px; height: 300px;";
+		document.body.append(host);
+		await render(PickNotice, { props: { map }, target: host } as never);
+		refuse(map);
+		await vi.waitFor(() => expect(host.querySelector(".mapsdk-pick-notice-text")).not.toBeNull());
+		const text = host.querySelector<HTMLElement>(".mapsdk-pick-notice-text")!;
+		expect(text.getBoundingClientRect().width).toBeGreaterThan(300);
+		expect(text.getBoundingClientRect().width).toBeLessThanOrEqual(600 - 32);
+	});
+});

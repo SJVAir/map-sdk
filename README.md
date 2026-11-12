@@ -603,7 +603,7 @@ local sjvair.com stack at `http://localhost:8000`.
   reaches the map through MapLibre's box zoom for these plugins; Shift-drag still zooms to a box.
 - **Refuse a pick before it shows.** `canSelect(next, ref)` returns `true` or a message: a refused
   pick changes nothing and calls no `onselectionchange`, and the map shows and announces the
-  message for 4 s (`map.notice`).
+  message for 4 s (`map.notice`). An empty message refuses quietly.
 - **The feature list's Shift+Enter now picks additively**, as Shift-click on a row does (Enter
   alone replaces, Space adds or removes, as before). This applies with any `pickWith`.
 - **New API:** `pickWith`, `canSelect`, `MapContext.togglePick`, `getPickWith`, `notice`,

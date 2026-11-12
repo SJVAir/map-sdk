@@ -146,6 +146,7 @@ export class InteractionRouter {
 		gl.on("click", this.#onClick);
 		gl.on("mousemove", this.#onMove);
 		gl.on("mouseout", this.#onOut);
+		gl.on("boxzoomstart", this.#onBoxZoomStart);
 		gl.on("boxzoomcancel", this.#onBoxZoomCancel);
 		this.#canvas = gl.getCanvas();
 		this.#canvas.addEventListener("pointerdown", this.#onPointerDown);
@@ -158,7 +159,9 @@ export class InteractionRouter {
 		gl.off("click", this.#onClick);
 		gl.off("mousemove", this.#onMove);
 		gl.off("mouseout", this.#onOut);
+		gl.off("boxzoomstart", this.#onBoxZoomStart);
 		gl.off("boxzoomcancel", this.#onBoxZoomCancel);
+		this.#boxDrawn = false;
 		this.#canvas?.removeEventListener("pointerdown", this.#onPointerDown);
 		this.#setPointer(false);
 		this.#canvas = null;
@@ -320,7 +323,17 @@ export class InteractionRouter {
 	 * fires `boxzoomcancel`. A release with a pointer position is reported as a Shift-click
 	 * (`boxZoom: true`) to the pick handlers only: no miss, no blocking layer's click.
 	 */
+	/** A box was drawn since the Shift press: its cancel is a drag back to the start, not a click. */
+	#boxDrawn = false;
+
+	#onBoxZoomStart = () => {
+		this.#boxDrawn = true;
+	};
+
 	#onBoxZoomCancel = (e: { originalEvent?: unknown }) => {
+		const drawn = this.#boxDrawn;
+		this.#boxDrawn = false;
+		if (drawn) return;
 		const o = e.originalEvent as
 			| {
 					clientX?: number;
@@ -332,8 +345,7 @@ export class InteractionRouter {
 			| undefined;
 		const gl = this.#gl;
 		if (!gl || typeof o?.clientX !== "number" || typeof o.clientY !== "number") return;
-		const rect = this.#canvas?.getBoundingClientRect?.() ?? { left: 0, top: 0 };
-		const point: [number, number] = [o.clientX - rect.left, o.clientY - rect.top];
+		const point = this.#canvasPoint(o.clientX, o.clientY);
 		const found = this.#lookup(point);
 		if (found.blockedBy || found.hits.length === 0) return;
 		const { lng, lat } = gl.unproject(point);
@@ -353,6 +365,19 @@ export class InteractionRouter {
 			}
 		}
 	};
+
+	/** A page position as a canvas pixel, as MapLibre's `DOM.mousePos` does (CSS scale included). */
+	#canvasPoint(clientX: number, clientY: number): [number, number] {
+		const canvas = this.#canvas;
+		const rect = canvas?.getBoundingClientRect?.();
+		if (!canvas || !rect) return [clientX, clientY];
+		const scaleX = canvas.offsetWidth ? rect.width / canvas.offsetWidth : 1;
+		const scaleY = canvas.offsetHeight ? rect.height / canvas.offsetHeight : 1;
+		return [
+			(clientX - rect.left) / scaleX - (canvas.clientLeft || 0),
+			(clientY - rect.top) / scaleY - (canvas.clientTop || 0)
+		];
+	}
 
 	#onMove = (e: PointerEventLike) => {
 		const found = this.#lookup([e.point.x, e.point.y], true);

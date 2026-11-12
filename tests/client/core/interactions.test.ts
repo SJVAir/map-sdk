@@ -1100,6 +1100,13 @@ describe("modifier mode and refusals", () => {
 		expect(map.notice).toBeNull();
 	});
 
+	it("canSelect returning an empty message refuses quietly", async () => {
+		const { map, clickOn } = await modSetUp("multiple", { canSelect: () => "" });
+		clickOn("a", { shiftKey: true });
+		expect(ids(map)).toBeNull();
+		expect(map.notice).toBeNull();
+	});
+
 	it("canSelect that throws refuses quietly and logs", async () => {
 		const error = vi.spyOn(console, "error").mockImplementation(() => {});
 		const { map, clickOn } = await modSetUp("multiple", {
@@ -1199,6 +1206,30 @@ describe("Shift-click through MapLibre's box zoom", () => {
 		expect(map.getSelection("monitors")).toBeNull();
 		expect(featureclick).not.toHaveBeenCalled();
 		expect(map.pinned).toBeNull();
+	});
+
+	it("ignores a Shift-drag that drew a box and came back to its start", async () => {
+		const { map, gl } = await boxSetUp("modifier");
+		gl.emit("boxzoomstart", {});
+		shiftRelease(gl);
+		expect(map.getSelection("monitors")).toBeNull();
+		shiftRelease(gl);
+		expect(map.getSelection("monitors")?.ids).toEqual(["a"]);
+	});
+
+	it("measures the point like MapLibre, under a CSS scale on the map", async () => {
+		const { map, gl } = await boxSetUp("modifier");
+		// Drawn at twice its layout size (a scale(2) ancestor), 4px from the page's corner.
+		Object.assign(gl.canvas, {
+			getBoundingClientRect: () => ({ left: 4, top: 4, width: 200, height: 200 }),
+			offsetWidth: 100,
+			offsetHeight: 100,
+			clientLeft: 0,
+			clientTop: 0
+		});
+		shiftRelease(gl);
+		// clientX 10, clientY 20 → ((10 - 4) / 2, (20 - 4) / 2); the fake's unproject echoes it.
+		expect(map.pinned?.lngLat).toEqual([3, 8]);
 	});
 
 	it("ignores a boxzoomcancel from Esc, which has no pointer position", async () => {

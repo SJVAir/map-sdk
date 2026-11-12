@@ -833,7 +833,10 @@ class MapContextImpl implements MapContext {
 				return;
 			}
 			if (verdict !== true) {
-				this.#notice = { message: String(verdict), id: ++this.#noticeCount };
+				// An empty (or, from untyped JS, false) verdict refuses quietly.
+				if (typeof verdict === "string" && verdict !== "") {
+					this.#notice = { message: verdict, id: ++this.#noticeCount };
+				}
 				return;
 			}
 		}
