@@ -146,6 +146,7 @@ export class InteractionRouter {
 		gl.on("click", this.#onClick);
 		gl.on("mousemove", this.#onMove);
 		gl.on("mouseout", this.#onOut);
+		gl.on("boxzoomcancel", this.#onBoxZoomCancel);
 		this.#canvas = gl.getCanvas();
 		this.#canvas.addEventListener("pointerdown", this.#onPointerDown);
 	}
@@ -157,6 +158,7 @@ export class InteractionRouter {
 		gl.off("click", this.#onClick);
 		gl.off("mousemove", this.#onMove);
 		gl.off("mouseout", this.#onOut);
+		gl.off("boxzoomcancel", this.#onBoxZoomCancel);
 		this.#canvas?.removeEventListener("pointerdown", this.#onPointerDown);
 		this.#setPointer(false);
 		this.#canvas = null;
@@ -303,6 +305,45 @@ export class InteractionRouter {
 			modifier,
 			touch,
 			lngLat: [e.lngLat.lng, e.lngLat.lat]
+		};
+		for (const handler of [...this.#pickHandlers]) {
+			try {
+				handler(event);
+			} catch (error) {
+				console.error("map-sdk: a pick handler failed", error);
+			}
+		}
+	};
+
+	/**
+	 * MapLibre's box zoom starts on a Shift press and, released in place, suppresses the click and
+	 * fires `boxzoomcancel`. A release with a pointer position is reported as a Shift-click
+	 * (`boxZoom: true`) to the pick handlers only: no miss, no blocking layer's click.
+	 */
+	#onBoxZoomCancel = (e: { originalEvent?: unknown }) => {
+		const o = e.originalEvent as
+			| {
+					clientX?: number;
+					clientY?: number;
+					shiftKey?: boolean;
+					metaKey?: boolean;
+					ctrlKey?: boolean;
+			  }
+			| undefined;
+		const gl = this.#gl;
+		if (!gl || typeof o?.clientX !== "number" || typeof o.clientY !== "number") return;
+		const rect = this.#canvas?.getBoundingClientRect?.() ?? { left: 0, top: 0 };
+		const point: [number, number] = [o.clientX - rect.left, o.clientY - rect.top];
+		const found = this.#lookup(point);
+		if (found.blockedBy || found.hits.length === 0) return;
+		const { lng, lat } = gl.unproject(point);
+		const event: ClickEvent = {
+			hits: found.hits,
+			additive: true,
+			modifier: true,
+			touch: false,
+			boxZoom: true,
+			lngLat: [lng, lat]
 		};
 		for (const handler of [...this.#pickHandlers]) {
 			try {

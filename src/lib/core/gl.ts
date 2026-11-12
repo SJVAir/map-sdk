@@ -70,6 +70,8 @@ export interface GlMapLike {
 	}): void;
 	/** Canvas pixel for a position. */
 	project(lngLat: [number, number]): { x: number; y: number };
+	/** Position at a canvas pixel. */
+	unproject(point: [number, number]): { lng: number; lat: number };
 	getCanvas(): HTMLCanvasElement;
 	remove(): void;
 }

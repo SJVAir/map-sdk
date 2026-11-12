@@ -106,6 +106,11 @@ export interface ClickEvent {
 	modifier: boolean;
 	/** A touch tap. */
 	touch: boolean;
+	/**
+	 * A Shift-click that MapLibre's box zoom swallowed (it fires `boxzoomcancel` instead of
+	 * `click`). Only `"modifier"` mode acts on it, so other maps behave as before.
+	 */
+	boxZoom?: boolean;
 	lngLat: [number, number];
 }
 

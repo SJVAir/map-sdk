@@ -1163,3 +1163,47 @@ function listed(id: string): FeatureListItem {
 		selectable: true
 	};
 }
+
+describe("Shift-click through MapLibre's box zoom", () => {
+	/** MapLibre turns a Shift press and release in place into `boxzoomcancel`, with no click. */
+	function shiftRelease(gl: FakeGl) {
+		gl.emit("boxzoomcancel", {
+			originalEvent: { type: "mouseup", button: 0, shiftKey: true, clientX: 10, clientY: 20 }
+		});
+	}
+
+	async function boxSetUp(pickWith: "click" | "modifier") {
+		const map = createMap({ config });
+		map.addPlugin(points("monitors"), { selectionMode: "multiple", pickWith });
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		map.setCardEnabled(true);
+		gl.setRenderedFeatures([rendered(map, "monitors", "a")]);
+		const featureclick = vi.fn();
+		map.on("featureclick", featureclick);
+		return { map, gl, featureclick };
+	}
+
+	it("picks as a Shift-click in modifier mode", async () => {
+		const { map, gl, featureclick } = await boxSetUp("modifier");
+		shiftRelease(gl);
+		expect(map.getSelection("monitors")?.ids).toEqual(["a"]);
+		expect(featureclick).toHaveBeenCalledTimes(1);
+		expect(map.pinned?.hit.refKey).toBe("monitor:a");
+	});
+
+	it("is ignored in click mode, as before", async () => {
+		const { map, gl, featureclick } = await boxSetUp("click");
+		shiftRelease(gl);
+		expect(map.getSelection("monitors")).toBeNull();
+		expect(featureclick).not.toHaveBeenCalled();
+		expect(map.pinned).toBeNull();
+	});
+
+	it("ignores a boxzoomcancel from Esc, which has no pointer position", async () => {
+		const { map, gl } = await boxSetUp("modifier");
+		gl.emit("boxzoomcancel", { originalEvent: { type: "keydown", key: "Escape" } });
+		expect(map.getSelection("monitors")).toBeNull();
+	});
+});

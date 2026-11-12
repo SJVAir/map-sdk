@@ -776,6 +776,10 @@ class MapContextImpl implements MapContext {
 		if (this.#destroyed) return;
 		const [hit] = e.hits;
 		const { pluginId, ref } = hit;
+		// A box-zoom Shift-click only counts for a plugin that asked for modifier picks.
+		if (e.boxZoom && untrack(() => this.#selections.get(pluginId)?.pickWith) !== "modifier") {
+			return;
+		}
 		this.#emitClick(pluginId, ref, e.lngLat);
 		this.#applyPick(pluginId, ref, { additive: e.additive, modifier: e.modifier });
 		if (!this.#cardEnabled || this.#destroyed) return;

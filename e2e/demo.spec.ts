@@ -71,7 +71,8 @@ type DemoMap = "left" | "right" | "today";
 interface DemoContext {
 	ready: boolean;
 	plugins: Array<{ id: string }>;
-	getSelection(id: string): unknown;
+	getSelection(id: string): { ids: string[] } | null;
+	setSelection(id: string, selection: { kind: "monitors"; ids: string[] } | null): void;
 	gl: {
 		getCanvas(): HTMLCanvasElement;
 		project(at: [number, number]): { x: number; y: number };
@@ -124,6 +125,14 @@ async function clickMonitor(page: Page, map: DemoMap, lngLat: [number, number]) 
 	const { x, y } = await monitorPoint(page, map, lngLat);
 	await page.mouse.move(x, y);
 	await page.mouse.click(x, y);
+}
+
+/** The Live map's monitors selection ids, or null. */
+async function liveSelection(page: Page): Promise<string[] | null> {
+	return page.evaluate(() => {
+		const demo = (window as unknown as { __mapsdkDemo: Record<string, DemoContext> }).__mapsdkDemo;
+		return demo.right.getSelection("monitors")?.ids ?? null;
+	});
 }
 
 /** The Live map's pinned card for Fixture Alpha. */
@@ -458,7 +467,7 @@ test("pinned card: Close closes it and the selection is unchanged", async ({ pag
 	expect(await selections()).toBe(before);
 });
 
-test("pinned card, keyboard: a list row shows it; Tab reaches Close; Escape returns to the row", async ({
+test("pinned card, keyboard: a list row shows it; Tab reaches it; Escape returns to the row", async ({
 	page
 }) => {
 	const list = await openList(rightMap(page));
@@ -467,8 +476,9 @@ test("pinned card, keyboard: a list row shows it; Tab reaches Close; Escape retu
 	// Sorted by name, so the first row is Fixture Alpha.
 	const rowCard = card(page);
 	await expect(rowCard).toBeVisible();
+	// The card's first control: the host's Select on the Live map, then Close.
 	await page.keyboard.press("Tab");
-	await expect(rowCard.getByRole("button", { name: "Close" })).toBeFocused();
+	await expect(rowCard.getByRole("button", { name: "Select" })).toBeFocused();
 	await page.keyboard.press("Escape");
 	await expect(rowCard).toHaveCount(0);
 	await expect(list).toBeFocused();
@@ -478,4 +488,64 @@ test("the monitor-map setup map doesn't pin on click", async ({ page }) => {
 	await zoomTo(page, "today", ALPHA_LNGLAT);
 	await clickMonitor(page, "today", ALPHA_LNGLAT);
 	await expect(todayMap(page).getByRole("group", { name: /Fixture Alpha/ })).toHaveCount(0);
+});
+
+test("modifier: a plain click pins and selects nothing", async ({ page }) => {
+	await zoomTo(page, "right", ALPHA_LNGLAT);
+	await clickMonitor(page, "right", ALPHA_LNGLAT);
+	await expect(card(page)).toBeVisible();
+	expect(await liveSelection(page)).toBeNull();
+});
+
+test("modifier: Shift-click selects, Shift-click again removes", async ({ page }) => {
+	await zoomTo(page, "right", ALPHA_LNGLAT);
+	const { x, y } = await monitorPoint(page, "right", ALPHA_LNGLAT);
+	await page.keyboard.down("Shift");
+	await page.mouse.click(x, y);
+	await page.keyboard.up("Shift");
+	await expect.poll(() => liveSelection(page)).toEqual([ALPHA]);
+	await page.keyboard.down("Shift");
+	await page.mouse.click(x, y);
+	await page.keyboard.up("Shift");
+	await expect.poll(() => liveSelection(page)).toBeNull();
+});
+
+test("modifier: the card's Select and Remove", async ({ page }) => {
+	await zoomTo(page, "right", ALPHA_LNGLAT);
+	await clickMonitor(page, "right", ALPHA_LNGLAT);
+	await card(page).getByRole("button", { name: "Select" }).click();
+	await expect.poll(() => liveSelection(page)).toEqual([ALPHA]);
+	await card(page).getByRole("button", { name: "Remove" }).click();
+	await expect.poll(() => liveSelection(page)).toBeNull();
+	await expect(card(page)).toBeVisible();
+});
+
+test.describe("modifier, touch", () => {
+	test.use({ hasTouch: true });
+
+	test("a tap pins only; the card's Select selects", async ({ page }) => {
+		await zoomTo(page, "right", ALPHA_LNGLAT);
+		const { x, y } = await monitorPoint(page, "right", ALPHA_LNGLAT);
+		await page.touchscreen.tap(x, y);
+		await expect(card(page)).toBeVisible();
+		expect(await liveSelection(page)).toBeNull();
+		await card(page).getByRole("button", { name: "Select" }).tap();
+		await expect.poll(() => liveSelection(page)).toEqual([ALPHA]);
+	});
+});
+
+test("a pick past the cap is refused with an announced message", async ({ page }) => {
+	await zoomTo(page, "right", ALPHA_LNGLAT);
+	await page.evaluate(() => {
+		const demo = (window as unknown as { __mapsdkDemo: Record<string, DemoContext> }).__mapsdkDemo;
+		demo.right.setSelection("monitors", { kind: "monitors", ids: ["x1", "x2", "x3"] });
+	});
+	const { x, y } = await monitorPoint(page, "right", ALPHA_LNGLAT);
+	await page.keyboard.down("Shift");
+	await page.mouse.click(x, y);
+	await page.keyboard.up("Shift");
+	await expect(
+		rightMap(page).getByRole("status").filter({ hasText: "Up to 3 monitors" })
+	).toBeVisible();
+	expect(await liveSelection(page)).toEqual(["x1", "x2", "x3"]);
 });
