@@ -1,6 +1,7 @@
 import type { Feature, FeatureCollection } from "geojson";
 import { untrack } from "svelte";
-import type { MapPlugin, PluginContext } from "../core/plugin.js";
+import type { FeatureListItem, MapPlugin, PluginContext } from "../core/plugin.js";
+import { NO_LEVEL } from "../data/scale.js";
 import { hitFromProps } from "../plugins/shared.js";
 import { themeColors } from "../plugins/style.js";
 import { assertFocusGeometry, worldMask, type FocusGeometry } from "./focus-geometry.js";
@@ -171,8 +172,28 @@ export function focusAreaPlugin(options: FocusAreaPluginOptions): FocusAreaPlugi
 		return () => {};
 	}
 
+	function features(): FeatureListItem[] {
+		const { geometry, label } = focus;
+		if (geometry?.type !== "Point") return [];
+		const [lng, lat] = geometry.coordinates;
+		return [
+			{
+				refKey,
+				ref: { kind: "feature", id: pluginId },
+				name: label ?? layerLabel,
+				value: null,
+				level: NO_LEVEL,
+				units: "",
+				lngLat: [lng, lat],
+				selectable: false,
+				noReading: true
+			}
+		];
+	}
+
 	return {
 		id: pluginId,
+		features,
 		label: layerLabel,
 		selectable: false,
 		setup,

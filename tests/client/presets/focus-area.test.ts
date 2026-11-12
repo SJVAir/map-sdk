@@ -8,6 +8,7 @@ import { PluginHost } from "../../../src/lib/core/plugin-host.svelte.js";
 import type { FormatProvider } from "../../../src/lib/data/format.js";
 import { defaultMessages } from "../../../src/lib/data/messages.js";
 import type { MetadataProvider } from "../../../src/lib/data/metadata.js";
+import { NO_LEVEL } from "../../../src/lib/data/scale.js";
 import { FALLBACK_THEME_COLORS } from "../../../src/lib/plugins/style.js";
 import {
 	focusAreaPlugin,
@@ -261,5 +262,34 @@ describe("focusAreaPlugin", () => {
 	it("is never selectable", async () => {
 		const { plugin } = await setup({ geometry: SPOT });
 		expect(plugin.selectable).toBe(false);
+	});
+
+	it("lists a point once, by its label, with no reading", async () => {
+		const { plugin } = await setup({ geometry: SPOT, label: "Your location" });
+		expect(plugin.features!()).toEqual([
+			{
+				refKey: "feature:focus",
+				ref: { kind: "feature", id: "focus" },
+				name: "Your location",
+				value: null,
+				level: NO_LEVEL,
+				units: "",
+				lngLat: [-119.5, 36.5],
+				selectable: false,
+				noReading: true
+			}
+		]);
+	});
+
+	it("lists an unlabelled point by its layer name", async () => {
+		const { plugin } = await setup({ geometry: SPOT });
+		expect(plugin.features!()[0].name).toBe("Places");
+	});
+
+	it("lists nothing for an area or no focus", async () => {
+		const { plugin } = await setup({ geometry: AREA });
+		expect(plugin.features!()).toEqual([]);
+		plugin.set({ geometry: null });
+		expect(plugin.features!()).toEqual([]);
 	});
 });

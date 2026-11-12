@@ -94,11 +94,13 @@ export function typeaheadIndex(items: FeatureListItem[], query: string, from: nu
 
 /**
  * What stands in an item's level place: its level's label, else its `detail`, else "No level".
+ * Nothing (`"omit"`) for a place with no reading.
  */
 export function levelText(
 	item: FeatureListItem,
 	messages: MessageProvider
-): { kind: "level" | "detail" | "none"; text: string } {
+): { kind: "level" | "detail" | "none" | "omit"; text: string } {
+	if (item.noReading) return { kind: "omit", text: "" };
 	const level = shownLevel(item);
 	if (level) return { kind: "level", text: level.label };
 	const detail = item.detail?.trim();
@@ -112,6 +114,7 @@ export function rowLabel(
 	messages: MessageProvider,
 	format: FormatProvider
 ): string {
+	if (item.noReading) return item.name;
 	const level = levelText(item, messages);
 	const value = shownValue(item, format);
 	if (value === null) {

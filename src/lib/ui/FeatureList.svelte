@@ -357,7 +357,7 @@
 						{value ?? ""}{#if row.units && value !== null}&nbsp;{row.units}{/if}
 					</span>
 					<span class="mapsdk-list-level text-xs">
-						{#if levelPlace.kind !== "detail"}
+						{#if levelPlace.kind === "level" || levelPlace.kind === "none"}
 							<span
 								class="mapsdk-list-swatch"
 								class:neutral={!level?.color}

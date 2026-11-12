@@ -82,6 +82,11 @@ export interface FeatureListItem {
 	 * when the item has a level.
 	 */
 	detail?: string;
+	/**
+	 * A place with no reading (a focus point): its row, accessible name, and tooltip show its name
+	 * alone, with no value, level, or "No level". Default false.
+	 */
+	noReading?: boolean;
 }
 
 export type LegendData =
