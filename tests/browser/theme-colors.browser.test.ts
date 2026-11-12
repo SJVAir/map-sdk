@@ -11,18 +11,17 @@ function container(vars: Record<string, string>): HTMLElement {
 	return el;
 }
 
-describe("focus-area theme colors", () => {
-	it("fall back to --foreground and --background", () => {
+describe("focus-area colors", () => {
+	it("stay fixed whatever the theme's --foreground and --background", () => {
 		const colors = themeColors(
 			container({ "--foreground": "rgb(11, 22, 33)", "--background": "rgb(4, 5, 6)" })
 		);
-		expect(colors.focusArea).toBe("rgba(11, 22, 33, 1)");
-		expect(colors.focusAreaCasing).toBe("rgba(4, 5, 6, 1)");
-		expect(colors.focusAreaWash).toBe("rgba(4, 5, 6, 1)");
-		expect(colors.background).toBe("rgba(4, 5, 6, 1)");
+		expect(colors.focusArea).toBe("#1f2d3d");
+		expect(colors.focusAreaCasing).toBe("#ffffff");
+		expect(colors.focusAreaWash).toBe("#ffffff");
 	});
 
-	it("read their own tokens first", () => {
+	it("take a host's token overrides", () => {
 		const colors = themeColors(
 			container({
 				"--foreground": "rgb(11, 22, 33)",

@@ -200,16 +200,21 @@ Part 1 must be designed so part 2 adds the buttons without a breaking change.
     a place.
   - **Color:** the ring's stroke is `--focus-area`, not `--highlight`: a `--highlight` ring is
     what a selected monitor looks like with `selectedStyle: "ring"`.
-- **Colors follow the theme** (the user, 2026-11-11), through three new family tokens:
+- **Fixed colors, with tokens as overrides** (the user, 2026-11-11, replacing "colors follow the
+  theme"). The dashboard's map no longer follows the dashboard's theme, and its basemap variant is
+  the person's choice, so neither the theme nor the basemap can pick these colors (basemap and
+  variant names don't say whether a style is dark). The two-tone line and the white wash read on
+  any basemap, as on sjvair.com's explorers. The line is the explorers' county-line slate, not
+  their orange `#d35400`, which would sit beside the AQI's orange and the fire markers. A fixed-color
+  exception like the inactive-monitor grey:
 
-  | Token                 | Falls back to                        | Used for                    |
-  | --------------------- | ------------------------------------ | --------------------------- |
-  | `--focus-area`        | `--foreground`                       | The line and the point ring |
-  | `--focus-area-casing` | `--background`                       | The casing under the line   |
-  | `--focus-area-wash`   | `--background`                       | The surround                |
+  | Token                 | Default (no fallback to other tokens) | Used for                            |
+  | --------------------- | ------------------------------------- | ----------------------------------- |
+  | `--focus-area`        | `#1f2d3d`                             | The line, the point ring, the label |
+  | `--focus-area-casing` | `#ffffff`                             | The casing and the label's halo     |
+  | `--focus-area-wash`   | `#ffffff`                             | The surround                        |
 
-  Not `--primary`: `--highlight` (selection) already falls back to it, so a focus area would look
-  like a selection.
+  Not `--primary` or `--highlight` either way: a focus area must not look like a selection.
 
 ### From sjvair.com (`assets/js/pesticides/section-map.js`, `assets/js/emissions/facility-map.js`)
 
@@ -231,8 +236,8 @@ These are the starting values. The builder may tune them, and says so in the PR.
   above), never selectable. Hosts add it at the bottom of the draw order (or `before` the first
   data plugin); the docs say so. The builder may make it a `MapContext` method instead if that
   fits the draw-order rules better; either way it lives in the registry like any plugin.
-- **The label** of a point is the host's text, drawn beside the ring in `--foreground` with a
-  `--background` halo. The builder picks a GL symbol layer (stays under the interactive layers) or
+- **The label** of a point is the host's text, drawn beside the ring in the `--focus-area` color
+  with a `--focus-area-casing` halo. The builder picks a GL symbol layer (stays under the interactive layers) or
   a DOM overlay.
 - **The point's label replaces the dashboard's own pin** (the user, 2026-11-11, through the
   coordinator). The widget's spec 1 labels its pin ("Your location", "Shared location", or a
@@ -243,7 +248,8 @@ These are the starting values. The builder may tune them, and says so in the PR.
   place (a host option); and kept across detach and remount (`active` off and on, a basemap or
   theme change). Read that file before building part 3.
 - Polygon and MultiPolygon geometries, and Point. Anything else throws a clear error.
-- It reads colors with `themeColors` and re-reads them on a theme change like the other plugins.
+- It reads colors with `themeColors` and re-reads them on a theme change like the other plugins, so
+  a host's token overrides apply.
 - With `projection` set to globe, the world polygon must still cover the visible earth. The
   builder checks this in the demo.
 

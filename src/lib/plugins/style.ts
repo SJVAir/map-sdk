@@ -16,13 +16,14 @@ export interface ThemeColors {
 	foreground: string;
 	/** Markers drawn muted by default (see `icon.mutedColor`): `--muted-foreground`. */
 	mutedForeground: string;
-	/** Text halos on the map: `--background`. */
-	background: string;
-	/** The focus area's line and point ring: `--focus-area`, else `--foreground`. */
+	/**
+	 * The focus area's line, point ring, and label: `--focus-area`, else a fixed slate. Fixed, not
+	 * the theme's: the basemap under it doesn't follow the theme.
+	 */
 	focusArea: string;
-	/** The casing under the focus area's line and ring: `--focus-area-casing`, else `--background`. */
+	/** The casing under the line and ring, and the label's halo: `--focus-area-casing`, else white. */
 	focusAreaCasing: string;
-	/** The wash outside a focus area: `--focus-area-wash`, else `--background`. */
+	/** The wash outside a focus area: `--focus-area-wash`, else white. */
 	focusAreaWash: string;
 }
 
@@ -36,8 +37,11 @@ export const FALLBACK_THEME_COLORS: Readonly<ThemeColors> = {
 	highlightForeground: "#ffffff",
 	foreground: "#111827",
 	mutedForeground: "#6b7280",
-	background: "#ffffff",
-	focusArea: "#111827",
+	// The user's decision (2026-11-11), an exception to the theme-token rule: the focus area's
+	// colors are fixed (sjvair.com's explorers' white casing and wash, their county-line slate),
+	// since they sit on a basemap that doesn't follow the theme. Hosts override them with the
+	// `--focus-area*` tokens.
+	focusArea: "#1f2d3d",
 	focusAreaCasing: "#ffffff",
 	focusAreaWash: "#ffffff"
 };
@@ -48,10 +52,9 @@ const THEME_TOKENS: Record<keyof ThemeColors, string[]> = {
 	highlightForeground: ["--highlight-foreground", "--primary-foreground"],
 	foreground: ["--foreground"],
 	mutedForeground: ["--muted-foreground"],
-	background: ["--background"],
-	focusArea: ["--focus-area", "--foreground"],
-	focusAreaCasing: ["--focus-area-casing", "--background"],
-	focusAreaWash: ["--focus-area-wash", "--background"]
+	focusArea: ["--focus-area"],
+	focusAreaCasing: ["--focus-area-casing"],
+	focusAreaWash: ["--focus-area-wash"]
 };
 
 /**

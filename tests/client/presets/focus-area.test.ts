@@ -137,8 +137,8 @@ describe("focusAreaPlugin", () => {
 			"text-ignore-placement": true
 		});
 		expect(layer(gl, "label").paint).toEqual({
-			"text-color": c.foreground,
-			"text-halo-color": c.background,
+			"text-color": c.focusArea,
+			"text-halo-color": c.focusAreaCasing,
 			"text-halo-width": 2
 		});
 		expect(data(gl, "point").features).toEqual([

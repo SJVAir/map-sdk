@@ -60,8 +60,9 @@ const feature = (
  * whose click pins a card with the label alone; it is never selectable.
  *
  * Add it first (or `before` the first data plugin), so the data draws over it. Change the focus
- * with `set`, which keeps the plugin and its draw-order slot. The colors are the
- * `--focus-area`, `--focus-area-casing`, and `--focus-area-wash` tokens. The label is drawn on
+ * with `set`, which keeps the plugin and its draw-order slot. The colors are fixed (a slate line
+ * on a white casing, a white wash), so they read on any basemap whatever the page's theme; set
+ * the `--focus-area`, `--focus-area-casing`, and `--focus-area-wash` tokens to change them. The label is drawn on
  * the map's canvas, so screen readers hear the list row instead; a map with no feature list
  * should name the place in `MapView`'s `label`.
  */
@@ -144,8 +145,8 @@ export function focusAreaPlugin(options: FocusAreaPluginOptions): FocusAreaPlugi
 				"text-ignore-placement": true
 			},
 			paint: {
-				"text-color": theme.foreground,
-				"text-halo-color": theme.background,
+				"text-color": theme.focusArea,
+				"text-halo-color": theme.focusAreaCasing,
 				"text-halo-width": LABEL_HALO
 			}
 		});

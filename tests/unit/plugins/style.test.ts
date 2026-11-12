@@ -216,19 +216,18 @@ describe("hasNumericValue", () => {
 	});
 });
 
-describe("focus-area theme colors", () => {
-	it("fall back to the text and page colors", () => {
-		expect(FALLBACK_THEME_COLORS.focusArea).toBe("#111827");
+describe("focus-area colors", () => {
+	it("default to fixed colors (the user's exception, 2026-11-11)", () => {
+		expect(FALLBACK_THEME_COLORS.focusArea).toBe("#1f2d3d");
 		expect(FALLBACK_THEME_COLORS.focusAreaCasing).toBe("#ffffff");
 		expect(FALLBACK_THEME_COLORS.focusAreaWash).toBe("#ffffff");
-		expect(FALLBACK_THEME_COLORS.background).toBe("#ffffff");
+		expect("background" in FALLBACK_THEME_COLORS).toBe(false);
 	});
 
-	it("are the fallbacks with no container", () => {
+	it("are the defaults with no container", () => {
 		const colors = themeColors(null);
-		expect(colors.focusArea).toBe("#111827");
+		expect(colors.focusArea).toBe("#1f2d3d");
 		expect(colors.focusAreaCasing).toBe("#ffffff");
 		expect(colors.focusAreaWash).toBe("#ffffff");
-		expect(colors.background).toBe("#ffffff");
 	});
 });
