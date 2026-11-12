@@ -101,6 +101,15 @@ export type LegendData =
 			 */
 			display?: "gradient" | "blocks";
 	  }
+	| {
+			pluginId: string;
+			title: string;
+			/**
+			 * One entry per kind of marker: decorative inline SVG (map-sdk's own presets' trusted
+			 * markup, never host text) beside its label.
+			 */
+			symbols: Array<{ label: string; markup: string }>;
+	  }
 	| { pluginId: string; status: DataStatus };
 
 export interface ClickEvent {

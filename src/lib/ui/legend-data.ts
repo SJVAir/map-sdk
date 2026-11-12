@@ -19,6 +19,12 @@ export interface LegendSection {
 
 export type LegendEntry =
 	| { kind: "scale"; section: LegendSection }
+	| {
+			kind: "symbols";
+			pluginId: string;
+			title: string;
+			symbols: Array<{ label: string; markup: string }>;
+	  }
 	| { kind: "status"; pluginId: string; layer: string; status: DataStatus };
 
 /** One legend section from a plugin's legend data; null for status-only data or no levels. */

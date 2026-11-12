@@ -413,3 +413,54 @@ describe("Legend framed={false}", () => {
 		expect(getComputedStyle(legend()).borderTopWidth).toBe("1px");
 	});
 });
+
+describe("symbol legends", () => {
+	const SVG =
+		'<svg width="16" height="16" aria-hidden="true" focusable="false"><rect width="16" height="16"/></svg>';
+	const symbolMap = fakeMap([
+		{
+			id: "schools",
+			legend: () => ({
+				pluginId: "schools",
+				title: "Schools",
+				symbols: [
+					{ label: "Public school", markup: SVG },
+					{ label: "Child care", markup: SVG }
+				]
+			})
+		},
+		{
+			id: "points",
+			legend: () => ({ pluginId: "points", title: "PM2.5", units: "µg/m³", scale: pm25Scale })
+		}
+	]);
+
+	it("lists each symbol with its label under the section title", async () => {
+		render(Legend, { map: symbolMap });
+		const section = page.getByRole("list", { name: "Schools" });
+		await expect.element(section).toBeInTheDocument();
+		const items = section.getByRole("listitem").elements();
+		expect(items.map((li) => li.textContent?.trim())).toEqual(["Public school", "Child care"]);
+		for (const li of items) expect(li.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(1);
+		await expect.element(page.getByRole("heading", { name: "Schools" })).toBeInTheDocument();
+	});
+
+	it("orders symbol sections with the others, top-first reversed", async () => {
+		render(Legend, { map: symbolMap, order: "top-first" });
+		await expect.element(page.getByRole("heading", { name: "Schools" })).toBeInTheDocument();
+		const headings = page
+			.getByRole("heading")
+			.elements()
+			.map((h) => h.textContent?.replace(/\s+/g, " ").trim());
+		expect(headings[0]).toMatch(/^PM2\.5/);
+		expect(headings[1]).toBe("Schools");
+	});
+
+	it("has no axe violations", async () => {
+		applyTheme("light");
+		render(Legend, { map: symbolMap });
+		await expect.element(page.getByRole("list", { name: "Schools" })).toBeInTheDocument();
+		const result = await axe.run(document.querySelector(".mapsdk-legend")!);
+		expect(result.violations).toEqual([]);
+	});
+});
