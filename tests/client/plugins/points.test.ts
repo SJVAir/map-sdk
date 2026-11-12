@@ -81,6 +81,11 @@ const ROWS: Props[] = [
 	{ refKey: "monitor:b", name: "Bravo", value: 40 }
 ];
 
+const stops: Array<() => void> = [];
+afterEach(() => {
+	for (const stop of stops.splice(0)) stop();
+});
+
 let errorSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
 	errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -883,5 +888,68 @@ describe("a real marksPlaces plugin and a focus point", () => {
 		expect(focus.features!()).toHaveLength(1);
 		host.remove("pts");
 		expect(focus.features!()).toHaveLength(1);
+	});
+});
+
+describe("a focus point under a marker, reactively", () => {
+	const AT: [number, number] = [-119.5, 36.5];
+	const rendered = {
+		layer: { id: "m1:pts:points" },
+		source: "m1:pts:points",
+		properties: { refKey: "feature:s" },
+		geometry: { type: "Point" as const, coordinates: AT }
+	};
+
+	async function focusFirst() {
+		const { host, gl } = await setup({
+			source: new TestSource<Props>({ features: points<Props>([]), scale: pm25Scale })
+		});
+		host.remove("pts");
+		const focus = focusAreaPlugin({
+			id: "focus",
+			layerLabel: "Places",
+			geometry: { type: "Point", coordinates: AT }
+		});
+		host.add(focus);
+		await settle();
+		const lengths: number[] = [];
+		stops.push(rootEffect(() => lengths.push(focus.features!().length)));
+		flushSync();
+		return { host, gl, lengths };
+	}
+
+	const marked = () =>
+		pointsPlugin<Props>({
+			id: "schools",
+			layerLabel: "Schools",
+			marksPlaces: true,
+			source: new TestSource<Props>({
+				features: points<Props>([{ refKey: "feature:s", name: "S", value: null, lngLat: AT }]),
+				scale: pm25Scale
+			})
+		});
+
+	it("drops the row when the marker's plugin is added at a still view", async () => {
+		const { host, gl, lengths } = await focusFirst();
+		host.add(marked());
+		await settle();
+		gl.setRenderedFeatures([{ ...rendered, layer: { id: "m1:schools:points" } }]);
+		gl.emit("idle", {});
+		flushSync();
+		expect(lengths.at(-1)).toBe(0);
+	});
+
+	it("drops the row again after a restyle at a still view", async () => {
+		const { host, gl, lengths } = await focusFirst();
+		host.add(marked());
+		await settle();
+		gl.setRenderedFeatures([{ ...rendered, layer: { id: "m1:schools:points" } }]);
+		gl.emit("idle", {});
+		flushSync();
+		host.restyle(true);
+		await settle();
+		gl.emit("idle", {});
+		flushSync();
+		expect(lengths.at(-1)).toBe(0);
 	});
 });

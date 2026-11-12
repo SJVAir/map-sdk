@@ -464,3 +464,28 @@ describe("symbol legends", () => {
 		expect(result.violations).toEqual([]);
 	});
 });
+
+describe("symbol legends with equal labels", () => {
+	it("renders both rows when two symbols share a label", async () => {
+		const SVG =
+			'<svg width="16" height="16" aria-hidden="true"><rect width="16" height="16"/></svg>';
+		const map = fakeMap([
+			{
+				id: "schools",
+				legend: () => ({
+					pluginId: "schools",
+					title: "Sites",
+					symbols: [
+						{ label: "Location", markup: SVG },
+						{ label: "Location", markup: SVG }
+					]
+				})
+			}
+		]);
+		render(Legend, { map });
+		await expect.element(page.getByRole("list", { name: "Sites" })).toBeInTheDocument();
+		expect(page.getByRole("list", { name: "Sites" }).getByRole("listitem").elements()).toHaveLength(
+			2
+		);
+	});
+});

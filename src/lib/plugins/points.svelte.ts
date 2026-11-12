@@ -698,6 +698,8 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			answers.clear();
 			drawn = { gl, layers: () => pointLayerIds };
 			gl.on("idle", onIdle);
+			// Answers given while not set up (false) weren't kept: ask again now.
+			settled++;
 		}
 
 		ctx.effect(() => {

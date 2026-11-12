@@ -15,7 +15,7 @@
 </script>
 
 <div class="mapsdk-school-cluster text-sm">
-	{#each counts as { label, count } (label)}
+	{#each counts as { label, count }, i (i)}
 		<p class="mapsdk-school-line">
 			{messages("mapsdk_schools_cluster_line", { count: format.number(count), type: label })}
 		</p>

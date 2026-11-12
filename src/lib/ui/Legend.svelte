@@ -123,7 +123,7 @@
 			<div class="mapsdk-legend-section">
 				<h3 class="text-sm">{entry.title}</h3>
 				<ul class="mapsdk-legend-symbols text-sm" aria-label={entry.title}>
-					{#each entry.symbols as symbol (symbol.label)}
+					{#each entry.symbols as symbol, i (i)}
 						<li>
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -- map-sdk's own SVG, never host text -->
 							<span class="mapsdk-legend-symbol">{@html symbol.markup}</span>
