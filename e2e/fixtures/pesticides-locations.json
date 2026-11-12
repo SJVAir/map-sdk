@@ -1,0 +1,167 @@
+{
+	"type": "FeatureCollection",
+	"features": [
+		{
+			"type": "Feature",
+			"id": "sch1",
+			"geometry": {
+				"type": "Point",
+				"coordinates": [
+					-119.75926,
+					36.874092
+				]
+			},
+			"properties": {
+				"id": "sch1",
+				"source": "cde-public",
+				"external_id": "10621666100001",
+				"name": "Lincoln Elementary",
+				"type": "public_school",
+				"type_label": "Public school",
+				"address": "1 Lincoln Ave",
+				"city": "Fresno",
+				"school_district": "Fresno Unified",
+				"school_district_id": null,
+				"school_district_url": null,
+				"grade_span": "K-6",
+				"enrollment": 420,
+				"capacity": null
+			}
+		},
+		{
+			"type": "Feature",
+			"id": "sch2",
+			"geometry": {
+				"type": "Point",
+				"coordinates": [
+					-119.735,
+					36.884
+				]
+			},
+			"properties": {
+				"id": "sch2",
+				"source": "cde-private",
+				"external_id": "10621666200002",
+				"name": "Saint Mary School",
+				"type": "private_school",
+				"type_label": "Private school",
+				"address": "100 Main St",
+				"city": "Fresno",
+				"school_district": null,
+				"school_district_id": null,
+				"school_district_url": null,
+				"grade_span": "K-8",
+				"enrollment": 180,
+				"capacity": null
+			}
+		},
+		{
+			"type": "Feature",
+			"id": "cc1",
+			"geometry": {
+				"type": "Point",
+				"coordinates": [
+					-119.762,
+					36.866
+				]
+			},
+			"properties": {
+				"id": "cc1",
+				"source": "cdss-ccl",
+				"external_id": "100000003",
+				"name": "Little Sprouts Preschool",
+				"type": "child_care",
+				"type_label": "Child care",
+				"address": "100 Main St",
+				"city": "Fresno",
+				"school_district": null,
+				"school_district_id": null,
+				"school_district_url": null,
+				"grade_span": null,
+				"enrollment": null,
+				"capacity": 40
+			}
+		},
+		{
+			"type": "Feature",
+			"id": "sch3",
+			"geometry": {
+				"type": "Point",
+				"coordinates": [
+					-119.728,
+					36.866
+				]
+			},
+			"properties": {
+				"id": "sch3",
+				"source": "cde-public",
+				"external_id": "10621666100004",
+				"name": "Roosevelt Middle",
+				"type": "public_school",
+				"type_label": "Public school",
+				"address": "100 Main St",
+				"city": "Fresno",
+				"school_district": "Fresno Unified",
+				"school_district_id": null,
+				"school_district_url": null,
+				"grade_span": "6-8",
+				"enrollment": 900,
+				"capacity": null
+			}
+		},
+		{
+			"type": "Feature",
+			"id": "cc2",
+			"geometry": {
+				"type": "Point",
+				"coordinates": [
+					-119.728,
+					36.866
+				]
+			},
+			"properties": {
+				"id": "cc2",
+				"source": "cdss-ccl",
+				"external_id": "100000005",
+				"name": "Roosevelt Preschool",
+				"type": "child_care",
+				"type_label": "Child care",
+				"address": "100 Main St",
+				"city": "Fresno",
+				"school_district": null,
+				"school_district_id": null,
+				"school_district_url": null,
+				"grade_span": null,
+				"enrollment": null,
+				"capacity": 0
+			}
+		},
+		{
+			"type": "Feature",
+			"id": "cc3",
+			"geometry": {
+				"type": "Point",
+				"coordinates": [
+					-119.745,
+					36.889
+				]
+			},
+			"properties": {
+				"id": "cc3",
+				"source": "cdss-ccl",
+				"external_id": "100000006",
+				"name": "Sunrise Family Child Care",
+				"type": "child_care",
+				"type_label": "Child care",
+				"address": "22 Oak St",
+				"city": null,
+				"school_district": null,
+				"school_district_id": null,
+				"school_district_url": null,
+				"grade_span": null,
+				"enrollment": null,
+				"capacity": 8
+			}
+		}
+	]
+}

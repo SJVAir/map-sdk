@@ -603,3 +603,62 @@ test("focus point: clearing the focus closes its card", async ({ page }) => {
 	await focusSelect(page).selectOption("none");
 	await expect(pinCard).toHaveCount(0);
 });
+
+/** The fixture's Lincoln Elementary (`e2e/fixtures/pesticides-locations.json`): west of Alpha. */
+const SCHOOL: [number, number] = [-119.75926, 36.874092];
+const schoolsToggle = (page: Page) =>
+	page.getByRole("checkbox", { name: "Schools and child care" });
+
+test("schools: a site is listed with its type", async ({ page }) => {
+	await schoolsToggle(page).check();
+	await zoomTo(page, "right", SCHOOL);
+	await openList(rightMap(page));
+	await expect(
+		rightMap(page).getByRole("option", { name: "Lincoln Elementary, Public school", exact: true })
+	).toBeVisible();
+});
+
+test("schools: a site's card shows its lines, and featureclick carries external_id", async ({
+	page
+}) => {
+	await schoolsToggle(page).check();
+	await zoomTo(page, "right", SCHOOL);
+	await clickMonitor(page, "right", SCHOOL);
+	const schoolCard = rightMap(page).getByRole("group", { name: /Lincoln Elementary/ });
+	await expect(schoolCard).toBeVisible();
+	await expect(schoolCard).toContainText("Public school");
+	await expect(schoolCard).toContainText("District: Fresno Unified");
+	await expect(schoolCard.getByRole("button", { name: "Select" })).toHaveCount(0);
+	const clicked = await page.evaluate(() => {
+		const demo = (window as unknown as { __mapsdkDemo: { lastClick: unknown } }).__mapsdkDemo;
+		return demo.lastClick as { pluginId: string; properties?: Record<string, unknown> } | null;
+	});
+	expect(clicked?.pluginId).toBe("schools");
+	expect(clicked?.properties).toMatchObject({
+		source: "cde-public",
+		external_id: "10621666100001"
+	});
+});
+
+test("schools: a focus point on a school is listed once", async ({ page }) => {
+	await schoolsToggle(page).check();
+	await focusSelect(page).selectOption("school");
+	await zoomTo(page, "right", SCHOOL);
+	await openList(rightMap(page));
+	await expect(
+		rightMap(page).getByRole("option", { name: "Lincoln Elementary, Public school", exact: true })
+	).toBeVisible();
+	await expect(
+		rightMap(page).getByRole("option", { name: "Lincoln Elementary", exact: true })
+	).toHaveCount(0);
+});
+
+test("schools: the legend lists the three types", async ({ page }) => {
+	await schoolsToggle(page).check();
+	const legend = page.getByRole("list", { name: "Schools and child care" });
+	await expect(legend.getByRole("listitem")).toHaveText([
+		"Public school",
+		"Private school",
+		"Child care"
+	]);
+});
