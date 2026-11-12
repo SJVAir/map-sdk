@@ -245,7 +245,8 @@ These are the starting values. The builder may tune them, and says so in the PR.
   `src/lib/widgets/map/pin-label.svelte.ts`), which costs it a direct `@maptiler/sdk` dependency.
   Part 3 covers everything that does, so the dashboard can drop both: a host-given text label
   beside the pin; theme tokens; hidden from screen readers when the feature list already names the
-  place (a host option); and kept across detach and remount (`active` off and on, a basemap or
+  place (as built, the label is canvas text, so it is always silent and the listed row names the
+  place; a host with no feature list names it in `MapView`'s `label`); and kept across detach and remount (`active` off and on, a basemap or
   theme change). Read that file before building part 3.
 - Polygon and MultiPolygon geometries, and Point. Anything else throws a clear error.
 - It reads colors with `themeColors` and re-reads them on a theme change like the other plugins, so

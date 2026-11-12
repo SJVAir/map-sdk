@@ -292,4 +292,15 @@ describe("focusAreaPlugin", () => {
 		plugin.set({ geometry: null });
 		expect(plugin.features!()).toEqual([]);
 	});
+
+	it("names a point with a blank label by its layer", async () => {
+		const { plugin, gl } = await setup({ geometry: SPOT, label: "  " });
+		expect(plugin.features!()[0].name).toBe("Places");
+		expect(data(gl, "point").features[0].properties!.name).toBe("Places");
+	});
+
+	it("has no summary line while nothing of it is in view", async () => {
+		const { plugin } = await setup({ geometry: AREA });
+		expect(plugin.summarizeEmpty).toBe(false);
+	});
 });

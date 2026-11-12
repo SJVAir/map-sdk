@@ -32,10 +32,13 @@
 			if (bounds && plugin.features) {
 				const data = plugin.legend?.();
 				const scale = data && "scale" in data ? data.scale : null;
-				out.push({
-					key: `view:${plugin.id}`,
-					text: summaryText(layer, inView(plugin.features(), bounds), scale, map.messages)
-				});
+				const shown = inView(plugin.features(), bounds);
+				if (shown.length > 0 || plugin.summarizeEmpty !== false) {
+					out.push({
+						key: `view:${plugin.id}`,
+						text: summaryText(layer, shown, scale, map.messages)
+					});
+				}
 			}
 			const count = map.getSelection(plugin.id)?.ids.length ?? 0;
 			counts[plugin.id] = count;

@@ -76,6 +76,8 @@ export function focusAreaPlugin(options: FocusAreaPluginOptions): FocusAreaPlugi
 	});
 
 	const refKey = `feature:${pluginId}`;
+	/** The point's name: its label, or the layer's name for a missing or blank one. */
+	const nameOf = (label: string | undefined) => label?.trim() || layerLabel;
 
 	function setup(ctx: PluginContext): () => void {
 		const { gl } = ctx;
@@ -165,7 +167,7 @@ export function focusAreaPlugin(options: FocusAreaPluginOptions): FocusAreaPlugi
 				setData(mask, collection(isArea ? [feature(worldMask(g))] : []));
 				setData(
 					point,
-					collection(g?.type === "Point" ? [feature(g, { refKey, name: label ?? layerLabel })] : [])
+					collection(g?.type === "Point" ? [feature(g, { refKey, name: nameOf(label) })] : [])
 				);
 			});
 		});
@@ -181,7 +183,7 @@ export function focusAreaPlugin(options: FocusAreaPluginOptions): FocusAreaPlugi
 			{
 				refKey,
 				ref: { kind: "feature", id: pluginId },
-				name: label ?? layerLabel,
+				name: nameOf(label),
 				value: null,
 				level: NO_LEVEL,
 				units: "",
@@ -197,6 +199,7 @@ export function focusAreaPlugin(options: FocusAreaPluginOptions): FocusAreaPlugi
 		features,
 		label: layerLabel,
 		selectable: false,
+		summarizeEmpty: false,
 		setup,
 		get focus() {
 			return focus;

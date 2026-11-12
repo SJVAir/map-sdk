@@ -453,7 +453,9 @@ bubble's (collocation sites under monitor clusters). Clicks always go to the top
 on a bubble still zooms into it. A plugin with `hoverable: false` never takes the hover: its
 features show no hover tooltip or pointer cursor and are passed over as if they weren't drawn, so
 whatever is beneath gets the hover. They are still clicked, returned by `featuresAt`, and pin
-their tooltip when focused from the feature list.
+their tooltip when focused from the feature list. A plugin with `summarizeEmpty: false` has no
+line in the view summary (the map's live region) while none of its features is in view, instead
+of "0 <layer>"; `focusAreaPlugin` uses it.
 
 ```ts
 import type { CustomLayerInterface, MapPlugin, PluginContext } from "@sjvair/map-sdk";
@@ -634,7 +636,7 @@ local sjvair.com stack at `http://localhost:8000`.
   to fixed colors (a slate line, a white casing and wash), since they sit on the basemap, which
   doesn't follow the page's theme.
 - **New API:** `focusAreaPlugin`, `FocusAreaPlugin`, `FocusAreaPluginOptions`, `FocusGeometry`,
-  `FeatureListItem.noReading`, and three new `ThemeColors` keys (`focusArea`, `focusAreaCasing`,
+  `FeatureListItem.noReading`, `MapPlugin.summarizeEmpty`, and three new `ThemeColors` keys (`focusArea`, `focusAreaCasing`,
   `focusAreaWash`); code that builds a `ThemeColors` object needs them.
 
 ### 0.1.0-beta.10
