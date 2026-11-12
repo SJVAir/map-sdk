@@ -951,3 +951,51 @@ describe("pinned card", () => {
 		expect(two.map.pinned).toBeNull();
 	});
 });
+
+describe("click modifiers", () => {
+	async function picks() {
+		const router = new InteractionRouter();
+		const gl = createFakeGl({ styleLoaded: true });
+		gl.addSource("s", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+		gl.addLayer({ id: "a", type: "circle", source: "s" });
+		router.register("p", ["a"], () => ({
+			pluginId: "p",
+			ref: { kind: "feature", id: "x" },
+			refKey: "feature:x",
+			name: "X"
+		}));
+		router.attach(gl);
+		await tick();
+		gl.setRenderedFeatures([
+			{
+				layer: { id: "a" },
+				source: "s",
+				properties: {},
+				geometry: { type: "Point" as const, coordinates: [-119, 36] }
+			}
+		]);
+		const events: Array<{ modifier: boolean; touch: boolean; additive: boolean }> = [];
+		router.onPick((e) =>
+			events.push({ modifier: e.modifier, touch: e.touch, additive: e.additive })
+		);
+		return { gl, events };
+	}
+
+	it("reports a plain click", async () => {
+		const { gl, events } = await picks();
+		click(gl);
+		expect(events).toEqual([{ modifier: false, touch: false, additive: false }]);
+	});
+
+	it("reports a Shift click as a modifier", async () => {
+		const { gl, events } = await picks();
+		click(gl, { shiftKey: true });
+		expect(events).toEqual([{ modifier: true, touch: false, additive: true }]);
+	});
+
+	it("reports a touch tap as touch, not a modifier", async () => {
+		const { gl, events } = await picks();
+		click(gl, { pointerType: "touch" });
+		expect(events).toEqual([{ modifier: false, touch: true, additive: true }]);
+	});
+});

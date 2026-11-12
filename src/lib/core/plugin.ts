@@ -100,7 +100,12 @@ export type LegendData =
 
 export interface ClickEvent {
 	hits: FeatureHit[];
+	/** `modifier || touch`: today's "add to the selection" in multiple mode. */
 	additive: boolean;
+	/** Shift, ⌘, or Ctrl was held. */
+	modifier: boolean;
+	/** A touch tap. */
+	touch: boolean;
 	lngLat: [number, number];
 }
 

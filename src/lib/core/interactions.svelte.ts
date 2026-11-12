@@ -295,9 +295,13 @@ export class InteractionRouter {
 		}
 		const o = e.originalEvent;
 		const pointerType = o?.pointerType || recorded;
+		const modifier = Boolean(o?.shiftKey || o?.metaKey || o?.ctrlKey);
+		const touch = pointerType === "touch";
 		const event: ClickEvent = {
 			hits,
-			additive: Boolean(o?.shiftKey || o?.metaKey || o?.ctrlKey || pointerType === "touch"),
+			additive: modifier || touch,
+			modifier,
+			touch,
 			lngLat: [e.lngLat.lng, e.lngLat.lat]
 		};
 		for (const handler of [...this.#pickHandlers]) {
