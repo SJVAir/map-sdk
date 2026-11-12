@@ -1,5 +1,11 @@
 import type { FeatureCollection, Geometry, Point } from "geojson";
-import type { DataSource, DataStatus, MapFeatureProperties } from "../../src/lib/data/types.js";
+import type {
+	DataSource,
+	DataStatus,
+	MapFeatureProperties,
+	SchoolLocationProperties,
+	SchoolsSource
+} from "../../src/lib/data/types.js";
 import type { Scale, ScaleRef } from "../../src/lib/data/scale-types.js";
 
 /** A writable, reactive `DataSource` for tests. */
@@ -36,4 +42,33 @@ export function points<P extends MapFeatureProperties>(
 /** A reactive boolean for tests (runes only compile in `.svelte.ts` files). */
 export class Flag {
 	value = $state(false);
+}
+
+type SchoolRow = Partial<SchoolLocationProperties> & { at?: [number, number] };
+
+/** School features as `getPesticideLocations` gives them: ids `s1`, `s2`…, public by default. */
+export function schoolRows(rows: SchoolRow[]): FeatureCollection<Point, SchoolLocationProperties> {
+	return {
+		type: "FeatureCollection",
+		features: rows.map(({ at, ...props }, i) => ({
+			type: "Feature",
+			geometry: { type: "Point", coordinates: at ?? [-119.8 + i * 0.01, 36.75] },
+			properties: {
+				id: `s${i + 1}`,
+				name: `Site ${i + 1}`,
+				type: "public_school",
+				type_label: "Public School (CDE)",
+				...props
+			}
+		}))
+	};
+}
+
+/** A host's plain schools source with reactive status and features. */
+export class SchoolsTestSource implements SchoolsSource {
+	status = $state.raw<DataStatus>({ state: "ready" });
+	features = $state.raw<FeatureCollection<Point, SchoolLocationProperties> | null>(null);
+	constructor(rows: SchoolRow[]) {
+		this.features = schoolRows(rows);
+	}
 }
