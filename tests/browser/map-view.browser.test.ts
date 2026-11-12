@@ -710,6 +710,45 @@ describe("MapView card", () => {
 		await expect.element(card.getByRole("button", { name: "Select" })).toBeVisible();
 	});
 
+	it("card Select past canSelect's cap shows the notice and leaves the card open", async () => {
+		const map = newMap();
+		map.addPlugin(
+			{
+				id: "pts",
+				setup: () => () => {},
+				features: () => [
+					{
+						refKey: "monitor:a",
+						ref: { kind: "monitor", id: "a" },
+						name: "Site A",
+						value: null,
+						level: NO_LEVEL,
+						units: "",
+						lngLat: map.config.initialView!.center,
+						selectable: true
+					}
+				]
+			},
+			{ selectionMode: "multiple", pickWith: "modifier", canSelect: () => "No more monitors" }
+		);
+		const actions = createRawSnippet((ctx: () => { toggle(): void }) => ({
+			render: () => `<button type="button">Select</button>`,
+			setup: (node: Element) => {
+				node.addEventListener("click", () => ctx().toggle());
+			}
+		}));
+		await render(MapView, { map, class: "wide-map", card: { actions } });
+		await vi.waitFor(() => expect(map.ready).toBe(true));
+		map.focusFeature("monitor:a", "pts");
+		const card = page.getByRole("group", { name: "Site A" });
+		await card.getByRole("button", { name: "Select" }).click();
+		await expect
+			.element(page.getByRole("status").filter({ hasText: "No more monitors" }))
+			.toBeVisible();
+		await expect.element(card).toBeVisible();
+		expect(map.getSelection("pts")).toBeNull();
+	});
+
 	it("card off by default: focus doesn't pin", async () => {
 		const { map } = await cardMap();
 		map.focusFeature("monitor:a", "pts");

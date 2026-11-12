@@ -14,6 +14,7 @@
 	import type { CardOptions } from "../ui/card.js";
 	import SelectionBar from "../ui/SelectionBar.svelte";
 	import ViewSummary from "../ui/ViewSummary.svelte";
+	import PickNotice from "../ui/PickNotice.svelte";
 	import { createDataCredits } from "../ui/data-credits.svelte.js";
 	import { createGlMap, setDataCredits, watchTheme } from "./create-gl-map.js";
 	import {
@@ -354,6 +355,7 @@
 		<SelectionBar {map} clearRight={list?.position === "top-right" && controls === "none"} />
 	{/if}
 	<ViewSummary {map} />
+	<PickNotice {map} />
 	{#if controls === "mapsdk"}
 		<MapControls {map} gl={projector} />
 	{/if}
