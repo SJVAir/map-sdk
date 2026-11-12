@@ -549,3 +549,57 @@ test("a pick past the cap is refused with an announced message", async ({ page }
 	).toBeVisible();
 	expect(await liveSelection(page)).toEqual(["x1", "x2", "x3"]);
 });
+
+/** "Your location" in the demo's focus choices: just east of Alpha. */
+const NEAR_ALPHA: [number, number] = [ALPHA_LNGLAT[0] + 0.012, ALPHA_LNGLAT[1]];
+const focusSelect = (page: Page) => page.locator("#right-focus");
+
+test("focus point: a list row named by its label alone", async ({ page }) => {
+	await focusSelect(page).selectOption("location");
+	await zoomTo(page, "right", NEAR_ALPHA);
+	await openList(rightMap(page));
+	await expect(
+		rightMap(page).getByRole("option", { name: "Your location", exact: true })
+	).toBeVisible();
+});
+
+test("focus point: clicking the ring pins a card with its label alone", async ({ page }) => {
+	await focusSelect(page).selectOption("location");
+	await zoomTo(page, "right", NEAR_ALPHA);
+	const { x, y } = await monitorPoint(page, "right", NEAR_ALPHA);
+	// On the ring (13px radius), off the center.
+	await page.mouse.move(x + 14, y);
+	await page.mouse.click(x + 14, y);
+	const pinCard = rightMap(page).getByRole("group", { name: "Your location" });
+	await expect(pinCard).toBeVisible();
+	await expect(pinCard).not.toContainText("No level");
+	// Never selectable, so no host Select button.
+	await expect(pinCard.getByRole("button", { name: "Select" })).toHaveCount(0);
+});
+
+test("focus point: a monitor on it takes the click", async ({ page }) => {
+	await focusSelect(page).selectOption("at-monitor");
+	await zoomTo(page, "right", ALPHA_LNGLAT);
+	await clickMonitor(page, "right", ALPHA_LNGLAT);
+	await expect(card(page)).toBeVisible();
+	await expect(rightMap(page).getByRole("group", { name: "Lincoln Elementary" })).toHaveCount(0);
+});
+
+test("focus area: an area isn't listed", async ({ page }) => {
+	await focusSelect(page).selectOption("county");
+	await openList(rightMap(page));
+	await expect(rightMap(page).getByRole("option", { name: /Fresno County/ })).toHaveCount(0);
+	await expect(rightMap(page).getByRole("option", { name: /Places/ })).toHaveCount(0);
+});
+
+test("focus point: clearing the focus closes its card", async ({ page }) => {
+	await focusSelect(page).selectOption("location");
+	await zoomTo(page, "right", NEAR_ALPHA);
+	const { x, y } = await monitorPoint(page, "right", NEAR_ALPHA);
+	await page.mouse.move(x + 14, y);
+	await page.mouse.click(x + 14, y);
+	const pinCard = rightMap(page).getByRole("group", { name: "Your location" });
+	await expect(pinCard).toBeVisible();
+	await focusSelect(page).selectOption("none");
+	await expect(pinCard).toHaveCount(0);
+});

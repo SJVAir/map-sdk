@@ -6,6 +6,7 @@
 		collocationSitesPlugin,
 		createMap,
 		defaultBasemaps,
+		focusAreaPlugin,
 		forecastZonesPlugin,
 		hmsFirePlugin,
 		hmsSmokePlugin,
@@ -37,6 +38,7 @@
 		type DateRangeSource,
 		type SourceKind
 	} from "./date-range-source.svelte.js";
+	import { focusChoices } from "./focus-areas.js";
 
 	const maptilerKey = import.meta.env.VITE_MAPTILER_KEY ?? "";
 
@@ -62,6 +64,19 @@
 			basemaps: { ...defaultBasemaps(), excludedLayers: [] }
 		}
 	});
+	// Focus areas, one plugin per map. "Your location" sits by the e2e fixture's Fixture Alpha.
+	const FOCUS_CHOICES = focusChoices([-119.74726, 36.874092]);
+	const todayFocus = focusAreaPlugin({ id: "focus", layerLabel: "Places" });
+	const rightFocus = focusAreaPlugin({ id: "focus", layerLabel: "Places" });
+	let todayFocusKey = $state("none");
+	let rightFocusKey = $state("none");
+	function focusOn(plugin: typeof todayFocus, key: string) {
+		const choice = FOCUS_CHOICES.find((c) => c.key === key) ?? FOCUS_CHOICES[0];
+		plugin.set({ geometry: choice.geometry, label: choice.pinLabel });
+	}
+	$effect(() => focusOn(todayFocus, todayFocusKey));
+	$effect(() => focusOn(rightFocus, rightFocusKey));
+
 	const todayMonitors = createMonitorsStore();
 	const todaySmoke = createHmsSmokeStore();
 	const todayFire = createHmsFireStore();
@@ -319,7 +334,8 @@
 			(window as unknown as { __mapsdkDemo: object }).__mapsdkDemo = { left, right, today };
 		}
 		// Bottom to top, as monitor-map draws: smoke, fire (groups below zoom 10, hotspots from
-		// it), collocation sites, monitors.
+		// it), collocation sites, monitors. The focus area goes under them all.
+		today.addPlugin(todayFocus);
 		today.addPlugin(
 			hmsSmokePlugin({ source: todaySmoke.dataSource, layerLabel: "Smoke", id: "hms-smoke" })
 		);
@@ -353,6 +369,7 @@
 		todayFire.init().catch(() => {});
 		todaySites.init().catch(() => {});
 		for (const preset of presets) if (enabled[preset.kind]) enable(preset);
+		right.addPlugin(rightFocus);
 		right.addPlugin(
 			monitorsPlugin({
 				source: live.dataSource,
@@ -422,6 +439,15 @@
 					{/each}
 				</select>
 				<output data-testid="today-status" class="demo-muted">{todayStatus}</output>
+			</fieldset>
+			<fieldset>
+				<legend>Focus</legend>
+				<label for="today-focus">Focus area</label>
+				<select id="today-focus" bind:value={todayFocusKey}>
+					{#each FOCUS_CHOICES as choice (choice.key)}
+						<option value={choice.key}>{choice.label}</option>
+					{/each}
+				</select>
 			</fieldset>
 			<fieldset>
 				<legend>List button</legend>
@@ -547,6 +573,15 @@
 					{/each}
 				</select>
 				<output data-testid="live-status" class="demo-muted">{liveStatus}</output>
+			</fieldset>
+			<fieldset>
+				<legend>Focus</legend>
+				<label for="right-focus">Focus area</label>
+				<select id="right-focus" bind:value={rightFocusKey}>
+					{#each FOCUS_CHOICES as choice (choice.key)}
+						<option value={choice.key}>{choice.label}</option>
+					{/each}
+				</select>
 			</fieldset>
 		</div>
 		<MapView map={right} label="Live map" class="demo-map" card={{ actions: liveCardActions }} />
