@@ -8,6 +8,7 @@
 	import type { Snippet } from "svelte";
 	import type { CardContext } from "./card.js";
 	import { selectionKeys } from "../data/selection.js";
+	import { selectionId } from "../data/refs.js";
 
 	interface Props {
 		map: MapContext;
@@ -166,10 +167,19 @@
 			ref,
 			refKey,
 			item,
+			get selectable() {
+				return (
+					map.getSelectionMode(pluginId) !== "none" &&
+					selectionId(ref) !== null &&
+					(item?.selectable ?? true)
+				);
+			},
 			get selected() {
 				return selectionKeys(map.getSelection(pluginId)).has(refKey);
 			},
-			toggle: () => map.togglePick(pluginId, ref)
+			toggle() {
+				if (this.selectable) map.togglePick(pluginId, ref);
+			}
 		};
 	});
 

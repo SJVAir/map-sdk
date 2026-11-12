@@ -749,6 +749,12 @@ describe("MapView card", () => {
 		expect(map.getSelection("pts")).toBeNull();
 	});
 
+	it("card={null} (from an untyped host) is off and doesn't throw", async () => {
+		const { map } = await cardMap({ card: null });
+		map.focusFeature("monitor:a", "pts");
+		expect(map.pinned).toBeNull();
+	});
+
 	it("card off by default: focus doesn't pin", async () => {
 		const { map } = await cardMap();
 		map.focusFeature("monitor:a", "pts");

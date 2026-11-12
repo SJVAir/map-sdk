@@ -397,9 +397,11 @@
 </header>
 
 {#snippet liveCardActions(card: CardContext)}
-	<button type="button" class="demo-card-button" onclick={card.toggle}>
-		{card.selected ? "Remove" : "Select"}
-	</button>
+	{#if card.selectable}
+		<button type="button" class="demo-card-button" onclick={() => card.toggle()}>
+			{card.selected ? "Remove" : "Select"}
+		</button>
+	{/if}
 {/snippet}
 
 <main class="demo-main">

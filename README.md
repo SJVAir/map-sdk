@@ -137,8 +137,10 @@ focus nowhere, it closes the page's most recently pinned card. One card shows at
 one is pinned. Selection and `featureclick` are unchanged: a click still selects as before and
 also pins. `map.pinned` is the pinned feature (reactive), and `map.unpin()` closes it.
 `card={{ actions }}` also puts your buttons in a row at the card's foot: `actions` is a snippet
-given a `CardContext` (`pluginId`, `ref`, `refKey`, the listed `item` or `null`, a reactive
-`selected`, and `toggle()`, which is `map.togglePick` for that feature). Anything else goes in
+given a `CardContext` (`pluginId`, `ref`, `refKey`, the listed `item` or `null`, reactive
+`selectable` and `selected`, and `toggle()`, which is `map.togglePick` for that feature). Show
+Select/Remove only when `selectable` is true: a fire hotspot, a smoke plume, or a layer in mode
+`"none"` can't be selected, and `toggle()` then does nothing. Anything else goes in
 the `overlays` snippet, where `getMapContext()` returns the map. `config.basemaps` replaces the
 default MapTiler Streets v4 variants (build on `defaultBasemaps()`, which `createMap` uses: today's
 sjvair.com setup is `{ ...defaultBasemaps(), excludedLayers: [] }`); `config.initialView` and
@@ -606,6 +608,8 @@ local sjvair.com stack at `http://localhost:8000`.
   alone replaces, Space adds or removes, as before). This applies with any `pickWith`.
 - **New API:** `pickWith`, `canSelect`, `MapContext.togglePick`, `getPickWith`, `notice`,
   `CardOptions`, `CardContext`, and `GlMapLike.unproject` (for hosts that wrap the GL map).
+- **Every `MapView` now has a `role="status"` element** (empty unless a pick is refused), so a host
+  test that finds "the" status by role inside a map may need to narrow it.
 
 ### 0.1.0-beta.9
 

@@ -623,6 +623,7 @@ describe("MapTooltip card", () => {
 		return {
 			...(map as object),
 			getSelection: () => (ids.length ? { kind: "monitors", ids } : null),
+			getSelectionMode: () => "multiple",
 			togglePick
 		} as never;
 	}
@@ -663,6 +664,69 @@ describe("MapTooltip card", () => {
 		await render(MapTooltip, { map, project, card: true, actions: selectButton });
 		await page.getByRole("button", { name: "Select" }).click();
 		expect(togglePick).toHaveBeenCalledWith("points", { kind: "monitor", id: "a" });
+	});
+
+	it("tells the actions whether the card's feature can be selected", async () => {
+		const shown: string[] = [];
+		const probe = createRawSnippet((ctx: () => CardContext) => ({
+			render: () => `<span>${ctx().selectable ? "can select" : "can't select"}</span>`,
+			setup: () => {
+				shown.push(String(ctx().selectable));
+			}
+		}));
+		const make = (mode: string, pinned: unknown, items: FeatureListItem[]) =>
+			({
+				...(withSelection(cardMap(items, { pinned }), []) as object),
+				getSelectionMode: () => mode
+			}) as never;
+		const monitor = [monitorItem("a", "Site A")];
+		const a = await render(MapTooltip, {
+			map: make("multiple", monitorHit("a", "Site A"), monitor),
+			project,
+			card: true,
+			actions: probe
+		});
+		await expect.element(page.getByText("can select", { exact: true })).toBeVisible();
+		await a.unmount();
+		const b = await render(MapTooltip, {
+			map: make("none", monitorHit("a", "Site A"), monitor),
+			project,
+			card: true,
+			actions: probe
+		});
+		await expect.element(page.getByText("can't select")).toBeVisible();
+		await b.unmount();
+		const hotspot = {
+			hit: {
+				pluginId: "points",
+				ref: { kind: "feature", id: "h1" },
+				refKey: "feature:h1",
+				name: "Hotspot"
+			},
+			lngLat: [-119.7, 36.7] as [number, number]
+		};
+		await render(MapTooltip, {
+			map: make("multiple", hotspot, monitor),
+			project,
+			card: true,
+			actions: probe
+		});
+		await expect.element(page.getByText("can't select")).toBeVisible();
+	});
+
+	it("a card's toggle does nothing for a feature that can't be selected", async () => {
+		const togglePick = vi.fn();
+		const map = {
+			...(withSelection(
+				cardMap([monitorItem("a", "Site A")], { pinned: monitorHit("a", "Site A") }),
+				[],
+				togglePick
+			) as object),
+			getSelectionMode: () => "none"
+		} as never;
+		await render(MapTooltip, { map, project, card: true, actions: selectButton });
+		await page.getByRole("button", { name: "Select" }).click();
+		expect(togglePick).not.toHaveBeenCalled();
 	});
 
 	it("no actions on the hover-only tooltip", async () => {

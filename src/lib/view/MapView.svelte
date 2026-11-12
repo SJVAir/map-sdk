@@ -81,8 +81,9 @@
 	}: Props = $props();
 
 	// Pinning only, no plugin setup, so it's safe in an effect.
-	const cardOn = $derived(card !== false && card !== undefined);
-	const cardActions = $derived(typeof card === "object" ? card.actions : undefined);
+	// Boolean(): an untyped host's `null` is off, like `false`.
+	const cardOn = $derived(Boolean(card));
+	const cardActions = $derived(card && typeof card === "object" ? card.actions : undefined);
 
 	$effect(() => {
 		map.setCardEnabled(cardOn);
