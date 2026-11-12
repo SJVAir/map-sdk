@@ -14,6 +14,7 @@
 		monitorsPlugin,
 		pointsPlugin,
 		regionsPlugin,
+		type CardContext,
 		type ListPosition
 	} from "../src/lib/index.js";
 	import type { MapPlugin } from "../src/lib/core/plugin.js";
@@ -359,7 +360,13 @@
 				id: "monitors",
 				selectable: true
 			}),
-			{ selectionMode: "multiple" }
+			{
+				selectionMode: "multiple",
+				// The dashboard's widget pattern: a plain click shows the card, Shift-click (or the
+				// card's Select) selects, up to 3.
+				pickWith: "modifier",
+				canSelect: (next) => (next?.ids.length ?? 0) <= 3 || "Up to 3 monitors"
+			}
 		);
 		// PM2.5 like the left map. A failure shows as the source's error status (with a retry in
 		// the legend), so the rejection needs no handling here.
@@ -388,6 +395,14 @@
 		<option value="dark">Dark</option>
 	</select>
 </header>
+
+{#snippet liveCardActions(card: CardContext)}
+	{#if card.selectable}
+		<button type="button" class="demo-card-button" onclick={() => card.toggle()}>
+			{card.selected ? "Remove" : "Select"}
+		</button>
+	{/if}
+{/snippet}
 
 <main class="demo-main">
 	<section class="demo-panel demo-wide" aria-labelledby="today-title">
@@ -534,7 +549,7 @@
 				<output data-testid="live-status" class="demo-muted">{liveStatus}</output>
 			</fieldset>
 		</div>
-		<MapView map={right} label="Live map" class="demo-map" card />
+		<MapView map={right} label="Live map" class="demo-map" card={{ actions: liveCardActions }} />
 		<Legend map={right} />
 	</section>
 </main>
@@ -652,6 +667,17 @@
 
 	.demo-legend-card h3 {
 		margin: 0 0 0.5rem;
+	}
+
+	/* The Live map card's Select/Remove: a host's own button, in theme tokens. */
+	.demo-card-button {
+		padding: 0.25rem 0.75rem;
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		background: var(--primary);
+		color: var(--primary-foreground);
+		font: inherit;
+		cursor: pointer;
 	}
 
 	:global(.demo-map-tall) {

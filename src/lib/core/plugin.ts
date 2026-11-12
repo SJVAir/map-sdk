@@ -100,7 +100,17 @@ export type LegendData =
 
 export interface ClickEvent {
 	hits: FeatureHit[];
+	/** `modifier || touch`: today's "add to the selection" in multiple mode. */
 	additive: boolean;
+	/** Shift, ⌘, or Ctrl was held. */
+	modifier: boolean;
+	/** A touch tap. */
+	touch: boolean;
+	/**
+	 * A Shift-click that MapLibre's box zoom swallowed (it fires `boxzoomcancel` instead of
+	 * `click`). Only `"modifier"` mode acts on it, so other maps behave as before.
+	 */
+	boxZoom?: boolean;
 	lngLat: [number, number];
 }
 

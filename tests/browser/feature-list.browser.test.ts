@@ -149,6 +149,17 @@ describe("FeatureList", () => {
 		expect(first).toBeGreaterThan(2000);
 	});
 
+	it("Shift+Enter picks additively; plain Enter doesn't", async () => {
+		const { map } = newMap("multiple");
+		const pick = vi.spyOn(map, "pickFromList");
+		render(FeatureList, { map });
+		await focusList();
+		await userEvent.keyboard("{Enter}");
+		expect(pick).toHaveBeenLastCalledWith("monitors", "monitor:1", false);
+		await userEvent.keyboard("{Shift>}{Enter}{/Shift}");
+		expect(pick).toHaveBeenLastCalledWith("monitors", "monitor:1", true);
+	});
+
 	it("moves with Down, Up, Home, and End, focusing each row's feature", async () => {
 		const { map } = newMap("single");
 		const focus = vi.spyOn(map, "focusFeature");

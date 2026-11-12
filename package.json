@@ -1,7 +1,7 @@
 {
 	"name": "@sjvair/map-sdk",
 	"description": "Svelte 5 map components for SJVAir air-quality data",
-	"version": "0.1.0-beta.9",
+	"version": "0.1.0-beta.10",
 	"license": "MIT",
 	"repository": {
 		"type": "git",

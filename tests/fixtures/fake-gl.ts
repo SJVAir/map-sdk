@@ -260,6 +260,10 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 			log("project");
 			return { x: lngLat[0], y: lngLat[1] };
 		},
+		unproject(point) {
+			log("unproject");
+			return { lng: point[0], lat: point[1] };
+		},
 		getCanvas() {
 			log("getCanvas");
 			return canvas;

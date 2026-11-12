@@ -951,3 +951,290 @@ describe("pinned card", () => {
 		expect(two.map.pinned).toBeNull();
 	});
 });
+
+describe("click modifiers", () => {
+	async function picks() {
+		const router = new InteractionRouter();
+		const gl = createFakeGl({ styleLoaded: true });
+		gl.addSource("s", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+		gl.addLayer({ id: "a", type: "circle", source: "s" });
+		router.register("p", ["a"], () => ({
+			pluginId: "p",
+			ref: { kind: "feature", id: "x" },
+			refKey: "feature:x",
+			name: "X"
+		}));
+		router.attach(gl);
+		await tick();
+		gl.setRenderedFeatures([
+			{
+				layer: { id: "a" },
+				source: "s",
+				properties: {},
+				geometry: { type: "Point" as const, coordinates: [-119, 36] }
+			}
+		]);
+		const events: Array<{ modifier: boolean; touch: boolean; additive: boolean }> = [];
+		router.onPick((e) =>
+			events.push({ modifier: e.modifier, touch: e.touch, additive: e.additive })
+		);
+		return { gl, events };
+	}
+
+	it("reports a plain click", async () => {
+		const { gl, events } = await picks();
+		click(gl);
+		expect(events).toEqual([{ modifier: false, touch: false, additive: false }]);
+	});
+
+	it("reports a Shift click as a modifier", async () => {
+		const { gl, events } = await picks();
+		click(gl, { shiftKey: true });
+		expect(events).toEqual([{ modifier: true, touch: false, additive: true }]);
+	});
+
+	it("reports a touch tap as touch, not a modifier", async () => {
+		const { gl, events } = await picks();
+		click(gl, { pointerType: "touch" });
+		expect(events).toEqual([{ modifier: false, touch: true, additive: true }]);
+	});
+});
+
+describe("modifier mode and refusals", () => {
+	async function modSetUp(
+		mode: "single" | "multiple",
+		extra: Partial<Parameters<MapContext["addPlugin"]>[1]> = {}
+	) {
+		const map = createMap({ config });
+		const onselectionchange = vi.fn();
+		map.addPlugin(points("monitors"), {
+			selectionMode: mode,
+			pickWith: "modifier",
+			onselectionchange,
+			...extra
+		});
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		map.setCardEnabled(true);
+		const clickOn = (id: string, originalEvent: Record<string, unknown> = {}) => {
+			gl.setRenderedFeatures([rendered(map, "monitors", id)]);
+			click(gl, originalEvent);
+		};
+		return { map, gl, onselectionchange, clickOn };
+	}
+	const ids = (map: MapContext) => map.getSelection("monitors")?.ids ?? null;
+	const cap1 = (next: { ids: string[] } | null) =>
+		(next?.ids.length ?? 0) <= 1 || "Up to 1 monitor";
+
+	it("modifier mode: a plain click pins and selects nothing", async () => {
+		const { map, clickOn, onselectionchange } = await modSetUp("multiple");
+		const featureclick = vi.fn();
+		map.on("featureclick", featureclick);
+		clickOn("a");
+		expect(ids(map)).toBeNull();
+		expect(onselectionchange).not.toHaveBeenCalled();
+		expect(featureclick).toHaveBeenCalledTimes(1);
+		expect(map.pinned?.hit.refKey).toBe("monitor:a");
+	});
+
+	it("modifier mode: Shift-click toggles in multiple mode", async () => {
+		const { map, clickOn } = await modSetUp("multiple");
+		clickOn("a", { shiftKey: true });
+		clickOn("b", { metaKey: true });
+		clickOn("a", { ctrlKey: true });
+		expect(ids(map)).toEqual(["b"]);
+	});
+
+	it("modifier mode: Shift-click in single mode selects, then clears", async () => {
+		const { map, clickOn } = await modSetUp("single");
+		clickOn("a", { shiftKey: true });
+		expect(ids(map)).toEqual(["a"]);
+		clickOn("a", { shiftKey: true });
+		expect(ids(map)).toBeNull();
+	});
+
+	it("modifier mode: a touch tap only pins, even in multiple mode", async () => {
+		const { map, clickOn } = await modSetUp("multiple");
+		clickOn("a", { pointerType: "touch" });
+		expect(ids(map)).toBeNull();
+		expect(map.pinned?.hit.refKey).toBe("monitor:a");
+	});
+
+	it("modifier mode: a list pick toggles only when additive", async () => {
+		const map = createMap({ config });
+		map.addPlugin(
+			{ ...points("monitors"), features: () => [listed("a")] },
+			{ selectionMode: "multiple", pickWith: "modifier" }
+		);
+		map.attach(createFakeGl({ styleLoaded: true }));
+		await tick();
+		map.pickFromList("monitors", "monitor:a", false);
+		expect(ids(map)).toBeNull();
+		map.pickFromList("monitors", "monitor:a", true);
+		expect(ids(map)).toEqual(["a"]);
+		map.pickFromList("monitors", "monitor:a", true);
+		expect(ids(map)).toBeNull();
+	});
+
+	it("canSelect refuses: selection unchanged, no onselectionchange, notice set", async () => {
+		const { map, clickOn, onselectionchange } = await modSetUp("multiple", { canSelect: cap1 });
+		clickOn("a", { shiftKey: true });
+		expect(onselectionchange).toHaveBeenCalledTimes(1);
+		clickOn("b", { shiftKey: true });
+		expect(ids(map)).toEqual(["a"]);
+		expect(onselectionchange).toHaveBeenCalledTimes(1);
+		expect(map.notice?.message).toBe("Up to 1 monitor");
+		const first = map.notice!.id;
+		clickOn("c", { shiftKey: true });
+		expect(map.notice?.id).toBeGreaterThan(first);
+	});
+
+	it("the next allowed pick clears the notice", async () => {
+		const { map, clickOn } = await modSetUp("multiple", { canSelect: cap1 });
+		clickOn("a", { shiftKey: true });
+		clickOn("b", { shiftKey: true });
+		expect(map.notice).not.toBeNull();
+		clickOn("a", { shiftKey: true });
+		expect(ids(map)).toBeNull();
+		expect(map.notice).toBeNull();
+	});
+
+	it("canSelect returning an empty message refuses quietly", async () => {
+		const { map, clickOn } = await modSetUp("multiple", { canSelect: () => "" });
+		clickOn("a", { shiftKey: true });
+		expect(ids(map)).toBeNull();
+		expect(map.notice).toBeNull();
+	});
+
+	it("canSelect that throws refuses quietly and logs", async () => {
+		const error = vi.spyOn(console, "error").mockImplementation(() => {});
+		const { map, clickOn } = await modSetUp("multiple", {
+			canSelect: () => {
+				throw new Error("boom");
+			}
+		});
+		clickOn("a", { shiftKey: true });
+		expect(ids(map)).toBeNull();
+		expect(map.notice).toBeNull();
+		expect(error).toHaveBeenCalledWith("map-sdk: canSelect failed", expect.any(Error));
+		error.mockRestore();
+	});
+
+	it("canSelect isn't asked for setSelection or Clear", async () => {
+		const canSelect = vi.fn(() => "no" as const);
+		const { map } = await modSetUp("multiple", { canSelect });
+		map.setSelection("monitors", { kind: "monitors", ids: ["a", "b"] });
+		map.clearSelection("monitors");
+		expect(canSelect).not.toHaveBeenCalled();
+		expect(ids(map)).toBeNull();
+	});
+
+	it("togglePick toggles with the same rules and refusal, in either mode", async () => {
+		for (const pickWith of ["click", "modifier"] as const) {
+			const { map, onselectionchange } = await modSetUp("multiple", { pickWith, canSelect: cap1 });
+			map.togglePick("monitors", { kind: "monitor", id: "a" });
+			expect(ids(map)).toEqual(["a"]);
+			map.togglePick("monitors", { kind: "monitor", id: "b" });
+			expect(ids(map)).toEqual(["a"]);
+			expect(map.notice?.message).toBe("Up to 1 monitor");
+			map.togglePick("monitors", { kind: "monitor", id: "a" });
+			expect(ids(map)).toBeNull();
+			expect(onselectionchange).toHaveBeenCalledTimes(2);
+		}
+	});
+
+	it("click mode with no canSelect behaves as before", async () => {
+		const { map, gl } = await setUp("multiple");
+		gl.setRenderedFeatures([rendered(map, "monitors", "a")]);
+		click(gl);
+		gl.setRenderedFeatures([rendered(map, "monitors", "b")]);
+		click(gl);
+		expect(ids(map)).toEqual(["b"]);
+		click(gl, { shiftKey: true });
+		expect(ids(map)).toBeNull();
+		expect(map.getPickWith("monitors")).toBe("click");
+		expect(map.notice).toBeNull();
+	});
+});
+
+function listed(id: string): FeatureListItem {
+	return {
+		refKey: `monitor:${id}`,
+		ref: { kind: "monitor", id },
+		name: `Site ${id}`,
+		value: null,
+		level: NO_LEVEL,
+		units: "",
+		lngLat: [-119, 36],
+		selectable: true
+	};
+}
+
+describe("Shift-click through MapLibre's box zoom", () => {
+	/** MapLibre turns a Shift press and release in place into `boxzoomcancel`, with no click. */
+	function shiftRelease(gl: FakeGl) {
+		gl.emit("boxzoomcancel", {
+			originalEvent: { type: "mouseup", button: 0, shiftKey: true, clientX: 10, clientY: 20 }
+		});
+	}
+
+	async function boxSetUp(pickWith: "click" | "modifier") {
+		const map = createMap({ config });
+		map.addPlugin(points("monitors"), { selectionMode: "multiple", pickWith });
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		map.setCardEnabled(true);
+		gl.setRenderedFeatures([rendered(map, "monitors", "a")]);
+		const featureclick = vi.fn();
+		map.on("featureclick", featureclick);
+		return { map, gl, featureclick };
+	}
+
+	it("picks as a Shift-click in modifier mode", async () => {
+		const { map, gl, featureclick } = await boxSetUp("modifier");
+		shiftRelease(gl);
+		expect(map.getSelection("monitors")?.ids).toEqual(["a"]);
+		expect(featureclick).toHaveBeenCalledTimes(1);
+		expect(map.pinned?.hit.refKey).toBe("monitor:a");
+	});
+
+	it("is ignored in click mode, as before", async () => {
+		const { map, gl, featureclick } = await boxSetUp("click");
+		shiftRelease(gl);
+		expect(map.getSelection("monitors")).toBeNull();
+		expect(featureclick).not.toHaveBeenCalled();
+		expect(map.pinned).toBeNull();
+	});
+
+	it("ignores a Shift-drag that drew a box and came back to its start", async () => {
+		const { map, gl } = await boxSetUp("modifier");
+		gl.emit("boxzoomstart", {});
+		shiftRelease(gl);
+		expect(map.getSelection("monitors")).toBeNull();
+		shiftRelease(gl);
+		expect(map.getSelection("monitors")?.ids).toEqual(["a"]);
+	});
+
+	it("measures the point like MapLibre, under a CSS scale on the map", async () => {
+		const { map, gl } = await boxSetUp("modifier");
+		// Drawn at twice its layout size (a scale(2) ancestor), 4px from the page's corner.
+		Object.assign(gl.canvas, {
+			getBoundingClientRect: () => ({ left: 4, top: 4, width: 200, height: 200 }),
+			offsetWidth: 100,
+			offsetHeight: 100,
+			clientLeft: 0,
+			clientTop: 0
+		});
+		shiftRelease(gl);
+		// clientX 10, clientY 20 → ((10 - 4) / 2, (20 - 4) / 2); the fake's unproject echoes it.
+		expect(map.pinned?.lngLat).toEqual([3, 8]);
+	});
+
+	it("ignores a boxzoomcancel from Esc, which has no pointer position", async () => {
+		const { map, gl } = await boxSetUp("modifier");
+		gl.emit("boxzoomcancel", { originalEvent: { type: "keydown", key: "Escape" } });
+		expect(map.getSelection("monitors")).toBeNull();
+	});
+});

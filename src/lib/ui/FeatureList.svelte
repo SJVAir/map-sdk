@@ -201,7 +201,8 @@
 			case "Enter":
 			case " ":
 				e.preventDefault();
-				if (current >= 0) pick(rows[current], e.key === " ");
+				// Space, or Shift with Enter, is the additive key (as Shift-click on a row).
+				if (current >= 0) pick(rows[current], e.key === " " || e.shiftKey);
 				return;
 			default:
 				if (e.key.length === 1 && e.key !== " ") {

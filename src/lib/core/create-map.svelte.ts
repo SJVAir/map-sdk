@@ -3,7 +3,7 @@ import { SvelteMap } from "svelte/reactivity";
 import { createDefaultFormat, type FormatProvider } from "../data/format.js";
 import { defaultMessages, type MessageProvider } from "../data/messages.js";
 import { createDefaultMetadata, type MetadataProvider } from "../data/metadata.js";
-import { applyPick, selectionKeys } from "../data/selection.js";
+import { applyPick, selectionKeys, toggleInSelection } from "../data/selection.js";
 import type { FeatureRef, SelectionMode, SpatialSelection } from "../data/types.js";
 import { BasemapState, type BasemapConfig } from "./basemap.svelte.js";
 import type { GlMapLike } from "./gl.js";
@@ -64,6 +64,20 @@ export interface PluginOptions {
 	selectionMode?: SelectionMode;
 	selection?: SpatialSelection | null;
 	onselectionchange?(sel: SpatialSelection | null): void;
+	/**
+	 * `"click"` (default): today's rules (a click selects; Shift/⌘/Ctrl or a tap adds in
+	 * `"multiple"` mode). `"modifier"`: a plain click or tap only pins the card (use it with
+	 * `MapView`'s `card`), and Shift/⌘/Ctrl-click, or the list's Space or Shift+Enter, toggles the
+	 * feature in the selection.
+	 */
+	pickWith?: "click" | "modifier";
+	/**
+	 * Called before a user's pick (a click, a list pick, or the card's `toggle`) changes the
+	 * selection, with the selection it would produce. `true` lets it through; a string refuses it
+	 * and is the message the map shows (`MapContext.notice`). Not called for `setSelection` or the
+	 * selection bar's Clear.
+	 */
+	canSelect?(next: SpatialSelection | null, ref: FeatureRef): true | string;
 }
 
 export type FeatureClickHandler = (e: {
@@ -183,6 +197,20 @@ export interface MapContext {
 	 * on a cluster bubble or a feature without a hover card) unpins.
 	 */
 	readonly pinned: Hovered | null;
+	/** Reactive. The plugin's `pickWith`: `"click"` for an unknown plugin. */
+	getPickWith(pluginId: string): "click" | "modifier";
+	/**
+	 * A user's toggle of `ref` (the card's Select/Remove): the modifier-click rule, with the
+	 * plugin's `canSelect` and `onselectionchange`, in either `pickWith` mode.
+	 */
+	togglePick(pluginId: string, ref: FeatureRef): void;
+	/**
+	 * Reactive. The latest refused pick's message; `id` grows with each refusal, so the same
+	 * message twice is announced again. Cleared by the next pick, `clearNotice()`, and detach.
+	 */
+	readonly notice: { message: string; id: number } | null;
+	/** @internal For `PickNotice`: clears the notice. */
+	clearNotice(): void;
 	/** Closes the pinned card. Does nothing when nothing is pinned. */
 	unpin(): void;
 	/** @internal For `MapView` only: turns pinning on or off. Off also unpins. */
@@ -256,6 +284,8 @@ class PluginSelection {
 	mode = $state<SelectionMode>("none");
 	selection = $state.raw<SpatialSelection | null>(null);
 	onselectionchange: PluginOptions["onselectionchange"];
+	pickWith = $state<"click" | "modifier">("click");
+	canSelect: PluginOptions["canSelect"];
 }
 
 function copyView(view: CameraState): CameraState {
@@ -305,6 +335,8 @@ class MapContextImpl implements MapContext {
 	#focusedPluginId = $state<string | null>(null);
 	#focusedAnchor = $state.raw<[number, number] | null>(null);
 	#pinned = $state.raw<Hovered | null>(null);
+	#notice = $state.raw<{ message: string; id: number } | null>(null);
+	#noticeCount = 0;
 	#cardEnabled = false;
 	#selections = new SvelteMap<string, PluginSelection>();
 	#featureClickHandlers = new Set<FeatureClickHandler>();
@@ -398,6 +430,23 @@ class MapContextImpl implements MapContext {
 		return this.#pinned;
 	}
 
+	get notice(): { message: string; id: number } | null {
+		return this.#notice;
+	}
+
+	clearNotice(): void {
+		if (untrack(() => this.#notice) !== null) this.#notice = null;
+	}
+
+	getPickWith(pluginId: string): "click" | "modifier" {
+		return this.#selections.get(pluginId)?.pickWith ?? "click";
+	}
+
+	togglePick(pluginId: string, ref: FeatureRef): void {
+		if (this.#destroyed) return;
+		this.#applyPick(pluginId, ref, { toggle: true });
+	}
+
 	unpin(): void {
 		if (untrack(() => this.#pinned) !== null) this.#pinned = null;
 	}
@@ -420,6 +469,10 @@ class MapContextImpl implements MapContext {
 					: (previous?.selection ?? null);
 		});
 		state.onselectionchange = options.onselectionchange ?? previous?.onselectionchange;
+		untrack(() => {
+			state.pickWith = options.pickWith ?? previous?.pickWith ?? "click";
+		});
+		state.canSelect = options.canSelect ?? previous?.canSelect;
 		// Stored before the host adds it, so a setup that runs at once sees its selection.
 		this.#selections.set(plugin.id, state);
 		try {
@@ -467,7 +520,7 @@ class MapContextImpl implements MapContext {
 			(untrack(() => this.#focusedPluginId) ?? pluginId) === pluginId;
 		const anchor = (focused && untrack(() => this.#focusedAnchor)) || this.anchorFor(item);
 		this.#emitClick(pluginId, item.ref, anchor);
-		if (item.selectable) this.#applyPick(pluginId, item.ref, additive);
+		if (item.selectable) this.#applyPick(pluginId, item.ref, { additive, modifier: additive });
 	}
 
 	clearSelection(pluginId: string): void {
@@ -676,6 +729,7 @@ class MapContextImpl implements MapContext {
 		this.#gl.off("moveend", this.#onMoveEnd);
 		this.#focusEasing = false;
 		this.unpin();
+		this.clearNotice();
 		this.#router.detach();
 		this.basemap.detach();
 		this.#host.detach();
@@ -722,8 +776,12 @@ class MapContextImpl implements MapContext {
 		if (this.#destroyed) return;
 		const [hit] = e.hits;
 		const { pluginId, ref } = hit;
+		// A box-zoom Shift-click only counts for a plugin that asked for modifier picks.
+		if (e.boxZoom && untrack(() => this.#selections.get(pluginId)?.pickWith) !== "modifier") {
+			return;
+		}
 		this.#emitClick(pluginId, ref, e.lngLat);
-		this.#applyPick(pluginId, ref, e.additive);
+		this.#applyPick(pluginId, ref, { additive: e.additive, modifier: e.modifier });
 		if (!this.#cardEnabled || this.#destroyed) return;
 		// A feature with no hover card (e.g. a smoke plume) gets no pinned card either.
 		const plugin = untrack(() => this.plugins).find((p) => p.id === pluginId);
@@ -742,18 +800,47 @@ class MapContextImpl implements MapContext {
 	}
 
 	/** The one place a user's pick (map click or list key) changes a plugin's selection. */
-	#applyPick(pluginId: string, ref: FeatureRef, additive: boolean): void {
+	/**
+	 * The one place a user's pick (map click, list key, or the card's toggle) changes a plugin's
+	 * selection: the plugin's `pickWith` rule, then its `canSelect`.
+	 */
+	#applyPick(
+		pluginId: string,
+		ref: FeatureRef,
+		gesture: { additive?: boolean; modifier?: boolean; toggle?: boolean }
+	): void {
 		// A featureclick handler may have removed the plugin.
 		const state = untrack(() => this.#selections.get(pluginId));
 		if (!state) return;
 		const current = untrack(() => state.selection);
-		const next = applyPick(
-			current,
-			ref,
-			untrack(() => state.mode),
-			{ additive }
-		);
-		if (sameSelection(current, next)) return;
+		const mode = untrack(() => state.mode);
+		let next: SpatialSelection | null;
+		if (gesture.toggle) next = toggleInSelection(current, ref, mode);
+		else if (untrack(() => state.pickWith) === "modifier") {
+			// A plain click or tap only pins the card.
+			next = gesture.modifier ? toggleInSelection(current, ref, mode) : current;
+		} else next = applyPick(current, ref, mode, { additive: gesture.additive ?? false });
+		if (sameSelection(current, next)) {
+			this.clearNotice();
+			return;
+		}
+		if (state.canSelect) {
+			let verdict: true | string;
+			try {
+				verdict = state.canSelect(copySelection(next), ref);
+			} catch (error) {
+				console.error("map-sdk: canSelect failed", error);
+				return;
+			}
+			if (verdict !== true) {
+				// An empty (or, from untyped JS, false) verdict refuses quietly.
+				if (typeof verdict === "string" && verdict !== "") {
+					this.#notice = { message: verdict, id: ++this.#noticeCount };
+				}
+				return;
+			}
+		}
+		this.clearNotice();
 		state.selection = next;
 		state.onselectionchange?.(copySelection(next));
 	}
