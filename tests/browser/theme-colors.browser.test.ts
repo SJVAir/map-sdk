@@ -43,3 +43,32 @@ describe("focus-area colors", () => {
 		expect(themeSignature(node)).not.toBe(before);
 	});
 });
+
+describe("school and child-care marker colors", () => {
+	it("stay fixed whatever the theme's tokens", () => {
+		const colors = themeColors(
+			container({
+				"--foreground": "rgb(11, 22, 33)",
+				"--background": "rgb(4, 5, 6)",
+				"--muted": "rgb(40, 50, 60)"
+			})
+		);
+		expect(colors.schoolMarker).toBe("#5a6b7b");
+		expect(colors.childCareMarker).toBe("#1c9099");
+	});
+
+	it("take a host's token overrides", () => {
+		const colors = themeColors(
+			container({ "--school-marker": "rgb(7, 8, 9)", "--child-care-marker": "rgb(10, 11, 12)" })
+		);
+		expect(colors.schoolMarker).toBe("rgba(7, 8, 9, 1)");
+		expect(colors.childCareMarker).toBe("rgba(10, 11, 12, 1)");
+	});
+
+	it("are in the theme signature", () => {
+		const node = container({ "--school-marker": "rgb(1, 1, 1)" });
+		const before = themeSignature(node);
+		node.style.setProperty("--school-marker", "rgb(2, 2, 2)");
+		expect(themeSignature(node)).not.toBe(before);
+	});
+});
