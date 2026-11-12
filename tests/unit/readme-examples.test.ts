@@ -249,6 +249,23 @@ describe("README examples", () => {
 		store.dispose();
 	});
 
+	it("selection: modifier picks, a cap through canSelect, and togglePick", () => {
+		const map: MapContext = createMap({ config: { maptilerKey: "" } });
+		const store = createMonitorsStore();
+		map.addPlugin(monitorsPlugin({ source: store.dataSource, layerLabel: "Monitors" }), {
+			selectionMode: "multiple",
+			pickWith: "modifier",
+			canSelect: (next) => (next?.ids.length ?? 0) <= 3 || "Up to 3 monitors"
+		});
+		map.setSelection("monitors", { kind: "monitors", ids: ["a", "b", "c"] });
+		map.togglePick("monitors", { kind: "monitor", id: "d" });
+		expect(map.getSelection("monitors")?.ids).toEqual(["a", "b", "c"]);
+		expect(map.notice?.message).toBe("Up to 3 monitors");
+		expect(map.getPickWith("monitors")).toBe("modifier");
+		map.destroy();
+		store.dispose();
+	});
+
 	it("a message provider (Paraglide-shaped)", () => {
 		const catalog: Record<string, (params?: MessageParams) => string> = {
 			mapsdk_list_button: () => "Lista"

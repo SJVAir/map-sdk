@@ -135,7 +135,10 @@ and closes with Esc, Close, or a click elsewhere on the map; focusing a feature-
 same card, and Tab from the row reaches it. Esc closes the card of the map that has focus; with
 focus nowhere, it closes the page's most recently pinned card. One card shows at a time, and no hover card shows while
 one is pinned. Selection and `featureclick` are unchanged: a click still selects as before and
-also pins. `map.pinned` is the pinned feature (reactive), and `map.unpin()` closes it. Anything else goes in
+also pins. `map.pinned` is the pinned feature (reactive), and `map.unpin()` closes it.
+`card={{ actions }}` also puts your buttons in a row at the card's foot: `actions` is a snippet
+given a `CardContext` (`pluginId`, `ref`, `refKey`, the listed `item` or `null`, a reactive
+`selected`, and `toggle()`, which is `map.togglePick` for that feature). Anything else goes in
 the `overlays` snippet, where `getMapContext()` returns the map. `config.basemaps` replaces the
 default MapTiler Streets v4 variants (build on `defaultBasemaps()`, which `createMap` uses: today's
 sjvair.com setup is `{ ...defaultBasemaps(), excludedLayers: [] }`); `config.initialView` and
@@ -467,6 +470,31 @@ map.addPlugin(plugin, {
 in the selection bar, and a feature that appears later shows as selected. `map.getSelection(id)`
 and `getSelectionMode(id)` are reactive.
 
+`pickWith: "modifier"` (an `addPlugin` option; default `"click"`) is for maps where a click should
+only show the reading: a plain click or tap pins the card (use it with `MapView`'s `card`), and
+Shift/Cmd/Ctrl-click, or the list's Space or Shift+Enter, toggles the feature in the selection (in
+`single` mode it selects, or clears it when it's already selected). A tap never selects; the card's
+own buttons do (below). Shift-click goes through MapLibre's box zoom, which takes every Shift press:
+map-sdk turns a Shift release in place into the pick for `"modifier"` plugins only, and Shift-drag
+still zooms to a box. With `pickWith: "click"`, a Shift-click still does nothing on the map.
+
+`canSelect(next, ref)` (also an `addPlugin` option) refuses a user's pick before it shows: it gets
+the selection the pick would produce and returns `true` to let it through or a message to refuse
+it. A refused pick changes nothing and calls no `onselectionchange`; the map shows the message for
+4 s and announces it to screen readers (`map.notice` holds it). It isn't asked for `setSelection`
+or the selection bar's Clear.
+
+```ts
+map.addPlugin(plugin, {
+	selectionMode: "multiple",
+	pickWith: "modifier",
+	canSelect: (next) => (next?.ids.length ?? 0) <= 3 || "Up to 3 monitors"
+});
+```
+
+`map.togglePick(pluginId, ref)` is a user's toggle for your own controls (the card's Select or
+Remove): the same rule, `canSelect`, and `onselectionchange` as a modifier-click.
+
 `map.on("featureclick", ({ pluginId, ref, lngLat }) => …)` fires for every click on a feature,
 whatever the mode, and also for a pick in the feature list, so keyboard users get the same event;
 `lngLat` is the click point. For a list pick it's where the item's tooltip pins: the item's
@@ -563,6 +591,21 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.10
+
+- **Buttons on the pinned card.** `card={{ actions }}`: a snippet of the host's own buttons, given
+  the card's feature, whether it's selected, and `toggle()` (the dashboard's Select and Remove).
+- **Pick with a modifier.** `pickWith: "modifier"`: a plain click or tap only pins the card, and
+  Shift/Cmd/Ctrl-click (or the list's Space or Shift+Enter) toggles the selection. Shift-click now
+  reaches the map through MapLibre's box zoom for these plugins; Shift-drag still zooms to a box.
+- **Refuse a pick before it shows.** `canSelect(next, ref)` returns `true` or a message: a refused
+  pick changes nothing and calls no `onselectionchange`, and the map shows and announces the
+  message for 4 s (`map.notice`).
+- **The feature list's Shift+Enter now picks additively**, as Shift-click on a row does (Enter
+  alone replaces, Space adds or removes, as before). This applies with any `pickWith`.
+- **New API:** `pickWith`, `canSelect`, `MapContext.togglePick`, `getPickWith`, `notice`,
+  `CardOptions`, `CardContext`, and `GlMapLike.unproject` (for hosts that wrap the GL map).
 
 ### 0.1.0-beta.9
 
