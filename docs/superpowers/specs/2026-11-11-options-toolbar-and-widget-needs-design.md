@@ -256,61 +256,109 @@ These are the starting values. The builder may tune them, and says so in the PR.
 
 ## 4. Schools and child care
 
+Revised 2026-11-12 from what changed since the spec was approved: the user's decisions in
+data-dashboard's step 5 spec 2 (the dashboard loads all map data itself and passes plain
+`DataSource`s; it never uses map-sdk stores), `data-dashboard-d8`'s answers for spec 2, and a
+brainstorm with the user on 2026-11-12.
+
 ### Decided
 
-- A preset on `pointsPlugin`, fed by sdk-js's locations. Types and labels come from metadata.
+- A preset on `pointsPlugin`. Types and labels come from metadata.
 - **Pictogram markers** (the user, 2026-11-11): a small glyph in an outlined badge, so they can't
   be mistaken for monitors, which are circles and triangles. Squares were rejected: map-sdk
   exports a `square` marker and the monitor shape type allows one, so it's too close to a monitor.
+- **The badge is a school-house pentagon** (the user, 2026-11-12, option A of four sketches: house,
+  map pin, hexagon, diamond): a flat bottom and a peaked roof, outlined in white with a faint dark
+  edge, the glyph in white. Child care uses the same outline. The sketches were 22px; the built
+  badge is 20px (my call, after the builder check) so its bottom corners clear the focus ring's
+  white casing, which starts 11.5px from the center.
+- **Glyphs** (the user, 2026-11-12): Lucide's `school` for public and private schools, `baby` for
+  child care. No `backpack`.
+- **No store** (the user, 2026-11-12). `createSchoolsStore` is dropped: the dashboard passes a plain
+  `DataSource` it builds from `getPesticideLocations`, and no other host (monitor-map 5.0, mobile)
+  draws schools. Recorded in data-dashboard's `DEFERRED.md` with a revisit trigger. The preset must
+  be fully usable from a plain `DataSource` (`staticSource` or hand-made), and the README documents
+  the properties it reads.
+- **A school that is also the focus point** (the user, 2026-11-12): the school stays in the data and
+  the focus point's ring circles its badge, reading as "this is our school". The school's marker
+  takes the tap (the focus area draws under data plugins) and shows the school's card. The ring
+  must visibly circle the badge (see the badge size above). In the feature list, the focus point's
+  own row is left out while a school or child-care marker is drawn at exactly the focus point's
+  coordinates, so a screen reader hears the place once (the user, 2026-11-12, after the builder
+  check). Only this preset's markers count, not monitors or other layers, and only one that is
+  drawn: inside the zoom range, passed by the type filter, and not gathered into a count bubble.
+  The dashboard takes the focus point's position from the school feature itself, so the
+  coordinates match exactly. This closes the part 3 deferral "a focus point that is also a school is drawn and
+  listed twice". (The other route, the host leaving that school out of its source, also stays
+  possible; the dashboard's later schools spec picks.)
+- **Shown at every zoom by default** (the user, 2026-11-12, replacing "from zoom 9"): a host that
+  turns schools on while viewing a region expects to see them, not to find they need a zoom-in.
+  The host can still pass a zoom range. What's drawn is what's listed and counted.
+- **Count bubbles when zoomed out** (the user, 2026-11-12): schools and child care gather into
+  count bubbles that split apart as you zoom in, as monitors do, with schools (public and private
+  together) and child care counted in separate bubbles so their colors stay apart. Clicking a
+  bubble zooms in (the existing cluster behavior).
+- **No point-and-radius mode** (unchanged): map-sdk never takes coordinates to look schools up.
 
-### What exists (checked 2026-11-11)
+### From the dashboard (`data-dashboard-d8`, 2026-11-12)
 
-- sdk-js has `getPesticideLocations` (`lib/pesticides/get_pesticide_locations.ts`) for
-  `/api/2.0/pesticides/locations/`: a bbox (at most 12 degrees a side), a region, or a point and
-  radius (at most 10 miles); optional `type` (`public_school`, `private_school`, `child_care`)
-  and `county`. Each feature has `id`, `name`, `type`, `type_label`, `address`, `city`,
-  `school_district`, `school_district_id`, `school_district_url`, `grade_span`, `enrollment`, and
-  `capacity`.
-- sdk-js's regions metadata (`getRegionsMeta`, `LocationTypeMeta`) lists location types with a
-  `label`.
-- So no sdk-js change is expected. If the builder finds one is needed, tell the coordinator, who
-  arranges an sdk-js session; don't work around it here.
+- Schools aren't in the dashboard's spec 2 (monitors and smoke & fire only); they join the Map
+  widget after this part ships, in a later dashboard spec.
+- Options must be plain values the host owns, settable from the dashboard's per-data-set entry.
+- A type filter (schools vs. child care) must be expressible as a plain option, since the later
+  toolbar shows a group when it has more than one option.
+- `featureclick` must carry `source` and `external_id`, so the dashboard can resolve a school as a
+  place with `getLocationsByCode(source, [external_id])`.
+- Card host buttons through part 2's `card={{ actions }}` are enough.
+
+### The data the host passes
+
+Features are GeoJSON points whose properties are `getPesticideLocations`' (`@sjvair/sdk`
+`5.0.0-beta.9`, `lib/pesticides/schemas/pesticide_locations.ts`), passed through unchanged: `id`,
+`source`, `external_id`, `name`, `type` (`public_school`, `private_school`, `child_care`),
+`type_label`, `address`, `city`, `school_district`, `school_district_id`, `school_district_url`,
+`grade_span`, `enrollment`, `capacity`. Nullable fields may be null or missing. map-sdk defines its
+own properties type for these (like `FireFeatureProperties`) in `./data`, so the type doesn't tie
+the preset to an SDK version.
 
 ### My calls
 
-- **Glyphs:** Lucide's `school` for public and private schools, and `baby` for child care
-  (`backpack` if `baby` reads poorly at marker size). Lucide is ISC. Markers are SVG strings drawn
-  into GL images, so map-sdk embeds the two path sets as strings with Lucide's license notice
-  rather than adding `@lucide/svelte`; `test:licenses` must still pass.
 - **Colors:** two new family tokens, `--school-marker` (fallback `#5a6b7b`, sjvair.com's slate) and
-  `--child-care-marker` (fallback `#1c9099`, sjvair.com's teal), with the badge outlined like the
-  other markers (`--swatch-outline-*` style, or the marker outline the points plugin already uses).
-- **Public vs. private** share the school glyph and color; the type label (from metadata) tells
-  them apart in the card, the list, and the legend.
-- **Data:** presets never fetch, so a store does: e.g. `createSchoolsStore` in `./stores`, on
-  `getPesticideLocations`, with two modes the host picks: a region (by its id) or following the
-  view (a bbox padded by half a view, from zoom 9 up, as sjvair.com's explorer does, staying under
-  the 12-degree cap). It exposes a `dataSource` like the other stores. The dashboard picks the
-  call. `./stores` must stay off the map engine (`test:bundle`).
-- **No point-and-radius mode.** The endpoint's `lat`/`lng` form puts the point in the URL, and
-  sdk-js warns to use it only for public points, never a person's own location. The dashboard's
-  place can be the user's location, so a public store API that takes any point would invite that
-  leak. If a host later needs "schools within N miles of a school", add a mode that takes a
-  school's id, not coordinates.
-- **Labels from metadata:** the type labels come through the metadata provider from the regions
-  metadata's location types. If the provider has no hook for that yet, the builder adds one
-  (default: the SDK call), as for the other metadata.
+  `--child-care-marker` (fallback `#1c9099`, sjvair.com's teal). Like the focus area's, these
+  fallbacks are fixed colors that never fall back to theme tokens (the basemap under them doesn't
+  follow the theme); add them to `CLAUDE.md`'s fixed-color exceptions. The badge outline (white
+  with a faint dark edge) is a fixed part of the drawing, as the monitors' darker stroke is.
+- **Glyph paths** are embedded as strings with Lucide's ISC notice, not `@lucide/svelte`;
+  `test:licenses` must still pass.
+- **Labels from metadata:** a new optional `MetadataProvider` hook, agreed with
+  `data-dashboard-d8` and the coordinator on 2026-11-12 (the dashboard implements the provider
+  itself, so map-sdk fetches nothing there):
+  `locationTypeLabel?(type: string, signal?: AbortSignal): Promise<string | "unavailable">`, the
+  same shape as `monitorTypeLabel`. A host implements it from `getRegionsMeta` →
+  `location_types[type]?.label`; an unknown type or metadata that can't load resolves
+  `"unavailable"`, and it rejects only on the caller's abort. `createDefaultMetadata` implements it
+  from `getRegionsMeta`. When the hook is missing or gives `"unavailable"`, the preset uses the
+  feature's own `type_label`, then a generic `mapsdk_*` message ("Location"), never the raw type
+  code. The README's "Changes" names every new message key (the dashboard keeps an explicit key
+  table). (`@sjvair/sdk` `5.0.0-beta.3`, map-sdk's dev dependency, already has `location_types`;
+  raise it only if needed.)
+- **Type filter:** an option listing the types to draw (`public_school`, `private_school`,
+  `child_care`), all three by default. Unknown types in the data are not drawn when a filter is set
+  (a filter is an allow-list). A host that offers "schools vs. child care" passes both school types
+  for its one choice.
 - **Card:** name; type label; address and city; school district; grade span; enrollment (schools)
-  or capacity (child care) when present. Every line a `mapsdk_*` message key.
-- **Legend:** one entry per type, glyph and label.
-- **Not selectable in map-sdk.** `SpatialSelection` is monitors or regions (the dashboard's
-  shape), and the dashboard treats a school as a single place, not part of a selection. A school's
-  card takes host buttons like any card (the dashboard's "use this place", for example), and
-  `featureclick` gives the host the feature's id. Widening `SpatialSelection` with a location kind
-  is out of scope. The dashboard may need the school's code rather than its id to resolve it as a
-  place (`getLocationsByCode`); the locations feature has no code today, which is the dashboard's
-  to raise with the coordinator if it needs it.
-- **Default zoom range:** from zoom 9, as sjvair.com; the host can change it.
+  or capacity (child care) when present. Every line a `mapsdk_*` message key; a missing value's
+  line is left out.
+- **List row:** the name, with the type label where a reading would be (`pointsPlugin`'s `detail`).
+- **Legend:** one entry per type that the filter draws, badge and label. Public and private show
+  the same badge with different labels; that's expected, since only the label tells them apart.
+- **Count bubbles:** a bubble in the group's token color with its count, and a tooltip giving the
+  count per type label. The exact radius and the zoom where bubbles stop are the builder's,
+  starting from the monitors preset's.
+- **Not selectable in map-sdk.** `SpatialSelection` stays monitors or regions. `featureclick` gives
+  the host the feature with its properties, including `source` and `external_id`.
+- **Order:** the preset draws wherever it's registered (the demo and docs register it
+  before monitors, so schools sit under monitors).
 
 ## 5. The options toolbar
 
@@ -463,8 +511,9 @@ Firm needs; anything about which rows the widget shows is for the dashboard's ow
   (no flash: `onselectionchange` never called, message announced).
 - Part 3: the mask's holes (Polygon, MultiPolygon, a region with holes), theme switch re-colors it,
   not listed or clickable.
-- Part 4: the store's two modes and the 12-degree cap, labels from metadata, `test:bundle`, and
-  `test:licenses`.
+- Part 4: labels from metadata (and the fallbacks), the type filter, the card's lines, the legend,
+  a plain `staticSource`, the focus point's row dropping out over a school, `test:bundle`, and
+  `test:licenses`. Screenshots of the markers on each basemap, light and dark, before the PR.
 - Part 5: both layouts at a 300px map in a wide window and a full-window map; keyboard through every
   row kind; touch; read-only; one event per action, including select-all and reset; setting values
   fires nothing; two maps on one page; axe checks on both layouts.
@@ -473,7 +522,8 @@ Firm needs; anything about which rows the widget shows is for the dashboard's ow
 
 ## Docs
 
-- README: each new prop, option, token (the token list), preset, and store; the "Changes" section
+- README: each new prop, option, token (the token list), preset, and store (part 4: the feature
+  properties the schools preset reads); the "Changes" section
   for each release; examples kept in step with `tests/unit/readme-examples.test.ts`.
 - map-sdk `CLAUDE.md`: the new pieces in the architecture overview.
 - data-dashboard, on `step-5` (worktree `.worktrees/docs-map-sdk` from `origin/step-5`): map-sdk's
@@ -491,5 +541,5 @@ Firm needs; anything about which rows the widget shows is for the dashboard's ow
 
 Names and exact shapes of every API above; the keyboard path into the card (within the rules
 above); where the refused-pick message shows; a plugin or a `MapContext` method for the focus area;
-GL symbol or DOM label for the point; the store's name and options; the starting values from
+GL symbol or DOM label for the point; the preset's name and options; the starting values from
 sjvair.com; and how the toolbar's CSS sizes (container query or measurement).
