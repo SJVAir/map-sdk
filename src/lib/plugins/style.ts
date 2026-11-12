@@ -16,6 +16,14 @@ export interface ThemeColors {
 	foreground: string;
 	/** Markers drawn muted by default (see `icon.mutedColor`): `--muted-foreground`. */
 	mutedForeground: string;
+	/** Text halos on the map: `--background`. */
+	background: string;
+	/** The focus area's line and point ring: `--focus-area`, else `--foreground`. */
+	focusArea: string;
+	/** The casing under the focus area's line and ring: `--focus-area-casing`, else `--background`. */
+	focusAreaCasing: string;
+	/** The wash outside a focus area: `--focus-area-wash`, else `--background`. */
+	focusAreaWash: string;
 }
 
 /**
@@ -27,7 +35,11 @@ export const FALLBACK_THEME_COLORS: Readonly<ThemeColors> = {
 	highlight: "#2563eb",
 	highlightForeground: "#ffffff",
 	foreground: "#111827",
-	mutedForeground: "#6b7280"
+	mutedForeground: "#6b7280",
+	background: "#ffffff",
+	focusArea: "#111827",
+	focusAreaCasing: "#ffffff",
+	focusAreaWash: "#ffffff"
 };
 
 const THEME_TOKENS: Record<keyof ThemeColors, string[]> = {
@@ -35,7 +47,11 @@ const THEME_TOKENS: Record<keyof ThemeColors, string[]> = {
 	highlight: ["--highlight", "--primary"],
 	highlightForeground: ["--highlight-foreground", "--primary-foreground"],
 	foreground: ["--foreground"],
-	mutedForeground: ["--muted-foreground"]
+	mutedForeground: ["--muted-foreground"],
+	background: ["--background"],
+	focusArea: ["--focus-area", "--foreground"],
+	focusAreaCasing: ["--focus-area-casing", "--background"],
+	focusAreaWash: ["--focus-area-wash", "--background"]
 };
 
 /**
