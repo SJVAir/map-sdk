@@ -6,12 +6,14 @@ const getDatasetCatalog = vi.fn();
 const getHMSMeta = vi.fn();
 const getCalHeatScoreMeta = vi.fn();
 const getForecastsMeta = vi.fn();
+const getRegionsMeta = vi.fn();
 vi.mock("@sjvair/sdk", () => ({
 	getHMSMeta: (...args: unknown[]) => getHMSMeta(...args),
 	getCalHeatScoreMeta: (...args: unknown[]) => getCalHeatScoreMeta(...args),
 	getForecastsMeta: (...args: unknown[]) => getForecastsMeta(...args),
 	getMonitorsMeta: (...args: unknown[]) => getMonitorsMeta(...args),
-	getDatasetCatalog: (...args: unknown[]) => getDatasetCatalog(...args)
+	getDatasetCatalog: (...args: unknown[]) => getDatasetCatalog(...args),
+	getRegionsMeta: (...args: unknown[]) => getRegionsMeta(...args)
 }));
 
 const { createDefaultMetadata } = await import("../../../src/lib/data/metadata.js");
@@ -34,6 +36,7 @@ beforeEach(() => {
 	getHMSMeta.mockReset();
 	getCalHeatScoreMeta.mockReset();
 	getForecastsMeta.mockReset();
+	getRegionsMeta.mockReset();
 });
 
 describe("default metadata", () => {
@@ -227,5 +230,58 @@ describe("default metadata", () => {
 	it("is unavailable when the catalog fails", async () => {
 		getDatasetCatalog.mockRejectedValue(new Error("404"));
 		expect(await createDefaultMetadata().attribution("air-quality")).toBe("unavailable");
+	});
+});
+
+describe("locationTypeLabel", () => {
+	function regionsMeta() {
+		return {
+			location_types: {
+				child_care: { type: "child_care", label: "Child care", source: "cdss" },
+				public_school: { type: "public_school", label: "Public school", source: "cde" }
+			}
+		};
+	}
+
+	it("reads the label from the regions meta", async () => {
+		getRegionsMeta.mockResolvedValue(regionsMeta());
+		expect(await createDefaultMetadata().locationTypeLabel!("child_care")).toBe("Child care");
+	});
+
+	it("is unavailable for an unknown type", async () => {
+		getRegionsMeta.mockResolvedValue(regionsMeta());
+		expect(await createDefaultMetadata().locationTypeLabel!("charter")).toBe("unavailable");
+	});
+
+	it("is unavailable when the regions meta fails, and the next call retries", async () => {
+		getRegionsMeta.mockRejectedValueOnce(new Error("down"));
+		getRegionsMeta.mockResolvedValueOnce(regionsMeta());
+		const meta = createDefaultMetadata();
+		expect(await meta.locationTypeLabel!("child_care")).toBe("unavailable");
+		expect(await meta.locationTypeLabel!("child_care")).toBe("Child care");
+		expect(getRegionsMeta).toHaveBeenCalledTimes(2);
+	});
+
+	it("rejects only on the caller's abort", async () => {
+		let resolve!: (value: unknown) => void;
+		getRegionsMeta.mockReturnValue(new Promise((r) => (resolve = r)));
+		const meta = createDefaultMetadata();
+		const controller = new AbortController();
+		const aborted = meta.locationTypeLabel!("child_care", controller.signal);
+		const other = meta.locationTypeLabel!("child_care");
+		controller.abort();
+		await expect(aborted).rejects.toThrow();
+		resolve(regionsMeta());
+		expect(await other).toBe("Child care");
+	});
+
+	it("fetches the regions meta once for several types", async () => {
+		getRegionsMeta.mockResolvedValue(regionsMeta());
+		const meta = createDefaultMetadata();
+		await Promise.all([
+			meta.locationTypeLabel!("child_care"),
+			meta.locationTypeLabel!("public_school")
+		]);
+		expect(getRegionsMeta).toHaveBeenCalledTimes(1);
 	});
 });

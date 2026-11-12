@@ -25,6 +25,10 @@ export interface ThemeColors {
 	focusAreaCasing: string;
 	/** The wash outside a focus area: `--focus-area-wash`, else white. */
 	focusAreaWash: string;
+	/** School badges and count bubbles: `--school-marker`, else a fixed slate. */
+	schoolMarker: string;
+	/** Child care badges and count bubbles: `--child-care-marker`, else a fixed teal. */
+	childCareMarker: string;
 }
 
 /**
@@ -43,7 +47,11 @@ export const FALLBACK_THEME_COLORS: Readonly<ThemeColors> = {
 	// `--focus-area*` tokens.
 	focusArea: "#1f2d3d",
 	focusAreaCasing: "#ffffff",
-	focusAreaWash: "#ffffff"
+	focusAreaWash: "#ffffff",
+	// The user's decision (2026-11-12), the same exception: sjvair.com's slate and teal, fixed for
+	// the same reason. Hosts override them with `--school-marker` and `--child-care-marker`.
+	schoolMarker: "#5a6b7b",
+	childCareMarker: "#1c9099"
 };
 
 const THEME_TOKENS: Record<keyof ThemeColors, string[]> = {
@@ -54,7 +62,9 @@ const THEME_TOKENS: Record<keyof ThemeColors, string[]> = {
 	mutedForeground: ["--muted-foreground"],
 	focusArea: ["--focus-area"],
 	focusAreaCasing: ["--focus-area-casing"],
-	focusAreaWash: ["--focus-area-wash"]
+	focusAreaWash: ["--focus-area-wash"],
+	schoolMarker: ["--school-marker"],
+	childCareMarker: ["--child-care-marker"]
 };
 
 /**

@@ -37,6 +37,7 @@ export type { MonitorShape, MonitorsPluginOptions } from "./presets/monitors.js"
 export { regionsPlugin } from "./presets/regions.js";
 export type { RegionsPluginOptions } from "./presets/regions.js";
 export { focusAreaPlugin } from "./presets/focus-area.svelte.js";
+export { schoolsPlugin, type SchoolsPluginOptions } from "./presets/schools.svelte.js";
 export type {
 	FocusAreaPlugin,
 	FocusAreaPluginOptions,

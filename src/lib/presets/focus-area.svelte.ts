@@ -79,8 +79,12 @@ export function focusAreaPlugin(options: FocusAreaPluginOptions): FocusAreaPlugi
 	/** The point's name: its label, or the layer's name for a missing or blank one. */
 	const nameOf = (label: string | undefined) => label?.trim() || layerLabel;
 
+	/** The running setup's `coveredAt`; null while not set up. Reactive. */
+	let coveredAt = $state.raw<PluginContext["coveredAt"] | null>(null);
+
 	function setup(ctx: PluginContext): () => void {
 		const { gl } = ctx;
+		coveredAt = ctx.coveredAt;
 		const container = gl.getCanvas().closest?.("[data-mapsdk-map]") ?? null;
 		const theme = themeColors(container);
 		const empty = collection([]);
@@ -172,13 +176,17 @@ export function focusAreaPlugin(options: FocusAreaPluginOptions): FocusAreaPlugi
 			});
 		});
 
-		return () => {};
+		return () => {
+			coveredAt = null;
+		};
 	}
 
 	function features(): FeatureListItem[] {
 		const { geometry, label } = focus;
 		if (geometry?.type !== "Point") return [];
 		const [lng, lat] = geometry.coordinates;
+		// A marker drawn on the point (a school that is the focus) is its row: list it once.
+		if (coveredAt?.([lng, lat])) return [];
 		return [
 			{
 				refKey,

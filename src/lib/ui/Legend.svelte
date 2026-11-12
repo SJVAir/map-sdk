@@ -47,6 +47,11 @@
 					const layer = plugin.label ?? plugin.id;
 					return [{ kind: "status", pluginId: data.pluginId, layer, status: data.status }];
 				}
+				if ("symbols" in data) {
+					if (data.symbols.length === 0) return [];
+					const { pluginId, title, symbols } = data;
+					return [{ kind: "symbols", pluginId, title, symbols }];
+				}
 				const section = legendSection(data, map.format);
 				return section ? [{ kind: "scale", section }] : [];
 			}
@@ -114,6 +119,19 @@
 					<LegendBar bar={section.bar} {background} messages={map.messages} />
 				{/if}
 			</div>
+		{:else if entry.kind === "symbols"}
+			<div class="mapsdk-legend-section">
+				<h3 class="text-sm">{entry.title}</h3>
+				<ul class="mapsdk-legend-symbols text-sm" aria-label={entry.title}>
+					{#each entry.symbols as symbol, i (i)}
+						<li>
+							<!-- eslint-disable-next-line svelte/no-at-html-tags -- map-sdk's own SVG, never host text -->
+							<span class="mapsdk-legend-symbol">{@html symbol.markup}</span>
+							<span>{symbol.label}</span>
+						</li>
+					{/each}
+				</ul>
+			</div>
 		{:else}
 			{@const status = entry.status}
 			<div class="mapsdk-legend-status text-sm" role="status">
@@ -174,6 +192,27 @@
 		margin: 0 0 0.5rem;
 		text-align: center;
 		font-weight: 600;
+	}
+
+	.mapsdk-legend-symbols {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.25rem 1rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.mapsdk-legend-symbols li {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+	}
+
+	.mapsdk-legend-symbol {
+		display: inline-flex;
+		flex: none;
 	}
 
 	.mapsdk-legend-status {

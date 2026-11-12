@@ -101,6 +101,15 @@ export type LegendData =
 			 */
 			display?: "gradient" | "blocks";
 	  }
+	| {
+			pluginId: string;
+			title: string;
+			/**
+			 * One entry per kind of marker: decorative inline SVG (map-sdk's own presets' trusted
+			 * markup, never host text) beside its label.
+			 */
+			symbols: Array<{ label: string; markup: string }>;
+	  }
 	| { pluginId: string; status: DataStatus };
 
 export interface ClickEvent {
@@ -167,6 +176,11 @@ export interface PluginContext {
 	on(type: string, layerId: string, listener: (e: any) => void): void;
 	/** Reactive. */
 	readonly selectedKeys: ReadonlySet<string>;
+	/**
+	 * True while another plugin on the map draws a marker at exactly `lngLat` (its `drawnAt`).
+	 * Reactive.
+	 */
+	coveredAt(lngLat: [number, number]): boolean;
 	/** An `$effect.root` torn down with the plugin. */
 	effect(fn: () => void | (() => void)): void;
 }
@@ -185,6 +199,17 @@ export interface MapPlugin {
 	setup(ctx: PluginContext): () => void;
 	legend?(): LegendData | null;
 	features?(): FeatureListItem[];
+	/**
+	 * A feature's source properties by its `refKey`, for `featureclick` (e.g. a school's
+	 * `external_id`); `undefined` when the plugin has none for it.
+	 */
+	properties?(refKey: string): Readonly<Record<string, unknown>> | undefined;
+	/**
+	 * True while one of the plugin's features at exactly `lngLat` is drawn as its own marker: in
+	 * its zoom range and not gathered into a cluster. A focus point there gives way to it (see
+	 * `PluginContext.coveredAt`). Reactive: re-runs as the map settles.
+	 */
+	drawnAt?(lngLat: [number, number]): boolean;
 	selectable?: boolean;
 	/**
 	 * Which plugin's feature the hover tooltip shows where several are under the pointer: the

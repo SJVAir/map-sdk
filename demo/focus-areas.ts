@@ -35,6 +35,11 @@ export interface FocusChoice {
 	pinLabel?: string;
 }
 
+/** The demo's sample school: just west of the monitor, off its marker (`e2e/fixtures`). */
+export function schoolSpot(alpha: [number, number]): [number, number] {
+	return [Math.round((alpha[0] - 0.012) * 1e6) / 1e6, alpha[1]];
+}
+
 /** `near` places "Your location" just east of a monitor, off its marker. */
 export function focusChoices(alpha: [number, number]): FocusChoice[] {
 	return [
@@ -54,6 +59,12 @@ export function focusChoices(alpha: [number, number]): FocusChoice[] {
 			label: "Your location",
 			geometry: { type: "Point", coordinates: [alpha[0] + 0.012, alpha[1]] },
 			pinLabel: "Your location"
+		},
+		{
+			key: "school",
+			label: "A school (turn on Schools)",
+			geometry: { type: "Point", coordinates: schoolSpot(alpha) },
+			pinLabel: "Lincoln Elementary"
 		},
 		{
 			key: "at-monitor",

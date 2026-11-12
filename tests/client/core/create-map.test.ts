@@ -646,6 +646,32 @@ describe("pickFromList", () => {
 		expect(map.getSelection("monitors")).toBeNull();
 	});
 
+	it("adds the plugin's properties to a list pick's featureclick", async () => {
+		const map = createMap({ config });
+		const seen: unknown[] = [];
+		map.on("featureclick", (e) => seen.push(e.properties));
+		map.addPlugin(
+			plugin("monitors", [], {
+				features: () => [listItem("1")],
+				properties: (refKey) => (refKey === "monitor:1" ? { refKey, source: "cde" } : undefined)
+			})
+		);
+		await tick();
+		map.pickFromList("monitors", "monitor:1", false);
+		expect(seen).toEqual([{ refKey: "monitor:1", source: "cde" }]);
+	});
+
+	it("leaves properties out of featureclick for a plugin without them", async () => {
+		const map = createMap({ config });
+		const events: object[] = [];
+		map.on("featureclick", (e) => events.push(e));
+		map.addPlugin(plugin("monitors", [], { features: () => [listItem("1")] }));
+		await tick();
+		map.pickFromList("monitors", "monitor:1", false);
+		expect(events).toHaveLength(1);
+		expect("properties" in events[0]).toBe(false);
+	});
+
 	it("fires featureclick like a map click, before the selection changes", async () => {
 		const map = createMap({ config });
 		const order: string[] = [];

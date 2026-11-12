@@ -3,7 +3,8 @@ import {
 	getDatasetCatalog,
 	getForecastsMeta,
 	getHMSMeta,
-	getMonitorsMeta
+	getMonitorsMeta,
+	getRegionsMeta
 } from "@sjvair/sdk";
 import type { Scale, ScaleRef } from "./scale-types.js";
 
@@ -27,6 +28,13 @@ export interface MetadataProvider {
 	 */
 	monitorTypeInterval?(type: string, signal?: AbortSignal): Promise<string | "unavailable">;
 	attribution(dataset: string, signal?: AbortSignal): Promise<string | "unavailable">;
+	/**
+	 * A location type's label (e.g. "Child care" for `child_care`), from the regions metadata's
+	 * `location_types`. Resolves "unavailable" for an unknown type or metadata that can't load,
+	 * and rejects only on the caller's abort. Optional: the schools preset falls back to the
+	 * feature's own `type_label`, then a generic "Location".
+	 */
+	locationTypeLabel?(type: string, signal?: AbortSignal): Promise<string | "unavailable">;
 }
 
 const AIR_QUALITY = "air-quality";
@@ -77,6 +85,7 @@ export function createDefaultMetadata(): MetadataProvider {
 	const catalog = memoize(() => getDatasetCatalog());
 	// The catalog splits HMS into two datasets; one meta carries both scales.
 	const hmsMeta = memoize(() => getHMSMeta());
+	const regionsMeta = memoize(() => getRegionsMeta());
 	const datasetScales: Record<
 		ScaleDataset,
 		ReturnType<typeof memoize<{ scales: Record<string, Scale> }>>
@@ -147,6 +156,12 @@ export function createDefaultMetadata(): MetadataProvider {
 			guarded(signal, async () => (await monitorsMeta(signal)).monitors[type]?.label),
 		monitorTypeInterval: (type, signal) =>
 			guarded(signal, async () => (await monitorsMeta(signal)).monitors[type]?.expected_interval),
+		locationTypeLabel: (type, signal) =>
+			guarded(signal, async () => {
+				const types: Partial<Record<string, { label: string }>> = (await regionsMeta(signal))
+					.location_types;
+				return Object.hasOwn(types, type) ? types[type]?.label || undefined : undefined;
+			}),
 		attribution: (dataset, signal) =>
 			guarded(
 				signal,

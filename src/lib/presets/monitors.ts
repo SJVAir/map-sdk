@@ -87,8 +87,8 @@ function monitorOrder(props: MonitorFeatureProperties): number {
 export const SHAPES = { circle, square, triangle };
 const ICON_SIZE = 24;
 const BORDER_WIDTH = 2;
-const CLUSTER_RADIUS = 40;
-const CLUSTER_MAX_ZOOM = 9;
+export const CLUSTER_RADIUS = 40;
+export const CLUSTER_MAX_ZOOM = 9;
 const CLUSTER_OPACITY = 0.8;
 /** Cluster icons grow with the count: 1.3×, then 1.6× from 10, then 2× from 25. */
 const CLUSTER_SIZES = [1.3, 10, 1.6, 25, 2.0];

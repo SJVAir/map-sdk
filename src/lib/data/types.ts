@@ -64,3 +64,41 @@ export interface CollocationFeatureProperties extends MonitorFeatureProperties {
 	colocatedValue: number | null;
 	colocatedTimestamp: string | null;
 }
+
+/** The kinds of school and child care site the schools preset draws. */
+export type LocationType = "public_school" | "private_school" | "child_care";
+
+/**
+ * A school or child care site's properties as `@sjvair/sdk`'s `getPesticideLocations` returns
+ * them; pass its features through unchanged. `type` is a `LocationType`, or a type a newer server
+ * adds.
+ */
+export interface SchoolLocationProperties {
+	id: string;
+	/** Where `external_id` comes from (for `getLocationsByCode(source, [external_id])`). */
+	source?: string;
+	/** The site's official code within its `source`. */
+	external_id?: string;
+	name: string;
+	type: string;
+	type_label?: string | null;
+	address?: string | null;
+	city?: string | null;
+	school_district?: string | null;
+	school_district_id?: string | null;
+	school_district_url?: string | null;
+	/** The grades served, such as "K-6". */
+	grade_span?: string | null;
+	enrollment?: number | null;
+	capacity?: number | null;
+}
+
+/**
+ * What the schools preset reads: a status and the sites' features. Any `DataSource` whose
+ * features carry `SchoolLocationProperties` is one, as is a plain
+ * `{ status: { state: "ready" }, features }`.
+ */
+export interface SchoolsSource {
+	readonly status: DataStatus;
+	readonly features: FeatureCollection<Geometry, SchoolLocationProperties> | null;
+}

@@ -69,7 +69,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   off before the GL map is made; sessions stay on, as MapTiler bills by them), and the `maptilerMap()` escape hatch (for markers
   and popups only).
   It has no GL map of its own; `MapView` attaches one. `plugin.ts` defines `MapPlugin`
-  (`hoverPriority`, `tooltipShowsName`, `hoverable`) and `PluginContext` (`addCustomLayer`);
+  (`hoverPriority`, `tooltipShowsName`, `hoverable`, `properties` for `featureclick`, `drawnAt`)
+  and `PluginContext` (`addCustomLayer`, `coveredAt`: another plugin draws a marker exactly there);
   `scoped-context.ts`'s internal `scopedContext` lets a preset run a nested plugin under a prefix. `shape-view.ts` is the shape-aware
   in-view test (`intersectsBounds`, `geometryBbox`) and the in-view anchor (`shapeAnchor`); focusing
   a shape that overlaps the view with its label point off-screen keeps the camera and sets
@@ -91,15 +92,20 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `dataSource`. `cleanFires` is exported from here.
 - **Plugins** (`src/lib/plugins/`): the general `pointsPlugin` (icons, clusters; `selectedStyle`,
   `icon.mutedColor`, `zoomRange`, `legendDisplay`, `legendTitle`, `detail` for features with no
-  level, `truncateValues` to cut values off instead of rounding) and `shapesPlugin`
+  level, `truncateValues` to cut values off instead of rounding, `marksPlaces` for `drawnAt`,
+  answers per point refreshed at the map's `idle`) and `shapesPlugin`
   (fill/`outline`/check overlay, `hoverable`), plus shared style expressions, scale resolution,
   and the exported marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
 - **Presets** (`src/lib/presets/`): `monitorsPlugin`, `collocationSitesPlugin`, `regionsPlugin`,
   `calHeatScorePlugin`, `forecastZonesPlugin`, `hmsSmokePlugin`, `hmsFirePlugin` (groups, then
   hotspots from zoom 10), `focusAreaPlugin` (`focus-area.svelte.ts`: an area's slate outline and
   white wash outside it, from `focus-geometry.ts`'s `worldMask`; or a point's ring and canvas label,
-  listed as one `noReading` row and clickable, never selectable; `set()` changes it in place), and
-  `groupFires`, with the monitor, cluster (its "within a X mi² area"
+  listed as one `noReading` row (left out while `ctx.coveredAt` its point) and clickable, never
+  selectable; `set()` changes it in place), `schoolsPlugin` (`schools.svelte.ts`: the host's raw
+  `getPesticideLocations` features, a `types` allow-list, `school-icons.ts`'s school-house badges
+  with Lucide's `school`/`baby` paths (ISC) and school-house count bubbles, `SchoolTooltip` and
+  `SchoolClusterTooltip`, a `symbols` legend with one row per badge, labels from
+  `locationTypeLabel`, never selectable, `marksPlaces`), and `groupFires`, with the monitor, cluster (its "within a X mi² area"
   line from `cluster-area.ts`'s convex hull), collocation (`CollocationTooltip`), and fire
   (`FireTooltip`, the reading box) tooltips. Smoke takes no hover. Presets never fetch.
 - **View** (`src/lib/view/`): `MapView.svelte` creates the GL map (`create-gl-map.ts`: per-map key
@@ -111,7 +117,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   of the controls in its corner, measured with a `ResizeObserver`). It sets `--mapsdk-map-width`,
   which caps the list panel and framed legend at the map's width. Credits come from the engine's
   AttributionControl, with data credits from `ui/data-credits.svelte.ts`.
-- **UI** (`src/lib/ui/`): Legend (`order`, `framed`; blocks legends are one labeled bar), FeatureList,
+- **UI** (`src/lib/ui/`): Legend (`order`, `framed`; blocks legends are one labeled bar; `symbols`
+  legends a row per symbol), FeatureList,
   MapTooltip, SelectionBar, ViewSummary, and MapControls (zoom buttons only; basemap switching is
   `MapContext`, credits are the engine's). `controls.css` holds the focus ring and motion classes.
   A `FeatureListItem` with `noReading` (the focus point) shows its name alone everywhere.
@@ -130,7 +137,9 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   inside-monitor outline `#000000`, and the collocation crosshair `#4A5FC6`. And (2026-11-11) the
   focus area's defaults: line, ring and label `#1f2d3d`, casing, halo and wash `#ffffff`, which the
   `--focus-area*` tokens override but which never fall back to theme tokens (the basemap under
-  them doesn't follow the theme).
+  them doesn't follow the theme). And (2026-11-12) the school markers: `--school-marker` `#5a6b7b`
+  and `--child-care-marker` `#1c9099`, fixed fallbacks too, with the badges' white outline and
+  glyph and the bubbles' white count.
 - No hardcoded labels, units, breakpoints, colors, or scales: they come from a `Scale` or the
   metadata provider. Every UI string is a `mapsdk_*` message key in `en.json`; no concatenated
   sentences. Dates and times are formatted in America/Los_Angeles through the `format` provider.

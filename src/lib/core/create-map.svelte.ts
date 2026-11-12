@@ -88,6 +88,11 @@ export type FeatureClickHandler = (e: {
 	 * or for a shape whose label point is off-screen, a point of the shape in view.
 	 */
 	lngLat: [number, number];
+	/**
+	 * The feature's source properties, from its plugin's `properties()` (e.g. a school's `source`
+	 * and `external_id`); absent when the plugin gives none.
+	 */
+	properties?: Readonly<Record<string, unknown>>;
 }) => void;
 
 /** Where a camera move ends up. `zoom` wins over `minZoom`. */
@@ -519,7 +524,7 @@ class MapContextImpl implements MapContext {
 			untrack(() => this.#focusedKey) === refKey &&
 			(untrack(() => this.#focusedPluginId) ?? pluginId) === pluginId;
 		const anchor = (focused && untrack(() => this.#focusedAnchor)) || this.anchorFor(item);
-		this.#emitClick(pluginId, item.ref, anchor);
+		this.#emitClick(pluginId, item.ref, anchor, refKey);
 		if (item.selectable) this.#applyPick(pluginId, item.ref, { additive, modifier: additive });
 	}
 
@@ -780,7 +785,7 @@ class MapContextImpl implements MapContext {
 		if (e.boxZoom && untrack(() => this.#selections.get(pluginId)?.pickWith) !== "modifier") {
 			return;
 		}
-		this.#emitClick(pluginId, ref, e.lngLat);
+		this.#emitClick(pluginId, ref, e.lngLat, hit.refKey);
 		this.#applyPick(pluginId, ref, { additive: e.additive, modifier: e.modifier });
 		if (!this.#cardEnabled || this.#destroyed) return;
 		// A feature with no hover card (e.g. a smoke plume) gets no pinned card either.
@@ -789,10 +794,14 @@ class MapContextImpl implements MapContext {
 		else this.#pinned = { hit, lngLat: e.lngLat };
 	}
 
-	#emitClick(pluginId: string, ref: FeatureRef, lngLat: [number, number]): void {
+	#emitClick(pluginId: string, ref: FeatureRef, lngLat: [number, number], refKey: string): void {
+		const plugin = untrack(() => this.plugins).find((p) => p.id === pluginId);
+		const properties = untrack(() => plugin?.properties?.(refKey));
 		for (const handler of [...this.#featureClickHandlers]) {
+			// Each handler gets its own event, as before properties existed.
+			const event = { pluginId, ref: { ...ref }, lngLat: [...lngLat] as [number, number] };
 			try {
-				handler({ pluginId, ref, lngLat });
+				handler(properties ? { ...event, properties: { ...properties } } : event);
 			} catch (error) {
 				console.error("map-sdk: a featureclick handler failed", error);
 			}

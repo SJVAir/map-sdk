@@ -15,6 +15,7 @@
 		monitorsPlugin,
 		pointsPlugin,
 		regionsPlugin,
+		schoolsPlugin,
 		type CardContext,
 		type ListPosition
 	} from "../src/lib/index.js";
@@ -24,6 +25,7 @@
 		DataSource,
 		MapFeatureProperties,
 		MonitorFeatureProperties,
+		SchoolsSource,
 		SelectionMode,
 		SpatialSelection
 	} from "../src/lib/data/index.js";
@@ -196,6 +198,38 @@
 			null
 		)
 	});
+	// Schools and child care, loaded by the host (map-sdk never fetches): the endpoint's features
+	// passed through as they are.
+	let showSchools = $state(false);
+	const schoolsSource = $state<{ -readonly [K in keyof SchoolsSource]: SchoolsSource[K] }>({
+		status: { state: "loading" },
+		features: null
+	});
+	const schools = schoolsPlugin({ source: schoolsSource, layerLabel: "Schools and child care" });
+	let schoolsLoaded = false;
+	async function loadSchools() {
+		schoolsSource.status = { state: "loading" };
+		try {
+			// The endpoint's GeoJSON as it is (the demo's SDK is older than its source and
+			// external_id fields).
+			const response = await fetch("/api/2.0/pesticides/locations/?bbox=-120.2,36.5,-119.4,37.0");
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			schoolsSource.features = (await response.json()) as SchoolsSource["features"];
+			schoolsSource.status = { state: "ready" };
+			schoolsLoaded = true;
+		} catch (error) {
+			schoolsSource.status = { state: "error", error, retry: () => void loadSchools() };
+		}
+	}
+	function toggleSchools(on: boolean) {
+		showSchools = on;
+		// Above the focus area, under the monitors.
+		if (on) right.addPlugin(schools, { before: "monitors" });
+		else right.removePlugin(schools.id);
+		if (on && !schoolsLoaded) void loadSchools();
+	}
+	// For e2e: the last featureclick, with the host's properties.
+	let lastClick = $state<unknown>(null);
 	function toggleChargers(on: boolean) {
 		showChargers = on;
 		if (on) today.addPlugin(chargers);
@@ -331,7 +365,16 @@
 	onMount(() => {
 		// For e2e only: the maps, so a test can project a monitor to a screen point.
 		if (import.meta.env.DEV) {
-			(window as unknown as { __mapsdkDemo: object }).__mapsdkDemo = { left, right, today };
+			(window as unknown as { __mapsdkDemo: object }).__mapsdkDemo = {
+				left,
+				right,
+				today,
+				schools,
+				rightFocus,
+				get lastClick() {
+					return lastClick;
+				}
+			};
 		}
 		// Bottom to top, as monitor-map draws: smoke, fire (groups below zoom 10, hotspots from
 		// it), collocation sites, monitors. The focus area goes under them all.
@@ -370,6 +413,7 @@
 		todaySites.init().catch(() => {});
 		for (const preset of presets) if (enabled[preset.kind]) enable(preset);
 		right.addPlugin(rightFocus);
+		right.on("featureclick", (e) => (lastClick = $state.snapshot(e)));
 		right.addPlugin(
 			monitorsPlugin({
 				source: live.dataSource,
@@ -582,6 +626,14 @@
 						<option value={choice.key}>{choice.label}</option>
 					{/each}
 				</select>
+				<label>
+					<input
+						type="checkbox"
+						checked={showSchools}
+						onchange={(e) => toggleSchools(e.currentTarget.checked)}
+					/>
+					Schools and child care
+				</label>
 			</fieldset>
 		</div>
 		<MapView map={right} label="Live map" class="demo-map" card={{ actions: liveCardActions }} />

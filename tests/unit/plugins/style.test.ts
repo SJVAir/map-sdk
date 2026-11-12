@@ -221,6 +221,8 @@ describe("focus-area colors", () => {
 		expect(FALLBACK_THEME_COLORS.focusArea).toBe("#1f2d3d");
 		expect(FALLBACK_THEME_COLORS.focusAreaCasing).toBe("#ffffff");
 		expect(FALLBACK_THEME_COLORS.focusAreaWash).toBe("#ffffff");
+		expect(FALLBACK_THEME_COLORS.schoolMarker).toBe("#5a6b7b");
+		expect(FALLBACK_THEME_COLORS.childCareMarker).toBe("#1c9099");
 		expect("background" in FALLBACK_THEME_COLORS).toBe(false);
 	});
 
