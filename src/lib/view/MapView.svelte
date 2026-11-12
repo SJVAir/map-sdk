@@ -11,6 +11,7 @@
 	import type { SortBy } from "../ui/feature-list.js";
 	import MapControls from "../ui/MapControls.svelte";
 	import MapTooltip from "../ui/MapTooltip.svelte";
+	import type { CardOptions } from "../ui/card.js";
 	import SelectionBar from "../ui/SelectionBar.svelte";
 	import ViewSummary from "../ui/ViewSummary.svelte";
 	import { createDataCredits } from "../ui/data-credits.svelte.js";
@@ -60,8 +61,9 @@
 		 * `true`: a click or tap on a feature pins its reading card, which takes the pointer and
 		 * closes with Esc, its Close button, or a click elsewhere on the map; focusing a
 		 * feature-list row shows the same card. Selection and `featureclick` are unchanged.
+		 * `{ actions }` also puts the host's buttons on the card (see `CardContext`).
 		 */
-		card?: boolean;
+		card?: boolean | CardOptions;
 	}
 
 	let {
@@ -78,8 +80,11 @@
 	}: Props = $props();
 
 	// Pinning only, no plugin setup, so it's safe in an effect.
+	const cardOn = $derived(card !== false && card !== undefined);
+	const cardActions = $derived(typeof card === "object" ? card.actions : undefined);
+
 	$effect(() => {
-		map.setCardEnabled(card);
+		map.setCardEnabled(cardOn);
 		return () => map.setCardEnabled(false);
 	});
 
@@ -192,7 +197,7 @@
 		if (e.key !== "Escape") return;
 		e.preventDefault();
 		// The card closes first (and the focused row's card with it); the next Esc closes the panel.
-		if (card && (map.pinned || map.focusedKey)) {
+		if (cardOn && (map.pinned || map.focusedKey)) {
 			map.unpin();
 			map.focusFeature(null);
 			return;
@@ -334,7 +339,16 @@
 		</div>
 	{/if}
 	<!-- After the list, so Tab from a list row reaches the pinned card's Close button. -->
-	<MapTooltip {map} {project} {width} {height} mode={tooltip} gl={projector} {card} />
+	<MapTooltip
+		{map}
+		{project}
+		{width}
+		{height}
+		mode={tooltip}
+		gl={projector}
+		card={cardOn}
+		actions={cardActions}
+	/>
 	<!-- After the list, so Tab reaches the List button first. -->
 	{#if selectionBar}
 		<SelectionBar {map} clearRight={list?.position === "top-right" && controls === "none"} />

@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { createRawSnippet } from "svelte";
 import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
 import { config as maptilerConfig } from "@maptiler/sdk";
@@ -698,6 +699,16 @@ describe("MapView card", () => {
 		await vi.waitFor(() => expect(map.ready).toBe(true));
 		return { map, view };
 	}
+
+	it("card: { actions } turns the card on and shows the buttons", async () => {
+		const actions = createRawSnippet(() => ({
+			render: () => `<button type="button">Select</button>`
+		}));
+		const { map } = await cardMap({ card: { actions } });
+		map.focusFeature("monitor:a", "pts");
+		const card = page.getByRole("group", { name: "Site A" });
+		await expect.element(card.getByRole("button", { name: "Select" })).toBeVisible();
+	});
 
 	it("card off by default: focus doesn't pin", async () => {
 		const { map } = await cardMap();

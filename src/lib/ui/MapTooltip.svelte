@@ -5,6 +5,9 @@
 	import type { GlMapLike } from "../core/gl.js";
 	import type { FeatureListItem, MapPlugin } from "../core/plugin.js";
 	import TooltipItem from "./TooltipItem.svelte";
+	import type { Snippet } from "svelte";
+	import type { CardContext } from "./card.js";
+	import { selectionKeys } from "../data/selection.js";
 
 	interface Props {
 		map: MapContext;
@@ -30,9 +33,20 @@
 		 * (pointer events, a Close button, Esc), and the hover doesn't show while one is pinned.
 		 */
 		card?: boolean;
+		/** The host's buttons on the card (`MapView`'s `card.actions`). */
+		actions?: Snippet<[CardContext]>;
 	}
 
-	let { map, project, width, height, mode = "pinned", gl = null, card = false }: Props = $props();
+	let {
+		map,
+		project,
+		width,
+		height,
+		mode = "pinned",
+		gl = null,
+		card = false,
+		actions
+	}: Props = $props();
 
 	// Ignored without the card, so a host's map never pins.
 	const pinned = $derived(card ? map.pinned : null);
@@ -138,6 +152,25 @@
 		if (!custom) return true;
 		const plugin = found?.plugin ?? map.plugins.find((p) => p.id === hitPluginId);
 		return !plugin?.tooltipShowsName;
+	});
+
+	// The card's feature for the host's actions: the focused item, or the pinned hit.
+	const cardContext = $derived.by((): CardContext | null => {
+		if (!interactive || !actions) return null;
+		const pluginId = found?.plugin.id ?? hitPluginId;
+		const ref = item?.ref ?? shownHit?.hit.ref;
+		const refKey = key;
+		if (!pluginId || !ref || refKey === null) return null;
+		return {
+			pluginId,
+			ref,
+			refKey,
+			item,
+			get selected() {
+				return selectionKeys(map.getSelection(pluginId)).has(refKey);
+			},
+			toggle: () => map.togglePick(pluginId, ref)
+		};
 	});
 
 	let cardEl: HTMLDivElement | undefined = $state();
@@ -251,6 +284,9 @@
 		{:else if item}
 			<TooltipItem {item} messages={map.messages} format={map.format} />
 		{/if}
+		{#if actions && cardContext}
+			<div class="mapsdk-card-actions">{@render actions(cardContext)}</div>
+		{/if}
 		<button
 			type="button"
 			class="mapsdk-card-close mapsdk-focus"
@@ -316,6 +352,13 @@
 		z-index: 3;
 		padding-right: 2rem;
 		pointer-events: auto;
+	}
+
+	.mapsdk-card-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-top: 0.5rem;
 	}
 
 	.mapsdk-card-close {

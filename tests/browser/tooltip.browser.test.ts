@@ -9,6 +9,7 @@ import { defaultMessages } from "../../src/lib/data/messages.js";
 import { NO_LEVEL } from "../../src/lib/data/scale.js";
 import type { Level } from "../../src/lib/data/scale-types.js";
 import MapTooltip from "../../src/lib/ui/MapTooltip.svelte";
+import type { CardContext } from "../../src/lib/ui/card.js";
 
 function level(label: string, color: string): Level {
 	return {
@@ -609,6 +610,66 @@ describe("MapTooltip card", () => {
 		expect(document.activeElement).toBe(container);
 		before.remove();
 		after.remove();
+	});
+
+	const selectButton = createRawSnippet((ctx: () => CardContext) => ({
+		render: () => `<button type="button">${ctx().selected ? "Remove" : "Select"}</button>`,
+		setup: (node: Element) => {
+			node.addEventListener("click", () => ctx().toggle());
+		}
+	}));
+
+	function withSelection(map: MapContext, ids: string[], togglePick = vi.fn()): MapContext {
+		return {
+			...(map as object),
+			getSelection: () => (ids.length ? { kind: "monitors", ids } : null),
+			togglePick
+		} as never;
+	}
+
+	/** A monitor item shaped like the monitors preset's: `monitor:<id>` refKeys. */
+	function monitorItem(id: string, name: string): FeatureListItem {
+		return { ...item(`monitor:${id}`, name, good), ref: { kind: "monitor", id } };
+	}
+	function monitorHit(id: string, name: string) {
+		return {
+			hit: {
+				pluginId: "points",
+				ref: { kind: "monitor", id },
+				refKey: `monitor:${id}`,
+				name
+			},
+			lngLat: [-119.7, 36.7] as [number, number]
+		};
+	}
+
+	it("renders the host's actions with the card's feature and selection", async () => {
+		const map = withSelection(
+			cardMap([monitorItem("a", "Site A")], { pinned: monitorHit("a", "Site A") }),
+			["a"]
+		);
+		await render(MapTooltip, { map, project, card: true, actions: selectButton });
+		const card = page.getByRole("group", { name: "Site A" });
+		await expect.element(card.getByRole("button", { name: "Remove" })).toBeVisible();
+	});
+
+	it("an action's toggle calls map.togglePick with the card's plugin and ref", async () => {
+		const togglePick = vi.fn();
+		const map = withSelection(
+			cardMap([monitorItem("a", "Site A")], { pinned: monitorHit("a", "Site A") }),
+			[],
+			togglePick
+		);
+		await render(MapTooltip, { map, project, card: true, actions: selectButton });
+		await page.getByRole("button", { name: "Select" }).click();
+		expect(togglePick).toHaveBeenCalledWith("points", { kind: "monitor", id: "a" });
+	});
+
+	it("no actions on the hover-only tooltip", async () => {
+		const map = withSelection(cardMap(sites(), { hovered: hit("a", "Site A") }), []);
+		await render(MapTooltip, { map, project, actions: selectButton });
+		await expect.element(page.getByRole("tooltip")).toBeVisible();
+		expect(document.body.textContent).not.toContain("Select");
 	});
 
 	it("with card off, a pinned value is ignored and the tooltip keeps role=tooltip", async () => {
