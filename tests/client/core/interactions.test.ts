@@ -999,3 +999,167 @@ describe("click modifiers", () => {
 		expect(events).toEqual([{ modifier: false, touch: true, additive: true }]);
 	});
 });
+
+describe("modifier mode and refusals", () => {
+	async function modSetUp(
+		mode: "single" | "multiple",
+		extra: Partial<Parameters<MapContext["addPlugin"]>[1]> = {}
+	) {
+		const map = createMap({ config });
+		const onselectionchange = vi.fn();
+		map.addPlugin(points("monitors"), {
+			selectionMode: mode,
+			pickWith: "modifier",
+			onselectionchange,
+			...extra
+		});
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		map.setCardEnabled(true);
+		const clickOn = (id: string, originalEvent: Record<string, unknown> = {}) => {
+			gl.setRenderedFeatures([rendered(map, "monitors", id)]);
+			click(gl, originalEvent);
+		};
+		return { map, gl, onselectionchange, clickOn };
+	}
+	const ids = (map: MapContext) => map.getSelection("monitors")?.ids ?? null;
+	const cap1 = (next: { ids: string[] } | null) =>
+		(next?.ids.length ?? 0) <= 1 || "Up to 1 monitor";
+
+	it("modifier mode: a plain click pins and selects nothing", async () => {
+		const { map, clickOn, onselectionchange } = await modSetUp("multiple");
+		const featureclick = vi.fn();
+		map.on("featureclick", featureclick);
+		clickOn("a");
+		expect(ids(map)).toBeNull();
+		expect(onselectionchange).not.toHaveBeenCalled();
+		expect(featureclick).toHaveBeenCalledTimes(1);
+		expect(map.pinned?.hit.refKey).toBe("monitor:a");
+	});
+
+	it("modifier mode: Shift-click toggles in multiple mode", async () => {
+		const { map, clickOn } = await modSetUp("multiple");
+		clickOn("a", { shiftKey: true });
+		clickOn("b", { metaKey: true });
+		clickOn("a", { ctrlKey: true });
+		expect(ids(map)).toEqual(["b"]);
+	});
+
+	it("modifier mode: Shift-click in single mode selects, then clears", async () => {
+		const { map, clickOn } = await modSetUp("single");
+		clickOn("a", { shiftKey: true });
+		expect(ids(map)).toEqual(["a"]);
+		clickOn("a", { shiftKey: true });
+		expect(ids(map)).toBeNull();
+	});
+
+	it("modifier mode: a touch tap only pins, even in multiple mode", async () => {
+		const { map, clickOn } = await modSetUp("multiple");
+		clickOn("a", { pointerType: "touch" });
+		expect(ids(map)).toBeNull();
+		expect(map.pinned?.hit.refKey).toBe("monitor:a");
+	});
+
+	it("modifier mode: a list pick toggles only when additive", async () => {
+		const map = createMap({ config });
+		map.addPlugin(
+			{ ...points("monitors"), features: () => [listed("a")] },
+			{ selectionMode: "multiple", pickWith: "modifier" }
+		);
+		map.attach(createFakeGl({ styleLoaded: true }));
+		await tick();
+		map.pickFromList("monitors", "monitor:a", false);
+		expect(ids(map)).toBeNull();
+		map.pickFromList("monitors", "monitor:a", true);
+		expect(ids(map)).toEqual(["a"]);
+		map.pickFromList("monitors", "monitor:a", true);
+		expect(ids(map)).toBeNull();
+	});
+
+	it("canSelect refuses: selection unchanged, no onselectionchange, notice set", async () => {
+		const { map, clickOn, onselectionchange } = await modSetUp("multiple", { canSelect: cap1 });
+		clickOn("a", { shiftKey: true });
+		expect(onselectionchange).toHaveBeenCalledTimes(1);
+		clickOn("b", { shiftKey: true });
+		expect(ids(map)).toEqual(["a"]);
+		expect(onselectionchange).toHaveBeenCalledTimes(1);
+		expect(map.notice?.message).toBe("Up to 1 monitor");
+		const first = map.notice!.id;
+		clickOn("c", { shiftKey: true });
+		expect(map.notice?.id).toBeGreaterThan(first);
+	});
+
+	it("the next allowed pick clears the notice", async () => {
+		const { map, clickOn } = await modSetUp("multiple", { canSelect: cap1 });
+		clickOn("a", { shiftKey: true });
+		clickOn("b", { shiftKey: true });
+		expect(map.notice).not.toBeNull();
+		clickOn("a", { shiftKey: true });
+		expect(ids(map)).toBeNull();
+		expect(map.notice).toBeNull();
+	});
+
+	it("canSelect that throws refuses quietly and logs", async () => {
+		const error = vi.spyOn(console, "error").mockImplementation(() => {});
+		const { map, clickOn } = await modSetUp("multiple", {
+			canSelect: () => {
+				throw new Error("boom");
+			}
+		});
+		clickOn("a", { shiftKey: true });
+		expect(ids(map)).toBeNull();
+		expect(map.notice).toBeNull();
+		expect(error).toHaveBeenCalledWith("map-sdk: canSelect failed", expect.any(Error));
+		error.mockRestore();
+	});
+
+	it("canSelect isn't asked for setSelection or Clear", async () => {
+		const canSelect = vi.fn(() => "no" as const);
+		const { map } = await modSetUp("multiple", { canSelect });
+		map.setSelection("monitors", { kind: "monitors", ids: ["a", "b"] });
+		map.clearSelection("monitors");
+		expect(canSelect).not.toHaveBeenCalled();
+		expect(ids(map)).toBeNull();
+	});
+
+	it("togglePick toggles with the same rules and refusal, in either mode", async () => {
+		for (const pickWith of ["click", "modifier"] as const) {
+			const { map, onselectionchange } = await modSetUp("multiple", { pickWith, canSelect: cap1 });
+			map.togglePick("monitors", { kind: "monitor", id: "a" });
+			expect(ids(map)).toEqual(["a"]);
+			map.togglePick("monitors", { kind: "monitor", id: "b" });
+			expect(ids(map)).toEqual(["a"]);
+			expect(map.notice?.message).toBe("Up to 1 monitor");
+			map.togglePick("monitors", { kind: "monitor", id: "a" });
+			expect(ids(map)).toBeNull();
+			expect(onselectionchange).toHaveBeenCalledTimes(2);
+		}
+	});
+
+	it("click mode with no canSelect behaves as before", async () => {
+		const { map, gl } = await setUp("multiple");
+		gl.setRenderedFeatures([rendered(map, "monitors", "a")]);
+		click(gl);
+		gl.setRenderedFeatures([rendered(map, "monitors", "b")]);
+		click(gl);
+		expect(ids(map)).toEqual(["b"]);
+		click(gl, { shiftKey: true });
+		expect(ids(map)).toBeNull();
+		expect(map.getPickWith("monitors")).toBe("click");
+		expect(map.notice).toBeNull();
+	});
+});
+
+function listed(id: string): FeatureListItem {
+	return {
+		refKey: `monitor:${id}`,
+		ref: { kind: "monitor", id },
+		name: `Site ${id}`,
+		value: null,
+		level: NO_LEVEL,
+		units: "",
+		lngLat: [-119, 36],
+		selectable: true
+	};
+}
