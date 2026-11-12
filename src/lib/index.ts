@@ -36,6 +36,12 @@ export { monitorShape, monitorsPlugin } from "./presets/monitors.js";
 export type { MonitorShape, MonitorsPluginOptions } from "./presets/monitors.js";
 export { regionsPlugin } from "./presets/regions.js";
 export type { RegionsPluginOptions } from "./presets/regions.js";
+export { focusAreaPlugin } from "./presets/focus-area.svelte.js";
+export type {
+	FocusAreaPlugin,
+	FocusAreaPluginOptions,
+	FocusGeometry
+} from "./presets/focus-area.svelte.js";
 export { calHeatScorePlugin } from "./presets/calheatscore.js";
 export type { CalHeatScorePluginOptions } from "./presets/calheatscore.js";
 export { forecastZonesPlugin } from "./presets/forecast-zones.js";
