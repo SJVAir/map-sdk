@@ -79,6 +79,12 @@ Standard (no fallback, must exist): `--background`, `--foreground`, `--card`, `-
 | `--swatch-outline-color` | a mix of `--foreground`      | Legend swatch outline                                        |
 | `--motion-duration-fast` | `120ms`                      | Control transitions (0 under reduced motion)                 |
 | `--motion-ease-standard` | `ease`                       | Control transitions                                          |
+| `--focus-area`           | `#1f2d3d` (fixed)            | The focus area's line, point ring, and label                 |
+| `--focus-area-casing`    | `#ffffff` (fixed)            | The casing under them, and the label's halo                  |
+| `--focus-area-wash`      | `#ffffff` (fixed)            | The wash outside a focus area                                |
+
+The focus area's tokens fall back to fixed colors, not to theme tokens: they're drawn on a basemap,
+which doesn't follow the page's theme. Set them only to override the defaults.
 
 `theme.css` exposes the family tokens as Tailwind utilities (`bg-highlight`, `border-card-border`,
 `text-link`, `ring-ring-edge`, `shadow-card`, `rounded-control`, `shadow-lifted`).
@@ -169,7 +175,7 @@ just below another plugin, and `map.movePlugin(id, { before? })` moves an added 
 layers to the top, or just below the plugin `before` names. A plugin object belongs to one map:
 create one per map (adding an object that is set up on another map throws). The presets are
 `monitorsPlugin`, `regionsPlugin`, `calHeatScorePlugin`, `forecastZonesPlugin`, `hmsSmokePlugin`,
-`hmsFirePlugin`, and `collocationSitesPlugin`; `pointsPlugin` and `shapesPlugin` are the general
+`hmsFirePlugin`, `collocationSitesPlugin`, and `focusAreaPlugin`; `pointsPlugin` and `shapesPlugin` are the general
 ones they are built on. Presets don't fetch: the host supplies a `DataSource`. `monitorsPlugin` is
 selectable by default, like the shape presets.
 
@@ -260,6 +266,31 @@ The monitor marker shapes are exported for your own plugins: `circle`, `square`,
 `triangle(color, borderWidth, borderColor?)` return a 24px SVG, and `withCrosshair(svg, color)`
 wraps one in the crosshair (`CROSSHAIR_ICON_SIZE`, 56px, square). Pass the size to
 `pointsPlugin`'s `icon.size`.
+
+### The focus area
+
+`focusAreaPlugin({ id?, layerLabel, geometry?, label? })` marks the place a map is about. Add it
+first (or `before` the first data plugin), so the data draws over it.
+
+- **An area** (`Polygon` or `MultiPolygon`) gets a two-tone outline (a slate line over a white
+  casing) and a white wash over everything outside it. It isn't listed, clicked, or hovered.
+- **A place** (`Point`) gets a two-tone ring with `label` beside it. It is one feature-list row
+  named by the label (`layerLabel` without one), and clicking the ring (or focusing the row) pins a
+  card with the label alone. It's never selectable, and a feature drawn above it (a monitor at the
+  same spot) takes the click. The label is drawn on the map's canvas, so screen readers hear the
+  row instead. A map with `featureList={false}` should name the place in `MapView`'s `label`.
+- **`plugin.set({ geometry, label })`** changes the focus in place; `geometry: null` clears it.
+  `plugin.focus` is the current one. Any other geometry type throws, from `set` or the options.
+  The focus is kept across `active` off and on, basemap switches, and theme changes.
+
+```ts
+const focus = focusAreaPlugin({ layerLabel: "Places" });
+map.addPlugin(focus, { before: "monitors" });
+focus.set({ geometry: { type: "Point", coordinates: [-119.79, 36.74] }, label: "Your location" });
+```
+
+A list item's `noReading: true` (set on the focus point's) shows the item by its name alone: no
+value, level, or "No level" in its row, its accessible name, or its card.
 
 ## Data sources
 
@@ -593,6 +624,18 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.11
+
+- **The focus area.** `focusAreaPlugin` marks the place a map is about: an area gets a two-tone
+  outline and a wash outside it, and a place gets a two-tone ring with its label, listed as one row
+  and clickable for a card with the label alone. `set()` changes it in place.
+- **New theme tokens:** `--focus-area`, `--focus-area-casing`, and `--focus-area-wash`. They default
+  to fixed colors (a slate line, a white casing and wash), since they sit on the basemap, which
+  doesn't follow the page's theme.
+- **New API:** `focusAreaPlugin`, `FocusAreaPlugin`, `FocusAreaPluginOptions`, `FocusGeometry`,
+  `FeatureListItem.noReading`, and three new `ThemeColors` keys (`focusArea`, `focusAreaCasing`,
+  `focusAreaWash`); code that builds a `ThemeColors` object needs them.
 
 ### 0.1.0-beta.10
 

@@ -6,6 +6,7 @@ import {
 	CROSSHAIR_ICON_SIZE,
 	createMap,
 	defaultBasemaps,
+	focusAreaPlugin,
 	hmsFirePlugin,
 	hmsSmokePlugin,
 	Legend,
@@ -307,5 +308,19 @@ describe("README examples", () => {
 	it("marker shapes in a crosshair", () => {
 		const svg = withCrosshair(circle("#00e400", 2), "#4A5FC6");
 		expect(svg).toContain(`width="${CROSSHAIR_ICON_SIZE}"`);
+	});
+
+	it("focus area: added under the data, set in place", () => {
+		const map = createMap({ config: { maptilerKey: "your-maptiler-key" } });
+		map.addPlugin(monitorsPlugin({ source: createMonitorsStore().dataSource, layerLabel: "M" }));
+		const focus = focusAreaPlugin({ layerLabel: "Places" });
+		map.addPlugin(focus, { before: "monitors" });
+		focus.set({
+			geometry: { type: "Point", coordinates: [-119.79, 36.74] },
+			label: "Your location"
+		});
+		expect(map.plugins.map((p) => p.id)).toEqual(["focus-area", "monitors"]);
+		expect(focus.features!()[0].name).toBe("Your location");
+		map.destroy();
 	});
 });

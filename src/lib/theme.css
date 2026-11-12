@@ -31,4 +31,5 @@
 }
 
 /* The motion, swatch-outline, and --ring-edge tokens are read with fallbacks where used (see
-   ui/controls.css and the components); they are never declared here. */
+   ui/controls.css and the components); they are never declared here. Nor are the --focus-area*
+   tokens: only the map's paint reads them (plugins/style.ts), with fixed defaults. */
