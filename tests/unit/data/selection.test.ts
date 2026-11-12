@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { applyPick, selectionKeys, selectionKind } from "../../../src/lib/data/selection.js";
+import {
+	applyPick,
+	selectionKeys,
+	selectionKind,
+	toggleInSelection
+} from "../../../src/lib/data/selection.js";
 import type { FeatureRef, SpatialSelection } from "../../../src/lib/data/types.js";
 
 const mon = (id: string): FeatureRef => ({ kind: "monitor", id });
@@ -74,5 +79,37 @@ describe("selectionKind", () => {
 		expect(selectionKind(mon("a"))).toBe("monitors");
 		expect(selectionKind({ kind: "region", type: "t", code: "c" })).toBe("regions");
 		expect(selectionKind({ kind: "feature", id: "f" })).toBeNull();
+	});
+});
+
+describe("toggleInSelection", () => {
+	const region = (code: string): FeatureRef => ({ kind: "region", type: "county", code });
+
+	it("returns current unchanged in mode none", () => {
+		const cur = monitors("a");
+		expect(toggleInSelection(cur, mon("b"), "none")).toBe(cur);
+	});
+
+	it("leaves the selection unchanged for a feature ref", () => {
+		const cur = monitors("a");
+		expect(toggleInSelection(cur, { kind: "feature", id: "x" }, "multiple")).toBe(cur);
+	});
+
+	it("single: selects, then clears the same one, and replaces with another", () => {
+		expect(toggleInSelection(null, mon("a"), "single")).toEqual(monitors("a"));
+		expect(toggleInSelection(monitors("a"), mon("a"), "single")).toBeNull();
+		expect(toggleInSelection(monitors("a"), mon("b"), "single")).toEqual(monitors("b"));
+	});
+
+	it("multiple: adds, removes, and clears on the last", () => {
+		expect(toggleInSelection(monitors("a"), mon("b"), "multiple")).toEqual(monitors("a", "b"));
+		expect(toggleInSelection(monitors("a", "b"), mon("a"), "multiple")).toEqual(monitors("b"));
+		expect(toggleInSelection(monitors("a"), mon("a"), "multiple")).toBeNull();
+	});
+
+	it("multiple: another kind starts a new selection", () => {
+		const next = toggleInSelection(monitors("a"), region("019"), "multiple");
+		expect(next?.kind).toBe("regions");
+		expect(next?.ids).toHaveLength(1);
 	});
 });
