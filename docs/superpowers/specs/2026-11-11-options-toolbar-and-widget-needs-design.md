@@ -188,8 +188,18 @@ Part 1 must be designed so part 2 adds the buttons without a breaking change.
 - For a given geometry: a two-tone outline (a line over a wider, lighter casing, so it reads on
   any basemap and over fills) and a faded surround outside it (an inverse mask), as on sjvair.com's
   pesticides and emissions explorers.
-- Not clickable, not listed, not hovered, and drawn under the interactive layers.
-- For a point (a school, say): an outlined ring with a label.
+- A polygon is not clickable, not listed, not hovered, and drawn under the interactive layers.
+- For a point (a school, "Your location"): an outlined ring with a label. The point pin, decided
+  by the user on 2026-11-11 (a pin-only brainstorm after the main one):
+  - **Shape:** the outlined ring (below), not the dashboard's teardrop pin.
+  - **Listed and clickable:** the point is one row in the feature list, named by its label, and
+    clicking the ring (or focusing its row) pins its card, which shows the label alone, as a
+    feature with no reading does. It is never selectable. It draws under the data plugins, so a
+    monitor at the same spot still takes the click. Since the row names the place, the label
+    beside the ring is hidden from screen readers. A polygon stays unlisted: it is a boundary, not
+    a place.
+  - **Color:** the ring's stroke is `--focus-area`, not `--highlight`: a `--highlight` ring is
+    what a selected monitor looks like with `selectedStyle: "ring"`.
 - **Colors follow the theme** (the user, 2026-11-11), through three new family tokens:
 
   | Token                 | Falls back to                        | Used for                    |
@@ -216,8 +226,9 @@ These are the starting values. The builder may tune them, and says so in the PR.
 ### My calls
 
 - **Shape of the API:** a preset plugin (e.g. `focusAreaPlugin({ id, geometry, label? })`, with a
-  way to change the geometry without re-adding it), `hoverable: false`, no `features()`, so it's
-  never listed or clicked. Hosts add it at the bottom of the draw order (or `before` the first
+  way to change the geometry without re-adding it). For a polygon it is `hoverable: false` with no
+  features, so it's never listed or clicked; for a point it lists one feature (the user's call,
+  above), never selectable. Hosts add it at the bottom of the draw order (or `before` the first
   data plugin); the docs say so. The builder may make it a `MapContext` method instead if that
   fits the draw-order rules better; either way it lives in the registry like any plugin.
 - **The label** of a point is the host's text, drawn beside the ring in `--foreground` with a
