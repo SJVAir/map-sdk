@@ -472,6 +472,8 @@ export class PluginHost {
 			get selectedKeys() {
 				return selectedKeys(pluginId);
 			},
+			coveredAt: (lngLat) =>
+				this.#plugins.some((p) => p.id !== pluginId && p.drawnAt?.(lngLat) === true),
 			effect(fn) {
 				if (running.dead) return;
 				running.effects.push(

@@ -23,6 +23,7 @@ export function scopedContext(ctx: PluginContext, prefix: string): PluginContext
 		get selectedKeys() {
 			return ctx.selectedKeys;
 		},
+		coveredAt: (lngLat) => ctx.coveredAt(lngLat),
 		id: (name) => ctx.id(local(name)),
 		addSource: (name, spec) => ctx.addSource(local(name), spec),
 		addLayer: (name, spec) => ctx.addLayer(local(name), spec),

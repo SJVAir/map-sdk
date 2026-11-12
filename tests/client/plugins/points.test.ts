@@ -721,3 +721,68 @@ describe("pointsPlugin selectedStyle", () => {
 		}
 	});
 });
+
+describe("pointsPlugin drawnAt (marksPlaces)", () => {
+	const AT: [number, number] = [-119.5, 36.5];
+	const renderedAt = (refKey: string) => ({
+		layer: { id: "m1:pts:points" },
+		source: "m1:pts:points",
+		properties: { refKey },
+		geometry: { type: "Point" as const, coordinates: AT }
+	});
+	const at = (rows: Array<Props & { lngLat?: [number, number] }>) =>
+		new TestSource<Props>({ features: points<Props>(rows), scale: pm25Scale });
+
+	it("has no drawnAt without marksPlaces", async () => {
+		const { plugin } = await setup({ source: at([]) });
+		expect(plugin.drawnAt).toBeUndefined();
+	});
+
+	it("is false before setup", () => {
+		const plugin = pointsPlugin<Props>({
+			id: "pts",
+			layerLabel: "Schools",
+			marksPlaces: true,
+			source: at([{ refKey: "feature:s", name: "S", value: null, lngLat: AT }])
+		});
+		expect(plugin.drawnAt!(AT)).toBe(false);
+	});
+
+	it("is true while a feature at exactly that point is rendered", async () => {
+		const { plugin, gl } = await setup({
+			marksPlaces: true,
+			source: at([{ refKey: "feature:s", name: "S", value: null, lngLat: AT }])
+		});
+		await settle();
+		gl.setRenderedFeatures([renderedAt("feature:s")]);
+		gl.emit("idle", {});
+		flushSync();
+		expect(plugin.drawnAt!(AT)).toBe(true);
+		expect(plugin.drawnAt!([AT[0] + 1e-7, AT[1]])).toBe(false);
+	});
+
+	it("is false while nothing of it is rendered there (clustered, or out of range)", async () => {
+		const { plugin, gl } = await setup({
+			marksPlaces: true,
+			source: at([{ refKey: "feature:s", name: "S", value: null, lngLat: AT }])
+		});
+		await settle();
+		gl.setRenderedFeatures([]);
+		gl.emit("idle", {});
+		expect(plugin.drawnAt!(AT)).toBe(false);
+	});
+
+	it("is true when either of two features sharing the point is rendered", async () => {
+		const { plugin, gl } = await setup({
+			marksPlaces: true,
+			source: at([
+				{ refKey: "feature:a", name: "A", value: null, lngLat: AT },
+				{ refKey: "feature:b", name: "B", value: null, lngLat: AT }
+			])
+		});
+		await settle();
+		gl.setRenderedFeatures([renderedAt("feature:b")]);
+		gl.emit("idle", {});
+		expect(plugin.drawnAt!(AT)).toBe(true);
+	});
+});

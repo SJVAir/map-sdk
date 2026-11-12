@@ -3,7 +3,7 @@ import { flushSync, tick } from "svelte";
 import type { GeoJSONSourceSpecification, LayerSpecification } from "@maptiler/sdk";
 import type { FeatureCollection, LineString, MultiPolygon, Point, Polygon } from "geojson";
 import { InteractionRouter } from "../../../src/lib/core/interactions.svelte.js";
-import type { Providers } from "../../../src/lib/core/plugin.js";
+import type { MapPlugin, Providers } from "../../../src/lib/core/plugin.js";
 import { PluginHost } from "../../../src/lib/core/plugin-host.svelte.js";
 import type { FormatProvider } from "../../../src/lib/data/format.js";
 import { defaultMessages } from "../../../src/lib/data/messages.js";
@@ -16,7 +16,9 @@ import {
 	type FocusGeometry
 } from "../../../src/lib/presets/focus-area.svelte.js";
 import { worldMask } from "../../../src/lib/presets/focus-geometry.js";
+import { rootEffect } from "../../fixtures/effects.svelte.js";
 import { createFakeGl, type FakeGl } from "../../fixtures/fake-gl.js";
+import { Flag } from "../../fixtures/sources.svelte.js";
 
 const AREA: Polygon = {
 	type: "Polygon",
@@ -302,5 +304,63 @@ describe("focusAreaPlugin", () => {
 	it("has no summary line while nothing of it is in view", async () => {
 		const { plugin } = await setup({ geometry: AREA });
 		expect(plugin.summarizeEmpty).toBe(false);
+	});
+});
+
+describe("focus point under a drawn marker", () => {
+	/** A plugin whose `drawnAt` is a reactive flag. */
+	function cover(drawn: { value: boolean }, withDrawnAt = true): MapPlugin {
+		return {
+			id: "schools",
+			setup: () => () => {},
+			...(withDrawnAt ? { drawnAt: () => drawn.value } : {})
+		};
+	}
+
+	async function withCover(withDrawnAt = true) {
+		const drawn = new Flag();
+		const { host } = makeHost();
+		const plugin = focusAreaPlugin({ id: "focus", layerLabel: "Places", geometry: SPOT });
+		host.add(plugin);
+		host.add(cover(drawn, withDrawnAt));
+		host.attach(createFakeGl({ styleLoaded: true }));
+		await tick();
+		return { plugin, drawn };
+	}
+
+	it("lists its row while no marker is drawn there", async () => {
+		const { plugin } = await withCover();
+		expect(plugin.features!()).toHaveLength(1);
+	});
+
+	it("drops its row while another plugin's marker is drawn there, and brings it back", async () => {
+		const { plugin, drawn } = await withCover();
+		drawn.value = true;
+		expect(plugin.features!()).toEqual([]);
+		drawn.value = false;
+		expect(plugin.features!()).toHaveLength(1);
+	});
+
+	it("re-derives the list when the cover changes (reactive)", async () => {
+		const { plugin, drawn } = await withCover();
+		const lengths: number[] = [];
+		const stop = rootEffect(() => {
+			lengths.push(plugin.features!().length);
+		});
+		flushSync();
+		drawn.value = true;
+		flushSync();
+		stop();
+		expect(lengths).toEqual([1, 0]);
+	});
+
+	it("ignores plugins without drawnAt", async () => {
+		const { plugin } = await withCover(false);
+		expect(plugin.features!()).toHaveLength(1);
+	});
+
+	it("lists its row when not set up", () => {
+		const plugin = focusAreaPlugin({ id: "focus", layerLabel: "Places", geometry: SPOT });
+		expect(plugin.features!()).toHaveLength(1);
 	});
 });

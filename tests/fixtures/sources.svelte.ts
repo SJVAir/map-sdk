@@ -32,3 +32,8 @@ export function points<P extends MapFeatureProperties>(
 		}))
 	};
 }
+
+/** A reactive boolean for tests (runes only compile in `.svelte.ts` files). */
+export class Flag {
+	value = $state(false);
+}

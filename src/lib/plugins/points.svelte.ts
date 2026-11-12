@@ -126,6 +126,11 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	truncateValues?: boolean;
 	/** Whether `features()` lists this plugin's features. Default true. */
 	listed?: boolean;
+	/**
+	 * A focus point at one of its features gives way to it: the plugin gets `drawnAt`, so the focus
+	 * area leaves out its own row while the feature's marker is drawn there. Default false.
+	 */
+	marksPlaces?: boolean;
 	/** Tooltip content for a feature, below its name; `props` are its source properties. */
 	tooltip?(item: FeatureListItem, props: P, env: PointsTooltipEnv): Snippet | undefined;
 	/**
@@ -180,6 +185,34 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		null;
 	/** Bumped on every data render: cluster ids from older data name nothing. Reactive. */
 	let dataGeneration = $state(0);
+	/** Bumped when the map settles (`idle`): what is rendered may have changed. Reactive. */
+	let settled = $state(0);
+	/** The running setup's map and point layers, for `drawnAt`; null while not set up. */
+	let drawn: { gl: GlMapLike; layers(): string[] } | null = null;
+
+	/** Whether a feature at exactly `lngLat` is drawn as its own marker (see `marksPlaces`). */
+	function drawnAt(lngLat: [number, number]): boolean {
+		void settled;
+		void dataGeneration;
+		const running = drawn;
+		if (!running) return false;
+		// Source coordinates, exact: rendered tile geometry is quantized.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- a local, not reactive
+		const keys = new Set<string>();
+		for (const feature of source.features?.features ?? []) {
+			const g = feature.geometry;
+			if (g?.type !== "Point" || !feature.properties) continue;
+			if (g.coordinates[0] === lngLat[0] && g.coordinates[1] === lngLat[1]) {
+				keys.add(feature.properties.refKey);
+			}
+		}
+		const layers = running.layers();
+		if (keys.size === 0 || layers.length === 0) return false;
+		const { x, y } = running.gl.project(lngLat);
+		return running.gl
+			.queryRenderedFeatures([x, y], { layers })
+			.some((f) => keys.has(f.properties.refKey as string));
+	}
 
 	function tooltipEnv(): PointsTooltipEnv | null {
 		if (!providers) return null;
@@ -631,6 +664,14 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 
 		scales.track(ctx, () => dead);
 
+		const onIdle = () => {
+			if (!dead) settled++;
+		};
+		if (options.marksPlaces) {
+			drawn = { gl, layers: () => pointLayerIds };
+			gl.on("idle", onIdle);
+		}
+
 		ctx.effect(() => {
 			const collection = source.features;
 			const scale = currentScale();
@@ -645,8 +686,11 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		return () => {
 			dead = true;
 			if (ranged) gl.off("zoom", onZoom);
+			if (options.marksPlaces) gl.off("idle", onIdle);
 			providers = null;
 			live = null;
+			drawn = null;
+			settled++;
 		};
 	}
 
@@ -661,6 +705,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		selectable
 	};
 	if (options.listed ?? true) plugin.features = features;
+	if (options.marksPlaces) plugin.drawnAt = drawnAt;
 	if (options.tooltip) plugin.tooltip = featureTooltip;
 	if (options.tooltipShowsName) plugin.tooltipShowsName = true;
 	if (cluster?.tooltip) plugin.hoverTooltip = clusterTooltip;
