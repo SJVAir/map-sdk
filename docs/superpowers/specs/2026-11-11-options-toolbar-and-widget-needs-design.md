@@ -371,8 +371,11 @@ Firm needs; anything about which rows the widget shows is for the dashboard's ow
 
 - Pollutant choices come from the host (the widget passes the monitors metadata's
   `available_pollutants`), never a list in map-sdk.
-- No theme row (the widget follows the dashboard's theme). Any subset of preset groups and rows,
-  plus the host's own rows and groups.
+- No theme row. The map no longer follows the dashboard's theme (the user, 2026-11-11, in the
+  dashboard's step 5 spec 2): the widget's Settings shows marker clusters, basemap, basemap variant
+  (MapTiler's own variants, defaulting to the style's default, as monitor-map does), and Reset. Part
+  5 checks whether the variant row needs more from `basemapOptions(map)` than the basemap row.
+  Any subset of preset groups and rows, plus the host's own rows and groups.
 - **One change event per user action, carrying the whole values object.** A select-all that flips
   several rows is one event, so it's one undo step. A list of the changed keys alongside it.
 - **The host can set values at any time without a change event** (undo, redo, another tab), like
