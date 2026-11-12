@@ -112,6 +112,18 @@ describe("picking", () => {
 		expect(lookup).toHaveBeenCalledWith("monitor:7");
 	});
 
+	it("gives each featureclick handler its own event", async () => {
+		const { map, gl } = await setUp("none");
+		const seen: unknown[] = [];
+		map.on("featureclick", (e) => {
+			delete (e as { ref?: unknown }).ref;
+		});
+		map.on("featureclick", (e) => seen.push(e.ref));
+		gl.setRenderedFeatures([rendered(map, "monitors", "7")]);
+		click(gl);
+		expect(seen).toEqual([{ kind: "monitor", id: "7" }]);
+	});
+
 	it("replaces the selection on a plain click", async () => {
 		const { map, gl, onselectionchange } = await setUp("multiple", ["1"]);
 		gl.setRenderedFeatures([rendered(map, "monitors", "2")]);

@@ -17,6 +17,8 @@ import {
 	FALLBACK_THEME_COLORS,
 	levelKeyExpression
 } from "../../../src/lib/plugins/style.js";
+import { focusAreaPlugin } from "../../../src/lib/presets/focus-area.svelte.js";
+import { rootEffect } from "../../fixtures/effects.svelte.js";
 import { createFakeGl, type FakeGl } from "../../fixtures/fake-gl.js";
 import { burnScale, fireScale, pm25Scale, smokeScale } from "../../fixtures/scales.js";
 import { points, TestSource } from "../../fixtures/sources.svelte.js";
@@ -784,5 +786,102 @@ describe("pointsPlugin drawnAt (marksPlaces)", () => {
 		gl.setRenderedFeatures([renderedAt("feature:b")]);
 		gl.emit("idle", {});
 		expect(plugin.drawnAt!(AT)).toBe(true);
+	});
+});
+
+describe("pointsPlugin drawnAt between idles", () => {
+	const AT: [number, number] = [-119.5, 36.5];
+	const hit = {
+		layer: { id: "m1:pts:points" },
+		source: "m1:pts:points",
+		properties: { refKey: "feature:s" },
+		geometry: { type: "Point" as const, coordinates: AT }
+	};
+
+	async function marked() {
+		const source = new TestSource<Props>({
+			features: points<Props>([{ refKey: "feature:s", name: "S", value: null, lngLat: AT }]),
+			scale: pm25Scale
+		});
+		const ctx = await setup({ marksPlaces: true, source });
+		await settle();
+		ctx.gl.setRenderedFeatures([hit]);
+		ctx.gl.emit("idle", {});
+		return { ...ctx, source };
+	}
+
+	it("keeps its answer while the map is between idles (a data refresh not yet drawn)", async () => {
+		const { plugin, gl, source } = await marked();
+		expect(plugin.drawnAt!(AT)).toBe(true);
+		// The refresh is set but not drawn yet: nothing is rendered until the next idle.
+		gl.setRenderedFeatures([]);
+		source.features = points<Props>([{ refKey: "feature:s", name: "S", value: null, lngLat: AT }]);
+		await settle();
+		expect(plugin.drawnAt!(AT)).toBe(true);
+		gl.setRenderedFeatures([hit]);
+		gl.emit("idle", {});
+		expect(plugin.drawnAt!(AT)).toBe(true);
+	});
+
+	it("changes its answer at the next idle", async () => {
+		const { plugin, gl } = await marked();
+		expect(plugin.drawnAt!(AT)).toBe(true);
+		gl.setRenderedFeatures([]);
+		expect(plugin.drawnAt!(AT)).toBe(true);
+		gl.emit("idle", {});
+		expect(plugin.drawnAt!(AT)).toBe(false);
+	});
+
+	it("re-runs dependents only when an answer changes", async () => {
+		const { plugin, gl } = await marked();
+		let runs = 0;
+		const stop = rootEffect(() => {
+			plugin.drawnAt!(AT);
+			runs++;
+		});
+		flushSync();
+		gl.emit("idle", {});
+		flushSync();
+		expect(runs).toBe(1);
+		gl.setRenderedFeatures([]);
+		gl.emit("idle", {});
+		flushSync();
+		stop();
+		expect(runs).toBe(2);
+	});
+});
+
+describe("a real marksPlaces plugin and a focus point", () => {
+	it("drops the focus row while the marker is drawn and brings it back when it leaves the data", async () => {
+		const AT: [number, number] = [-119.5, 36.5];
+		const source = new TestSource<Props>({
+			features: points<Props>([{ refKey: "feature:s", name: "S", value: null, lngLat: AT }]),
+			scale: pm25Scale
+		});
+		const { host, gl } = await setup({ marksPlaces: true, source });
+		const focus = focusAreaPlugin({
+			id: "focus",
+			layerLabel: "Places",
+			geometry: { type: "Point", coordinates: AT }
+		});
+		host.add(focus, "pts");
+		await settle();
+		gl.setRenderedFeatures([
+			{
+				layer: { id: "m1:pts:points" },
+				source: "m1:pts:points",
+				properties: { refKey: "feature:s" },
+				geometry: { type: "Point", coordinates: AT }
+			}
+		]);
+		gl.emit("idle", {});
+		expect(focus.features!()).toEqual([]);
+		source.features = points<Props>([]);
+		gl.setRenderedFeatures([]);
+		await settle();
+		gl.emit("idle", {});
+		expect(focus.features!()).toHaveLength(1);
+		host.remove("pts");
+		expect(focus.features!()).toHaveLength(1);
 	});
 });

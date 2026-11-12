@@ -797,10 +797,11 @@ class MapContextImpl implements MapContext {
 	#emitClick(pluginId: string, ref: FeatureRef, lngLat: [number, number], refKey: string): void {
 		const plugin = untrack(() => this.plugins).find((p) => p.id === pluginId);
 		const properties = untrack(() => plugin?.properties?.(refKey));
-		const event = properties ? { pluginId, ref, lngLat, properties } : { pluginId, ref, lngLat };
 		for (const handler of [...this.#featureClickHandlers]) {
+			// Each handler gets its own event, as before properties existed.
+			const event = { pluginId, ref: { ...ref }, lngLat: [...lngLat] as [number, number] };
 			try {
-				handler(event);
+				handler(properties ? { ...event, properties: { ...properties } } : event);
 			} catch (error) {
 				console.error("map-sdk: a featureclick handler failed", error);
 			}

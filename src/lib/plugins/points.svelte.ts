@@ -185,33 +185,50 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		null;
 	/** Bumped on every data render: cluster ids from older data name nothing. Reactive. */
 	let dataGeneration = $state(0);
-	/** Bumped when the map settles (`idle`): what is rendered may have changed. Reactive. */
+	/** Bumped when an answer `drawnAt` gave changes (checked at `idle`). Reactive. */
 	let settled = $state(0);
 	/** The running setup's map and point layers, for `drawnAt`; null while not set up. */
 	let drawn: { gl: GlMapLike; layers(): string[] } | null = null;
+	/**
+	 * Each point `drawnAt` was asked about and its answer, kept until the map settles again, so a
+	 * refresh or zoom that isn't drawn yet doesn't flip it back and forth. Not reactive (`settled`
+	 * is).
+	 */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, see `settled`
+	const answers = new Map<string, { at: [number, number]; drawn: boolean }>();
 
-	/** Whether a feature at exactly `lngLat` is drawn as its own marker (see `marksPlaces`). */
-	function drawnAt(lngLat: [number, number]): boolean {
-		void settled;
-		void dataGeneration;
-		const running = drawn;
-		if (!running) return false;
+	/** Whether a feature at exactly `at` is rendered as its own marker right now. */
+	function rendersAt(running: { gl: GlMapLike; layers(): string[] }, at: [number, number]) {
 		// Source coordinates, exact: rendered tile geometry is quantized.
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- a local, not reactive
 		const keys = new Set<string>();
 		for (const feature of source.features?.features ?? []) {
 			const g = feature.geometry;
 			if (g?.type !== "Point" || !feature.properties) continue;
-			if (g.coordinates[0] === lngLat[0] && g.coordinates[1] === lngLat[1]) {
+			if (g.coordinates[0] === at[0] && g.coordinates[1] === at[1]) {
 				keys.add(feature.properties.refKey);
 			}
 		}
 		const layers = running.layers();
 		if (keys.size === 0 || layers.length === 0) return false;
-		const { x, y } = running.gl.project(lngLat);
+		const { x, y } = running.gl.project(at);
 		return running.gl
 			.queryRenderedFeatures([x, y], { layers })
 			.some((f) => keys.has(f.properties.refKey as string));
+	}
+
+	/** Whether a feature at exactly `lngLat` is drawn as its own marker (see `marksPlaces`). */
+	function drawnAt(lngLat: [number, number]): boolean {
+		void settled;
+		const running = drawn;
+		if (!running) return false;
+		const key = `${lngLat[0]},${lngLat[1]}`;
+		let known = answers.get(key);
+		if (!known) {
+			known = { at: [lngLat[0], lngLat[1]], drawn: untrack(() => rendersAt(running, lngLat)) };
+			answers.set(key, known);
+		}
+		return known.drawn;
 	}
 
 	function tooltipEnv(): PointsTooltipEnv | null {
@@ -665,9 +682,20 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		scales.track(ctx, () => dead);
 
 		const onIdle = () => {
-			if (!dead) settled++;
+			const running = drawn;
+			if (dead || !running) return;
+			let changed = false;
+			for (const known of answers.values()) {
+				const now = untrack(() => rendersAt(running, known.at));
+				if (now !== known.drawn) {
+					known.drawn = now;
+					changed = true;
+				}
+			}
+			if (changed) settled++;
 		};
 		if (options.marksPlaces) {
+			answers.clear();
 			drawn = { gl, layers: () => pointLayerIds };
 			gl.on("idle", onIdle);
 		}
@@ -690,6 +718,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			providers = null;
 			live = null;
 			drawn = null;
+			answers.clear();
 			settled++;
 		};
 	}
