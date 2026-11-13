@@ -349,6 +349,95 @@ map.on("featureclick", (e) => {
 
 The badges' glyphs are Lucide's `school` and `baby` icons (lucide.dev, ISC license).
 
+### The options toolbar
+
+`OptionsToolbar` is monitor-map 5.0's toolbar, shared: the same groups (Pollutant, Monitors,
+Layers, Overlays, Settings), rows, words, and sizes. Pass it as `MapView`'s `toolbar` snippet:
+it sits top-left, the List button stacks below it, and the map's box gets
+`--mapsdk-toolbar-height` (px from the map's top to the toolbar's bottom) for your own overlays.
+A map at least 48rem wide (the map's box, not the window) shows a row of joined dropdown buttons;
+a narrower one shows one options button that opens a "Map Options" panel over the map, with each
+group a section. Crossing the line closes everything. It uses the disclosure pattern (buttons
+with `aria-expanded` over ordinary checkboxes, radios, and a select); a mouse opens a dropdown on
+hover (wide only); Esc closes it and returns focus; dropdowns stay inside the map (capped and
+scrolling, aligned to whichever edge fits); the panel slides in only without reduced motion, and
+the map's other pieces are inert while it's open.
+
+**You own the values.** `values` is a flat record (`OptionValues`, `Record<string, boolean |
+string>`) keyed by row id. `onchange(values, changed)` is called once per user action with the
+whole new record and the keys that changed: a select-all that flips several rows, or Reset, is one
+call. Setting `values` yourself (undo, another tab) never calls it. `defaults` enables Reset rows
+and is what they put back. `readonly` keeps every row focusable and readable (`aria-disabled`)
+and the dropdowns opening, but changes nothing. To hide the toolbar, don't render it.
+
+**You declare the groups.** `groups` is plain data (`OptionGroup[]`): each group has an `id`,
+`label`, optional `icon` (a snippet, such as a Lucide icon with its tint, or `{ svg }` markup),
+`iconOnly` (the wide toolbar shows the icon alone, when there is one), `align: "end"`, `disabled`,
+a `cluster` key (groups with the same one join into one button row), and `rows`. Row kinds
+(`OptionRow`): `checkbox` (with `children` shown while it's on), `group` (a select-all over its
+checkbox `children`: checked, unchecked, or partly checked; hidden with none), `radio` (one key;
+`choices` with `label`, `unit`, `help`, `icon`; `closesMenu`), `select` (a choice's `matches`
+also show it as chosen), `action` (your button), `reset`, and `separator`. Pass a new array to
+change them; whatever is open stays open. Rows that show only in some states, or a trigger that
+follows a value, are you recomputing `groups`.
+
+**Presets** return declarations and their defaults; they don't wire values to plugins (you do,
+as one row can drive two plugins):
+
+- `monitorsOptions(map).groups({ types, pollutants, pollutant, defaultPollutant?, hasInactive?,
+hasInside?, collocation?, none?, icons?, keys?, cluster? })`: monitor-map's Pollutant group
+  (left out with fewer than two choices; `none` adds "None" and disables Monitors while it's
+  chosen) and Monitors group. `types` and `pollutants` are the tile's; types that don't report the
+  pollutant are left out (the metadata's `published`). When the types span two groups, the
+  metadata's group headings (Reference-grade, Low-cost sensors, in their `order`) select all of
+  their types; otherwise it's a flat list, each row with its group's marker; a type with no group
+  goes last. Inactive and Inside show only when `hasInactive`/`hasInside`; Collocation Sites only
+  for PM2.5. Labels, units, and help text come from the metadata provider, so build it in a
+  `$derived`. Default keys: `pollutant`, `` `type:${type}` ``, `inactive`, `inside`,
+  `collocationSites`.
+- `settingsGroup(map, { icon?, cluster?, clusters?, basemap?, reset? })`: monitor-map's Settings
+  (Marker Clusters `clustered`, Basemap and Theme, Reset Map Options), icon-only and end-aligned.
+- `basemapOptions(map, { key?, icons? })`: the Basemap select (one choice per basemap, landing on
+  its default variant) and the Theme radios (the current basemap's variants), on one key holding
+  the variant id. Pass the key as `basemapKey`: those rows then show what the map draws
+  (`map.basemap.current`). A basemap that fails to load, or a saved id that isn't listed, never
+  calls `onchange`; listen on `map.basemap.onFallback(id => …)` if you want to save it.
+- `hmsOptions(map)` (Fire & Smoke, `fireAndSmoke`) and `schoolsOptions(map)` (Schools & Child
+  Care, `schools`) give one row each for your Layers group.
+
+```svelte
+<script lang="ts">
+	const monitors = monitorsOptions(map);
+	const settings = settingsGroup(map);
+	let values = $state<OptionValues>({ ...settings.defaults, pollutant: "pm25" });
+	const groups = $derived([
+		...monitors.groups({ types, pollutants: ["pm25", "o3"], pollutant: "pm25" }).groups,
+		...settings.groups
+	]);
+	function onchange(next: OptionValues, changed: string[]) {
+		values = next;
+		if (changed.includes("basemap")) map.basemap.select(String(next.basemap));
+		// …and the plugins each key drives.
+	}
+</script>
+
+<MapView {map}>
+	{#snippet toolbar()}
+		<OptionsToolbar
+			{groups}
+			{values}
+			{onchange}
+			defaults={settings.defaults}
+			basemapKey="basemap"
+		/>
+	{/snippet}
+</MapView>
+```
+
+`search` (a snippet) sits last on the wide toolbar and beside the options button on the narrow
+one. The toolbar's own glyphs (chevron, sliders, close) are Lucide's (ISC; `chevron-down` and `x`
+derive from Feather, MIT).
+
 ## Data sources
 
 A `DataSource` is `{ status, features, scale }`: a load status (`loading`, `ready`, `error` with
@@ -638,7 +727,11 @@ if (gl) new Marker().setLngLat(lngLat).addTo(gl);
 from:
 
 - `metadata`: scales, entry-type labels and units, monitor type labels, location type labels
-  (optional `locationTypeLabel`), and dataset attribution. The default reads the SJVAir API
+  (optional `locationTypeLabel`), and dataset attribution. Four optional methods feed the
+  options toolbar's Monitors and Pollutant rows: `monitorGroups()` (`MonitorGroup[]`, sorted by
+  `order`), `monitorTypeGroup(type)` (a group key), `monitorTypeReports(type, entryType)` (the
+  metadata's `published`), and `entryTypeHelp(ref)` (its `description`); without them the rows
+  are one flat list with no help text. The default reads the SJVAir API
   through `@sjvair/sdk`. `monitorTypeInterval(type)` is an
   optional method returning how often a monitor type reports (e.g. `"2 min"`); the monitor
   tooltip shows "(2 min avg)" under the entry-type label when it exists, and omits the note when a
@@ -671,7 +764,7 @@ maps it to its own plural form. Layer names (`layerLabel`) are passed already tr
 ## Examples are checked
 
 `tests/unit/readme-examples.test.ts` repeats the TypeScript examples above (the map setup, plain
-GeoJSON, writing a plugin, selection, and a message provider) against the real exports: `npm run
+GeoJSON, writing a plugin, selection, the options toolbar's presets, and a message provider) against the real exports: `npm run
 check` type-checks them and `npm test` runs them. The Svelte markup isn't mounted there. Update
 it with the README.
 
@@ -691,6 +784,43 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.13
+
+- **The options toolbar.** `OptionsToolbar` (monitor-map 5.0's, shared), placed by `MapView`'s new
+  `toolbar` snippet, with the presets `monitorsOptions`, `settingsGroup`, `basemapOptions`,
+  `hmsOptions`, and `schoolsOptions`. See "The options toolbar".
+- **Basemaps.** `defaultBasemaps()` lists every MapTiler basemap at its newest version (14 today;
+  MapTiler's deprecated Basic, Toner, and Voyager are left out), each style with `basemap`,
+  `name`, and `isDefault`. The map still opens on Streets v4 with the POI layers removed, now from
+  the Streets v4 styles only (`excludedLayers` per style); `defaultBasemaps({ keepPoiLabels: true
+})` keeps them (the old `{ ...defaultBasemaps(), excludedLayers: [] }` no longer does).
+  `map.basemap.select` now resolves an unlisted id to its basemap's default variant, or the
+  default basemap, instead of ignoring it, and reports that and a load failure's revert through
+  `map.basemap.onFallback`. New: `map.basemap.styles`, `defaultId`, `resolve(id)`.
+- **Fix: a modifier pick doesn't pin.** On a `pickWith: "modifier"` plugin, Shift/⌘/Ctrl-click
+  marks or unmarks without opening (or closing) the card.
+- **Fix: the spoken view summary follows the data.** It also re-counts when a plugin's features
+  change or a plugin is added or removed at a still view.
+- **The feature list's note:** `featureList={{ note }}` (text or a snippet) shows above the rows
+  and describes the list.
+- **The child-care color** is darker, `#15747c`, so the white bubble count passes 4.5:1.
+- **`@sjvair/sdk` `5.0.0-beta.10`** in development. `Scale` (the SDK's) gains required
+  `averaging_hours`, `daily_statistic`, and `daily_statistic_label`; code that builds a `Scale`
+  sets them (`null` is fine). The SDK's `getMonitorsMeta` needs a server with `monitor_groups`.
+- **New message keys:** `mapsdk_options_toolbar_label`, `mapsdk_options_open`,
+  `mapsdk_options_close`, `mapsdk_options_title`, `mapsdk_options_monitors`,
+  `mapsdk_options_layers`, `mapsdk_options_overlays`, `mapsdk_options_settings`,
+  `mapsdk_options_inactive`, `mapsdk_options_inside`, `mapsdk_options_collocation_sites`,
+  `mapsdk_options_fire_smoke`, `mapsdk_options_schools`, `mapsdk_options_marker_clusters`,
+  `mapsdk_options_basemap`, `mapsdk_options_theme`, `mapsdk_options_reset`, `mapsdk_options_none`.
+- **New API:** `OptionsToolbar`; the types `OptionValues`, `OptionGroup`, `OptionRow`,
+  `OptionCheckbox`, `OptionChoice`, `OptionIcon`, `OptionsPreset`, `MonitorsOptions`,
+  `MonitorsOptionsInput`, `BasemapOptionsOptions`, `SettingsGroupOptions`, `BasemapStyle`;
+  `MapView`'s `toolbar`; `FeatureListOptions.note` and `FeatureList`'s `note`;
+  `defaultBasemaps(options)`; `BasemapState.styles`, `defaultId`, `resolve`, `onFallback`; in
+  `./data`, `MonitorGroup` and the optional `MetadataProvider.monitorGroups`,
+  `monitorTypeGroup`, `monitorTypeReports`, `entryTypeHelp`.
 
 ### 0.1.0-beta.12
 
