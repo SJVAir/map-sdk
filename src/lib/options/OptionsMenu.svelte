@@ -11,6 +11,8 @@
 	const ctx = getToolbarContext();
 	const contentId = $derived(`${ctx.uid}-menu-${group.id}`);
 	const open = $derived(ctx.menus.isOpen(group.id) && !group.disabled);
+	// Icon-only on the wide toolbar, and only when there is an icon to show.
+	const iconOnly = $derived(Boolean(group.iconOnly && group.icon && ctx.wide));
 
 	let button: HTMLButtonElement;
 	let body: HTMLDivElement;
@@ -97,8 +99,8 @@
 		onclick={() => ctx.menus.toggle(group.id, ctx.wide)}
 	>
 		{#if group.icon}<OptionIcon icon={group.icon} />{/if}
-		<span class={group.iconOnly && ctx.wide ? "mapsdk-options-sr" : undefined}>{group.label}</span>
-		{#if !(group.iconOnly && ctx.wide)}
+		<span class={iconOnly ? "mapsdk-options-sr" : undefined}>{group.label}</span>
+		{#if !iconOnly}
 			<span class="mapsdk-options-chevron"><Glyph name="chevronDown" /></span>
 		{/if}
 	</button>

@@ -16,6 +16,7 @@ import type {
 	createHmsSmokeStore,
 	createMonitorsStore
 } from "../src/lib/stores/index.js";
+import { ICONS } from "./toolbar-icons.js";
 
 type MonitorsStore = ReturnType<typeof createMonitorsStore>;
 
@@ -102,16 +103,23 @@ export class TodayOptions {
 			pollutants: [...this.#monitors.availableEntryTypes],
 			pollutant: (this.values.pollutant as string | undefined) ?? this.#monitors.entryType,
 			hasInactive: features.some((f) => !f.properties.isActive),
-			hasInside: features.some((f) => f.properties.location === "inside")
+			hasInside: features.some((f) => f.properties.location === "inside"),
+			icons: { monitors: ICONS.monitors }
 		});
-		const fire = hmsOptions(this.#map);
+		const fire = hmsOptions(this.#map, { icon: ICONS.fire });
 		const layers: OptionGroup = {
 			id: "layers",
 			label: this.#map.messages("mapsdk_options_layers"),
+			icon: ICONS.layers,
 			cluster: "options",
 			rows: [fire.row]
 		};
-		const settings = settingsGroup(this.#map);
+		const settings = settingsGroup(this.#map, {
+			icon: ICONS.settings,
+			clusters: { icon: ICONS.clusters },
+			basemap: { icons: { basemap: ICONS.basemap, theme: ICONS.theme } },
+			reset: { icon: ICONS.reset }
+		});
 		return [...monitors.groups, layers, ...settings.groups];
 	});
 

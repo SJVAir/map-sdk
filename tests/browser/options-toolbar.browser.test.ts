@@ -513,3 +513,25 @@ describe("OptionsToolbar, basemap rows after a fallback", () => {
 		expect(state.calls).toEqual([{ values: { basemap: "outdoor-v4" }, changed: ["basemap"] }]);
 	});
 });
+
+describe("OptionsToolbar, icon-only groups", () => {
+	it("an icon-only group without an icon shows its label", async () => {
+		await setup();
+		const settings = trigger("Settings").element();
+		const label = [...settings.querySelectorAll("span")].find((s) => s.textContent === "Settings")!;
+		expect(label.getBoundingClientRect().width).toBeGreaterThan(10);
+	});
+
+	it("an icon-only group with an icon hides its label visually", async () => {
+		const state = new ToolbarState({
+			groups: groups().map((g) =>
+				g.id === "settings" ? { ...g, icon: { svg: "<svg></svg>" } } : g
+			),
+			values: values()
+		});
+		await render(OptionsToolbarHost, { map: newMap(), state });
+		const settings = trigger("Settings").element();
+		const label = [...settings.querySelectorAll("span")].find((s) => s.textContent === "Settings")!;
+		expect(label.getBoundingClientRect().width).toBeLessThanOrEqual(1);
+	});
+});
