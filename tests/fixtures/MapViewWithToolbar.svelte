@@ -21,13 +21,15 @@
 </script>
 
 {#snippet toolbar()}
-	<OptionsToolbar
-		groups={state.groups}
-		values={state.values}
-		defaults={state.defaults}
-		readonly={state.readonly}
-		onchange={state.onchange}
-	/>
+	{#if state.shown}
+		<OptionsToolbar
+			groups={state.groups}
+			values={state.values}
+			defaults={state.defaults}
+			readonly={state.readonly}
+			onchange={state.onchange}
+		/>
+	{/if}
 {/snippet}
 
 <MapView {map} class={className} {featureList} toolbar={withToolbar ? toolbar : undefined} />

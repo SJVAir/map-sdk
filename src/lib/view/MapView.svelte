@@ -169,8 +169,7 @@
 		const engine = glContainer.querySelector(`.maplibregl-ctrl-${corner}`);
 		if (engine) sources.push(engine);
 		if (corner === "top-left") {
-			const bar = root.querySelector(".mapsdk-toolbar-slot [data-mapsdk-toolbar-bar]");
-			if (bar) sources.push(bar);
+			if (toolbarBar) sources.push(toolbarBar);
 		}
 		if (corner === "top-right" && controls === "mapsdk") {
 			const zoom = root.querySelector(".mapsdk-zoom");
@@ -259,31 +258,47 @@
 	let toolbarHeight = $state(0);
 	const wide = $derived(width === 0 || isWideWidth(width));
 
+	// The bar the toolbar registered (it can show up after mount, and is a new element per layout).
+	let toolbarBar = $state.raw<Element | null>(null);
+	let covered = $state(false);
+
 	$effect(() => {
-		void wide;
-		if (!toolbar) {
+		const bar = toolbar ? toolbarBar : null;
+		if (!bar) {
 			toolbarHeight = 0;
 			return;
 		}
 		const measure = () => {
-			const bar = root.querySelector(".mapsdk-toolbar-slot [data-mapsdk-toolbar-bar]");
-			const r = bar?.getBoundingClientRect();
+			const r = bar.getBoundingClientRect();
 			toolbarHeight =
 				r && r.height > 0 ? Math.round(r.bottom - root.getBoundingClientRect().top) : 0;
 		};
 		const observer = new ResizeObserver(measure);
 		observer.observe(root);
-		const bar = root.querySelector(".mapsdk-toolbar-slot [data-mapsdk-toolbar-bar]");
-		if (bar) observer.observe(bar);
+		observer.observe(bar);
 		measure();
 		return () => observer.disconnect();
+	});
+
+	// While the narrow options panel covers the map, the map's other pieces leave the Tab order.
+	$effect(() => {
+		const on = covered && !!toolbar;
+		for (const child of root.children) {
+			if (!child.classList.contains("mapsdk-toolbar-slot")) child.toggleAttribute("inert", on);
+		}
 	});
 
 	setMapLayout({
 		get wide() {
 			return wide;
 		},
-		box: () => root?.getBoundingClientRect() ?? null
+		box: () => root?.getBoundingClientRect() ?? null,
+		setBar: (bar) => {
+			toolbarBar = bar;
+		},
+		setCovered: (on) => {
+			covered = on;
+		}
 	});
 
 	function project(lngLat: [number, number]) {

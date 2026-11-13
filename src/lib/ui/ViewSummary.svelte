@@ -24,8 +24,8 @@
 	);
 
 	// Every plugin's features, so a refresh, a source swap, or a plugin added or removed at a
-	// still view reschedules the update too. Identity is enough: a source hands out a new array
-	// (or collection) when its data changes.
+	// still view reschedules the update too: reading them tracks what they depend on (a source's
+	// features, the plugin list).
 	const featureLists = $derived(map.plugins.map((p) => p.features?.()));
 
 	function compute(): Line[] {

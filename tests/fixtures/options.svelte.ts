@@ -7,6 +7,10 @@ export class ToolbarState {
 	defaults = $state.raw<OptionValues | undefined>(undefined);
 	readonly = $state(false);
 	basemapKey = $state<string | undefined>(undefined);
+	/** False: the snippet renders no toolbar yet (a host that shows it later). */
+	shown = $state(true);
+	/** True: the host records changes but never applies them. */
+	ignoreChanges = false;
 	calls: Array<{ values: OptionValues; changed: string[] }> = [];
 
 	constructor(init: { groups: OptionGroup[]; values?: OptionValues; defaults?: OptionValues }) {
@@ -17,6 +21,6 @@ export class ToolbarState {
 
 	onchange = (values: OptionValues, changed: string[]) => {
 		this.calls.push({ values, changed });
-		this.values = values;
+		if (!this.ignoreChanges) this.values = values;
 	};
 }

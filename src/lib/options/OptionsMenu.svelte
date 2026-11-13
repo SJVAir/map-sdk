@@ -55,13 +55,24 @@
 			return;
 		}
 		// No destination: a click on something that takes no focus (the outside-click handler
-		// decides), or the focused row being removed (new groups). Chrome fires this while the row
-		// is still attached, so look a microtask later: a detached row hands focus to the trigger.
-		const left = e.target as Node;
-		queueMicrotask(() => {
-			if (!left.isConnected && root.isConnected && ctx.menus.isOpen(group.id)) button?.focus();
-		});
+		// decides), or the focused row being removed, which the effects below handle.
 	}
+
+	// New rows can remove the focused one. Chrome fires focusout as it goes and Firefox fires
+	// nothing, so note before the update whether focus was in this dropdown, and after it hand
+	// focus to the trigger if it fell to the page.
+	let focusWasInside = false;
+	$effect.pre(() => {
+		void group.rows;
+		focusWasInside = !!body && body.contains(document.activeElement);
+	});
+	$effect(() => {
+		void group.rows;
+		if (!focusWasInside) return;
+		focusWasInside = false;
+		const active = document.activeElement;
+		if (open && (!active || active === document.body)) button?.focus();
+	});
 </script>
 
 <div

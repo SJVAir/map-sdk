@@ -6,6 +6,10 @@ export interface MapLayout {
 	readonly wide: boolean;
 	/** The map's box on the page, or null before it's mounted. */
 	box(): DOMRect | null;
+	/** The toolbar's bar, measured for `--mapsdk-toolbar-height` and the List button (null: gone). */
+	setBar(bar: Element | null): void;
+	/** While the narrow panel covers the map, everything else in it is inert. */
+	setCovered(covered: boolean): void;
 }
 
 const KEY = Symbol("mapsdk-map-layout");

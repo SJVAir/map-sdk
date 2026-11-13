@@ -4,7 +4,7 @@
 	import OptionIcon from "./OptionIcon.svelte";
 	import Self from "./OptionRows.svelte";
 	import { getToolbarContext } from "./toolbar-context.js";
-	import type { OptionRow } from "./types.js";
+	import type { OptionRow, OptionValues } from "./types.js";
 	import { applyGroup, applyReset, applyValue, choiceFor, groupStatus } from "./values.js";
 
 	/** `menuId`: the group these rows are in, so a `closesMenu` radio can close it. */
@@ -25,7 +25,13 @@
 		if (ctx.readonly) e.preventDefault();
 	}
 
-	const name = (id: string) => `${ctx.uid}-${id}`;
+	const name = (id: string) => `${ctx.uid}-row-${id}`;
+
+	/** The values as the rows show them (the basemap key reads what the map draws). */
+	function shown(id: string): OptionValues {
+		const value = ctx.valueOf(id);
+		return value === undefined ? ctx.values : { ...ctx.values, [id]: value };
+	}
 </script>
 
 {#each rows as row (`${row.kind}:${row.id}`)}
@@ -38,7 +44,11 @@
 				checked={on}
 				aria-disabled={ro}
 				onclick={guard}
-				onchange={(e) => ctx.emit(applyValue(row.id, e.currentTarget.checked, ctx.values))}
+				onchange={(e) => {
+					ctx.emit(applyValue(row.id, e.currentTarget.checked, shown(row.id)));
+					// The host's values decide what shows; until they arrive, show what they were.
+					e.currentTarget.checked = on;
+				}}
 			/>
 			{#if row.icon}<OptionIcon icon={row.icon} />{/if}
 			<span class="mapsdk-option-label">{row.label}</span>
@@ -96,7 +106,12 @@
 							aria-disabled={ro}
 							onclick={guard}
 							onchange={() => {
-								ctx.emit(applyValue(row.id, choice.value, ctx.values));
+								ctx.emit(applyValue(row.id, choice.value, shown(row.id)));
+								// Shows what the host has until its values say otherwise.
+								for (const radio of document.getElementsByName(name(row.id))) {
+									(radio as HTMLInputElement).checked =
+										(radio as HTMLInputElement).value === current;
+								}
 								if (row.closesMenu && ctx.wide) ctx.menus.close(menuId);
 							}}
 						/>
@@ -128,7 +143,7 @@
 					const picked = e.currentTarget.value;
 					// Shows what the host has until the host's values say otherwise.
 					e.currentTarget.value = chosen;
-					ctx.emit(applyValue(row.id, picked, ctx.values));
+					ctx.emit(applyValue(row.id, picked, shown(row.id)));
 				}}
 			>
 				{#each row.choices as choice (choice.value)}

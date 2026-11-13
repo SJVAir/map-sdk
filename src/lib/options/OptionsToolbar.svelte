@@ -68,6 +68,27 @@
 		});
 	});
 
+	// The panel covers the map: the map's other pieces go inert while it's open.
+	$effect(() => {
+		const covered = !wide && panelOpen;
+		layout?.setCovered(covered);
+		return () => layout?.setCovered(false);
+	});
+
+	/** Tells MapView which element is the bar, so it measures the one on screen. */
+	const registerBar = (bar: HTMLElement) => {
+		layout?.setBar(bar);
+		return () => layout?.setBar(null);
+	};
+
+	/** Clusters keyed by their cluster name (or first group), so a group added earlier in the list doesn't remount the open one. */
+	function clusterKey(cluster: OptionGroup[], i: number): string {
+		const name = cluster[0].cluster;
+		if (name === undefined) return `group:${cluster[0].id}`;
+		const before = clusters.slice(0, i).filter((c) => c[0].cluster === name).length;
+		return `cluster:${name}:${before}`;
+	}
+
 	function openPanel() {
 		panelOpen = true;
 		// Into the panel, for keyboard and screen-reader users.
@@ -121,7 +142,8 @@
 	// A click outside this toolbar closes its dropdowns; clicks inside never do.
 	$effect(() => {
 		const onclick = (e: MouseEvent) => {
-			if (wide && !root.contains(e.target as Node)) menus.closeAll();
+			// The path, not the target: a click that re-rendered its own row leaves a detached target.
+			if (wide && !e.composedPath().includes(root)) menus.closeAll();
 		};
 		document.addEventListener("click", onclick);
 		return () => document.removeEventListener("click", onclick);
@@ -136,6 +158,8 @@
 			closePanel();
 			return;
 		}
+		// Nothing open: Esc is the map's (a pinned card, the list).
+		if (!menus.anyOpen) return;
 		const menu = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>(
 			"[data-options-menu]"
 		);
@@ -159,8 +183,8 @@
 	{onkeydown}
 >
 	{#if wide}
-		<div class="mapsdk-options-bar" data-mapsdk-toolbar-bar>
-			{#each clusters as cluster, i (i)}
+		<div class="mapsdk-options-bar" data-mapsdk-toolbar-bar {@attach registerBar}>
+			{#each clusters as cluster, i (clusterKey(cluster, i))}
 				<div class="mapsdk-options-cluster">
 					{#each cluster as group (group.id)}
 						<OptionsMenu {group} />
@@ -172,7 +196,7 @@
 			{/if}
 		</div>
 	{:else}
-		<div class="mapsdk-options-bar" data-mapsdk-toolbar-bar>
+		<div class="mapsdk-options-bar" data-mapsdk-toolbar-bar {@attach registerBar}>
 			<button
 				bind:this={openButton}
 				type="button"

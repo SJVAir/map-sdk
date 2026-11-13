@@ -399,3 +399,117 @@ describe("OptionsToolbar, basemap rows", () => {
 		expect(state.calls).toEqual([{ values: { basemap: "streets-v4-dark" }, changed: ["basemap"] }]);
 	});
 });
+
+describe("OptionsToolbar, review fixes", () => {
+	it("a group added before the open one keeps its menu open and its row focused", async () => {
+		const { state } = await setup();
+		await trigger("Layers").click();
+		const ev = page.getByRole("checkbox", { name: "EV Chargers" }).element() as HTMLElement;
+		ev.focus();
+		state.groups = [
+			{ id: "extra", label: "Extra", rows: [{ kind: "checkbox", id: "x", label: "X" }] },
+			...groups()
+		];
+		await new Promise((r) => setTimeout(r, 0));
+		expect(expanded("Layers")).toBe("true");
+		expect(document.activeElement).toBe(ev);
+	});
+
+	it("Esc with nothing open is left to the map (a pinned card still closes)", async () => {
+		await setup();
+		const button = trigger("Monitors").element() as HTMLElement;
+		button.focus();
+		const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+		button.dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(false);
+	});
+
+	it("a host that doesn't apply a change leaves the checkbox and radio as they were", async () => {
+		const { state } = await setup();
+		state.ignoreChanges = true;
+		await trigger("Monitors").click();
+		await page.getByRole("checkbox", { name: "Inactive" }).click();
+		expect(state.calls).toHaveLength(1);
+		expect(
+			(page.getByRole("checkbox", { name: "Inactive" }).element() as HTMLInputElement).checked
+		).toBe(false);
+		await trigger("PM2.5").click();
+		await page.getByRole("radio", { name: /Ozone/ }).click();
+		// Ozone closes the menu (closesMenu); the radios are still in the page.
+		const radios = [...document.querySelectorAll<HTMLInputElement>("input[type=radio]")];
+		expect(radios.find((r) => r.value === "pm25")!.checked).toBe(true);
+		expect(radios.find((r) => r.value === "o3")!.checked).toBe(false);
+	});
+
+	it("an action that replaces itself keeps its menu open", async () => {
+		const state = new ToolbarState({ groups: [], values: {} });
+		const swap = (id: string): OptionGroup[] => [
+			{
+				id: "tools",
+				label: "Tools",
+				rows: [
+					{
+						kind: "action",
+						id,
+						label: `Action ${id}`,
+						onclick: () => (state.groups = swap(id === "a" ? "b" : "a"))
+					}
+				]
+			}
+		];
+		state.groups = swap("a");
+		await render(OptionsToolbarHost, { map: newMap(), state });
+		await trigger("Tools").click();
+		await page.getByRole("button", { name: "Action a" }).click();
+		await expect.element(page.getByRole("button", { name: "Action b" })).toBeInTheDocument();
+		expect(expanded("Tools")).toBe("true");
+	});
+
+	it("row ids can't collide with the toolbar's own ids", async () => {
+		const state = new ToolbarState({
+			groups: [
+				{
+					id: "g",
+					label: "G",
+					rows: [
+						{ kind: "select", id: "panel", label: "Panel", choices: [{ value: "a", label: "A" }] }
+					]
+				}
+			],
+			values: { panel: "a" }
+		});
+		await render(OptionsToolbarHost, { map: newMap(), state });
+		const ids = [...document.querySelectorAll("[id]")].map((el) => el.id);
+		expect(new Set(ids).size).toBe(ids.length);
+		expect(document.querySelector("select")!.id).toMatch(/-row-panel$/);
+	});
+});
+
+describe("OptionsToolbar, basemap rows after a fallback", () => {
+	it("picking the failed basemap again sends a change, so the host can retry it", async () => {
+		const url = (id: string) => `https://tiles.test/maps/${id}/style.json`;
+		const map = createMap({
+			config: {
+				maptilerKey: "k",
+				basemaps: {
+					styles: [
+						{ id: "streets-v4", style: url("streets-v4"), basemap: "Streets", isDefault: true },
+						{ id: "outdoor-v4", style: url("outdoor-v4"), basemap: "Outdoor", isDefault: true }
+					],
+					defaultId: "streets-v4"
+				}
+			}
+		});
+		map.attach(createFakeGl({ styleLoaded: true }));
+		const settings = settingsGroup(map, { clusters: false, reset: false });
+		// The host saved Outdoor; it failed and the map fell back to Streets.
+		const state = new ToolbarState({ groups: settings.groups, values: { basemap: "outdoor-v4" } });
+		state.basemapKey = "basemap";
+		await render(OptionsToolbarHost, { map, state });
+		const select = document.querySelector("select")!;
+		expect(select.value).toBe("streets-v4");
+		select.value = "outdoor-v4";
+		select.dispatchEvent(new Event("change", { bubbles: true }));
+		expect(state.calls).toEqual([{ values: { basemap: "outdoor-v4" }, changed: ["basemap"] }]);
+	});
+});

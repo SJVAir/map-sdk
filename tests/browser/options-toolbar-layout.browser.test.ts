@@ -277,3 +277,37 @@ describe("OptionsToolbar in MapView", () => {
 		expect(result.violations).toEqual([]);
 	});
 });
+
+describe("OptionsToolbar in MapView, review fixes", () => {
+	it("measures a toolbar the host shows after mount, and follows the bar's size", async () => {
+		const state = new ToolbarState({ groups: groups(), values: { pollutant: "pm25" } });
+		state.shown = false;
+		await render(MapViewWithToolbar, { map: newMap(), state, class: "mid-map" } as never);
+		const root = document.querySelector<HTMLElement>(".mapsdk-map")!;
+		await settle();
+		expect(root.style.getPropertyValue("--mapsdk-toolbar-height")).toBe("");
+		state.shown = true;
+		await vi.waitFor(() =>
+			expect(root.style.getPropertyValue("--mapsdk-toolbar-height")).not.toBe("")
+		);
+		const before = parseFloat(root.style.getPropertyValue("--mapsdk-toolbar-height"));
+		// Labels long enough to wrap the bar onto a second line.
+		state.groups = groups().map((g) => ({ ...g, label: `${g.label} with a much longer label` }));
+		await vi.waitFor(() =>
+			expect(parseFloat(root.style.getPropertyValue("--mapsdk-toolbar-height"))).toBeGreaterThan(
+				before
+			)
+		);
+	});
+
+	it("while the narrow panel is open, Tab can't reach the controls it covers", async () => {
+		await setup({ class: "narrow-map" });
+		await page.getByRole("button", { name: "Open map options" }).click();
+		await slid();
+		const map = document.querySelector<HTMLElement>(".mapsdk-map")!;
+		const list = map.querySelector(".mapsdk-list-panel")!;
+		expect(list.closest("[inert]")).not.toBeNull();
+		await page.getByRole("button", { name: "Close map options" }).click();
+		expect(list.closest("[inert]")).toBeNull();
+	});
+});

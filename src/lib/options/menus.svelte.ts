@@ -8,6 +8,11 @@ export class OptionsMenus {
 	#clicked = new SvelteSet<string>();
 	#hovered = $state<string | null>(null);
 
+	/** Whether any menu is open. */
+	get anyOpen(): boolean {
+		return this.#clicked.size > 0 || this.#hovered !== null;
+	}
+
 	isOpen(id: string): boolean {
 		return this.#clicked.has(id) || this.#hovered === id;
 	}
