@@ -73,6 +73,12 @@
 		 * own overlays.
 		 */
 		toolbar?: Snippet;
+		/**
+		 * The element whose width decides the toolbar's wide/narrow layout (48rem), such as a box
+		 * holding the map and a side panel. Unset or null: the map's own box. Dropdowns and the
+		 * narrow panel stay inside the map.
+		 */
+		layoutRoot?: HTMLElement | null;
 	}
 
 	let {
@@ -86,7 +92,8 @@
 		controls = "mapsdk",
 		tooltip = "pinned",
 		card = false,
-		toolbar
+		toolbar,
+		layoutRoot = null
 	}: Props = $props();
 
 	// Pinning only, no plugin setup, so it's safe in an effect.
@@ -259,8 +266,22 @@
 	// The layout follows the width a frame later: switching it re-renders the toolbar, which inside
 	// the width's ResizeObserver callback would be a ResizeObserver loop.
 	let layoutWidth = $state(0);
+	// With a `layoutRoot`, the layout measures that box instead of the map's.
+	let rootWidth = $state(0);
 	$effect(() => {
-		const w = width;
+		const el = layoutRoot;
+		if (!el) return;
+		const measure = () => (rootWidth = el.clientWidth);
+		const observer = new ResizeObserver(measure);
+		observer.observe(el);
+		measure();
+		return () => {
+			observer.disconnect();
+			rootWidth = 0;
+		};
+	});
+	$effect(() => {
+		const w = layoutRoot ? rootWidth : width;
 		const frame = requestAnimationFrame(() => (layoutWidth = w));
 		return () => cancelAnimationFrame(frame);
 	});
