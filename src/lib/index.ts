@@ -116,3 +116,5 @@ export type {
 } from "./options/types.js";
 export { basemapOptions, hmsOptions, schoolsOptions, settingsGroup } from "./options/presets.js";
 export type { BasemapOptionsOptions, SettingsGroupOptions } from "./options/presets.js";
+export { monitorsOptions } from "./options/monitors-options.svelte.js";
+export type { MonitorsOptions, MonitorsOptionsInput } from "./options/monitors-options.svelte.js";
