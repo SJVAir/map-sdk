@@ -441,6 +441,34 @@ describe("layoutRoot", () => {
 		expect(isWide()).toBe(true);
 	});
 
+	it("a root element that unmounts: back to the map's own box", async () => {
+		const { screen } = await inRoot({ altRoot: true, altClass: "root-1024" });
+		expect(isWide()).toBe(true);
+		const errors: string[] = [];
+		const onerror = (e: ErrorEvent) => errors.push(e.message);
+		window.addEventListener("error", onerror);
+		try {
+			await screen.rerender({ altShown: false });
+			await settle();
+			await settle();
+		} finally {
+			window.removeEventListener("error", onerror);
+		}
+		expect(document.querySelector(".alt-root")).toBeNull();
+		expect(isNarrow()).toBe(true);
+		expect(errors).toEqual([]);
+	});
+
+	it("two maps under one root decide on their own", async () => {
+		await inRoot({ secondMap: newMap() });
+		const maps = [...document.querySelectorAll<HTMLElement>(".mapsdk-map")];
+		expect(maps).toHaveLength(2);
+		const options = (el: HTMLElement) => el.querySelector("[aria-label='Open map options']");
+		// The first map has the root (1024px): wide. The second has none, so its own 683px: narrow.
+		expect(options(maps[0])).toBeNull();
+		expect(options(maps[1])).not.toBeNull();
+	});
+
 	it("an open dropdown stays inside the 683px map", async () => {
 		const { mapBox } = await inRoot();
 		for (const name of ["Settings", "Monitors"]) {

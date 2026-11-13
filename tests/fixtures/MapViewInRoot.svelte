@@ -10,7 +10,10 @@
 		rootClass = "root-1024",
 		mapClass = "map-683",
 		useRoot = true,
-		altRoot = false
+		altRoot = false,
+		altShown = true,
+		altClass = "root-600",
+		secondMap
 	}: {
 		map: MapContext;
 		state: ToolbarState;
@@ -18,6 +21,10 @@
 		mapClass?: string;
 		useRoot?: boolean;
 		altRoot?: boolean;
+		altShown?: boolean;
+		altClass?: string;
+		/** A second map in the same root, with no layoutRoot. */
+		secondMap?: MapContext;
 	} = $props();
 
 	let shell = $state<HTMLDivElement>();
@@ -39,6 +46,11 @@
 
 <div bind:this={shell} class={["layout-root", rootClass]} style="display: flex">
 	<MapView {map} class={mapClass} featureList={false} {layoutRoot} {toolbar} />
+	{#if secondMap}
+		<MapView map={secondMap} class={mapClass} featureList={false} {toolbar} />
+	{/if}
 	<div style="flex: 1"></div>
 </div>
-<div bind:this={alt} class="alt-root root-600"></div>
+{#if altShown}
+	<div bind:this={alt} class={["alt-root", altClass]}></div>
+{/if}
