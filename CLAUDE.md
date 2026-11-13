@@ -138,7 +138,7 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   focus area's defaults: line, ring and label `#1f2d3d`, casing, halo and wash `#ffffff`, which the
   `--focus-area*` tokens override but which never fall back to theme tokens (the basemap under
   them doesn't follow the theme). And (2026-11-12) the school markers: `--school-marker` `#5a6b7b`
-  and `--child-care-marker` `#1c9099`, fixed fallbacks too, with the badges' white outline and
+  and `--child-care-marker` `#15747c`, fixed fallbacks too, with the badges' white outline and
   glyph and the bubbles' white count.
 - No hardcoded labels, units, breakpoints, colors, or scales: they come from a `Scale` or the
   metadata provider. Every UI string is a `mapsdk_*` message key in `en.json`; no concatenated

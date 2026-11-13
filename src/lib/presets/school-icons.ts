@@ -54,7 +54,7 @@ const GLYPHS: Record<BadgeKind, string[]> = {
 /** The token and its fixed fallback for each kind (the user's decision, 2026-11-12). */
 const TOKENS: Record<BadgeKind, string> = {
 	school: "var(--school-marker, #5a6b7b)",
-	"child-care": "var(--child-care-marker, #1c9099)"
+	"child-care": "var(--child-care-marker, #15747c)"
 };
 
 /** The school-house outline: its fill, a white outline, and a faint dark edge. */

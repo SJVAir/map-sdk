@@ -83,7 +83,7 @@ Standard (no fallback, must exist): `--background`, `--foreground`, `--card`, `-
 | `--focus-area-casing`    | `#ffffff` (fixed)            | The casing under them, and the label's halo                  |
 | `--focus-area-wash`      | `#ffffff` (fixed)            | The wash outside a focus area                                |
 | `--school-marker`        | `#5a6b7b` (fixed)            | School badges and count bubbles                              |
-| `--child-care-marker`    | `#1c9099` (fixed)            | Child care badges and count bubbles                          |
+| `--child-care-marker`    | `#15747c` (fixed)            | Child care badges and count bubbles                          |
 
 The focus area's and the school markers' tokens fall back to fixed colors, not to theme tokens:
 they're drawn on a basemap, which doesn't follow the page's theme. Set them only to override the
