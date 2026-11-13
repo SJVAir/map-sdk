@@ -104,3 +104,13 @@ export {
 export type { CollocationSitesPluginOptions } from "./presets/collocation-sites.js";
 export { circle, CROSSHAIR_ICON_SIZE, square, triangle, withCrosshair } from "./plugins/icons.js";
 export type { CardContext, CardOptions } from "./ui/card.js";
+export { default as OptionsToolbar } from "./options/OptionsToolbar.svelte";
+export type {
+	OptionCheckbox,
+	OptionChoice,
+	OptionGroup,
+	OptionIcon,
+	OptionRow,
+	OptionsPreset,
+	OptionValues
+} from "./options/types.js";
