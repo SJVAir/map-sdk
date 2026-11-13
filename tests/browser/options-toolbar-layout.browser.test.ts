@@ -164,6 +164,8 @@ describe("OptionsToolbar in MapView", () => {
 	it("crossing 48rem closes everything", async () => {
 		const { root } = await setup();
 		await trigger("Monitors").click();
+		// Off the toolbar: otherwise Monitors comes back under the pointer and opens on hover.
+		await userEvent.unhover(trigger("Monitors"));
 		root().style.width = "300px";
 		await settle();
 		await expect.element(page.getByRole("button", { name: "Open map options" })).toBeVisible();
@@ -172,6 +174,8 @@ describe("OptionsToolbar in MapView", () => {
 		).toBe("false");
 		root().style.width = "1000px";
 		await settle();
+		// Long enough for Chromium's pointer events after a layout change.
+		await new Promise((r) => setTimeout(r, 300));
 		await expect.element(trigger("Monitors")).toBeVisible();
 		expect(trigger("Monitors").element().getAttribute("aria-expanded")).toBe("false");
 	});

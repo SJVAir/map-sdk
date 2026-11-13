@@ -569,8 +569,11 @@ describe("OptionsToolbar, final review fixes", () => {
 	it("a group removed while open is forgotten: it doesn't reopen, and Esc is the map's again", async () => {
 		const { state } = await setup();
 		await trigger("Layers").click();
+		// Off the toolbar: otherwise Settings slides in under the pointer and opens on hover.
+		await userEvent.unhover(trigger("Layers"));
 		state.groups = groups().filter((g) => g.id !== "layers");
-		await new Promise((r) => setTimeout(r, 0));
+		// Long enough for Chromium's pointer events after a layout change.
+		await new Promise((r) => setTimeout(r, 300));
 		const button = trigger("Monitors").element() as HTMLElement;
 		button.focus();
 		const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
