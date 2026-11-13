@@ -114,3 +114,5 @@ export type {
 	OptionsPreset,
 	OptionValues
 } from "./options/types.js";
+export { basemapOptions, hmsOptions, schoolsOptions, settingsGroup } from "./options/presets.js";
+export type { BasemapOptionsOptions, SettingsGroupOptions } from "./options/presets.js";

@@ -66,6 +66,11 @@ export class BasemapState {
 		return this.#current;
 	}
 
+	/** The configured default basemap id. */
+	get defaultId(): string {
+		return this.#config?.defaultId ?? "";
+	}
+
 	/** The configured styles, in order. */
 	get styles(): readonly BasemapStyle[] {
 		return this.#config?.styles ?? [];

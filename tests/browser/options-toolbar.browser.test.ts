@@ -6,6 +6,8 @@ import { createMap, type MapContext } from "../../src/lib/core/create-map.svelte
 import type { OptionGroup } from "../../src/lib/options/types.js";
 import OptionsToolbarHost from "../fixtures/OptionsToolbarHost.svelte";
 import { ToolbarState } from "../fixtures/options.svelte.js";
+import { createFakeGl } from "../fixtures/fake-gl.js";
+import { settingsGroup } from "../../src/lib/options/presets.js";
 
 const newMap = (): MapContext => createMap({ config: { maptilerKey: "test-key" } });
 
@@ -322,5 +324,78 @@ describe("OptionsToolbar, wide", () => {
 		await trigger("Monitors").click();
 		const result = await axe.run(page.getByRole("group", { name: "Map options" }).element());
 		expect(result.violations).toEqual([]);
+	});
+});
+
+describe("OptionsToolbar, basemap rows", () => {
+	const url = (id: string) => `https://tiles.test/maps/${id}/style.json`;
+	const basemapMap = () =>
+		createMap({
+			config: {
+				maptilerKey: "k",
+				basemaps: {
+					styles: [
+						{
+							id: "streets-v4",
+							style: url("streets-v4"),
+							basemap: "Streets",
+							name: "Default",
+							isDefault: true
+						},
+						{
+							id: "streets-v4-dark",
+							style: url("streets-v4-dark"),
+							basemap: "Streets",
+							name: "Dark"
+						},
+						{
+							id: "outdoor-v4",
+							style: url("outdoor-v4"),
+							basemap: "Outdoor",
+							name: "Default",
+							isDefault: true
+						}
+					],
+					defaultId: "streets-v4"
+				}
+			}
+		});
+
+	async function basemapSetup() {
+		const map = basemapMap();
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		const settings = settingsGroup(map, { clusters: false, reset: false });
+		const state = new ToolbarState({ groups: settings.groups, values: { ...settings.defaults } });
+		state.basemapKey = "basemap";
+		await render(OptionsToolbarHost, { map, state });
+		await trigger("Settings").click();
+		return { map, gl, state };
+	}
+
+	const shownBasemap = () =>
+		(page.getByRole("combobox", { name: "Basemap" }).element() as HTMLSelectElement).value;
+
+	it("a failed style sends no change, and the rows show what the map fell back to", async () => {
+		const { map, gl, state } = await basemapSetup();
+		map.basemap.select("outdoor-v4");
+		await expect.poll(shownBasemap).toBe("outdoor-v4");
+		gl.emit("error", { error: { url: url("outdoor-v4") } });
+		await expect.poll(shownBasemap).toBe("streets-v4");
+		expect(state.calls).toEqual([]);
+	});
+
+	it("a resolved unlisted id sends no change, and the rows show the resolved id", async () => {
+		const { map, state } = await basemapSetup();
+		map.basemap.select("outdoor-v2-dark");
+		await expect.poll(shownBasemap).toBe("outdoor-v4");
+		expect(state.calls).toEqual([]);
+	});
+
+	it("picking a Theme sends the variant id as one change", async () => {
+		const { state } = await basemapSetup();
+		// Settings is end-aligned at the page's left edge here (no MapView to keep it inside).
+		(page.getByRole("radio", { name: "Dark" }).element() as HTMLElement).click();
+		expect(state.calls).toEqual([{ values: { basemap: "streets-v4-dark" }, changed: ["basemap"] }]);
 	});
 });

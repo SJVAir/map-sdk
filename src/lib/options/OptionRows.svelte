@@ -28,7 +28,7 @@
 	const name = (id: string) => `${ctx.uid}-${id}`;
 </script>
 
-{#each rows as row (row.id)}
+{#each rows as row (`${row.kind}:${row.id}`)}
 	{#if row.kind === "checkbox"}
 		{@const on = ctx.valueOf(row.id) === true}
 		<label class="mapsdk-option-row text-sm">

@@ -6,6 +6,7 @@ export class ToolbarState {
 	groups = $state.raw<OptionGroup[]>([]);
 	defaults = $state.raw<OptionValues | undefined>(undefined);
 	readonly = $state(false);
+	basemapKey = $state<string | undefined>(undefined);
 	calls: Array<{ values: OptionValues; changed: string[] }> = [];
 
 	constructor(init: { groups: OptionGroup[]; values?: OptionValues; defaults?: OptionValues }) {

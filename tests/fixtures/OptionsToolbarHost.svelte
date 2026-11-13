@@ -13,5 +13,6 @@
 	values={state.values}
 	defaults={state.defaults}
 	readonly={state.readonly}
+	basemapKey={state.basemapKey}
 	onchange={state.onchange}
 />
