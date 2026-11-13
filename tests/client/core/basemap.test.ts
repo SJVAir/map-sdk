@@ -52,10 +52,9 @@ describe("BasemapState", () => {
 		expect(gl.listeners.filter((l) => l.type === "error" || l.type === "style.load")).toEqual([]);
 	});
 
-	it("does not reload the applied basemap, and ignores unknown ids", () => {
+	it("does not reload the applied basemap", () => {
 		const { basemap, setStyle } = setup();
 		basemap.select("streets");
-		basemap.select("nope");
 		expect(setStyle).not.toHaveBeenCalled();
 		expect(basemap.current).toBe("streets");
 	});
@@ -324,5 +323,128 @@ describe("BasemapState with the plugin host", () => {
 		expect(data.data.features).toHaveLength(3);
 		expect(gl.featureStates.get(`${map.uid}:shp:shapes/region:a`)).toEqual({ selected: true });
 		map.destroy();
+	});
+});
+
+describe("BasemapState: named basemaps, resolution, and fallback reports", () => {
+	const named: BasemapConfig = {
+		styles: [
+			{
+				id: "streets-v4",
+				style: url("streets-v4"),
+				basemap: "Streets",
+				name: "Default",
+				isDefault: true
+			},
+			{ id: "streets-v4-dark", style: url("streets-v4-dark"), basemap: "Streets", name: "Dark" },
+			{
+				id: "outdoor-v2",
+				style: url("outdoor-v2"),
+				basemap: "Outdoor",
+				name: "Default",
+				isDefault: true
+			},
+			{ id: "outdoor-v2-dark", style: url("outdoor-v2-dark"), basemap: "Outdoor", name: "Dark" }
+		],
+		defaultId: "streets-v4"
+	};
+
+	function namedSetup() {
+		const gl = createFakeGl({ styleLoaded: true });
+		const basemap = new BasemapState(named);
+		basemap.attach(gl, vi.fn());
+		const setStyle = vi.spyOn(gl, "setStyle");
+		const reports = vi.fn();
+		basemap.onFallback(reports);
+		return { gl, basemap, setStyle, reports };
+	}
+
+	it("lists its styles", () => {
+		const { basemap } = namedSetup();
+		expect(basemap.styles.map((s) => s.id)).toEqual(named.styles.map((s) => s.id));
+	});
+
+	it("resolves an unlisted id of a listed basemap to its default variant and reports it", () => {
+		const { basemap, reports } = namedSetup();
+		expect(basemap.resolve("outdoor-v1-dark")).toBe("outdoor-v2");
+		basemap.select("outdoor-v1-dark");
+		expect(basemap.current).toBe("outdoor-v2");
+		expect(reports).toHaveBeenCalledTimes(1);
+		expect(reports).toHaveBeenCalledWith("outdoor-v2");
+	});
+
+	it("resolves an id of no listed basemap to the default", () => {
+		const { basemap, reports } = namedSetup();
+		basemap.select("outdoor-v2-dark");
+		reports.mockClear();
+		expect(basemap.resolve("nope")).toBe("streets-v4");
+		basemap.select("nope");
+		expect(basemap.current).toBe("streets-v4");
+		expect(reports).toHaveBeenCalledOnce();
+		expect(reports).toHaveBeenCalledWith("streets-v4");
+	});
+
+	it("a listed id never reports", () => {
+		const { basemap, reports } = namedSetup();
+		expect(basemap.resolve("outdoor-v2-dark")).toBe("outdoor-v2-dark");
+		basemap.select("outdoor-v2-dark");
+		expect(reports).not.toHaveBeenCalled();
+	});
+
+	it("reports a load failure's revert once", () => {
+		const { gl, basemap, reports } = namedSetup();
+		basemap.select("outdoor-v2");
+		gl.emit("error", { error: { url: url("outdoor-v2") } });
+		expect(basemap.current).toBe("streets-v4");
+		expect(reports).toHaveBeenCalledOnce();
+		expect(reports).toHaveBeenCalledWith("streets-v4");
+	});
+
+	it("a handler that throws doesn't stop the others", () => {
+		const { basemap, reports } = namedSetup();
+		const error = vi.spyOn(console, "error").mockImplementation(() => {});
+		basemap.onFallback(() => {
+			throw new Error("boom");
+		});
+		const after = vi.fn();
+		basemap.onFallback(after);
+		basemap.select("nope");
+		expect(reports).toHaveBeenCalledOnce();
+		expect(after).toHaveBeenCalledOnce();
+		expect(error).toHaveBeenCalled();
+		error.mockRestore();
+	});
+
+	it("onFallback's unsubscribe stops reports", () => {
+		const gl = createFakeGl({ styleLoaded: true });
+		const basemap = new BasemapState(named);
+		basemap.attach(gl, vi.fn());
+		const reports = vi.fn();
+		const stop = basemap.onFallback(reports);
+		stop();
+		basemap.select("nope");
+		expect(reports).not.toHaveBeenCalled();
+	});
+
+	it("removes a style's own excludedLayers, else the config's", () => {
+		const gl = createFakeGl({ styleLoaded: true });
+		const basemap = new BasemapState({
+			styles: [
+				{ id: "a", style: url("a"), excludedLayers: ["Food"] },
+				{ id: "b", style: url("b") }
+			],
+			defaultId: "a",
+			excludedLayers: ["Water"]
+		});
+		const layer = (id: string) => ({ id, type: "background" as const });
+		gl.layers.push(layer("Food"), layer("Water"));
+		basemap.attach(gl, vi.fn());
+		expect(gl.layers.map((l) => l.id)).toEqual(["Water"]);
+		basemap.select("b");
+		gl.setStyle(null);
+		gl.styleLoaded = true;
+		gl.layers.push(layer("Food"), layer("Water"));
+		gl.emit("style.load");
+		expect(gl.layers.map((l) => l.id)).toEqual(["Food"]);
 	});
 });

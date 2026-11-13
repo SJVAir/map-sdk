@@ -151,8 +151,8 @@ given a `CardContext` (`pluginId`, `ref`, `refKey`, the listed `item` or `null`,
 Select/Remove only when `selectable` is true: a fire hotspot, a smoke plume, or a layer in mode
 `"none"` can't be selected, and `toggle()` then does nothing. Anything else goes in
 the `overlays` snippet, where `getMapContext()` returns the map. `config.basemaps` replaces the
-default MapTiler Streets v4 variants (build on `defaultBasemaps()`, which `createMap` uses: today's
-sjvair.com setup is `{ ...defaultBasemaps(), excludedLayers: [] }`); `config.initialView` and
+default MapTiler basemaps (build on `defaultBasemaps()`, which `createMap` uses: today's
+sjvair.com setup is `defaultBasemaps({ keepPoiLabels: true })`); `config.initialView` and
 `config.cooperativeGestures` set the camera and gesture handling. `config.projection` (`"mercator"`
 by default, or `"globe"`) and `config.space` (`false` by default, or `{ preset: "milkyway" }` for a
 space background behind the globe) are passed to MapTiler only when set. `config.telemetry: false`

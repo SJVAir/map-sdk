@@ -70,10 +70,10 @@ describe("README examples", () => {
 	});
 
 	it("today's basemaps without the POI layer filter", () => {
-		const basemaps = { ...defaultBasemaps(), excludedLayers: [] };
+		const basemaps = defaultBasemaps({ keepPoiLabels: true });
 		const map = createMap({ config: { maptilerKey: "your-maptiler-key", basemaps } });
 		expect(basemaps.styles.length).toBeGreaterThan(0);
-		expect(basemaps.excludedLayers).toEqual([]);
+		expect(basemaps.styles.some((s) => s.excludedLayers)).toBe(false);
 		map.destroy();
 	});
 

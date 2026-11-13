@@ -63,7 +63,7 @@
 			},
 			projection: "globe",
 			space: { preset: "milkyway" },
-			basemaps: { ...defaultBasemaps(), excludedLayers: [] }
+			basemaps: defaultBasemaps({ keepPoiLabels: true })
 		}
 	});
 	// Focus areas, one plugin per map. "Your location" sits by the e2e fixture's Fixture Alpha.
