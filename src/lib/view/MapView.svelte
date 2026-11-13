@@ -256,7 +256,15 @@
 	// and `--mapsdk-toolbar-height`. Re-measured when the bar or the map resizes, or the layout
 	// switches (the bar is a different element in each).
 	let toolbarHeight = $state(0);
-	const wide = $derived(width === 0 || isWideWidth(width));
+	// The layout follows the width a frame later: switching it re-renders the toolbar, which inside
+	// the width's ResizeObserver callback would be a ResizeObserver loop.
+	let layoutWidth = $state(0);
+	$effect(() => {
+		const w = width;
+		const frame = requestAnimationFrame(() => (layoutWidth = w));
+		return () => cancelAnimationFrame(frame);
+	});
+	const wide = $derived(layoutWidth === 0 || isWideWidth(layoutWidth));
 
 	// The bar the toolbar registered (it can show up after mount, and is a new element per layout).
 	let toolbarBar = $state.raw<Element | null>(null);
@@ -273,11 +281,20 @@
 			toolbarHeight =
 				r && r.height > 0 ? Math.round(r.bottom - root.getBoundingClientRect().top) : 0;
 		};
-		const observer = new ResizeObserver(measure);
+		// Measured a frame later: the height moves the List button and host overlays, which can
+		// resize what's observed, and changing it inside the callback is a ResizeObserver loop.
+		let frame = 0;
+		const observer = new ResizeObserver(() => {
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(measure);
+		});
 		observer.observe(root);
 		observer.observe(bar);
 		measure();
-		return () => observer.disconnect();
+		return () => {
+			cancelAnimationFrame(frame);
+			observer.disconnect();
+		};
 	});
 
 	// While the narrow options panel covers the map, the map's other pieces leave the Tab order.

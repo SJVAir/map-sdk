@@ -94,6 +94,8 @@ async function setup(props: { class?: string; featureList?: unknown; withToolbar
 	const map = newMap();
 	const screen = await render(MapViewWithToolbar, { map, state, ...props } as never);
 	const root = () => document.querySelector<HTMLElement>(".mapsdk-map")!;
+	// The layout follows the map's width a frame later.
+	await settle();
 	return { state, map, screen, root };
 }
 
@@ -317,5 +319,28 @@ describe("OptionsToolbar narrow panel, final review fixes", () => {
 		await setup({ class: "narrow-map" });
 		await page.getByRole("button", { name: "Open map options" }).click();
 		await expect.element(page.getByRole("region", { name: "Map Options" })).toBeVisible();
+	});
+});
+
+describe("OptionsToolbar measuring", () => {
+	it("crossing to narrow and back raises no ResizeObserver loop error", async () => {
+		const errors: string[] = [];
+		const onerror = (e: ErrorEvent) => errors.push(e.message);
+		window.addEventListener("error", onerror);
+		try {
+			const { root } = await setup();
+			for (const width of ["500px", "1000px", "300px", "900px"]) {
+				root().style.width = width;
+				await settle();
+				await settle();
+			}
+			await page.viewport(500, 900);
+			await settle();
+			await settle();
+		} finally {
+			await page.viewport(1400, 900);
+			window.removeEventListener("error", onerror);
+		}
+		expect(errors.filter((m) => /ResizeObserver/.test(m))).toEqual([]);
 	});
 });
