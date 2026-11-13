@@ -11,6 +11,7 @@ import {
 	hmsSmokePlugin,
 	Legend,
 	maptilerMap,
+	MapView,
 	monitorsOptions,
 	monitorsPlugin,
 	settingsGroup,
@@ -70,6 +71,11 @@ describe("README examples", () => {
 	it("MapView's featureList options, as monitor-map uses them", () => {
 		const featureList: FeatureListOptions = { position: "top-right", reveal: "focus" };
 		expect(featureList).toEqual({ position: "top-right", reveal: "focus" });
+	});
+
+	it("MapView's layoutRoot, as monitor-map's shell uses it", () => {
+		const props: Pick<ComponentProps<typeof MapView>, "layoutRoot"> = { layoutRoot: null };
+		expect(props.layoutRoot).toBeNull();
 	});
 
 	it("today's basemaps without the POI layer filter", () => {

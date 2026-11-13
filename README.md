@@ -355,7 +355,7 @@ The badges' glyphs are Lucide's `school` and `baby` icons (lucide.dev, ISC licen
 Layers, Overlays, Settings), rows, words, and sizes. Pass it as `MapView`'s `toolbar` snippet:
 it sits top-left, the List button stacks below it, and the map's box gets
 `--mapsdk-toolbar-height` (px from the map's top to the toolbar's bottom) for your own overlays.
-A map at least 48rem wide (the map's box, not the window) shows a row of joined dropdown buttons;
+A map at least 48rem wide (the map's box, or the `layoutRoot` you pass; never the window) shows a row of joined dropdown buttons;
 a narrower one shows one options button that opens a "Map Options" panel over the map, with each
 group a section. Crossing the line closes everything. It uses the disclosure pattern (buttons
 with `aria-expanded` over ordinary checkboxes, radios, and a select); a mouse opens a dropdown on
@@ -433,6 +433,19 @@ hasInside?, collocation?, none?, icons?, keys?, cluster? })`: monitor-map's Poll
 		<OptionsToolbar {groups} {values} {onchange} {defaults} basemapKey="basemap" />
 	{/snippet}
 </MapView>
+```
+
+**`layoutRoot`** (a `MapView` prop) takes an element whose width decides wide or narrow instead
+of the map's: usually a box holding the map and a side panel, so opening the panel doesn't flip the
+toolbar. Only that decision moves: dropdowns and the narrow panel still stay inside the map, and
+`--mapsdk-toolbar-height` is the map's. Unset or null (as before `bind:this` fills it in, or after
+the element unmounts), the map measures its own box.
+
+```svelte
+<div bind:this={shell} class="flex">
+	<MapView {map} layoutRoot={shell} class="flex-1">…</MapView>
+	<aside class="w-1/3">…</aside>
+</div>
 ```
 
 `search` (a snippet) sits last on the wide toolbar and beside the options button on the narrow
@@ -785,6 +798,12 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.14
+
+- **`MapView`'s `layoutRoot`:** the toolbar's wide/narrow switch can measure a box larger than the
+  map (monitor-map's map plus its detail panel). Hosts that pass nothing see no change. See "The
+  options toolbar".
 
 ### 0.1.0-beta.13
 

@@ -129,7 +129,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   adds the host's buttons, `ui/card.ts`), `PickNotice` (refusals), and
   `toolbar` (a snippet, normally `OptionsToolbar`: a top-left slot above the list and card; the bar
   registers itself through `MapLayout.setBar`, the List button stacks below it, and the map's box
-  gets `--mapsdk-toolbar-height`; the narrow panel makes the map's other children inert), and
+  gets `--mapsdk-toolbar-height`; the narrow panel makes the map's other children inert;
+  `layoutRoot`, an element, makes the wide/narrow switch measure that box instead of the map's), and
   `featureList` (`boolean` or `{ position, reveal, note }`; `list-placement.ts`; the button stacks clear
   of the controls in its corner, measured with a `ResizeObserver`). It sets `--mapsdk-map-width`,
   which caps the list panel and framed legend at the map's width. Credits come from the engine's
