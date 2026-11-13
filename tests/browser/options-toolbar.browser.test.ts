@@ -6,6 +6,7 @@ import { createMap, type MapContext } from "../../src/lib/core/create-map.svelte
 import type { OptionGroup } from "../../src/lib/options/types.js";
 import OptionsToolbarHost from "../fixtures/OptionsToolbarHost.svelte";
 import { ToolbarState } from "../fixtures/options.svelte.js";
+import { parkPointer } from "./park-pointer.js";
 import { createFakeGl } from "../fixtures/fake-gl.js";
 import { settingsGroup } from "../../src/lib/options/presets.js";
 
@@ -106,8 +107,9 @@ const panelOf = (name: string) =>
 	document.getElementById(trigger(name).element().getAttribute("aria-controls")!)!;
 const visible = (el: Element) => (el as HTMLElement).offsetParent !== null;
 
-afterEach(() => {
+afterEach(async () => {
 	document.body.replaceChildren();
+	await parkPointer();
 });
 
 describe("OptionsToolbar, wide", () => {
@@ -560,7 +562,8 @@ describe("OptionsToolbar, final review fixes", () => {
 		trigger("Layers")
 			.element()
 			.parentElement!.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
-		await new Promise((r) => setTimeout(r, 0));
+		// Long enough for Chromium's pointer events after a layout change.
+		await new Promise((r) => setTimeout(r, 300));
 		expect(expanded("Layers")).toBe("true");
 		await userEvent.keyboard("{Escape}");
 		expect(expanded("Layers")).toBe("false");
@@ -570,7 +573,7 @@ describe("OptionsToolbar, final review fixes", () => {
 		const { state } = await setup();
 		await trigger("Layers").click();
 		// Off the toolbar: otherwise Settings slides in under the pointer and opens on hover.
-		await userEvent.unhover(trigger("Layers"));
+		await parkPointer();
 		state.groups = groups().filter((g) => g.id !== "layers");
 		// Long enough for Chromium's pointer events after a layout change.
 		await new Promise((r) => setTimeout(r, 300));
