@@ -13,6 +13,7 @@ import SelectionBar from "../../src/lib/ui/SelectionBar.svelte";
 import ViewSummary from "../../src/lib/ui/ViewSummary.svelte";
 import { SUMMARY_DEBOUNCE_MS } from "../../src/lib/ui/view-summary.js";
 import { pm25Scale } from "../fixtures/scales.js";
+import { ItemsBox } from "../fixtures/sources.svelte.js";
 
 const [good, moderate] = pm25Scale.levels;
 
@@ -305,6 +306,74 @@ describe("ViewSummary", () => {
 		map.updateView(camera, bounds);
 		await settle();
 		expect(lines(region)).toEqual(["monitors: 1 Good"]);
+	});
+
+	it("re-counts when a plugin's features change at a still view", async () => {
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		const map = newMap();
+		const box = new ItemsBox([item("1"), item("2")]);
+		map.addPlugin(plugin([], { features: () => box.items }));
+		map.updateView(camera, bounds);
+		render(ViewSummary, { map });
+		const region = document.querySelector(".mapsdk-summary")!;
+		box.items = [item("1"), item("2"), item("3", moderate)];
+		await settle();
+		expect(lines(region)).toEqual(["monitors: 2 Good, 1 Moderate"]);
+	});
+
+	it("re-counts when a plugin is added or removed at a still view", async () => {
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		const map = newMap();
+		map.addPlugin(plugin([item("1")]));
+		map.updateView(camera, bounds);
+		render(ViewSummary, { map });
+		const region = document.querySelector(".mapsdk-summary")!;
+		map.addPlugin(plugin([item("9")], { id: "second", label: "second" }));
+		await settle();
+		expect(lines(region)).toEqual(["monitors: 1 Good", "second: 1 Good"]);
+		map.removePlugin("second");
+		await settle();
+		expect(lines(region)).toEqual(["monitors: 1 Good"]);
+	});
+
+	it("keeps an unchanged line's element when another plugin's data changes", async () => {
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		const map = newMap();
+		const box = new ItemsBox([item("9")]);
+		map.addPlugin(plugin([item("1")]));
+		map.addPlugin(plugin([], { id: "second", label: "second", features: () => box.items }));
+		map.updateView(camera, bounds);
+		await settle();
+		render(ViewSummary, { map });
+		const region = document.querySelector(".mapsdk-summary")!;
+		box.items = [item("9"), item("8")];
+		await settle();
+		const first = region.querySelector("p");
+		expect(lines(region)).toEqual(["monitors: 1 Good", "second: 2 Good"]);
+		const { seen, stop } = watch(region);
+		box.items = [item("9")];
+		await settle();
+		stop();
+		expect(region.querySelector("p")).toBe(first);
+		expect(seen).toEqual(["second: 1 Good"]);
+	});
+
+	it("debounces feature changes like moves", async () => {
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		const map = newMap();
+		const box = new ItemsBox([item("1")]);
+		map.addPlugin(plugin([], { features: () => box.items }));
+		map.updateView(camera, bounds);
+		render(ViewSummary, { map });
+		const region = document.querySelector(".mapsdk-summary")!;
+		box.items = [item("1"), item("2")];
+		await settle(SUMMARY_DEBOUNCE_MS - 1);
+		box.items = [item("1"), item("2"), item("3")];
+		await settle(SUMMARY_DEBOUNCE_MS - 1);
+		// Still the line from mount: the second change restarted the wait.
+		expect(lines(region)).toEqual(["monitors: 1 Good"]);
+		await settle(1);
+		expect(lines(region)).toEqual(["monitors: 3 Good"]);
 	});
 });
 
