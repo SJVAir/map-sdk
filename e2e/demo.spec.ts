@@ -658,3 +658,84 @@ test("schools: the legend has a School row and a Child care row", async ({ page 
 	const legend = page.getByRole("list", { name: "Schools and child care" });
 	await expect(legend.getByRole("listitem")).toHaveText(["School", "Child care"]);
 });
+
+// The options toolbar on the monitor-map setup map (wide: the map spans the page at 1280px).
+const optionsTrigger = (page: Page, name: string) =>
+	todayMap(page).getByRole("button", { name, exact: true });
+
+test("toolbar: Fire & Smoke off at a still view takes smoke and fire out of the list", async ({
+	page
+}) => {
+	const map = todayMap(page);
+	const list = await openList(map);
+	await expect(list.getByRole("option", { name: /^Smoke/ }).first()).toBeVisible();
+	await optionsTrigger(page, "Layers").click();
+	await map.getByRole("checkbox", { name: "Fire & Smoke" }).uncheck();
+	await expect(list.getByRole("option", { name: /^Smoke/ })).toHaveCount(0);
+	await expect(list.getByRole("option", { name: /Fixture Alpha/ })).toBeVisible();
+});
+
+test("toolbar: a basemap goes to its default variant, and Theme lists its variants", async ({
+	page
+}) => {
+	const map = todayMap(page);
+	await optionsTrigger(page, "Settings").click();
+	await map.getByRole("combobox", { name: "Basemap" }).selectOption({ label: "Outdoor" });
+	await expect
+		.poll(() =>
+			page.evaluate(
+				() =>
+					(window as unknown as { __mapsdkDemo: { today: { basemap: { current: string } } } })
+						.__mapsdkDemo.today.basemap.current
+			)
+		)
+		.toMatch(/^outdoor-v\d+$/);
+	await expect(map.getByRole("radio", { name: "Dark" })).toBeVisible();
+});
+
+test("toolbar: Monitors' rows filter the map's monitors", async ({ page }) => {
+	const map = todayMap(page);
+	const list = await openList(map);
+	await expect(list.getByRole("option", { name: /Fixture Alpha/ })).toBeVisible();
+	await optionsTrigger(page, "Monitors").click();
+	// The fixture's types span both groups: monitor-map's two select-all headings.
+	await map.getByRole("checkbox", { name: "Reference-grade" }).uncheck();
+	await map.getByRole("checkbox", { name: "Low-cost sensors" }).uncheck();
+	await expect(list.getByRole("option", { name: /Fixture Alpha/ })).toHaveCount(0);
+});
+
+test("modifier: Shift-click marks without opening the card", async ({ page }) => {
+	await zoomTo(page, "right", ALPHA_LNGLAT);
+	const { x, y } = await monitorPoint(page, "right", ALPHA_LNGLAT);
+	await page.keyboard.down("Shift");
+	await page.mouse.click(x, y);
+	await page.keyboard.up("Shift");
+	await expect.poll(() => liveSelection(page)).toEqual([ALPHA]);
+	await expect(card(page)).toHaveCount(0);
+});
+
+test("toolbar: a narrow window gets the options button and the Map Options panel", async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 500, height: 900 });
+	const map = todayMap(page);
+	const open = map.getByRole("button", { name: "Open map options" });
+	await open.scrollIntoViewIfNeeded();
+	await expect(open).toBeVisible();
+	await open.click();
+	await expect(map.getByText("Map Options", { exact: true })).toBeVisible();
+	await map.getByRole("button", { name: "Close map options" }).click();
+	await expect(open).toBeFocused();
+});
+
+test.describe("toolbar on touch", () => {
+	test.use({ hasTouch: true });
+
+	test("a tap opens a dropdown, and another tap closes it", async ({ page }) => {
+		const trigger = optionsTrigger(page, "Layers");
+		await trigger.tap();
+		await expect(trigger).toHaveAttribute("aria-expanded", "true");
+		await trigger.tap();
+		await expect(trigger).toHaveAttribute("aria-expanded", "false");
+	});
+});
