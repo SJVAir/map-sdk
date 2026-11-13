@@ -355,9 +355,9 @@ The badges' glyphs are Lucide's `school` and `baby` icons (lucide.dev, ISC licen
 Layers, Overlays, Settings), rows, words, and sizes. Pass it as `MapView`'s `toolbar` snippet:
 it sits top-left, the List button stacks below it, and the map's box gets
 `--mapsdk-toolbar-height` (px from the map's top to the toolbar's bottom) for your own overlays.
-A map at least 48rem wide (the map's box, or the `layoutRoot` you pass; never the window) shows a row of joined dropdown buttons;
-a narrower one shows one options button that opens a "Map Options" panel over the map, with each
-group a section. Crossing the line closes everything. It uses the disclosure pattern (buttons
+A map at least 48rem wide (the map's box, or the `layoutRoot` you pass; never the window) shows
+a row of joined dropdown buttons; a narrower one shows one options button that opens a "Map
+Options" panel over the map, with each group a section. Crossing the line closes everything. It uses the disclosure pattern (buttons
 with `aria-expanded` over ordinary checkboxes, radios, and a select); a mouse opens a dropdown on
 hover (wide only); Esc closes it and returns focus; dropdowns stay inside the map (capped and
 scrolling, aligned to whichever edge fits); the panel slides in only without reduced motion, and
@@ -439,9 +439,15 @@ hasInside?, collocation?, none?, icons?, keys?, cluster? })`: monitor-map's Poll
 of the map's: usually a box holding the map and a side panel, so opening the panel doesn't flip the
 toolbar. Only that decision moves: dropdowns and the narrow panel still stay inside the map, and
 `--mapsdk-toolbar-height` is the map's. Unset or null (as before `bind:this` fills it in, or after
-the element unmounts), the map measures its own box.
+the element unmounts), the map measures its own box. A root that measures 0 wide (`display: none`)
+counts as wide. Declare the element with `$state`: a plain `let` isn't reactive, so `MapView`
+would never see it.
 
 ```svelte
+<script lang="ts">
+	let shell = $state<HTMLElement>();
+</script>
+
 <div bind:this={shell} class="flex">
 	<MapView {map} layoutRoot={shell} class="flex-1">…</MapView>
 	<aside class="w-1/3">…</aside>
