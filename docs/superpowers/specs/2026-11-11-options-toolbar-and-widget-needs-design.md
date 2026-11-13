@@ -496,8 +496,12 @@ These override anything below that says otherwise.
     group's marker**;
   - then a separator and Inactive, Inside (each only when present in the data) and Collocation
     Sites (monitor-map's rule: only for PM2.5).
-  - Type labels come from the metadata's `monitors[type].label` (bam1022 is "BAM 1022"; the user
-    will change the server's label to "SJVAir"). **Each type's group and each pollutant's help text
+  - Type labels come from the metadata's `monitors[type].label` (bam1022 stays "BAM 1022": the user
+    held the rename to "SJVAir" on 2026-11-12, since the server's label also drives the admin's
+    type choices and each BAM's `device` fallback; recorded in data-dashboard `DEFERRED.md`). The
+    server's fields: `monitor_groups` (`{ key, label, order }`, keys `"reference"` and
+    `"low-cost"`; headings take its labels, sorted by `order`), `monitors[type].group`, and
+    `entries[type].description` (`string | null`). **Each type's group and each pollutant's help text
     come from the metadata too** (the user, 2026-11-12: the server and sdk-js are adding them now),
     not from the host, **through map-sdk's `MetadataProvider`**, like every other label: two new
     optional methods beside `monitorTypeLabel` and `entryType` (named by the builder, e.g.
