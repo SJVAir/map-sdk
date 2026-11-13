@@ -387,7 +387,7 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			{#if listOpen}
 				<div bind:this={listBox} bind:clientWidth={listWidth} onkeydown={onListKeydown}>
-					<FeatureList {map} id={listId} bind:sortBy={listSort} />
+					<FeatureList {map} id={listId} bind:sortBy={listSort} note={list.note} />
 				</div>
 			{/if}
 		</div>

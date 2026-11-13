@@ -1,3 +1,5 @@
+import type { Snippet } from "svelte";
+
 /** A corner of the map. */
 export type ListPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
@@ -11,15 +13,21 @@ export interface FeatureListOptions {
 	 * stays in the Tab order and the accessibility tree, like a skip link.
 	 */
 	reveal?: "always" | "focus";
+	/** A short note shown in the open list, above the rows, describing it ("2 marked monitors aren't shown"). */
+	note?: string | Snippet;
 }
 
 /** The `featureList` prop with its defaults filled in, or `null` when the list is off. */
 export function resolveFeatureList(
 	value: boolean | FeatureListOptions | undefined
-): Required<FeatureListOptions> | null {
+): (Required<Omit<FeatureListOptions, "note">> & Pick<FeatureListOptions, "note">) | null {
 	if (value === false) return null;
 	const options = value === true || value === undefined ? {} : value;
-	return { position: options.position ?? "top-left", reveal: options.reveal ?? "always" };
+	return {
+		position: options.position ?? "top-left",
+		reveal: options.reveal ?? "always",
+		note: options.note
+	};
 }
 
 /** A corner's edges, and the other corner on the same side (where the panel must stop). */

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, tick, untrack } from "svelte";
+	import { onDestroy, tick, untrack, type Snippet } from "svelte";
 	import type { Bounds, MapContext } from "../core/create-map.svelte.js";
 	import type { FeatureListItem } from "../core/plugin.js";
 	import { selectionKeys } from "../data/selection.js";
@@ -24,9 +24,11 @@
 		id?: string;
 		/** The sort order; bind it to keep it while the list is unmounted. */
 		sortBy?: SortBy;
+		/** A short host note shown above the rows (e.g. "2 marked monitors aren't shown"); it describes the listbox. */
+		note?: string | Snippet;
 	}
 
-	let { map, class: className, id, sortBy = $bindable("name") }: Props = $props();
+	let { map, class: className, id, sortBy = $bindable("name"), note }: Props = $props();
 
 	const baseId = $props.id();
 	/** Rows rendered above and below the visible ones. */
@@ -295,6 +297,11 @@
 			{map.messages("mapsdk_list_sort_value")}
 		</button>
 	</div>
+	{#if note}
+		<p id="{baseId}-note" class="mapsdk-list-note text-xs">
+			{#if typeof note === "string"}{note}{:else}{@render note()}{/if}
+		</p>
+	{/if}
 	<div class="mapsdk-list-row mapsdk-list-sizer" aria-hidden="true" bind:offsetHeight={rowHeight}>
 		&nbsp;
 	</div>
@@ -312,6 +319,7 @@
 			role="listbox"
 			tabindex="0"
 			aria-label={map.messages("mapsdk_list_label")}
+			aria-describedby={note ? `${baseId}-note` : undefined}
 			aria-multiselectable={multiselectable || undefined}
 			aria-activedescendant={activeIndex >= 0 ? optionId(rows[activeIndex]) : undefined}
 			style:padding-top="{range.start * rowHeight}px"
@@ -496,6 +504,12 @@
 	.mapsdk-list-empty {
 		margin: 0;
 		padding: 0.75rem;
+		color: var(--muted-foreground);
+	}
+
+	.mapsdk-list-note {
+		margin: 0;
+		padding: 0.25rem 0.5rem;
 		color: var(--muted-foreground);
 	}
 </style>
