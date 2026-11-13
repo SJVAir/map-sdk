@@ -11,7 +11,7 @@
   - the `OptionsToolbar` component and its row components.
 - **`MapView` places the toolbar.** It takes a `toolbar` snippet, renders it in a top-left slot, and measures that slot, so the List button stacks below it and hosts get `--mapsdk-toolbar-height`. It also provides the map's width to the toolbar through context, which picks the layout from that width (48rem).
 - **The presets are functions of the map:** `basemapOptions(map)`, `hmsOptions(map)`, `schoolsOptions(map)` and `monitorsOptions(map)`. Each returns groups and defaults and takes its labels from message keys and the `MetadataProvider`. None of them wire values to plugins; the host does.
-- **Basemaps:** `BasemapConfig` styles gain names, grouping and their own excluded layers. `BasemapState` gains id resolution and a fallback event.
+- **Basemaps:** `BasemapConfig` styles gain names, grouping and their own excluded layers. `BasemapState` gains id resolution and a fallback event for hosts (the toolbar never turns it into a change).
 
 **Tech Stack:** Svelte 5 runes, TypeScript, MapTiler SDK 4.2, Vitest (unit, client, browser), Playwright.
 
@@ -38,7 +38,7 @@
 1. **A dropdown that closes on focus-out, as its row is removed.** Chrome fires `focusout` while the node is still attached. Example: a monitor type row vanishes when the pollutant changes while it's focused. The dropdown must not close or throw, and focus goes to the trigger. Pinned in Task 5.
 2. **A tile shorter than its dropdown, or a trigger near the right edge.** The dropdown stays inside the map, scrolls, and aligns to whichever edge keeps it inside. Pinned in Task 6.
 3. **The host replaces `groups` while a menu is open** (labels resolving, rows appearing). The open menu stays open and focus stays on its row. Pinned in Task 5.
-4. **A saved basemap id from an older MapTiler version** (`streets-v2-dark`) resolves to `streets-v4`, and the toolbar sends one change event. A garbage id resolves to the default. Never a blank map. Pinned in Task 3 and Task 7.
+4. **A saved basemap id from an older MapTiler version** (`streets-v2-dark`) resolves to `streets-v4`; the toolbar's rows show `streets-v4` and send no change event. A garbage id resolves to the default. Never a blank map. Pinned in Task 3 and Task 7.
 5. **Two maps on one page:** Esc, outside clicks and hover in one toolbar leave the other's menus alone, and ids never collide. Pinned in Task 6.
 
 ---
@@ -224,7 +224,7 @@
   	readonly?: boolean;
   	/** Last on the wide toolbar, beside the options button on the narrow one. */
   	search?: Snippet;
-  	/** The key of a basemap row: map-sdk's fallbacks are sent as changes to it (Task 7). */
+  	/** The key of the basemap rows: they show `map.basemap.current`, not `values[key]` (Task 7). Fallbacks never fire `onchange`. */
   	basemapKey?: string;
   }
   ```
@@ -284,11 +284,11 @@
 - [ ] **Step 5: Commit:** `git commit -m "OptionsToolbar: the narrow panel, placement in MapView, kept inside the map"`
 - [ ] **Step 6: Checkpoint review.** Dispatch a fresh reviewer on the most capable model over Tasks 1–6. These touch shared core and `MapView` code that every host uses. Fix Critical and Important findings with failing tests first.
 
-### Task 7: Settings: `basemapOptions(map)`, clusters, reset, the fallback event
+### Task 7: Settings: `basemapOptions(map)`, clusters, reset
 
 **Files:**
 - Create: `src/lib/options/presets.ts` (`basemapOptions`, `settingsGroup`, `hmsOptions`, `schoolsOptions`)
-- Modify: `src/lib/options/OptionsToolbar.svelte` (subscribe to `map.basemap.onFallback` while mounted and not `readonly`, when `basemapKey` is set), `src/lib/index.ts`
+- Modify: `src/lib/options/OptionsToolbar.svelte` (rows bound to `basemapKey` read `map.basemap.current`), `src/lib/index.ts`
 - Test: `tests/client/options/presets.test.ts`, `tests/browser/options-toolbar.browser.test.ts`
 
 **Interfaces:**
@@ -308,7 +308,7 @@
   - Picking "Satellite" in the select sets `basemap` to `"satellite-v4"` (its default variant), in one change.
   - On a Streets-only config the select row is absent.
   - `settingsGroup` defaults: `clustered: true`, `basemap: map.basemap` config's `defaultId`.
-  - Browser: a failed style sends one `onchange` with `changed: ["basemap"]` and the reverted id. Read-only sends none. An unmounted toolbar sends none. A resolved unlisted id sends one (Review Focus 4).
+  - Browser: a failed style sends **no** `onchange`, and the Basemap and Theme rows show the reverted id; a resolved unlisted saved id sends none and the rows show the resolved id (Review Focus 4).
   - `hmsOptions` / `schoolsOptions` labels are "Fire & Smoke" and "Schools & Child Care", with default `true`.
 - [ ] **Step 2:** run both files. Expected: FAIL.
 - [ ] **Step 3: Implement**, reading `map.basemap.styles` and `map.messages`.

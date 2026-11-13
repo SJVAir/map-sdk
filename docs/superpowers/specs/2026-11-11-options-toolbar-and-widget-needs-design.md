@@ -580,11 +580,12 @@ These override anything below that says otherwise.
   their own strings.
 - **Per-instance ids** (`$props.id()`), so two toolbars never share an id or an open menu.
 - **The basemap row stays host-owned.** `basemapOptions(map)` is plain data like the other
-  presets; the host applies a change with `map.basemap.select`. When a basemap fails to load and
-  map-sdk falls back, the toolbar sends one change event with the basemap it fell back to (its
-  changed keys name the basemap row), so the host's saved value follows what the map shows. It's
-  the one change event a user didn't make, and the docs say so. The builder adds whatever
-  `BasemapState` needs to report the fallback.
+  presets; the host applies a change with `map.basemap.select`. **A fallback or a resolve sends no change event** (the user,
+  2026-11-12, on the coordinator's point: in the dashboard every change event is a saved edit with
+  an undo step, so opening a document would write to it, and spec 2 draws fallbacks without saving
+  them). Change events come only from user actions. The Basemap and Theme rows show what the map
+  draws (`map.basemap.current`), as monitor-map's Settings does, so they never show a stale choice;
+  a host that wants to save a fallback listens on `map.basemap`'s fallback event itself.
 - **One stored value for basemap and Theme** (part 5): the variant's id (what `map.basemap.select`
   takes, e.g. `outdoor-v2-dark`). Since a basemap switch always lands on its default variant, the
   basemap is derived from the id and a second key would only duplicate it. Both rows report that
@@ -594,11 +595,9 @@ These override anything below that says otherwise.
   `_V<n>`/`-v<n>` version), otherwise to the default basemap's default variant. It never throws and
   never leaves the map blank. (Today `select` ignores an unknown id; resolving is part 5's.)
 - **The `search` slot stays** (monitor-map's place search needs it); the dashboard doesn't use it.
-- **Where the fallback event comes from:** `BasemapState` reports a fallback itself (a callback or
-  event on `map.basemap`, whatever the builder names it), so a host whose toolbar is hidden can
-  still hear it. The toolbar passes it on as its one non-user change event while it's mounted and
-  not read-only; a read-only toolbar doesn't send it (a viewer's screen falling back isn't an edit
-  to save).
+- **Where the fallback event comes from:** `BasemapState` reports a fallback or a resolve itself
+  (a callback on `map.basemap`, whatever the builder names it), for hosts that want to save it. The
+  toolbar never turns it into a change event.
 - **Excluded layers per style:** `excludedLayers` moves onto each style entry (the config-wide
   list stays as a fallback, so existing configs work). `defaultBasemaps()` removes the POI label
   layers from the Streets variants only, as today; the 16 new styles keep all their layers.
