@@ -10,6 +10,9 @@ export const NO_SCALE: Scale = {
 	units: "",
 	kind: "category",
 	source: null,
+	averaging_hours: null,
+	daily_statistic: null,
+	daily_statistic_label: null,
 	levels: []
 };
 
