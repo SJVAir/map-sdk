@@ -217,4 +217,16 @@ describe("monitorsOptions", () => {
 		expect(runs).toBeGreaterThan(1);
 		expect(labels(group(result.groups, "monitors")!.rows)).toEqual(["AirNow"]);
 	});
+
+	it("a provider method that throws is answered as unavailable, without an uncaught error", async () => {
+		const { result } = await build(
+			{ types: ["airnow", "purpleair"], pollutants: ["pm25"], pollutant: "pm25" },
+			provider({
+				monitorTypeGroup: () => {
+					throw new Error("boom");
+				}
+			})
+		);
+		expect(labels(group(result.groups, "monitors")!.rows)).toEqual(["AirNow", "PurpleAir"]);
+	});
 });

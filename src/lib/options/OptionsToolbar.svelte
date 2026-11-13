@@ -68,6 +68,25 @@
 		});
 	});
 
+	// A group removed or disabled while open is forgotten (an id left behind would swallow Esc,
+	// and reopen the group when it comes back).
+	$effect(() => {
+		const ids = new Set(groups.filter((g) => !g.disabled).map((g) => g.id));
+		untrack(() => menus.keepOnly(ids));
+	});
+
+	// A dropdown a mouse is showing closes on Esc wherever focus is (WCAG 1.4.13). Only this
+	// toolbar's: the pointer is over one toolbar at a time.
+	$effect(() => {
+		const hovered = menus.hovered;
+		if (hovered === null) return;
+		const onkeydown = (e: KeyboardEvent) => {
+			if (e.key === "Escape" && !e.defaultPrevented) menus.unhover(hovered);
+		};
+		document.addEventListener("keydown", onkeydown);
+		return () => document.removeEventListener("keydown", onkeydown);
+	});
+
 	// The panel covers the map: the map's other pieces go inert while it's open.
 	$effect(() => {
 		const covered = !wide && panelOpen;
@@ -212,9 +231,15 @@
 				<div class="mapsdk-options-search">{@render search()}</div>
 			{/if}
 		</div>
-		<div id={panelId} class="mapsdk-options-panel" data-open={panelOpen}>
+		<div
+			id={panelId}
+			class="mapsdk-options-panel"
+			data-open={panelOpen}
+			role="region"
+			aria-labelledby="{panelId}-title"
+		>
 			<div class="mapsdk-options-panel-header">
-				<p class="text-lg">{map.messages("mapsdk_options_title")}</p>
+				<p id="{panelId}-title" class="text-lg">{map.messages("mapsdk_options_title")}</p>
 				<button
 					bind:this={closeButton}
 					type="button"

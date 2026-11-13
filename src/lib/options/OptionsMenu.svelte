@@ -63,17 +63,30 @@
 	// New rows can remove the focused one. Chrome fires focusout as it goes and Firefox fires
 	// nothing, so note before the update whether focus was in this dropdown, and after it hand
 	// focus to the trigger if it fell to the page.
+	// Values can remove it too: a select-all collapses when its last child is unchecked. Focus then
+	// goes to that group's own checkbox, else the trigger.
 	let focusWasInside = false;
+	let focusGroup: string | undefined;
 	$effect.pre(() => {
 		void group.rows;
-		focusWasInside = !!body && body.contains(document.activeElement);
+		void ctx.values;
+		const active = document.activeElement;
+		focusWasInside = !!body && body.contains(active);
+		focusGroup = focusWasInside
+			? active?.closest<HTMLElement>("[data-option-children]")?.dataset.optionChildren
+			: undefined;
 	});
 	$effect(() => {
 		void group.rows;
+		void ctx.values;
 		if (!focusWasInside) return;
 		focusWasInside = false;
 		const active = document.activeElement;
-		if (open && (!active || active === document.body)) button?.focus();
+		if (!open || (active && active !== document.body)) return;
+		const own = focusGroup
+			? body.querySelector<HTMLElement>(`[data-option-group="${CSS.escape(focusGroup)}"]`)
+			: null;
+		(own ?? button)?.focus();
 	});
 </script>
 
@@ -110,7 +123,7 @@
 			class="mapsdk-options-dropdown-body"
 			style:--mapsdk-options-max-height={maxHeight === null ? undefined : `${maxHeight}px`}
 		>
-			<OptionRows rows={group.rows} menuId={group.id} />
+			<OptionRows rows={group.rows} menuId={group.id} groupLabel={group.label} />
 		</div>
 	</div>
 </div>

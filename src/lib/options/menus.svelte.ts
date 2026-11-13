@@ -8,6 +8,17 @@ export class OptionsMenus {
 	#clicked = new SvelteSet<string>();
 	#hovered = $state<string | null>(null);
 
+	/** The menu a mouse is showing, if any. */
+	get hovered(): string | null {
+		return this.#hovered;
+	}
+
+	/** Forgets menus whose groups are gone or disabled, so they don't reopen by themselves. */
+	keepOnly(ids: ReadonlySet<string>): void {
+		for (const id of [...this.#clicked]) if (!ids.has(id)) this.#clicked.delete(id);
+		if (this.#hovered !== null && !ids.has(this.#hovered)) this.#hovered = null;
+	}
+
 	/** Whether any menu is open. */
 	get anyOpen(): boolean {
 		return this.#clicked.size > 0 || this.#hovered !== null;

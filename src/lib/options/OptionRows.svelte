@@ -8,7 +8,8 @@
 	import { applyGroup, applyReset, applyValue, choiceFor, groupStatus } from "./values.js";
 
 	/** `menuId`: the group these rows are in, so a `closesMenu` radio can close it. */
-	let { rows, menuId }: { rows: OptionRow[]; menuId: string } = $props();
+	let { rows, menuId, groupLabel }: { rows: OptionRow[]; menuId: string; groupLabel?: string } =
+		$props();
 
 	const ctx = getToolbarContext();
 	const ro = $derived(ctx.readonly || undefined);
@@ -54,7 +55,7 @@
 			<span class="mapsdk-option-label">{row.label}</span>
 		</label>
 		{#if row.children?.length && on}
-			<div class="mapsdk-option-children"><Self rows={row.children} {menuId} /></div>
+			<div class="mapsdk-option-children"><Self rows={row.children} {menuId} {groupLabel} /></div>
 		{/if}
 	{:else if row.kind === "group"}
 		{@const status = groupStatus(row, ctx.values)}
@@ -66,6 +67,7 @@
 					class="mapsdk-focus"
 					checked={status === "checked"}
 					aria-disabled={ro}
+					data-option-group={row.id}
 					{@attach partly(status === "indeterminate")}
 					onclick={guard}
 					onchange={(e) => {
@@ -82,12 +84,14 @@
 				</span>
 			</label>
 			{#if open}
-				<div class="mapsdk-option-children"><Self rows={row.children} {menuId} /></div>
+				<div class="mapsdk-option-children" data-option-children={row.id}>
+					<Self rows={row.children} {menuId} {groupLabel} />
+				</div>
 			{/if}
 		{/if}
 	{:else if row.kind === "radio"}
 		{@const current = ctx.valueOf(row.id)}
-		<div role="radiogroup" aria-label={row.label} class="mapsdk-option-radios">
+		<div role="radiogroup" aria-label={row.label ?? groupLabel} class="mapsdk-option-radios">
 			{#if row.label}
 				<p class="mapsdk-option-heading text-sm" aria-hidden="true">
 					{#if row.icon}<OptionIcon icon={row.icon} />{/if}

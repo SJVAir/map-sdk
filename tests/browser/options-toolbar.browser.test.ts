@@ -535,3 +535,55 @@ describe("OptionsToolbar, icon-only groups", () => {
 		expect(label.getBoundingClientRect().width).toBeLessThanOrEqual(1);
 	});
 });
+
+describe("OptionsToolbar, final review fixes", () => {
+	it("unchecking a select-all's last child hands focus to the group's own checkbox", async () => {
+		const { state } = await setup({
+			values: { ...values(), "type:purpleair": true, "type:airgradient": false }
+		});
+		await trigger("Monitors").click();
+		const purple = page.getByRole("checkbox", { name: "PurpleAir" }).element() as HTMLInputElement;
+		purple.focus();
+		await userEvent.keyboard(" ");
+		await new Promise((r) => setTimeout(r, 0));
+		expect(state.calls.at(-1)?.changed).toEqual(["type:purpleair"]);
+		expect(expanded("Monitors")).toBe("true");
+		expect(document.activeElement).toBe(
+			page.getByRole("checkbox", { name: "Low-cost sensors" }).element()
+		);
+	});
+
+	it("Esc closes a dropdown a mouse opened, with focus outside the toolbar", async () => {
+		await setup();
+		(page.getByTestId("outside").element() as HTMLElement).tabIndex = 0;
+		(page.getByTestId("outside").element() as HTMLElement).focus();
+		trigger("Layers")
+			.element()
+			.parentElement!.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
+		await new Promise((r) => setTimeout(r, 0));
+		expect(expanded("Layers")).toBe("true");
+		await userEvent.keyboard("{Escape}");
+		expect(expanded("Layers")).toBe("false");
+	});
+
+	it("a group removed while open is forgotten: it doesn't reopen, and Esc is the map's again", async () => {
+		const { state } = await setup();
+		await trigger("Layers").click();
+		state.groups = groups().filter((g) => g.id !== "layers");
+		await new Promise((r) => setTimeout(r, 0));
+		const button = trigger("Monitors").element() as HTMLElement;
+		button.focus();
+		const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+		button.dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(false);
+		state.groups = groups();
+		await new Promise((r) => setTimeout(r, 0));
+		expect(expanded("Layers")).toBe("false");
+	});
+
+	it("a radio group without a label is named by its group", async () => {
+		await setup();
+		await trigger("PM2.5").click();
+		expect(page.getByRole("radiogroup", { name: "PM2.5" }).query()).not.toBeNull();
+	});
+});

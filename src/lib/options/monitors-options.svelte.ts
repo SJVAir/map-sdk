@@ -62,7 +62,8 @@ export interface MonitorsOptions {
 	/**
 	 * The Pollutant group (when there are two or more choices) and the Monitors group, with their
 	 * defaults. Reads labels the map's metadata provider resolves into state, so call it in a
-	 * `$derived`: it re-runs as they arrive.
+	 * `$derived`: it re-runs as they arrive. Create the `monitorsOptions(map)` itself once per map,
+	 * outside any `$derived` (it holds those answers).
 	 */
 	groups(input: MonitorsOptionsInput): OptionsPreset;
 }
@@ -100,9 +101,15 @@ export function monitorsOptions(map: MapContext): MonitorsOptions {
 		if (asked.has(key)) return;
 		asked.add(key);
 		queueMicrotask(() => {
-			const p = fetch();
-			if (!p) return;
-			p.then(store, () => asked.delete(key));
+			let p: Promise<T> | undefined;
+			try {
+				p = fetch();
+			} catch (error) {
+				// A provider that throws answers nothing: the row falls back as for "unavailable".
+				console.error("map-sdk: a metadata provider method failed", error);
+				return;
+			}
+			p?.then(store, () => asked.delete(key));
 		});
 	}
 

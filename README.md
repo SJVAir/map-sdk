@@ -377,8 +377,10 @@ a `cluster` key (groups with the same one join into one button row), and `rows`.
 (`OptionRow`): `checkbox` (with `children` shown while it's on), `group` (a select-all over its
 checkbox `children`: checked, unchecked, or partly checked; hidden with none), `radio` (one key;
 `choices` with `label`, `unit`, `help`, `icon`; `closesMenu`), `select` (a choice's `matches`
-also show it as chosen), `action` (your button), `reset`, and `separator`. Pass a new array to
-change them; whatever is open stays open. Rows that show only in some states, or a trigger that
+also show it as chosen), `action` (your button), `reset`, and `separator`. Group and row ids
+are single tokens (no spaces), and a key appears in one row per toolbar (the Basemap select and
+the Theme radios share theirs by design). Pass a new array to change them; whatever is open stays
+open. Rows that show only in some states, or a trigger that
 follows a value, are you recomputing `groups`.
 
 **Presets** return declarations and their defaults; they don't wire values to plugins (you do,
@@ -392,8 +394,9 @@ hasInside?, collocation?, none?, icons?, keys?, cluster? })`: monitor-map's Poll
   metadata's group headings (Reference-grade, Low-cost sensors, in their `order`) select all of
   their types; otherwise it's a flat list, each row with its group's marker; a type with no group
   goes last. Inactive and Inside show only when `hasInactive`/`hasInside`; Collocation Sites only
-  for PM2.5. Labels, units, and help text come from the metadata provider, so build it in a
-  `$derived`. Default keys: `pollutant`, `` `type:${type}` ``, `inactive`, `inside`,
+  for PM2.5. Create `monitorsOptions(map)` once per map (it keeps what the metadata provider
+  answers) and call `.groups(...)` in a `$derived`: labels, units, and help text arrive after the
+  first call. Default keys: `pollutant`, `` `type:${type}` ``, `inactive`, `inside`,
   `collocationSites`.
 - `settingsGroup(map, { icon?, cluster?, clusters?, basemap?, reset? })`: monitor-map's Settings
   (Marker Clusters `clustered`, Basemap and Theme, Reset Map Options), icon-only and end-aligned.
@@ -407,13 +410,16 @@ hasInside?, collocation?, none?, icons?, keys?, cluster? })`: monitor-map's Poll
 
 ```svelte
 <script lang="ts">
+	// Once per map: it keeps the labels the metadata provider resolves.
 	const monitors = monitorsOptions(map);
-	const settings = settingsGroup(map);
-	let values = $state<OptionValues>({ ...settings.defaults, pollutant: "pm25" });
-	const groups = $derived([
-		...monitors.groups({ types, pollutants: ["pm25", "o3"], pollutant: "pm25" }).groups,
-		...settings.groups
-	]);
+	let values = $state<OptionValues>({ pollutant: "pm25", clustered: true, basemap: "streets-v4" });
+	// In $derived: the rows follow the data, the values, and what the map draws.
+	const forMonitors = $derived(
+		monitors.groups({ types, pollutants: ["pm25", "o3"], pollutant: String(values.pollutant) })
+	);
+	const settings = $derived(settingsGroup(map));
+	const groups = $derived([...forMonitors.groups, ...settings.groups]);
+	const defaults = $derived({ ...forMonitors.defaults, ...settings.defaults });
 	function onchange(next: OptionValues, changed: string[]) {
 		values = next;
 		if (changed.includes("basemap")) map.basemap.select(String(next.basemap));
@@ -423,13 +429,7 @@ hasInside?, collocation?, none?, icons?, keys?, cluster? })`: monitor-map's Poll
 
 <MapView {map}>
 	{#snippet toolbar()}
-		<OptionsToolbar
-			{groups}
-			{values}
-			{onchange}
-			defaults={settings.defaults}
-			basemapKey="basemap"
-		/>
+		<OptionsToolbar {groups} {values} {onchange} {defaults} basemapKey="basemap" />
 	{/snippet}
 </MapView>
 ```

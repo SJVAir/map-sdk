@@ -311,3 +311,11 @@ describe("OptionsToolbar in MapView, review fixes", () => {
 		expect(list.closest("[inert]")).toBeNull();
 	});
 });
+
+describe("OptionsToolbar narrow panel, final review fixes", () => {
+	it("the panel is a region named by its title", async () => {
+		await setup({ class: "narrow-map" });
+		await page.getByRole("button", { name: "Open map options" }).click();
+		await expect.element(page.getByRole("region", { name: "Map Options" })).toBeVisible();
+	});
+});
