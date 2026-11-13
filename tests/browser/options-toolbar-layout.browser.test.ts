@@ -9,6 +9,7 @@ import type { OptionGroup, OptionRow } from "../../src/lib/options/types.js";
 import MapViewWithToolbar from "../fixtures/MapViewWithToolbar.svelte";
 import MapViewInRoot from "../fixtures/MapViewInRoot.svelte";
 import { ToolbarState } from "../fixtures/options.svelte.js";
+import { parkPointer } from "./park-pointer.js";
 
 vi.mock("esm-env", () => ({ BROWSER: true, DEV: true, NODE: false }));
 
@@ -48,6 +49,7 @@ beforeAll(async () => {
 
 afterEach(async () => {
 	document.body.replaceChildren();
+	await parkPointer();
 	await cdp().send("Emulation.setEmulatedMedia", { features: [] });
 });
 
@@ -165,7 +167,7 @@ describe("OptionsToolbar in MapView", () => {
 		const { root } = await setup();
 		await trigger("Monitors").click();
 		// Off the toolbar: otherwise Monitors comes back under the pointer and opens on hover.
-		await userEvent.unhover(trigger("Monitors"));
+		await parkPointer();
 		root().style.width = "300px";
 		await settle();
 		await expect.element(page.getByRole("button", { name: "Open map options" })).toBeVisible();
@@ -247,7 +249,7 @@ describe("OptionsToolbar in MapView", () => {
 		expect(document.querySelector(".mapsdk-toolbar-slot")).toBeNull();
 	});
 
-	it("two maps: Esc in one leaves the other's open dropdown alone", async () => {
+	it("two maps: Esc with focus in one closes the dropdown a mouse shows in the other", async () => {
 		await setup();
 		await setup();
 		const monitors = page.getByRole("button", { name: "Monitors", exact: true });
@@ -262,7 +264,9 @@ describe("OptionsToolbar in MapView", () => {
 			page.getByRole("button", { name: "Layers", exact: true }).nth(0).element() as HTMLElement
 		).focus();
 		await userEvent.keyboard("{Escape}");
-		expect(monitors.nth(1).element().getAttribute("aria-expanded")).toBe("true");
+		// WCAG 1.4.13: a dropdown the mouse shows closes on Esc wherever focus is.
+		expect(monitors.nth(1).element().getAttribute("aria-expanded")).toBe("false");
+		expect(monitors.nth(0).element().getAttribute("aria-expanded")).toBe("false");
 	});
 
 	it("the panel slides only without reduced motion", async () => {
