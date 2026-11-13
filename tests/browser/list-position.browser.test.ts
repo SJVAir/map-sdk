@@ -405,3 +405,15 @@ describe("featureList reveal: focus", () => {
 		expect(shown()).toBe(true);
 	});
 });
+
+describe("MapView featureList note", () => {
+	it("passes the note to the open list", async () => {
+		await show({ note: "2 marked monitors aren't shown" });
+		button().click();
+		await vi.waitFor(() =>
+			expect(document.querySelector(".mapsdk-list-note")?.textContent?.trim()).toBe(
+				"2 marked monitors aren't shown"
+			)
+		);
+	});
+});

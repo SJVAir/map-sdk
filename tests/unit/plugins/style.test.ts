@@ -222,7 +222,7 @@ describe("focus-area colors", () => {
 		expect(FALLBACK_THEME_COLORS.focusAreaCasing).toBe("#ffffff");
 		expect(FALLBACK_THEME_COLORS.focusAreaWash).toBe("#ffffff");
 		expect(FALLBACK_THEME_COLORS.schoolMarker).toBe("#5a6b7b");
-		expect(FALLBACK_THEME_COLORS.childCareMarker).toBe("#1c9099");
+		expect(FALLBACK_THEME_COLORS.childCareMarker).toBe("#15747c");
 		expect("background" in FALLBACK_THEME_COLORS).toBe(false);
 	});
 
@@ -231,5 +231,28 @@ describe("focus-area colors", () => {
 		expect(colors.focusArea).toBe("#1f2d3d");
 		expect(colors.focusAreaCasing).toBe("#ffffff");
 		expect(colors.focusAreaWash).toBe("#ffffff");
+	});
+});
+
+describe("the school markers' count text contrast", () => {
+	/** WCAG 2.2 relative luminance of a #rrggbb color. */
+	function luminance(hex: string): number {
+		const [r, g, b] = [1, 3, 5].map((i) => {
+			const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+			return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+		});
+		return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+	}
+	const contrast = (a: string, b: string) => {
+		const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+		return (hi + 0.05) / (lo + 0.05);
+	};
+
+	it("white 12px bold on the child-care fill is at least 4.5:1", () => {
+		expect(contrast("#ffffff", FALLBACK_THEME_COLORS.childCareMarker)).toBeGreaterThanOrEqual(4.5);
+	});
+
+	it("white 12px bold on the school fill is at least 4.5:1", () => {
+		expect(contrast("#ffffff", FALLBACK_THEME_COLORS.schoolMarker)).toBeGreaterThanOrEqual(4.5);
 	});
 });

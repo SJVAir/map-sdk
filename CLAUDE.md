@@ -75,7 +75,9 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   in-view test (`intersectsBounds`, `geometryBbox`) and the in-view anchor (`shapeAnchor`); focusing
   a shape that overlaps the view with its label point off-screen keeps the camera and sets
   `focusedAnchor` (`anchorFor` gives the same point for hover).
-  `plugin-host.svelte.ts` runs plugins' `setup` when the style is ready and tears them down on
+  `basemap.svelte.ts`'s `BasemapState` also has `styles`, `defaultId`, `resolve(id)` (an unlisted
+  id goes to its basemap's default variant, else the default) and `onFallback` (a load revert or a
+  resolve; never a toolbar change). `plugin-host.svelte.ts` runs plugins' `setup` when the style is ready and tears them down on
   detach or restyle (draw order = registry order); `interactions.svelte.ts` routes clicks, hovers
   (and the pointer cursor), and blocking layers (cluster bubbles); a `hoverable: false` plugin's
   features are left out of the hover as if not drawn, but still clicked; `basemap.svelte.ts`
@@ -108,12 +110,27 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `locationTypeLabel`, never selectable, `marksPlaces`), and `groupFires`, with the monitor, cluster (its "within a X mi² area"
   line from `cluster-area.ts`'s convex hull), collocation (`CollocationTooltip`), and fire
   (`FireTooltip`, the reading box) tooltips. Smoke takes no hover. Presets never fetch.
+- **Options** (`src/lib/options/`): `OptionsToolbar` (monitor-map 5.0's toolbar, shared): plain
+  declarations (`types.ts`: `OptionGroup`, `OptionRow`, `OptionValues`), pure value logic
+  (`values.ts`: select-all, reset, one change per action), `menus.svelte.ts` (per-toolbar open
+  state), `OptionsMenu` (a trigger and its dropdown, or a narrow-panel section), the recursive
+  `OptionRows`, `Glyph` (inline Lucide chevron/sliders/x, ISC + Feather MIT), and
+  `toolbar-context.ts`. Wide vs narrow comes from `MapView`'s `MapLayout` context
+  (`view/map-layout.ts`, 48rem of the map's box); without one it's wide. The host owns the values;
+  setting them never fires `onchange`; read-only is `aria-disabled`. Presets: `presets.ts`
+  (`basemapOptions`, `settingsGroup`, `hmsOptions`, `schoolsOptions`) and
+  `monitors-options.svelte.ts` (`monitorsOptions(map)`: Pollutant and Monitors from the
+  `MetadataProvider`'s optional `monitorGroups`/`monitorTypeGroup`/`monitorTypeReports`/
+  `entryTypeHelp`, into per-map `$state`). Rows bound to `basemapKey` show `map.basemap.current`.
 - **View** (`src/lib/view/`): `MapView.svelte` creates the GL map (`create-gl-map.ts`: per-map key
   through `transformRequest`, theme watching, `active` releases WebGL). Props include `controls`
   (`"mapsdk"` | `"engine"` | `"none"`), `selectionBar`, `tooltip` (`"pinned"` | `"pointer"`), `card`
   (the pinned reading card, drawn by `MapTooltip` after the list so Tab reaches it; `{ actions }`
   adds the host's buttons, `ui/card.ts`), `PickNotice` (refusals), and
-  `featureList` (`boolean` or `{ position, reveal }`; `list-placement.ts`; the button stacks clear
+  `toolbar` (a snippet, normally `OptionsToolbar`: a top-left slot above the list and card; the bar
+  registers itself through `MapLayout.setBar`, the List button stacks below it, and the map's box
+  gets `--mapsdk-toolbar-height`; the narrow panel makes the map's other children inert), and
+  `featureList` (`boolean` or `{ position, reveal, note }`; `list-placement.ts`; the button stacks clear
   of the controls in its corner, measured with a `ResizeObserver`). It sets `--mapsdk-map-width`,
   which caps the list panel and framed legend at the map's width. Credits come from the engine's
   AttributionControl, with data credits from `ui/data-credits.svelte.ts`.
@@ -138,7 +155,7 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   focus area's defaults: line, ring and label `#1f2d3d`, casing, halo and wash `#ffffff`, which the
   `--focus-area*` tokens override but which never fall back to theme tokens (the basemap under
   them doesn't follow the theme). And (2026-11-12) the school markers: `--school-marker` `#5a6b7b`
-  and `--child-care-marker` `#1c9099`, fixed fallbacks too, with the badges' white outline and
+  and `--child-care-marker` `#15747c`, fixed fallbacks too, with the badges' white outline and
   glyph and the bubbles' white count.
 - No hardcoded labels, units, breakpoints, colors, or scales: they come from a `Scale` or the
   metadata provider. Every UI string is a `mapsdk_*` message key in `en.json`; no concatenated

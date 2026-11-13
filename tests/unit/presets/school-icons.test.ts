@@ -33,7 +33,7 @@ describe("schoolBadge", () => {
 	});
 
 	it("draws the baby glyph for child care", () => {
-		const svg = schoolBadge("child-care", "#1c9099");
+		const svg = schoolBadge("child-care", "#15747c");
 		expect(svg).toContain('d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"');
 		expect(svg).toContain('d="M9 12h.01"');
 		expect(svg.match(/<(path|circle) /g)).toHaveLength(2 + 4);
@@ -49,7 +49,7 @@ describe("schoolBadge", () => {
 describe("schoolBadgeMarkup", () => {
 	it("fills from the token with its fixed fallback, and hides from screen readers", () => {
 		const markup = schoolBadgeMarkup("child-care", 16);
-		expect(markup).toContain("var(--child-care-marker, #1c9099)");
+		expect(markup).toContain("var(--child-care-marker, #15747c)");
 		expect(markup).toContain('aria-hidden="true"');
 		expect(markup).toContain('focusable="false"');
 		expect(markup).toContain('width="16"');

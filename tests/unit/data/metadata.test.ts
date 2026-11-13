@@ -285,3 +285,83 @@ describe("locationTypeLabel", () => {
 		expect(getRegionsMeta).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe("default metadata: monitor groups, help text, published pairs", () => {
+	function groupedMeta() {
+		return {
+			monitor_groups: {
+				"low-cost": { key: "low-cost", label: "Low-cost sensors", order: 1 },
+				reference: { key: "reference", label: "Reference-grade", order: 0 }
+			},
+			entries: {
+				pm25: { label: "PM2.5", units: "µg/m³", description: "Fine particles." },
+				o3: { label: "Ozone", units: "ppb", description: null }
+			},
+			monitors: {
+				airnow: {
+					label: "AirNow",
+					group: "reference",
+					entries: { pm25: { published: true }, o3: { published: true } }
+				},
+				purpleair: {
+					label: "PurpleAir",
+					group: "low-cost",
+					entries: { pm25: { published: true } }
+				},
+				cimis: { label: "CIMIS", group: null, entries: { o3: { published: false } } },
+				odd: { label: "Odd", group: "nope", entries: {} }
+			}
+		};
+	}
+
+	it("lists the groups sorted by order", async () => {
+		getMonitorsMeta.mockResolvedValue(groupedMeta());
+		expect(await createDefaultMetadata().monitorGroups!()).toEqual([
+			{ key: "reference", label: "Reference-grade", order: 0 },
+			{ key: "low-cost", label: "Low-cost sensors", order: 1 }
+		]);
+	});
+
+	it("gives a type's group key, and unavailable for none or an unknown key", async () => {
+		getMonitorsMeta.mockResolvedValue(groupedMeta());
+		const meta = createDefaultMetadata();
+		expect(await meta.monitorTypeGroup!("airnow")).toBe("reference");
+		expect(await meta.monitorTypeGroup!("cimis")).toBe("unavailable");
+		expect(await meta.monitorTypeGroup!("odd")).toBe("unavailable");
+		expect(await meta.monitorTypeGroup!("zzz")).toBe("unavailable");
+	});
+
+	it("an older server with no groups: unavailable, never a throw", async () => {
+		getMonitorsMeta.mockResolvedValue(monitorsMeta());
+		const meta = createDefaultMetadata();
+		expect(await meta.monitorGroups!()).toBe("unavailable");
+		expect(await meta.monitorTypeGroup!("airgradient")).toBe("unavailable");
+		expect(await meta.monitorTypeReports!("airgradient", "pm25")).toBe("unavailable");
+	});
+
+	it("gives an entry type's help text, unavailable when null", async () => {
+		getMonitorsMeta.mockResolvedValue(groupedMeta());
+		const meta = createDefaultMetadata();
+		expect(await meta.entryTypeHelp!(pm25)).toBe("Fine particles.");
+		expect(await meta.entryTypeHelp!({ dataset: "air-quality", entryType: "o3" })).toBe(
+			"unavailable"
+		);
+	});
+
+	it("says whether a type's entry is published on the map", async () => {
+		getMonitorsMeta.mockResolvedValue(groupedMeta());
+		const meta = createDefaultMetadata();
+		expect(await meta.monitorTypeReports!("airnow", "o3")).toBe(true);
+		expect(await meta.monitorTypeReports!("purpleair", "o3")).toBe(false);
+		expect(await meta.monitorTypeReports!("cimis", "o3")).toBe(false);
+	});
+
+	it("only the caller's abort rejects", async () => {
+		getMonitorsMeta.mockRejectedValue(new Error("down"));
+		const meta = createDefaultMetadata();
+		expect(await meta.monitorGroups!()).toBe("unavailable");
+		const controller = new AbortController();
+		controller.abort();
+		await expect(meta.monitorTypeGroup!("airnow", controller.signal)).rejects.toThrow();
+	});
+});

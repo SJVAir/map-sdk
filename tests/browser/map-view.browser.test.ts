@@ -383,25 +383,45 @@ describe("maptilerKeyTransform", () => {
 });
 
 describe("defaultBasemaps", () => {
-	it("lists the Streets v4 variants as style URLs, without the busy POI layers", () => {
+	const POI = ["Sport", "Tourism", "Culture", "Shopping", "Food", "Transport"];
+
+	it("lists every MapTiler style at its newest version, sorted, opening on Streets v4", () => {
+		const warn = vi.spyOn(console, "warn");
 		const config = defaultBasemaps();
+		expect(warn).not.toHaveBeenCalled();
 		expect(config.defaultId).toBe("streets-v4");
-		expect(config.styles.map((s) => s.id)).toEqual([
+		const names = [...new Set(config.styles.map((s) => s.basemap))];
+		// 17 at their newest version, less the three MapTiler deprecated (Basic, Toner, Voyager).
+		expect(names).toHaveLength(14);
+		expect(names).not.toContain("Toner");
+		expect(names).toEqual([...names].sort((a, b) => a!.localeCompare(b!)));
+		for (const name of names) {
+			expect(config.styles.filter((s) => s.basemap === name && s.isDefault)).toHaveLength(1);
+		}
+		expect(new Set(config.styles.map((s) => s.id)).size).toBe(config.styles.length);
+		for (const { style, name } of config.styles) {
+			expect(style).toMatch(/^https:\/\/.+\/style\.json$/);
+			expect(name).toBeTruthy();
+		}
+	});
+
+	it("keeps the Streets v4 variants and removes the busy POI layers from them only", () => {
+		const config = defaultBasemaps();
+		expect(config.styles.filter((s) => s.basemap === "Streets").map((s) => s.id)).toEqual([
 			"streets-v4",
 			"streets-v4-dark",
 			"streets-v4-pastel"
 		]);
-		for (const { style } of config.styles) {
-			expect(style).toMatch(/^https:\/\/.+\/style\.json$/);
+		for (const s of config.styles) {
+			expect(s.excludedLayers ?? []).toEqual(s.id.startsWith("streets-v4") ? POI : []);
 		}
-		expect(config.excludedLayers).toEqual([
-			"Sport",
-			"Tourism",
-			"Culture",
-			"Shopping",
-			"Food",
-			"Transport"
-		]);
+		expect(config.excludedLayers).toBeUndefined();
+	});
+
+	it("keepPoiLabels keeps every layer (sjvair.com's setup)", () => {
+		const config = defaultBasemaps({ keepPoiLabels: true });
+		expect(config.styles.every((s) => s.excludedLayers === undefined)).toBe(true);
+		expect(config.styles.length).toBe(defaultBasemaps().styles.length);
 	});
 });
 

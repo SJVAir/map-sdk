@@ -63,7 +63,7 @@ export type {
 export type { GlMapLike } from "./core/gl.js";
 export type { CustomLayerInterface } from "@maptiler/sdk";
 export type { Hovered } from "./core/interactions.svelte.js";
-export type { BasemapConfig } from "./core/basemap.svelte.js";
+export type { BasemapConfig, BasemapStyle } from "./core/basemap.svelte.js";
 export type {
 	Bounds,
 	CameraState,
@@ -104,3 +104,17 @@ export {
 export type { CollocationSitesPluginOptions } from "./presets/collocation-sites.js";
 export { circle, CROSSHAIR_ICON_SIZE, square, triangle, withCrosshair } from "./plugins/icons.js";
 export type { CardContext, CardOptions } from "./ui/card.js";
+export { default as OptionsToolbar } from "./options/OptionsToolbar.svelte";
+export type {
+	OptionCheckbox,
+	OptionChoice,
+	OptionGroup,
+	OptionIcon,
+	OptionRow,
+	OptionsPreset,
+	OptionValues
+} from "./options/types.js";
+export { basemapOptions, hmsOptions, schoolsOptions, settingsGroup } from "./options/presets.js";
+export type { BasemapOptionsOptions, SettingsGroupOptions } from "./options/presets.js";
+export { monitorsOptions } from "./options/monitors-options.svelte.js";
+export type { MonitorsOptions, MonitorsOptionsInput } from "./options/monitors-options.svelte.js";

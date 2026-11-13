@@ -1080,6 +1080,21 @@ describe("modifier mode and refusals", () => {
 		expect(ids(map)).toEqual(["b"]);
 	});
 
+	it("modifier mode: Shift-click marks without pinning the card", async () => {
+		const { map, clickOn } = await modSetUp("multiple");
+		clickOn("a", { shiftKey: true });
+		expect(ids(map)).toEqual(["a"]);
+		expect(map.pinned).toBeNull();
+	});
+
+	it("modifier mode: Shift-click keeps an already pinned card as it is", async () => {
+		const { map, clickOn } = await modSetUp("multiple");
+		clickOn("b");
+		clickOn("a", { shiftKey: true });
+		expect(map.pinned?.hit.refKey).toBe("monitor:b");
+		expect(ids(map)).toEqual(["a"]);
+	});
+
 	it("modifier mode: Shift-click in single mode selects, then clears", async () => {
 		const { map, clickOn } = await modSetUp("single");
 		clickOn("a", { shiftKey: true });
@@ -1231,7 +1246,8 @@ describe("Shift-click through MapLibre's box zoom", () => {
 		shiftRelease(gl);
 		expect(map.getSelection("monitors")?.ids).toEqual(["a"]);
 		expect(featureclick).toHaveBeenCalledTimes(1);
-		expect(map.pinned?.hit.refKey).toBe("monitor:a");
+		// A modifier pick marks without pinning the card.
+		expect(map.pinned).toBeNull();
 	});
 
 	it("is ignored in click mode, as before", async () => {
@@ -1252,7 +1268,7 @@ describe("Shift-click through MapLibre's box zoom", () => {
 	});
 
 	it("measures the point like MapLibre, under a CSS scale on the map", async () => {
-		const { map, gl } = await boxSetUp("modifier");
+		const { gl, featureclick } = await boxSetUp("modifier");
 		// Drawn at twice its layout size (a scale(2) ancestor), 4px from the page's corner.
 		Object.assign(gl.canvas, {
 			getBoundingClientRect: () => ({ left: 4, top: 4, width: 200, height: 200 }),
@@ -1263,7 +1279,7 @@ describe("Shift-click through MapLibre's box zoom", () => {
 		});
 		shiftRelease(gl);
 		// clientX 10, clientY 20 → ((10 - 4) / 2, (20 - 4) / 2); the fake's unproject echoes it.
-		expect(map.pinned?.lngLat).toEqual([3, 8]);
+		expect(featureclick.mock.calls[0][0].lngLat).toEqual([3, 8]);
 	});
 
 	it("ignores a boxzoomcancel from Esc, which has no pointer position", async () => {

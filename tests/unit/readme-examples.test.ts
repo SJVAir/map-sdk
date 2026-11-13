@@ -11,7 +11,9 @@ import {
 	hmsSmokePlugin,
 	Legend,
 	maptilerMap,
+	monitorsOptions,
 	monitorsPlugin,
+	settingsGroup,
 	pointsPlugin,
 	regionsPlugin,
 	schoolsPlugin,
@@ -24,6 +26,7 @@ import type {
 	FeatureListOptions,
 	MapContext,
 	MapPlugin,
+	OptionValues,
 	PluginContext
 } from "../../src/lib/index.js";
 import {
@@ -70,10 +73,10 @@ describe("README examples", () => {
 	});
 
 	it("today's basemaps without the POI layer filter", () => {
-		const basemaps = { ...defaultBasemaps(), excludedLayers: [] };
+		const basemaps = defaultBasemaps({ keepPoiLabels: true });
 		const map = createMap({ config: { maptilerKey: "your-maptiler-key", basemaps } });
 		expect(basemaps.styles.length).toBeGreaterThan(0);
-		expect(basemaps.excludedLayers).toEqual([]);
+		expect(basemaps.styles.some((s) => s.excludedLayers)).toBe(false);
 		map.destroy();
 	});
 
@@ -357,6 +360,26 @@ describe("README examples", () => {
 		});
 		map.pickFromList("schools", "feature:s1", false);
 		expect(seen).toEqual(["10621666006068"]);
+		map.destroy();
+	});
+
+	it("options toolbar: presets build the groups; the host applies a change", () => {
+		const map = createMap({ config: { maptilerKey: "your-maptiler-key" } });
+		const monitors = monitorsOptions(map);
+		const settings = settingsGroup(map);
+		let values: OptionValues = { ...settings.defaults, pollutant: "pm25" };
+		const groups = [
+			...monitors.groups({ types: ["airnow"], pollutants: ["pm25", "o3"], pollutant: "pm25" })
+				.groups,
+			...settings.groups
+		];
+		expect(groups.map((g) => g.id)).toEqual(["pollutant", "monitors", "settings"]);
+		function onchange(next: OptionValues, changed: string[]) {
+			values = next;
+			if (changed.includes("basemap")) map.basemap.select(String(next.basemap));
+		}
+		onchange({ ...values, basemap: "streets-v4-dark" }, ["basemap"]);
+		expect(map.basemap.current).toBe("streets-v4-dark");
 		map.destroy();
 	});
 });

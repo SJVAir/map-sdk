@@ -13,6 +13,7 @@
 		Legend,
 		MapView,
 		monitorsPlugin,
+		OptionsToolbar,
 		pointsPlugin,
 		regionsPlugin,
 		schoolsPlugin,
@@ -41,6 +42,7 @@
 		type SourceKind
 	} from "./date-range-source.svelte.js";
 	import { focusChoices } from "./focus-areas.js";
+	import { TodayOptions } from "./today-options.svelte.js";
 
 	const maptilerKey = import.meta.env.VITE_MAPTILER_KEY ?? "";
 
@@ -63,7 +65,7 @@
 			},
 			projection: "globe",
 			space: { preset: "milkyway" },
-			basemaps: { ...defaultBasemaps(), excludedLayers: [] }
+			basemaps: defaultBasemaps({ keepPoiLabels: true })
 		}
 	});
 	// Focus areas, one plugin per map. "Your location" sits by the e2e fixture's Fixture Alpha.
@@ -83,6 +85,12 @@
 	const todaySmoke = createHmsSmokeStore();
 	const todayFire = createHmsFireStore();
 	const todaySites = createCollocationSitesStore({ monitors: todayMonitors });
+	// The shared options toolbar drives the setup map's monitors, smoke and fire, and basemap.
+	const todayOptions = new TodayOptions(today, {
+		monitors: todayMonitors,
+		smoke: todaySmoke,
+		fire: todayFire
+	});
 
 	interface Preset {
 		kind: SourceKind;
@@ -369,6 +377,7 @@
 				left,
 				right,
 				today,
+				todayOptions,
 				schools,
 				rightFocus,
 				get lastClick() {
@@ -380,32 +389,13 @@
 		// it), collocation sites, monitors. The focus area goes under them all.
 		today.addPlugin(todayFocus);
 		today.addPlugin(
-			hmsSmokePlugin({ source: todaySmoke.dataSource, layerLabel: "Smoke", id: "hms-smoke" })
-		);
-		today.addPlugin(
-			hmsFirePlugin({
-				source: todayFire.groups,
-				hotspots: todayFire.hotspots,
-				layerLabel: "Fires",
-				id: "hms-fire"
-			})
-		);
-		today.addPlugin(
 			collocationSitesPlugin({
 				source: todaySites.dataSource,
 				layerLabel: "Collocation sites"
 			})
 		);
-		today.addPlugin(
-			monitorsPlugin({
-				source: todayMonitors.dataSource,
-				layerLabel: "Monitors",
-				id: "monitors",
-				selectable: true,
-				selectedStyle: "enlarge"
-			}),
-			{ selectionMode: "single" }
-		);
+		// Monitors (filtered by the toolbar's rows), smoke and fire: added by the toolbar's values.
+		todayOptions.start();
 		today.on("featureclick", (e) => today.easeTo({ center: e.lngLat, minZoom: 12 }));
 		todayMonitors.init("pm25").catch(() => {});
 		todaySmoke.init().catch(() => {});
@@ -531,7 +521,17 @@
 			tooltip="pointer"
 			featureList={{ position: listPosition, reveal: listFocusOnly ? "focus" : "always" }}
 			class="demo-map demo-map-tall"
-		/>
+		>
+			{#snippet toolbar()}
+				<OptionsToolbar
+					groups={todayOptions.groups}
+					values={todayOptions.values}
+					defaults={todayOptions.defaults}
+					basemapKey="basemap"
+					onchange={todayOptions.apply}
+				/>
+			{/snippet}
+		</MapView>
 		{#if legendInCard}
 			<div class="demo-legend-card">
 				<h3 class="text-sm">Legend</h3>

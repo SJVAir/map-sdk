@@ -1,10 +1,30 @@
 import { untrack } from "svelte";
 import type { GlMapLike } from "./gl.js";
 
-export interface BasemapConfig {
-	styles: Array<{ id: string; style: unknown }>;
-	defaultId: string;
+/** One basemap style: a variant of a basemap, such as Streets' Dark. */
+export interface BasemapStyle {
+	id: string;
+	style: unknown;
+	/** The basemap's display name ("Streets"); the variants of one basemap share it. */
+	basemap?: string;
+	/** The variant's display name ("Dark"). */
+	name?: string;
+	/** This style is its basemap's default variant. */
+	isDefault?: boolean;
+	/** Layers removed from this style once it loads; without it, the config's `excludedLayers`. */
 	excludedLayers?: string[];
+}
+
+export interface BasemapConfig {
+	styles: BasemapStyle[];
+	defaultId: string;
+	/** Layers removed from every style that has no `excludedLayers` of its own. */
+	excludedLayers?: string[];
+}
+
+/** An id without its version and what follows it: `streets-v2-dark` → `streets`. */
+function stem(id: string): string {
+	return id.replace(/-v\d+(?:-.*)?$/, "");
 }
 
 /** The first of these means the style of a map just created is ready. */
@@ -33,6 +53,8 @@ export class BasemapState {
 	/** The id the map last finished loading, which a failed change falls back to. */
 	#loaded = "";
 	#stopWaiting: (() => void) | null = null;
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
+	#fallbackHandlers = new Set<(id: string) => void>();
 
 	constructor(config: BasemapConfig | undefined) {
 		this.#config = config;
@@ -44,10 +66,59 @@ export class BasemapState {
 		return this.#current;
 	}
 
-	/** Unknown ids are ignored. While no map is attached, only `current` changes. */
-	select(id: string): void {
+	/** The configured default basemap id. */
+	get defaultId(): string {
+		return this.#config?.defaultId ?? "";
+	}
+
+	/** The configured styles, in order. */
+	get styles(): readonly BasemapStyle[] {
+		return this.#config?.styles ?? [];
+	}
+
+	/**
+	 * `id` when it's listed. Otherwise its basemap's default variant, found by the id without its
+	 * version (`streets-v2-dark` → a listed `streets-v…` default), and failing that the config's
+	 * default. A saved id from an older MapTiler version so never leaves the map blank.
+	 */
+	resolve(id: string): string {
+		if (this.#entry(id)) return id;
+		const styles = this.styles;
+		const want = stem(id);
+		const kin = styles.filter((s) => stem(s.id) === want);
+		const match = kin.find((s) => s.isDefault) ?? kin[0];
+		return match?.id ?? this.#config?.defaultId ?? id;
+	}
+
+	/**
+	 * Calls `handler` with the id the map ended up on whenever that wasn't the user's choice: a
+	 * style failed to load and `current` reverted, or `select` was given an unlisted id and
+	 * resolved it. Returns an unsubscribe. Nothing else (the options toolbar included) saves it.
+	 */
+	onFallback(handler: (id: string) => void): () => void {
+		this.#fallbackHandlers.add(handler);
+		return () => this.#fallbackHandlers.delete(handler);
+	}
+
+	#reportFallback(id: string): void {
+		for (const handler of [...this.#fallbackHandlers]) {
+			try {
+				handler(id);
+			} catch (error) {
+				console.error("map-sdk: a basemap fallback handler failed", error);
+			}
+		}
+	}
+
+	/**
+	 * Shows `id`, or what `resolve` makes of an unlisted one (reported through `onFallback`).
+	 * While no map is attached, only `current` changes.
+	 */
+	select(requested: string): void {
+		const id = this.resolve(requested);
 		if (!this.#entry(id)) return;
 		this.#current = id;
+		if (id !== requested) this.#reportFallback(id);
 		if (!this.#gl || id === this.#applied) return;
 		this.#load(id);
 	}
@@ -68,7 +139,7 @@ export class BasemapState {
 		this.#applied = id;
 		this.#loaded = id;
 		// The first style: drop the excluded layers, but leave the plugin host to set itself up.
-		this.#whenReady(gl, () => this.#removeExcluded(gl));
+		this.#whenReady(gl, () => this.#removeExcluded(gl, id));
 	}
 
 	/** For MapView only (through the map context's `detach`): stops using the GL map. */
@@ -102,8 +173,9 @@ export class BasemapState {
 		for (const type of STYLE_READY_EVENTS) gl.on(type, listener);
 	}
 
-	#removeExcluded(gl: GlMapLike): void {
-		for (const layerId of this.#config?.excludedLayers ?? []) {
+	#removeExcluded(gl: GlMapLike, id: string): void {
+		const own = this.#entry(id)?.excludedLayers;
+		for (const layerId of own ?? this.#config?.excludedLayers ?? []) {
 			try {
 				if (gl.getLayer(layerId)) gl.removeLayer(layerId);
 			} catch (error) {
@@ -123,7 +195,7 @@ export class BasemapState {
 		const onLoad = () => {
 			stop();
 			this.#loaded = id;
-			this.#removeExcluded(gl);
+			this.#removeExcluded(gl, id);
 			this.#onStyleReady?.();
 		};
 		// "error" also fires for tiles, sprites and glyphs; only the style document failing means
@@ -159,6 +231,7 @@ export class BasemapState {
 			return;
 		}
 		this.#current = this.#loaded;
+		this.#reportFallback(this.#loaded);
 		this.#load(this.#loaded);
 	}
 }

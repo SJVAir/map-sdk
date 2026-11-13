@@ -68,7 +68,7 @@ export interface PluginOptions {
 	 * `"click"` (default): today's rules (a click selects; Shift/⌘/Ctrl or a tap adds in
 	 * `"multiple"` mode). `"modifier"`: a plain click or tap only pins the card (use it with
 	 * `MapView`'s `card`), and Shift/⌘/Ctrl-click, or the list's Space or Shift+Enter, toggles the
-	 * feature in the selection.
+	 * feature in the selection without opening or closing the card.
 	 */
 	pickWith?: "click" | "modifier";
 	/**
@@ -788,6 +788,10 @@ class MapContextImpl implements MapContext {
 		this.#emitClick(pluginId, ref, e.lngLat, hit.refKey);
 		this.#applyPick(pluginId, ref, { additive: e.additive, modifier: e.modifier });
 		if (!this.#cardEnabled || this.#destroyed) return;
+		// A modifier pick only marks: the card (pinned or not) stays as it is.
+		if (e.modifier && untrack(() => this.#selections.get(pluginId)?.pickWith) === "modifier") {
+			return;
+		}
 		// A feature with no hover card (e.g. a smoke plume) gets no pinned card either.
 		const plugin = untrack(() => this.plugins).find((p) => p.id === pluginId);
 		if (!plugin || plugin.hoverable === false) this.unpin();

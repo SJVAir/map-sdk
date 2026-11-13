@@ -17,6 +17,7 @@
 	import PickNotice from "../ui/PickNotice.svelte";
 	import { createDataCredits } from "../ui/data-credits.svelte.js";
 	import { createGlMap, setDataCredits, watchTheme } from "./create-gl-map.js";
+	import { isWideWidth, setMapLayout } from "./map-layout.js";
 	import {
 		cornerSides,
 		resolveFeatureList,
@@ -65,6 +66,13 @@
 		 * `{ actions }` also puts the host's buttons on the card (see `CardContext`).
 		 */
 		card?: boolean | CardOptions;
+		/**
+		 * An options toolbar (`OptionsToolbar`), drawn top-left over the map, above the list, the
+		 * legend and the card. The List button stacks below it, and the map's box gets
+		 * `--mapsdk-toolbar-height` (px from the map's top to the toolbar's bottom) for the host's
+		 * own overlays.
+		 */
+		toolbar?: Snippet;
 	}
 
 	let {
@@ -77,7 +85,8 @@
 		selectionBar = true,
 		controls = "mapsdk",
 		tooltip = "pinned",
-		card = false
+		card = false,
+		toolbar
 	}: Props = $props();
 
 	// Pinning only, no plugin setup, so it's safe in an effect.
@@ -159,6 +168,9 @@
 		const sources: Element[] = [];
 		const engine = glContainer.querySelector(`.maplibregl-ctrl-${corner}`);
 		if (engine) sources.push(engine);
+		if (corner === "top-left") {
+			if (toolbarBar) sources.push(toolbarBar);
+		}
 		if (corner === "top-right" && controls === "mapsdk") {
 			const zoom = root.querySelector(".mapsdk-zoom");
 			if (zoom) sources.push(zoom);
@@ -176,6 +188,7 @@
 		const s = sides;
 		void projector;
 		void controls;
+		void toolbarHeight;
 		if (!s) return;
 		const measure = () => {
 			nearExtent = extent(`${s.vertical}-${s.horizontal}`);
@@ -238,6 +251,72 @@
 	let moves = $state(0);
 	let width = $state(0);
 	let height = $state(0);
+
+	// The toolbar's bar: how far it reaches down from the map's top, for the List button below it
+	// and `--mapsdk-toolbar-height`. Re-measured when the bar or the map resizes, or the layout
+	// switches (the bar is a different element in each).
+	let toolbarHeight = $state(0);
+	// The layout follows the width a frame later: switching it re-renders the toolbar, which inside
+	// the width's ResizeObserver callback would be a ResizeObserver loop.
+	let layoutWidth = $state(0);
+	$effect(() => {
+		const w = width;
+		const frame = requestAnimationFrame(() => (layoutWidth = w));
+		return () => cancelAnimationFrame(frame);
+	});
+	const wide = $derived(layoutWidth === 0 || isWideWidth(layoutWidth));
+
+	// The bar the toolbar registered (it can show up after mount, and is a new element per layout).
+	let toolbarBar = $state.raw<Element | null>(null);
+	let covered = $state(false);
+
+	$effect(() => {
+		const bar = toolbar ? toolbarBar : null;
+		if (!bar) {
+			toolbarHeight = 0;
+			return;
+		}
+		const measure = () => {
+			const r = bar.getBoundingClientRect();
+			toolbarHeight =
+				r && r.height > 0 ? Math.round(r.bottom - root.getBoundingClientRect().top) : 0;
+		};
+		// Measured a frame later: the height moves the List button and host overlays, which can
+		// resize what's observed, and changing it inside the callback is a ResizeObserver loop.
+		let frame = 0;
+		const observer = new ResizeObserver(() => {
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(measure);
+		});
+		observer.observe(root);
+		observer.observe(bar);
+		measure();
+		return () => {
+			cancelAnimationFrame(frame);
+			observer.disconnect();
+		};
+	});
+
+	// While the narrow options panel covers the map, the map's other pieces leave the Tab order.
+	$effect(() => {
+		const on = covered && !!toolbar;
+		for (const child of root.children) {
+			if (!child.classList.contains("mapsdk-toolbar-slot")) child.toggleAttribute("inert", on);
+		}
+	});
+
+	setMapLayout({
+		get wide() {
+			return wide;
+		},
+		box: () => root?.getBoundingClientRect() ?? null,
+		setBar: (bar) => {
+			toolbarBar = bar;
+		},
+		setCovered: (on) => {
+			covered = on;
+		}
+	});
 
 	function project(lngLat: [number, number]) {
 		void moves;
@@ -309,8 +388,13 @@
 	aria-label={label ?? map.messages("mapsdk_map_label")}
 	data-mapsdk-map={map.uid}
 	style:--mapsdk-map-width={width > 0 ? `${width}px` : undefined}
+	style:--mapsdk-toolbar-height={toolbar && toolbarHeight > 0 ? `${toolbarHeight}px` : undefined}
 >
 	<div class="mapsdk-gl" bind:this={glContainer}></div>
+	{#if toolbar}
+		<!-- Before the list in the Tab order, as it is on screen; above it in the stacking. -->
+		<div class="mapsdk-toolbar-slot" data-controls={controls}>{@render toolbar()}</div>
+	{/if}
 	{#if list && sides}
 		<div
 			class="mapsdk-list-panel"
@@ -335,7 +419,7 @@
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			{#if listOpen}
 				<div bind:this={listBox} bind:clientWidth={listWidth} onkeydown={onListKeydown}>
-					<FeatureList {map} id={listId} bind:sortBy={listSort} />
+					<FeatureList {map} id={listId} bind:sortBy={listSort} note={list.note} />
 				</div>
 			{/if}
 		</div>
@@ -435,6 +519,26 @@
 		font-family: inherit;
 		cursor: pointer;
 		pointer-events: auto;
+	}
+
+	/* Covers the map (so the narrow panel can fill it) and lets the pointer through; the toolbar's
+	   bar sits top-left, short of the zoom controls at top-right. Above the list (2) and card (3). */
+	.mapsdk-toolbar-slot {
+		position: absolute;
+		inset: 0;
+		z-index: 4;
+		pointer-events: none;
+	}
+
+	.mapsdk-toolbar-slot :global([data-mapsdk-toolbar-bar]) {
+		position: absolute;
+		top: 1rem;
+		left: 1rem;
+		right: 4rem;
+	}
+
+	.mapsdk-toolbar-slot[data-controls="none"] :global([data-mapsdk-toolbar-bar]) {
+		right: 1rem;
 	}
 
 	.mapsdk-list-button:hover {

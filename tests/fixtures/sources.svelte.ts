@@ -72,3 +72,11 @@ export class SchoolsTestSource implements SchoolsSource {
 		this.features = schoolRows(rows);
 	}
 }
+
+/** A reactive list of feature-list items, for a plugin whose `features()` changes at a still view. */
+export class ItemsBox<T> {
+	items = $state.raw<T[]>([]);
+	constructor(items: T[]) {
+		this.items = items;
+	}
+}

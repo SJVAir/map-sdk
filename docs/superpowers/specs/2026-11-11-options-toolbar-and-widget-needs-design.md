@@ -454,6 +454,88 @@ Firm needs; anything about which rows the widget shows is for the dashboard's ow
   and smoke and fire; schools wait on part 4, and pesticides come in dashboard spec 5. Only
   monitors can be selected in the dashboard.
 
+### Decided in part 5's brainstorm (the user, 2026-11-12)
+
+These override anything below that says otherwise.
+
+- **Monitor-map's look, icons and wording, exactly.** The toolbar matches monitor-map 5.0's
+  (`src/lib/options/` on `release/5.0.0`): its Lucide icons and tints (Monitors `RadioTower`
+  `#4682b4`, Layers `Layers` `#708090`, Overlays `SquareStack` `#708090`, Settings `Settings`
+  `#696969` icon-only on the wide toolbar, Marker Clusters `Network` `#1e90ff`, Basemap `Map`
+  `#708090`, Theme `Contrast` `#708090`, Reset `RotateCcw`, Fire & Smoke `Flame` `#ff4500`,
+  Collocation Sites `Crosshair` `#4A5FC6`, the narrow layout's `SlidersHorizontal` options button),
+  its sizes (40px triggers, `text-sm`, a 16px inset, 256px-min dropdowns), and its words
+  ("Monitors", "Layers", "Overlays", "Settings", "Reference-grade", "Low-cost sensors",
+  "Inactive", "Inside", "Collocation Sites", "Fire & Smoke", "Marker Clusters", "Basemap",
+  "Theme", "Reset Map Options", "Open map options", "Map Options", "Close map options"). The
+  variant row is **"Theme"**, as on monitor-map (not "Style"). Lucide icons stay the host's (the
+  presets take them as snippets); map-sdk's message keys hold the words. The toolbar's own surfaces
+  use theme tokens; the icon tints are passed by the host with the icons.
+- **Placement:** top-left with monitor-map's 16px inset, wrapping short of the zoom controls at
+  top-right. The feature list's button (hidden until focused under `reveal: "focus"`, which the
+  dashboard and monitor-map use) shows **below** the toolbar, not over it. `MapView` exposes the
+  toolbar's height as a CSS variable on the map's box, so a host's own overlay (the dashboard's
+  `data-map-note` banner across the map's top) can sit below it. The legend stays bottom-left.
+- **Basemaps:** `defaultBasemaps()` returns monitor-map's full list: every MapTiler style at its
+  newest `_V<n>` version, sorted by name (17 today), each with its name and its variants' names
+  and types (monitor-map's `MAP_STYLE_OPTIONS` / `BASEMAP_STYLES`). The map still opens on Streets
+  v4's default variant with the POI label layers removed, so a host that changes nothing sees the
+  same map; only `map.basemap.select` accepts more ids. `BasemapConfig` carries the names and the
+  grouping (style → variants) so `basemapOptions(map)` can build the Basemap select and the Theme
+  radios.
+- **Switching basemap goes to the new basemap's default variant** (not monitor-map's "keep the
+  variant type"). Picking a Theme changes only the variant.
+- **The Monitors rows** follow the tile's data and the metadata, never a list in map-sdk:
+  - only the types the host passes (the tile's data), minus those that don't report the current
+    pollutant (metadata `monitors[type].entries`);
+  - **when those types span both groups**, monitor-map's two select-all headings,
+    "Reference-grade" and "Low-cost sensors", each with its group marker (triangle, circle) and its
+    types indented under it, shown while the heading is on or partly on; a heading with one type
+    still shows;
+  - **when they're all in one group**, a flat list of the types with no heading, **each row with its
+    group's marker**;
+  - then a separator and Inactive, Inside (each only when present in the data) and Collocation
+    Sites (monitor-map's rule: only for PM2.5).
+  - Type labels come from the metadata's `monitors[type].label` (bam1022 stays "BAM 1022": the user
+    held the rename to "SJVAir" on 2026-11-12, since the server's label also drives the admin's
+    type choices and each BAM's `device` fallback; recorded in data-dashboard `DEFERRED.md`). The
+    server's fields: `monitor_groups` (`{ key, label, order }`, keys `"reference"` and
+    `"low-cost"`; headings take its labels, sorted by `order`), `monitors[type].group`, and
+    `entries[type].description` (`string | null`). **Each type's group and each pollutant's help text
+    come from the metadata too** (the user, 2026-11-12: the server and sdk-js are adding them now),
+    not from the host, **through map-sdk's `MetadataProvider`**, like every other label: two new
+    optional methods beside `monitorTypeLabel` and `entryType` (named by the builder, e.g.
+    `monitorTypeGroup(type)` and `entryTypeHelp(ref)`), so a host's own provider doesn't break. The
+    default provider reads the new fields through `@sjvair/sdk`'s `getMonitorsMeta`, under the field
+    names the sjvair.com session picks (the coordinator sends them). A type with no group (an older
+    server or SDK, or a provider without the method) is listed flat, without a heading; a pollutant
+    with no help text shows no help line. Nothing fails.
+- **The option presets take the map** (`monitorsOptions(map, …)`, like `basemapOptions(map)`) and
+  get their text from its provider, filling labels in when the metadata resolves, as the plugins do.
+  The host passes only what is the tile's: which types and pollutants its data has.
+- **map-sdk's dev `@sjvair/sdk` moves from `5.0.0-beta.3` to `5.0.0-beta.10`** (the release that
+  carries the new fields, expected from sdk-js; its publish is the user's yes). That takes in the
+  deferred item: `5.0.0-beta.9` added required fields to the SDK's `Scale`, which map-sdk's public
+  `Scale` follows; part 5 settles it and removes that `DEFERRED.md` entry. The peer range stays
+  `^5.0.0-beta.2`: an older SDK works, without headings or help text. The Monitors and Pollutant
+  tasks wait on `5.0.0-beta.10`; the rest of the toolbar doesn't.
+- **The feature list gets a host note slot** (in part 5; data-dashboard-d8 asked): a short host
+  text or snippet shown with the list (the dashboard's "N marked monitors aren't shown"), read by
+  screen readers with the list.
+- **Fix: a modifier pick doesn't pin.** A Shift-click on a `pickWith: "modifier"` plugin marks or
+  unmarks without opening the card; a plain click or tap opens it (the dashboard's spec 2
+  decision). This is the plain behavior, not an option: only the dashboard uses `"modifier"`
+  (monitor-map doesn't). The list's Shift+Enter only marks, since focusing a row already pins it.
+- **Fix: the spoken view summary follows the data.** `ViewSummary` also recomputes when a plugin's
+  features change (a refresh, a source swap, a plugin added or removed at a still view), keeping
+  its debounce and announcing only lines that changed.
+- **Fix: the child-care bubble count's contrast.** White 12px bold on `#1c9099` is ~3.8:1, under
+  4.5:1. Darken `--child-care-marker`'s fallback (`#15747c` gives ~5.5:1), and the school color
+  with it only if the pair no longer looks like a pair; badges keep 3:1 against each basemap. The
+  user sees screenshots on each basemap before it's settled.
+- **Screenshots before the PR** include a schools count bubble's hover tooltip and monitors with
+  Marker Clusters on and off.
+
 ### My calls
 
 - **The value model:** a flat record keyed by option id (`Record<string, boolean | string>`; the
@@ -482,8 +564,9 @@ Firm needs; anything about which rows the widget shows is for the dashboard's ow
   Smoke checkbox for two plugins, one Marker Clusters for monitors and EV chargers, Pollutant
   "None"). The builder checks the monitors metadata has what the Pollutant and Monitors defaults
   need (pollutant labels, units, and help text; monitor type labels; which types report which
-  pollutant). A gap goes to the coordinator for an SDK or server change, and the preset accepts the
-  text from the host until then.
+  pollutant). A gap goes to the coordinator for an SDK or server change. (Part 5: the gaps, each
+  type's group and a pollutant's help text, are being added; the preset reads them through the
+  `MetadataProvider`, never from the host. See "Decided in part 5's brainstorm".)
 - **The breakpoint:** monitor-map's 48rem, measured on the map's box (a container query or the
   `ResizeObserver` `MapView` already has). monitor-map's behavior is unchanged, since its map fills
   the window.
@@ -497,11 +580,32 @@ Firm needs; anything about which rows the widget shows is for the dashboard's ow
   their own strings.
 - **Per-instance ids** (`$props.id()`), so two toolbars never share an id or an open menu.
 - **The basemap row stays host-owned.** `basemapOptions(map)` is plain data like the other
-  presets; the host applies a change with `map.basemap.select`. When a basemap fails to load and
-  map-sdk falls back, the toolbar sends one change event with the basemap it fell back to (its
-  changed keys name the basemap row), so the host's saved value follows what the map shows. It's
-  the one change event a user didn't make, and the docs say so. The builder adds whatever
-  `BasemapState` needs to report the fallback.
+  presets; the host applies a change with `map.basemap.select`. **A fallback or a resolve sends no change event** (the user,
+  2026-11-12, on the coordinator's point: in the dashboard every change event is a saved edit with
+  an undo step, so opening a document would write to it, and spec 2 draws fallbacks without saving
+  them). Change events come only from user actions. The Basemap and Theme rows show what the map
+  draws (`map.basemap.current`), as monitor-map's Settings does, so they never show a stale choice;
+  a host that wants to save a fallback listens on `map.basemap`'s fallback event itself.
+- **One stored value for basemap and Theme** (part 5): the variant's id (what `map.basemap.select`
+  takes, e.g. `outdoor-v2-dark`). Since a basemap switch always lands on its default variant, the
+  basemap is derived from the id and a second key would only duplicate it. Both rows report that
+  one key as changed. The user confirmed it (2026-11-12, through the coordinator), with a condition:
+  **a saved variant id that isn't in the list** (e.g. after a MapTiler version bump) resolves to its
+  basemap's default variant when the basemap can still be identified (by its name without the
+  `_V<n>`/`-v<n>` version), otherwise to the default basemap's default variant. It never throws and
+  never leaves the map blank. (Today `select` ignores an unknown id; resolving is part 5's.)
+- **The `search` slot stays** (monitor-map's place search needs it); the dashboard doesn't use it.
+- **Where the fallback event comes from:** `BasemapState` reports a fallback or a resolve itself
+  (a callback on `map.basemap`, whatever the builder names it), for hosts that want to save it. The
+  toolbar never turns it into a change event.
+- **Excluded layers per style:** `excludedLayers` moves onto each style entry (the config-wide
+  list stays as a fallback, so existing configs work). `defaultBasemaps()` removes the POI label
+  layers from the Streets variants only, as today; the 16 new styles keep all their layers.
+- **Pollutant "None":** `monitorsOptions` offers monitor-map's "None" radio only when the host asks
+  for it, and then disables the Monitors group while it's chosen (monitor-map's `monitorsOn`). The
+  dashboard's choices are its `available_pollutants`, without "None", unless spec 3 asks for it.
+- **One PR and one release** (`0.1.0-beta.13`) for the toolbar and the three fixes, as the user
+  decided (fold them into part 5, no hotfix).
 
 ## Testing
 

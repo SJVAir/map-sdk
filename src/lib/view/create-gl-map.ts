@@ -6,7 +6,7 @@ import {
 	MapStyle,
 	config as maptilerConfig
 } from "@maptiler/sdk";
-import type { StyleSpecification } from "@maptiler/sdk";
+import type { ReferenceMapStyle, StyleSpecification } from "@maptiler/sdk";
 import type { BasemapConfig } from "../core/basemap.svelte.js";
 import type { MapContext } from "../core/create-map.svelte.js";
 import type { GlMapLike } from "../core/gl.js";
@@ -39,15 +39,56 @@ export function watchTheme(container: Element, onChange: () => void): () => void
 	};
 }
 
-/** Today's live map: MapTiler Streets v4 and its variants, without the busy POI label layers. */
-export function defaultBasemaps(): BasemapConfig {
-	const streets = MapStyle.STREETS_V4;
-	return {
-		// Style URLs, not variant objects: the basemap fallback matches a failed style by its URL.
-		styles: streets.getVariants().map((v) => ({ id: v.getId(), style: v.getExpandedStyleURL() })),
-		defaultId: streets.getDefaultVariant().getId(),
-		excludedLayers: ["Sport", "Tourism", "Culture", "Shopping", "Food", "Transport"]
-	};
+/** The busy POI label layers today's live map removes from Streets v4. */
+const STREETS_POI_LAYERS = ["Sport", "Tourism", "Culture", "Shopping", "Food", "Transport"];
+
+/** A MapTiler variant's `deprecated` flag (set on styles MapTiler will remove). */
+function deprecated(variant: object): boolean {
+	return (variant as { deprecated?: unknown }).deprecated === true;
+}
+
+/**
+ * Every MapTiler style at its newest `_V<n>` version, sorted by name (monitor-map's list), less
+ * what MapTiler has deprecated: a deprecated variant, and a basemap whose default variant is.
+ */
+function latestStyles(): ReferenceMapStyle[] {
+	const latest = new Map<string, { version: number; style: ReferenceMapStyle }>();
+	for (const style of Object.values(MapStyle) as ReferenceMapStyle[]) {
+		const match = style.getId().match(/^(.+?)_V(\d+)$/i);
+		const baseName = match ? match[1] : style.getId();
+		const version = match ? parseInt(match[2], 10) : 0;
+		const existing = latest.get(baseName);
+		if (!existing || version > existing.version) latest.set(baseName, { version, style });
+	}
+	return Array.from(latest.values(), (e) => e.style)
+		.filter((style) => !style.getVariants().some((v) => v.getType() === "DEFAULT" && deprecated(v)))
+		.sort((a, b) => a.getName().localeCompare(b.getName()));
+}
+
+/**
+ * Every MapTiler basemap and its variants, opening on Streets v4's default. The Streets v4
+ * variants lose the busy POI label layers, as on today's live map, unless `keepPoiLabels`
+ * (sjvair.com's setup); the other basemaps keep all their layers.
+ */
+export function defaultBasemaps(options: { keepPoiLabels?: boolean } = {}): BasemapConfig {
+	const dropPoi = !options.keepPoiLabels;
+	const styles: BasemapConfig["styles"] = [];
+	for (const style of latestStyles()) {
+		for (const variant of style.getVariants()) {
+			if (deprecated(variant)) continue;
+			const id = variant.getId();
+			styles.push({
+				id,
+				// Style URLs, not variant objects: the basemap fallback matches a failed style by its URL.
+				style: variant.getExpandedStyleURL(),
+				basemap: style.getName(),
+				name: variant.getName(),
+				isDefault: variant.getType() === "DEFAULT",
+				...(dropPoi && id.startsWith("streets-v4") && { excludedLayers: STREETS_POI_LAYERS })
+			});
+		}
+	}
+	return { styles, defaultId: MapStyle.STREETS_V4.getDefaultVariant().getId() };
 }
 
 /**

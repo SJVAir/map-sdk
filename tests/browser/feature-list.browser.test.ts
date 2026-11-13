@@ -1,3 +1,4 @@
+import { createRawSnippet } from "svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
@@ -462,5 +463,44 @@ describe("FeatureList", () => {
 		expect(option("Your location").querySelector(".mapsdk-list-swatch")).toBeNull();
 		expect(option("Your location").textContent).not.toContain("No level");
 		expect(option("Your location").textContent!.trim()).toBe("Your location");
+	});
+});
+
+describe("FeatureList note", () => {
+	it("shows a host note that describes the listbox", async () => {
+		const { map } = newMap("single");
+		render(FeatureList, { map, note: "2 marked monitors aren't shown" });
+		await expect.element(listbox()).toBeInTheDocument();
+		const describedBy = listbox().element().getAttribute("aria-describedby");
+		expect(describedBy).toBeTruthy();
+		expect(document.getElementById(describedBy!)?.textContent?.trim()).toBe(
+			"2 marked monitors aren't shown"
+		);
+	});
+
+	it("renders a snippet note", async () => {
+		const { map } = newMap("single");
+		const note = createRawSnippet(() => ({ render: () => "<span>Own note</span>" }));
+		render(FeatureList, { map, note });
+		await expect.element(page.getByText("Own note")).toBeInTheDocument();
+		const id = listbox().element().getAttribute("aria-describedby")!;
+		expect(document.getElementById(id)?.textContent).toContain("Own note");
+	});
+
+	it("without a note, no element and no aria-describedby", async () => {
+		const { map } = newMap("single");
+		render(FeatureList, { map });
+		await expect.element(listbox()).toBeInTheDocument();
+		expect(listbox().element().getAttribute("aria-describedby")).toBeNull();
+		expect(document.querySelector(".mapsdk-list-note")).toBeNull();
+	});
+
+	it("updates in place when the host changes it", async () => {
+		const { map } = newMap("single");
+		const screen = await render(FeatureList, { map, note: "One" });
+		await expect.element(page.getByText("One")).toBeInTheDocument();
+		await screen.rerender({ note: "Two" });
+		await expect.element(page.getByText("Two")).toBeInTheDocument();
+		expect(document.querySelectorAll(".mapsdk-list-note")).toHaveLength(1);
 	});
 });

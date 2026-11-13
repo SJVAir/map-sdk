@@ -54,7 +54,7 @@ describe("school and child-care marker colors", () => {
 			})
 		);
 		expect(colors.schoolMarker).toBe("#5a6b7b");
-		expect(colors.childCareMarker).toBe("#1c9099");
+		expect(colors.childCareMarker).toBe("#15747c");
 	});
 
 	it("take a host's token overrides", () => {

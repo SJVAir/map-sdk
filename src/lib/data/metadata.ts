@@ -18,6 +18,13 @@ export interface EntryTypeInfo {
 	precision: number | null;
 }
 
+/** A monitor group from the monitors metadata (`monitor_groups`), e.g. Reference-grade. */
+export interface MonitorGroup {
+	key: string;
+	label: string;
+	order: number;
+}
+
 export interface MetadataProvider {
 	scale(ref: ScaleRef, signal?: AbortSignal): Promise<Scale | "unavailable">;
 	entryType(ref: ScaleRef, signal?: AbortSignal): Promise<EntryTypeInfo | "unavailable">;
@@ -35,6 +42,36 @@ export interface MetadataProvider {
 	 * feature's own `type_label`, then a generic "Location".
 	 */
 	locationTypeLabel?(type: string, signal?: AbortSignal): Promise<string | "unavailable">;
+	/**
+	 * The monitor groups (Reference-grade, Low-cost sensors), sorted by `order`. Optional, like the
+	 * three below: without them the options toolbar's Monitors rows are one flat list with no help
+	 * text, and every type counts as reporting every pollutant.
+	 */
+	monitorGroups?(signal?: AbortSignal): Promise<MonitorGroup[] | "unavailable">;
+	/** A monitor type's group key; "unavailable" for a type with no group or an unknown key. */
+	monitorTypeGroup?(type: string, signal?: AbortSignal): Promise<string | "unavailable">;
+	/** Whether the map shows a monitor type's readings of an entry type (the metadata's `published`). */
+	monitorTypeReports?(
+		type: string,
+		entryType: string,
+		signal?: AbortSignal
+	): Promise<boolean | "unavailable">;
+	/** An entry type's help text (the metadata's `description`). */
+	entryTypeHelp?(ref: ScaleRef, signal?: AbortSignal): Promise<string | "unavailable">;
+}
+
+/**
+ * The monitors metadata's newer fields, read loosely: `@sjvair/sdk` before 5.0.0-beta.10 doesn't
+ * type them (and has no `monitor_groups` getter), and an older server doesn't send them.
+ */
+interface LooseMonitorsMeta {
+	monitor_groups?: Record<string, MonitorGroup | undefined>;
+	monitors?: Record<
+		string,
+		| { group?: string | null; entries?: Record<string, { published?: boolean } | undefined> }
+		| undefined
+	>;
+	entries?: Record<string, { description?: string | null } | undefined>;
 }
 
 const AIR_QUALITY = "air-quality";
@@ -78,6 +115,10 @@ function memoize<T>(fetch: () => Promise<T>): (signal?: AbortSignal) => Promise<
 		}
 		return untilAborted(cached, signal);
 	};
+}
+
+function loose(meta: unknown): LooseMonitorsMeta {
+	return (meta ?? {}) as LooseMonitorsMeta;
 }
 
 export function createDefaultMetadata(): MetadataProvider {
@@ -161,6 +202,38 @@ export function createDefaultMetadata(): MetadataProvider {
 				const types: Partial<Record<string, { label: string }>> = (await regionsMeta(signal))
 					.location_types;
 				return Object.hasOwn(types, type) ? types[type]?.label || undefined : undefined;
+			}),
+		monitorGroups: (signal) =>
+			guarded(signal, async () => {
+				const groups = loose(await monitorsMeta(signal)).monitor_groups;
+				if (!groups) return undefined;
+				return Object.values(groups)
+					.filter((g): g is MonitorGroup => !!g && typeof g.key === "string")
+					.sort((a, b) => a.order - b.order);
+			}),
+		monitorTypeGroup: (type, signal) =>
+			guarded(signal, async () => {
+				const meta = loose(await monitorsMeta(signal));
+				const key = meta.monitors?.[type]?.group;
+				return key && meta.monitor_groups && Object.hasOwn(meta.monitor_groups, key)
+					? key
+					: undefined;
+			}),
+		monitorTypeReports: (type, entryType, signal) =>
+			guarded(signal, async () => {
+				const entries = loose(await monitorsMeta(signal)).monitors?.[type]?.entries;
+				if (!entries) return undefined;
+				const published = entries[entryType]?.published;
+				if (typeof published === "boolean") return published;
+				// No such entry for this type: it doesn't report it. An entry without the flag is an
+				// older server's: unknown.
+				return Object.hasOwn(entries, entryType) ? undefined : false;
+			}),
+		entryTypeHelp: (ref, signal) =>
+			guarded(signal, async () => {
+				if (ref.dataset !== AIR_QUALITY) return undefined;
+				const help = loose(await monitorsMeta(signal)).entries?.[ref.entryType]?.description;
+				return help || undefined;
 			}),
 		attribution: (dataset, signal) =>
 			guarded(

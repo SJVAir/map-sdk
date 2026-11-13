@@ -51,7 +51,7 @@ export const FALLBACK_THEME_COLORS: Readonly<ThemeColors> = {
 	// The user's decision (2026-11-12), the same exception: sjvair.com's slate and teal, fixed for
 	// the same reason. Hosts override them with `--school-marker` and `--child-care-marker`.
 	schoolMarker: "#5a6b7b",
-	childCareMarker: "#1c9099"
+	childCareMarker: "#15747c"
 };
 
 const THEME_TOKENS: Record<keyof ThemeColors, string[]> = {

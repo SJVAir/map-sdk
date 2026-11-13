@@ -23,6 +23,11 @@
 		map.plugins.map((p) => `${p.id}:${map.getSelection(p.id)?.ids.length ?? 0}`).join(",")
 	);
 
+	// Every plugin's features, so a refresh, a source swap, or a plugin added or removed at a
+	// still view reschedules the update too: reading them tracks what they depend on (a source's
+	// features, the plugin list).
+	const featureLists = $derived(map.plugins.map((p) => p.features?.()));
+
 	function compute(): Line[] {
 		const bounds = map.bounds;
 		const out: Line[] = [];
@@ -67,6 +72,7 @@
 	$effect(() => {
 		void map.bounds;
 		void selectionCounts;
+		void featureLists;
 		if (first) {
 			first = false;
 			return;
