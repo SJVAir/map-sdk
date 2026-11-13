@@ -2,6 +2,7 @@
 	import Glyph from "./Glyph.svelte";
 	import OptionIcon from "./OptionIcon.svelte";
 	import OptionRows from "./OptionRows.svelte";
+	import { getMapLayout } from "../view/map-layout.js";
 	import { getToolbarContext } from "./toolbar-context.js";
 	import type { OptionGroup } from "./types.js";
 
@@ -12,6 +13,37 @@
 	const open = $derived(ctx.menus.isOpen(group.id) && !group.disabled);
 
 	let button: HTMLButtonElement;
+	let body: HTMLDivElement;
+	const layout = getMapLayout();
+
+	/** Room inside the map, so a dropdown never spills past the tile (which clips it). */
+	const EDGE = 8;
+	let maxHeight = $state<number | null>(null);
+	let flipped = $state(false);
+	const align = $derived.by(() => {
+		const side = group.align ?? "start";
+		return flipped ? (side === "start" ? "end" : "start") : side;
+	});
+
+	// When it opens on the wide toolbar: cap its height by the room below the trigger, and align
+	// it to whichever edge keeps it inside the map.
+	$effect(() => {
+		if (!open || !ctx.wide || !layout) {
+			maxHeight = null;
+			flipped = false;
+			return;
+		}
+		const box = layout.box();
+		if (!box) return;
+		const trigger = button.getBoundingClientRect();
+		maxHeight = Math.max(0, Math.floor(box.bottom - trigger.bottom - EDGE - 4));
+		const width = body.getBoundingClientRect().width;
+		const side = group.align ?? "start";
+		flipped =
+			side === "start"
+				? trigger.left + width > box.right - EDGE && trigger.right - width >= box.left + EDGE
+				: trigger.right - width < box.left + EDGE && trigger.left + width <= box.right - EDGE;
+	});
 
 	function onfocusout(e: FocusEvent) {
 		if (!ctx.wide) return;
@@ -59,13 +91,12 @@
 			<span class="mapsdk-options-chevron"><Glyph name="chevronDown" /></span>
 		{/if}
 	</button>
-	<div
-		id={contentId}
-		class="mapsdk-options-dropdown"
-		data-align={group.align ?? "start"}
-		hidden={!open}
-	>
-		<div class="mapsdk-options-dropdown-body">
+	<div id={contentId} class="mapsdk-options-dropdown" data-align={align} hidden={!open}>
+		<div
+			bind:this={body}
+			class="mapsdk-options-dropdown-body"
+			style:--mapsdk-options-max-height={maxHeight === null ? undefined : `${maxHeight}px`}
+		>
 			<OptionRows rows={group.rows} menuId={group.id} />
 		</div>
 	</div>

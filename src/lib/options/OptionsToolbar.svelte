@@ -1,6 +1,9 @@
 <script lang="ts">
 	import type { Snippet } from "svelte";
+	import { untrack } from "svelte";
 	import { getMapContext } from "../core/context.js";
+	import { getMapLayout } from "../view/map-layout.js";
+	import Glyph from "./Glyph.svelte";
 	import type { MapContext } from "../core/create-map.svelte.js";
 	import { OptionsMenus } from "./menus.svelte.js";
 	import OptionsMenu from "./OptionsMenu.svelte";
@@ -45,7 +48,36 @@
 	const map = mapProp ?? getMapContext();
 	const uid = $props.id();
 	const menus = new OptionsMenus();
-	const wide = $derived(true);
+	const layout = getMapLayout();
+	// Outside a MapView there's no map box to measure: the wide row.
+	const wide = $derived(layout ? layout.wide : true);
+	const panelId = `${uid}-panel`;
+	let panelOpen = $state(false);
+	let openButton: HTMLButtonElement | undefined = $state();
+	let closeButton: HTMLButtonElement | undefined = $state();
+
+	// Open menus mean different things in the two layouts (dropdowns, sections), so crossing the
+	// breakpoint starts from everything closed.
+	let lastWide = untrack(() => wide);
+	$effect(() => {
+		if (wide === lastWide) return;
+		lastWide = wide;
+		untrack(() => {
+			menus.closeAll();
+			panelOpen = false;
+		});
+	});
+
+	function openPanel() {
+		panelOpen = true;
+		// Into the panel, for keyboard and screen-reader users.
+		queueMicrotask(() => closeButton?.focus());
+	}
+
+	function closePanel() {
+		panelOpen = false;
+		openButton?.focus();
+	}
 
 	setToolbarContext({
 		map,
@@ -97,6 +129,13 @@
 
 	function onkeydown(e: KeyboardEvent) {
 		if (e.key !== "Escape") return;
+		if (!wide) {
+			if (!panelOpen) return;
+			e.preventDefault();
+			e.stopPropagation();
+			closePanel();
+			return;
+		}
 		const menu = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>(
 			"[data-options-menu]"
 		);
@@ -109,34 +148,167 @@
 	}
 </script>
 
+<!-- Esc anywhere in the toolbar closes its dropdowns or panel. -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div
 	bind:this={root}
 	class="mapsdk-options"
+	data-layout={wide ? "wide" : "narrow"}
 	role="group"
 	aria-label={map.messages("mapsdk_options_toolbar_label")}
-	tabindex="-1"
 	{onkeydown}
 >
-	{#each clusters as cluster, i (i)}
-		<div class="mapsdk-options-cluster">
-			{#each cluster as group (group.id)}
+	{#if wide}
+		<div class="mapsdk-options-bar" data-mapsdk-toolbar-bar>
+			{#each clusters as cluster, i (i)}
+				<div class="mapsdk-options-cluster">
+					{#each cluster as group (group.id)}
+						<OptionsMenu {group} />
+					{/each}
+				</div>
+			{/each}
+			{#if search}
+				<div class="mapsdk-options-search">{@render search()}</div>
+			{/if}
+		</div>
+	{:else}
+		<div class="mapsdk-options-bar" data-mapsdk-toolbar-bar>
+			<button
+				bind:this={openButton}
+				type="button"
+				class="mapsdk-options-open mapsdk-focus mapsdk-motion"
+				aria-label={map.messages("mapsdk_options_open")}
+				aria-expanded={panelOpen}
+				aria-controls={panelId}
+				onclick={openPanel}
+			>
+				<Glyph name="slidersHorizontal" size={22} />
+			</button>
+			{#if search}
+				<div class="mapsdk-options-search">{@render search()}</div>
+			{/if}
+		</div>
+		<div id={panelId} class="mapsdk-options-panel" data-open={panelOpen}>
+			<div class="mapsdk-options-panel-header">
+				<p class="text-lg">{map.messages("mapsdk_options_title")}</p>
+				<button
+					bind:this={closeButton}
+					type="button"
+					class="mapsdk-options-close mapsdk-focus mapsdk-motion"
+					aria-label={map.messages("mapsdk_options_close")}
+					onclick={closePanel}
+				>
+					<Glyph name="x" size={20} />
+				</button>
+			</div>
+			{#each groups as group (group.id)}
 				<OptionsMenu {group} />
 			{/each}
 		</div>
-	{/each}
-	{#if search}
-		<div class="mapsdk-options-search">{@render search()}</div>
 	{/if}
 </div>
 
 <style>
 	.mapsdk-options {
+		color: var(--foreground);
+	}
+
+	/* The bar lets the pointer through between its buttons (it spans the map's top in MapView). */
+	.mapsdk-options-bar {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: flex-start;
 		gap: 0.5rem;
+		pointer-events: none;
+	}
+
+	.mapsdk-options-bar > :global(*) {
+		pointer-events: auto;
+	}
+
+	.mapsdk-options-open,
+	.mapsdk-options-close {
+		display: flex;
+		width: 2.5rem;
+		height: 2.5rem;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: center;
+		border: 1px solid var(--card-border, var(--border));
+		border-radius: var(--radius-control, var(--radius));
+		background: var(--background);
 		color: var(--foreground);
-		outline: none;
+		box-shadow: var(--shadow-card, none);
+		cursor: pointer;
+	}
+
+	.mapsdk-options-close {
+		width: 2.25rem;
+		height: 2.25rem;
+		border-color: transparent;
+		box-shadow: none;
+	}
+
+	.mapsdk-options-open:hover,
+	.mapsdk-options-close:hover {
+		background: var(--accent, var(--muted));
+	}
+
+	/* Narrow: a panel over the whole map (its containing block is MapView's toolbar slot). */
+	.mapsdk-options-panel {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 1rem;
+		overflow-y: auto;
+		background: var(--background);
+		color: var(--foreground);
+		pointer-events: auto;
+	}
+
+	.mapsdk-options-panel[data-open="false"] {
+		visibility: hidden;
+		translate: -100% 0;
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.mapsdk-options-panel {
+			transition-property: translate, visibility;
+			transition-duration: 200ms;
+		}
+	}
+
+	.mapsdk-options-panel-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 0.5rem;
+	}
+
+	.mapsdk-options-panel-header p {
+		margin: 0;
+		font-weight: 600;
+	}
+
+	/* Narrow: each group is a section that expands in place. */
+	.mapsdk-options-panel :global(.mapsdk-options-trigger) {
+		border: 1px solid var(--border);
+		border-radius: var(--radius-control, var(--radius));
+		background: var(--background);
+	}
+
+	.mapsdk-options-panel :global(.mapsdk-options-dropdown) {
+		position: static;
+		min-width: 0;
+	}
+
+	.mapsdk-options-panel :global(.mapsdk-options-dropdown-body) {
+		max-height: none;
+		overflow: visible;
+		border: 0;
+		box-shadow: none;
 	}
 
 	.mapsdk-options-cluster {
