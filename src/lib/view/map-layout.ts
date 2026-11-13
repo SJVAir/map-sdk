@@ -2,7 +2,7 @@ import { getContext, setContext } from "svelte";
 
 /** What `MapView` tells the pieces drawn over it (the options toolbar) about the map's box. */
 export interface MapLayout {
-	/** The map's box is at least 48rem wide (the toolbar's wide layout). */
+	/** The map's box, or `MapView`'s `layoutRoot`, is at least 48rem wide (the toolbar's wide layout). */
 	readonly wide: boolean;
 	/** The map's box on the page, or null before it's mounted. */
 	box(): DOMRect | null;

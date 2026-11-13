@@ -7,6 +7,7 @@ import { createMap } from "../../src/lib/index.js";
 import type { MapContext } from "../../src/lib/core/create-map.svelte.js";
 import type { OptionGroup, OptionRow } from "../../src/lib/options/types.js";
 import MapViewWithToolbar from "../fixtures/MapViewWithToolbar.svelte";
+import MapViewInRoot from "../fixtures/MapViewInRoot.svelte";
 import { ToolbarState } from "../fixtures/options.svelte.js";
 
 vi.mock("esm-env", () => ({ BROWSER: true, DEV: true, NODE: false }));
@@ -22,7 +23,11 @@ sized.textContent = [
 	".wide-map { width: 1000px; height: 500px; }",
 	".narrow-map { width: 300px; height: 400px; }",
 	".short-map { width: 1000px; height: 220px; }",
-	".mid-map { width: 800px; height: 400px; }"
+	".mid-map { width: 800px; height: 400px; }",
+	".root-1024 { width: 1024px; height: 500px; }",
+	".root-600 { width: 600px; height: 400px; }",
+	".map-683 { width: 683px; height: 500px; flex: none; }",
+	".map-600 { width: 600px; height: 400px; flex: none; }"
 ].join("\n");
 
 const EXPECTED_WARNINGS = [
@@ -159,6 +164,8 @@ describe("OptionsToolbar in MapView", () => {
 	it("crossing 48rem closes everything", async () => {
 		const { root } = await setup();
 		await trigger("Monitors").click();
+		// Off the toolbar: otherwise Monitors comes back under the pointer and opens on hover.
+		await userEvent.unhover(trigger("Monitors"));
 		root().style.width = "300px";
 		await settle();
 		await expect.element(page.getByRole("button", { name: "Open map options" })).toBeVisible();
@@ -167,6 +174,8 @@ describe("OptionsToolbar in MapView", () => {
 		).toBe("false");
 		root().style.width = "1000px";
 		await settle();
+		// Long enough for Chromium's pointer events after a layout change.
+		await new Promise((r) => setTimeout(r, 300));
 		await expect.element(trigger("Monitors")).toBeVisible();
 		expect(trigger("Monitors").element().getAttribute("aria-expanded")).toBe("false");
 	});
@@ -342,5 +351,141 @@ describe("OptionsToolbar measuring", () => {
 			window.removeEventListener("error", onerror);
 		}
 		expect(errors.filter((m) => /ResizeObserver/.test(m))).toEqual([]);
+	});
+});
+
+describe("layoutRoot", () => {
+	async function inRoot(props: Record<string, unknown> = {}) {
+		const state = new ToolbarState({ groups: groups(), values: { pollutant: "pm25" } });
+		const screen = await render(MapViewInRoot, { map: newMap(), state, ...props } as never);
+		await settle();
+		await settle();
+		const shell = () => document.querySelector<HTMLElement>(".layout-root")!;
+		const mapBox = () => document.querySelector<HTMLElement>(".mapsdk-map")!;
+		return { screen, shell, mapBox };
+	}
+	const openButton = () => page.getByRole("button", { name: "Open map options" });
+	const isWide = () => !!trigger("Monitors").query() && !openButton().query();
+	const isNarrow = () => !trigger("Monitors").query() && !!openButton().query();
+
+	it("a 1024px root keeps a 683px map's toolbar wide", async () => {
+		const { mapBox } = await inRoot();
+		expect(mapBox().getBoundingClientRect().width).toBe(683);
+		expect(isWide()).toBe(true);
+	});
+
+	it("without it, the same 683px map goes narrow, as before", async () => {
+		await inRoot({ useRoot: false });
+		expect(isNarrow()).toBe(true);
+	});
+
+	it("a root under 48rem goes narrow (phones: the panel stacks under the map)", async () => {
+		await inRoot({ rootClass: "root-600", mapClass: "map-600" });
+		expect(isNarrow()).toBe(true);
+	});
+
+	it("null root: back to the map's own box", async () => {
+		const { screen } = await inRoot();
+		expect(isWide()).toBe(true);
+		await screen.rerender({ useRoot: false });
+		await settle();
+		await settle();
+		expect(isNarrow()).toBe(true);
+	});
+
+	it("follows the root's resize, not the map's", async () => {
+		const { shell, mapBox } = await inRoot();
+		shell().style.width = "600px";
+		await settle();
+		await settle();
+		expect(isNarrow()).toBe(true);
+		shell().style.width = "1024px";
+		await settle();
+		await settle();
+		expect(mapBox().getBoundingClientRect().width).toBe(683);
+		expect(isWide()).toBe(true);
+	});
+
+	it("swapped root: follows the new element", async () => {
+		const { screen } = await inRoot();
+		await screen.rerender({ altRoot: true });
+		await settle();
+		await settle();
+		expect(isNarrow()).toBe(true);
+		await screen.rerender({ altRoot: false });
+		await settle();
+		await settle();
+		expect(isWide()).toBe(true);
+	});
+
+	it("root crossing 48rem raises no ResizeObserver loop error", async () => {
+		const errors: string[] = [];
+		const onerror = (e: ErrorEvent) => errors.push(e.message);
+		window.addEventListener("error", onerror);
+		try {
+			const { shell } = await inRoot();
+			for (const width of ["600px", "1024px", "700px", "1100px"]) {
+				shell().style.width = width;
+				await settle();
+				await settle();
+			}
+		} finally {
+			window.removeEventListener("error", onerror);
+		}
+		expect(errors.filter((m) => /ResizeObserver/.test(m))).toEqual([]);
+	});
+
+	it("a zero-width root counts as wide", async () => {
+		const { shell, mapBox } = await inRoot();
+		shell().style.width = "0px";
+		shell().style.overflow = "visible";
+		await settle();
+		await settle();
+		expect(mapBox().getBoundingClientRect().width).toBe(683);
+		expect(isWide()).toBe(true);
+	});
+
+	it("a root element that unmounts: back to the map's own box", async () => {
+		const { screen } = await inRoot({ altRoot: true, altClass: "root-1024" });
+		expect(isWide()).toBe(true);
+		const errors: string[] = [];
+		const onerror = (e: ErrorEvent) => errors.push(e.message);
+		window.addEventListener("error", onerror);
+		try {
+			await screen.rerender({ altShown: false });
+			await settle();
+			await settle();
+		} finally {
+			window.removeEventListener("error", onerror);
+		}
+		expect(document.querySelector(".alt-root")).toBeNull();
+		expect(isNarrow()).toBe(true);
+		expect(errors).toEqual([]);
+	});
+
+	it("two maps under one root decide on their own", async () => {
+		await inRoot({ secondMap: newMap() });
+		const maps = [...document.querySelectorAll<HTMLElement>(".mapsdk-map")];
+		expect(maps).toHaveLength(2);
+		const options = (el: HTMLElement) => el.querySelector("[aria-label='Open map options']");
+		// The first map has the root (1024px): wide. The second has none, so its own 683px: narrow.
+		expect(options(maps[0])).toBeNull();
+		expect(options(maps[1])).not.toBeNull();
+	});
+
+	it("an open dropdown stays inside the 683px map", async () => {
+		const { mapBox } = await inRoot();
+		for (const name of ["Settings", "Monitors"]) {
+			await trigger(name).click();
+			await settle();
+			const body = document.querySelector<HTMLElement>(
+				`#${CSS.escape(trigger(name).element().getAttribute("aria-controls")!)} > div`
+			)!;
+			const box = body.getBoundingClientRect();
+			const map = mapBox().getBoundingClientRect();
+			expect(box.left).toBeGreaterThanOrEqual(map.left);
+			expect(box.right).toBeLessThanOrEqual(map.right);
+			await userEvent.keyboard("{Escape}");
+		}
 	});
 });
