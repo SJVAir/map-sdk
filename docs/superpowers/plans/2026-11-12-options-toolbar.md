@@ -25,7 +25,7 @@
 - **Breakpoint:** wide when the map's box is at least `48rem` wide (computed from the root font size), narrow below. Crossing it closes everything.
 - **Values:** `type OptionValues = Record<string, boolean | string>`. `onchange(values, changed)` fires once per user action with the whole new object. Setting `values` from the host never fires it.
 - **The basemap is one key** holding the variant id. A switch of basemap lands on that basemap's default variant.
-- **Every new UI string is a `mapsdk_options_*` key** in `en.json`, with the English text from the spec: "Open map options", "Close map options", "Map Options", "Monitors", "Layers", "Overlays", "Settings", "Reference-grade", "Low-cost sensors", "Inactive", "Inside", "Collocation Sites", "Fire & Smoke", "Marker Clusters", "Basemap", "Theme", "Reset Map Options", "None", plus "Schools & Child Care" (my call) and `mapsdk_options_toolbar_label` "Map options".
+- **Every new UI string is a `mapsdk_options_*` key** in `en.json`, with the English text from the spec: "Open map options", "Close map options", "Map Options", "Monitors", "Layers", "Overlays", "Settings", "Inactive", "Inside", "Collocation Sites", "Fire & Smoke", "Marker Clusters", "Basemap", "Theme", "Reset Map Options", "None", plus "Schools & Child Care" (my call) and `mapsdk_options_toolbar_label` "Map options".
 - **Per-instance ids** come from `$props.id()`. Nothing is module-global. Two toolbars never share an open menu.
 - **Disclosure pattern:** `aria-expanded` and `aria-controls` triggers, and native checkbox, radio and select inputs. Read-only uses `aria-disabled`, never `disabled`, and the triggers still open.
 - **Reduced motion:** the panel slides in only under `prefers-reduced-motion: no-preference`.
@@ -345,7 +345,9 @@
 
 ### Task 10: Metadata: `@sjvair/sdk` `5.0.0-beta.10`, groups and help text
 
-**Blocked until** the sjvair.com session sends the field names and `@sjvair/sdk` `5.0.0-beta.10` is published (with the user's yes, by the coordinator). Do Tasks 1–9 first; Tasks 10 and 11 can come after Task 12's demo work if the SDK is late (the demo then shows a flat Monitors list).
+**Field shapes (sjvair.com session, 2026-11-12; additions under `data` of `/monitors/meta/`):** `monitor_groups: { [key]: { key, label, order } }` with permanent keys `"reference"` and `"low-cost"` (labels may change; sort headings by `order`); `monitors[type].group`: a `monitor_groups` key; `entries[type].description`: `string | null`. Group headings take their labels from `monitor_groups` (no `mapsdk_*` keys for them).
+
+**Blocked until** the server ships those fields and `@sjvair/sdk` `5.0.0-beta.10` is published (with the user's yes, by the coordinator). Do Tasks 1–9 first; Tasks 10 and 11 can come after Task 12's demo work if the SDK is late (the demo then shows a flat Monitors list).
 
 **Files:**
 - Modify: `package.json` (dev `@sjvair/sdk` → `npm:@jsr/sjvair__sdk@5.0.0-beta.10`; peer stays `^5.0.0-beta.2`), `src/lib/data/metadata.ts`, `src/lib/data/index.ts`, `tests/fixtures/scales.ts` and every hand-built `Scale` (add `averaging_hours`, `daily_statistic` and `daily_statistic_label`), `demo/` (drop its own `/api/2.0/pesticides/locations/` fetch if `beta.10`'s parser keeps `source`/`external_id`)
@@ -354,13 +356,15 @@
 **Interfaces:**
 - Produces, on `MetadataProvider`:
   ```ts
-  export type MonitorGroup = "reference-grade" | "low-cost";
+  export interface MonitorGroup { key: string; label: string; order: number }
+  /** The monitor groups, sorted by `order`. Optional: without it, the Monitors rows are a flat list. */
+  monitorGroups?(signal?: AbortSignal): Promise<MonitorGroup[] | "unavailable">;
   /** A monitor type's group. Optional: without it, the Monitors rows are a flat list. */
-  monitorTypeGroup?(type: string, signal?: AbortSignal): Promise<MonitorGroup | "unavailable">;
+  monitorTypeGroup?(type: string, signal?: AbortSignal): Promise<string | "unavailable">; // a MonitorGroup key
   /** An entry type's help text. Optional: without it, no help line. */
   entryTypeHelp?(ref: ScaleRef, signal?: AbortSignal): Promise<string | "unavailable">;
   ```
-  The default provider maps the server's field (name and values from the sjvair.com session) onto `MonitorGroup`. An unknown or missing value gives `"unavailable"`.
+  The default provider reads `monitor_groups`, `monitors[type].group` and `entries[type].description` (null or empty → `"unavailable"`). A type whose group key isn't in `monitor_groups` gives `"unavailable"`.
 
 - [ ] **Step 1: Write the failing tests** with a stubbed `getMonitorsMeta`:
   - the group for each type;
@@ -405,10 +409,10 @@
   Default keys: `"pollutant"`, `` `type:${type}` ``, `"inactive"`, `"inside"`, `"collocationSites"`. Marker icons use `triangle` and `circle` in the display color `#48c78e`; Inactive uses `#969696`; Inside uses the `#000000` outline (the fixed-color exceptions).
 
 - [ ] **Step 1: Write the failing tests** with a stub provider:
-  - types in both groups → two `group` rows ("Reference-grade" with a triangle, "Low-cost sensors" with a circle), children in input order;
+  - types in both groups → one `group` row per group, labelled from `monitorGroups()` and sorted by `order` ("reference" with a triangle, "low-cost" with a circle; any other key with a circle), children in input order;
   - one group only → flat `checkbox` rows, each with its group's marker;
   - a type that doesn't report the pollutant is left out (via `entryType`'s presence in `monitors[type].entries`, read through the provider). If the provider can't answer, keep the type;
-  - no groups at all (provider without `monitorTypeGroup`) → a flat list, no throw;
+  - no groups at all (provider without `monitorGroups`/`monitorTypeGroup`, or the fields missing) → a flat list, no throw; a type with no group in an otherwise grouped list goes last, under no heading;
   - Pollutant radios show label and unit from `entryType`, and help from `entryTypeHelp` when present. The group's label and icon follow `pollutant`;
   - `none: true` adds "None", and with `pollutant: null` the Monitors group is `disabled`;
   - Inactive and Inside appear only when `hasInactive` / `hasInside`; Collocation Sites only for `pm25`;
