@@ -393,7 +393,8 @@ hasInside?, collocation?, none?, icons?, keys?, cluster? })`: monitor-map's Poll
   pollutant are left out (the metadata's `published`). When the types span two groups, the
   metadata's group headings (Reference-grade, Low-cost sensors, in their `order`) select all of
   their types; otherwise it's a flat list, each row with its group's marker; a type with no group
-  goes last. Inactive and Inside show only when `hasInactive`/`hasInside`; Collocation Sites only
+  goes last. The rows' markers take the pollutant's lowest level color from its scale (the
+  theme's `--muted` until it arrives, or with None chosen). Inactive and Inside show only when `hasInactive`/`hasInside`; Collocation Sites only
   for PM2.5. Create `monitorsOptions(map)` once per map (it keeps what the metadata provider
   answers) and call `.groups(...)` in a `$derived`: labels, units, and help text arrive after the
   first call. Default keys: `pollutant`, `` `type:${type}` ``, `inactive`, `inside`,

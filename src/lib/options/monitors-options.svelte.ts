@@ -14,8 +14,7 @@ import type {
 } from "./types.js";
 
 const AIR_QUALITY = "air-quality";
-/** monitor-map's marker colors for the rows (the fixed-color exceptions for inactive and inside). */
-const DISPLAY_COLOR = "#48c78e";
+/** The fixed-color exceptions for inactive monitors and the inside outline. */
 const INACTIVE_COLOR = "#969696";
 const INSIDE_OUTLINE = "#000000";
 const BORDER_WIDTH = 2;
@@ -69,12 +68,33 @@ export interface MonitorsOptions {
 }
 
 const svgIcon = (svg: string): OptionIcon => ({ svg });
-const markerFor = (shape: "triangle" | "circle"): OptionIcon =>
-	svgIcon(
+
+/**
+ * A row's marker: in `color` (the pollutant's lowest level, as the map draws it), or, with none
+ * known yet, the theme's neutral level color (`--muted`, as the map draws a feature with no level).
+ */
+function markerFor(
+	shape: "triangle" | "circle",
+	color: string | null,
+	outline?: string
+): OptionIcon {
+	if (color) {
+		return svgIcon(
+			shape === "triangle"
+				? triangle(color, BORDER_WIDTH, outline)
+				: circle(color, BORDER_WIDTH, outline)
+		);
+	}
+	const paint = `style="fill: var(--muted, #9ca3af); stroke: ${outline ?? "var(--border, #6b7280)"}"`;
+	const b = BORDER_WIDTH;
+	const body =
 		shape === "triangle"
-			? triangle(DISPLAY_COLOR, BORDER_WIDTH)
-			: circle(DISPLAY_COLOR, BORDER_WIDTH)
+			? `<polygon points="12,${b} ${24 - b},${24 - b} ${b},${24 - b}" ${paint} stroke-width="${b}"/>`
+			: `<circle cx="12" cy="12" r="${12 - b}" ${paint} stroke-width="${b}"/>`;
+	return svgIcon(
+		`<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">${body}</svg>`
 	);
+}
 
 type Answer<T> = T | "unavailable";
 
@@ -93,6 +113,7 @@ export function monitorsOptions(map: MapContext): MonitorsOptions {
 	const reports = new SvelteMap<string, Answer<boolean>>();
 	const entries = new SvelteMap<string, Answer<{ label: string; units: string }>>();
 	const helps = new SvelteMap<string, Answer<string>>();
+	const lowest = new SvelteMap<string, string | null>();
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
 	const asked = new Set<string>();
 
@@ -164,6 +185,17 @@ export function monitorsOptions(map: MapContext): MonitorsOptions {
 		};
 	}
 
+	/** The pollutant's lowest level color from its scale; null while unknown or without one. */
+	function levelColor(pollutant: string | null): string | null {
+		if (!pollutant) return null;
+		ask(
+			`scale:${pollutant}`,
+			() => metadata.scale({ dataset: AIR_QUALITY, entryType: pollutant }),
+			(v) => lowest.set(pollutant, v === "unavailable" ? null : v.levels[0]?.color || null)
+		);
+		return lowest.get(pollutant) ?? null;
+	}
+
 	function groupsKnown(): MonitorGroup[] {
 		ask(
 			"groups",
@@ -221,14 +253,15 @@ export function monitorsOptions(map: MapContext): MonitorsOptions {
 				? input.types.filter((t) => typeReports(t, input.pollutant!))
 				: input.types;
 			const known = groupsKnown();
+			const color = levelColor(input.pollutant);
 			const keyOf = (type: string) => {
 				const key = typeGroup(type);
 				return key && known.some((g) => g.key === key) ? key : null;
 			};
 			const markerOf = (type: string) => {
 				const key = keyOf(type);
-				if (key) return markerFor(key === REFERENCE_GROUP ? "triangle" : "circle");
-				return markerFor(monitorShape(type) === "triangle" ? "triangle" : "circle");
+				if (key) return markerFor(key === REFERENCE_GROUP ? "triangle" : "circle", color);
+				return markerFor(monitorShape(type) === "triangle" ? "triangle" : "circle", color);
 			};
 			const typeRow = (type: string, icon?: OptionIcon): OptionCheckbox => ({
 				kind: "checkbox",
@@ -244,7 +277,7 @@ export function monitorsOptions(map: MapContext): MonitorsOptions {
 						kind: "group",
 						id: `group:${g.key}`,
 						label: g.label,
-						icon: markerFor(g.key === REFERENCE_GROUP ? "triangle" : "circle"),
+						icon: markerFor(g.key === REFERENCE_GROUP ? "triangle" : "circle", color),
 						children: shown.filter((t) => keyOf(t) === g.key).map((t) => typeRow(t))
 					});
 				}
@@ -269,7 +302,7 @@ export function monitorsOptions(map: MapContext): MonitorsOptions {
 					kind: "checkbox",
 					id: k.inside,
 					label: map.messages("mapsdk_options_inside"),
-					icon: svgIcon(circle(DISPLAY_COLOR, BORDER_WIDTH, INSIDE_OUTLINE))
+					icon: markerFor("circle", color, INSIDE_OUTLINE)
 				});
 				defaults[k.inside] = false;
 			}

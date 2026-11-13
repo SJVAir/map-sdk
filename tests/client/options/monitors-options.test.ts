@@ -8,6 +8,7 @@ import {
 } from "../../../src/lib/options/monitors-options.svelte.js";
 import type { OptionGroup, OptionRow } from "../../../src/lib/options/types.js";
 import { rootEffect } from "../../fixtures/effects.svelte.js";
+import { pm25Scale } from "../../fixtures/scales.js";
 
 const GROUPS: MonitorGroup[] = [
 	{ key: "reference", label: "Reference-grade", order: 0 },
@@ -28,7 +29,7 @@ const ENTRIES: Record<string, { label: string; units: string; help: string | nul
 function provider(extra: Partial<MetadataProvider> = {}): MetadataProvider {
 	const ok = <T>(v: T | undefined) => Promise.resolve(v === undefined ? "unavailable" : v);
 	return {
-		scale: () => Promise.resolve("unavailable"),
+		scale: (ref) => Promise.resolve(ref.entryType === "pm25" ? pm25Scale : "unavailable"),
 		attribution: () => Promise.resolve("unavailable"),
 		entryType: (ref) =>
 			ok(ENTRIES[ref.entryType] && { ...ENTRIES[ref.entryType], precision: null }),
@@ -228,5 +229,32 @@ describe("monitorsOptions", () => {
 			})
 		);
 		expect(labels(group(result.groups, "monitors")!.rows)).toEqual(["AirNow", "PurpleAir"]);
+	});
+
+	it("row markers take the chosen pollutant's lowest level color", async () => {
+		const { result } = await build({
+			types: ["airnow", "purpleair"],
+			pollutants: ["pm25"],
+			pollutant: "pm25",
+			hasInside: true
+		});
+		const rows = group(result.groups, "monitors")!.rows;
+		const good = pm25Scale.levels[0].color!;
+		expect(svg(rows[0])).toContain(`fill="${good}"`);
+		expect(svg(rows[1])).toContain(`fill="${good}"`);
+		const inside = rows.find((r) => r.id === "inside")!;
+		expect(svg(inside)).toContain(`fill="${good}"`);
+		// Black (map-sdk's marker outline darkens it to hsla(0, 0%, 0%, 1), still black).
+		expect(svg(inside)).toMatch(/stroke="(#000000|hsla\(0, 0%, 0%, 1\))"/);
+		expect(rows.map(svg).join("")).not.toContain("#48c78e");
+	});
+
+	it("without a scale (none yet, None chosen, or unavailable) the markers use the neutral token", async () => {
+		const { result } = await build({
+			types: ["airnow"],
+			pollutants: ["o3", "pm25"],
+			pollutant: "o3"
+		});
+		expect(svg(group(result.groups, "monitors")!.rows[0])).toContain("var(--muted");
 	});
 });
