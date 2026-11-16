@@ -423,11 +423,11 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				spec.cluster = true;
 				spec.clusterRadius = cluster.radius;
 				spec.clusterMaxZoom = cluster.maxZoom;
-				const properties = {
-					...cluster.properties,
-					...(countProp && { [COUNT_SUM]: ["+", ["get", countProp]] })
-				} as GeoJSONSourceSpecification["clusterProperties"];
-				if (cluster.properties || countProp) spec.clusterProperties = properties;
+				const properties: Record<string, unknown> = { ...(cluster.properties ?? {}) };
+				if (countProp) properties[COUNT_SUM] = ["+", ["get", countProp]];
+				if (cluster.properties || countProp) {
+					spec.clusterProperties = properties as GeoJSONSourceSpecification["clusterProperties"];
+				}
 			}
 			return spec;
 		}
@@ -493,7 +493,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			return {
 				type: "symbol",
 				source: sourceId,
-				filter: ["all", UNCLUSTERED, [">=", ["get", property], 2]],
+				filter: ["all", UNCLUSTERED, [">=", ["get", property], 2]] as FilterSpecification,
 				layout: {
 					"text-field": ["to-string", ["get", property]],
 					"text-size": 11,
