@@ -83,6 +83,12 @@ export interface FeatureListItem {
 	 */
 	detail?: string;
 	/**
+	 * Drawn as a no-figure outline (`shapesPlugin`'s `noFigure: "outline"`): where "No level" would
+	 * be, its list row, the row's accessible name, the generic tooltip and the view summary read the
+	 * Legend's "No data". Ignored when the item has a level; wins over `detail`. Default false.
+	 */
+	noFigure?: boolean;
+	/**
 	 * A place with no reading (a focus point): its row, accessible name, and tooltip show its name
 	 * alone, with no value, level, or "No level". Default false.
 	 */

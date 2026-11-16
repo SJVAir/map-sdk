@@ -45,6 +45,19 @@ describe("summaryText", () => {
 		);
 	});
 
+	it("counts noFigure items as No data, before No level", () => {
+		const outlined = many(2, NO_LEVEL, 5).map((i) => ({ ...i, noFigure: true }));
+		const items = [...many(1, good), ...outlined, ...many(1, NO_LEVEL, 10)];
+		expect(summaryText("Counties", items, pm25Scale, defaultMessages)).toBe(
+			"Counties: 1 Good, 2 No data, 1 No level"
+		);
+	});
+
+	it("counts a noFigure item with a level under its level", () => {
+		const items = many(2, good).map((i) => ({ ...i, noFigure: true }));
+		expect(summaryText("Counties", items, pm25Scale, defaultMessages)).toBe("Counties: 2 Good");
+	});
+
 	it("counts an empty-color level under its own label", () => {
 		const unknown: Level = { ...good, key: "unknown", label: "Unknown", color: "" };
 		const scale = { ...pm25Scale, levels: [...pm25Scale.levels, unknown] };

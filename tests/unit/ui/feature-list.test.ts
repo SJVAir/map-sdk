@@ -142,6 +142,25 @@ describe("typeaheadIndex", () => {
 describe("rowLabel", () => {
 	const format = createDefaultFormat();
 
+	it("names a no-value noFigure item with No data", () => {
+		const region = { value: null, level: NO_LEVEL, noFigure: true } as const;
+		expect(rowLabel(item("1", "Fresno", region), defaultMessages, format)).toBe("Fresno, No data");
+	});
+
+	it("puts No data after a noFigure item's value", () => {
+		const region = { value: 5, precision: 0, level: NO_LEVEL, noFigure: true } as const;
+		expect(rowLabel(item("1", "Fresno", region), defaultMessages, format)).toBe(
+			"Fresno, 5 µg/m³, No data"
+		);
+	});
+
+	it("keeps no reading for a no-value item without noFigure", () => {
+		const region = { value: null, level: NO_LEVEL } as const;
+		expect(rowLabel(item("1", "Fresno", region), defaultMessages, format)).toBe(
+			"Fresno, no reading"
+		);
+	});
+
 	it("reads a detail in place of No level, with no reading", () => {
 		const ev = { value: null, level: NO_LEVEL, detail: "Level 2 charger" } as const;
 		expect(rowLabel(item("1", "Fresno Station", ev), defaultMessages, format)).toBe(
@@ -252,6 +271,32 @@ describe("optionIdPart", () => {
 });
 
 describe("levelText", () => {
+	it("reads No data for a noFigure item with no level", () => {
+		expect(levelText(item("1", "A", { level: NO_LEVEL, noFigure: true }), defaultMessages)).toEqual(
+			{ kind: "none", text: "No data" }
+		);
+	});
+
+	it("gives a level's label over noFigure", () => {
+		expect(levelText(item("1", "A", { noFigure: true }), defaultMessages)).toEqual({
+			kind: "level",
+			text: "Good"
+		});
+	});
+
+	it("gives noFigure's No data over a detail", () => {
+		const both = { level: NO_LEVEL, noFigure: true, detail: "x" } as const;
+		expect(levelText(item("1", "A", both), defaultMessages)).toEqual({
+			kind: "none",
+			text: "No data"
+		});
+	});
+
+	it("still omits a noReading item with noFigure", () => {
+		const place = { level: NO_LEVEL, noFigure: true, noReading: true } as const;
+		expect(levelText(item("1", "A", place), defaultMessages).kind).toBe("omit");
+	});
+
 	it("is the level's label, else a detail, else No level", () => {
 		expect(levelText(item("1", "A", { detail: "x" }), defaultMessages)).toEqual({
 			kind: "level",
