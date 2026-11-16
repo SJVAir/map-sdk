@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
 import axe from "axe-core";
@@ -210,6 +210,37 @@ describe("OptionsToolbar, wide", () => {
 		await page.getByRole("checkbox", { name: "EV Chargers" }).click();
 		expect(state.calls[0].changed).toEqual(["ev"]);
 		await expect.element(page.getByRole("checkbox", { name: "Level 2" })).toBeInTheDocument();
+	});
+
+	it("a checkbox row with children has a chevron, closed while off", async () => {
+		await setup();
+		await trigger("Layers").click();
+		const row = () =>
+			(page.getByRole("checkbox", { name: "EV Chargers" }).element() as HTMLElement).closest(
+				"label"
+			)!;
+		await vi.waitFor(() => expect(row()).not.toBeNull());
+		const chevron = row().querySelector(".mapsdk-option-chevron");
+		expect(chevron).not.toBeNull();
+		expect(chevron!.classList.contains("mapsdk-option-chevron-closed")).toBe(true);
+		document.body.replaceChildren();
+		await setup({ values: { ...values(), ev: true } });
+		await trigger("Layers").click();
+		await vi.waitFor(() => expect(row().querySelector(".mapsdk-option-chevron")).not.toBeNull());
+		expect(
+			row()
+				.querySelector(".mapsdk-option-chevron")!
+				.classList.contains("mapsdk-option-chevron-closed")
+		).toBe(false);
+	});
+
+	it("a checkbox row without children has no chevron", async () => {
+		await setup();
+		await trigger("Monitors").click();
+		const label = (
+			page.getByRole("checkbox", { name: "Inactive" }).element() as HTMLElement
+		).closest("label")!;
+		expect(label.querySelector(".mapsdk-option-chevron")).toBeNull();
 	});
 
 	it("a select shows the choice matching the value, and a pick is one change", async () => {
