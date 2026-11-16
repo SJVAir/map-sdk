@@ -13,6 +13,7 @@ import type { Scale, ScaleRef } from "../../../src/lib/data/scale-types.js";
 import type { MapFeatureProperties } from "../../../src/lib/data/types.js";
 import { geometryBbox } from "../../../src/lib/core/shape-view.js";
 import { shapesPlugin, type ShapesOptions } from "../../../src/lib/plugins/shapes.svelte.js";
+import { lensParentOf } from "../../../src/lib/plugins/lens-hooks.js";
 import {
 	colorExpression,
 	FALLBACK_THEME_COLORS,
@@ -22,6 +23,7 @@ import {
 import { createFakeGl, type FakeGl } from "../../fixtures/fake-gl.js";
 import { smokeScale } from "../../fixtures/scales.js";
 import { TestSource } from "../../fixtures/sources.svelte.js";
+import { rootEffect } from "../../fixtures/effects.svelte.js";
 
 type Props = MapFeatureProperties;
 
@@ -733,5 +735,191 @@ describe("shapesPlugin noFigure", () => {
 		).features.map((f) => (f.geometry as GeoJSON.Point).coordinates);
 		expect(checks).toEqual([[1, 1]]);
 		expect(layerIds(gl)).toContain("m1:shp:selected");
+	});
+});
+
+describe("shapesPlugin zoomRange", () => {
+	const visibility = (l: unknown) =>
+		(l as { layout?: { visibility?: string } }).layout?.visibility ?? "visible";
+	const zoomTo = (gl: FakeGl, zoom: number) => {
+		gl.jumpTo({ zoom });
+		gl.emit("zoom", {});
+	};
+
+	it("hides the layers out of range and shows them in range", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl } = await setup({ source, zoomRange: { max: 11 } });
+		zoomTo(gl, 12);
+		await settle();
+		expect(gl.layers.length).toBeGreaterThan(1);
+		expect(new Set(gl.layers.map(visibility))).toEqual(new Set(["none"]));
+		zoomTo(gl, 10);
+		expect(new Set(gl.layers.map(visibility))).toEqual(new Set(["visible"]));
+		for (const l of gl.layers) {
+			expect(l).not.toHaveProperty("minzoom");
+			expect(l).not.toHaveProperty("maxzoom");
+		}
+	});
+
+	it("builds its layers hidden when set up out of range", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl } = await setup({ source, zoomRange: { min: 11 } });
+		await settle();
+		expect(new Set(gl.layers.map(visibility))).toEqual(new Set(["none"]));
+	});
+
+	it("out of its zoomRange, lists nothing and has no legend", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl, plugin } = await setup({ source, zoomRange: { max: 11 } });
+		await settle();
+		const counts: number[] = [];
+		const stop = rootEffect(() => void counts.push(plugin.features!().length));
+		flushSync();
+		expect(plugin.legend!()).not.toBeNull();
+		zoomTo(gl, 12);
+		flushSync();
+		expect(plugin.features!()).toEqual([]);
+		expect(plugin.legend!()).toBeNull();
+		zoomTo(gl, 10);
+		flushSync();
+		expect(plugin.features!()).toHaveLength(2);
+		expect(plugin.legend!()).not.toBeNull();
+		expect(counts).toEqual([2, 0, 2]);
+		stop();
+	});
+
+	it("without zoomRange, shapes are unchanged", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl } = await setup({ source });
+		await settle();
+		for (const l of gl.layers) expect(l).not.toHaveProperty("layout.visibility");
+		expect(gl.listeners.filter((l) => l.type === "zoom")).toEqual([]);
+	});
+});
+
+describe("shapesPlugin tooltip", () => {
+	it("gets the item, its source props and the env", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const content = (() => {}) as unknown as import("svelte").Snippet;
+		const tooltip = vi.fn(() => content);
+		const { plugin } = await setup({ source, tooltip });
+		await settle();
+		const item = plugin.features!()[0];
+		expect(plugin.tooltip!(item)).toBe(content);
+		const [gotItem, props, env] = tooltip.mock.calls[0] as unknown as [
+			unknown,
+			Props,
+			{ scale: unknown; precision: number; messages: unknown }
+		];
+		expect(gotItem).toBe(item);
+		expect(props.refKey).toBe(item.refKey);
+		expect(props.name).toBe("Alpha");
+		expect(env.scale).toEqual(smokeScale);
+		expect(env.messages).toBe(defaultMessages);
+	});
+
+	it("gives nothing once torn down", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const tooltip = vi.fn(() => (() => {}) as unknown as import("svelte").Snippet);
+		const { plugin, host } = await setup({ source, tooltip });
+		await settle();
+		const item = plugin.features!()[0];
+		host.remove("shp");
+		expect(plugin.tooltip!(item)).toBeUndefined();
+	});
+
+	it("tooltipShowsName sets the plugin flag; without a tooltip there is none", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const named = await setup({ source, tooltip: () => undefined, tooltipShowsName: true });
+		expect(named.plugin.tooltipShowsName).toBe(true);
+		const bare = await setup({
+			source: new TestSource<Props>({ features: POLYGONS, scale: smokeScale })
+		});
+		expect(bare.plugin.tooltip).toBeUndefined();
+		expect(bare.plugin.tooltipShowsName).toBeUndefined();
+	});
+});
+
+describe("shapesPlugin legendUnits and legendNote", () => {
+	it("the legend carries them", async () => {
+		const note = (() => {}) as unknown as import("svelte").Snippet;
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({ source, legendUnits: "lbs per township", legendNote: note });
+		await settle();
+		const data = plugin.legend!();
+		expect(data && "scale" in data && data.unitsLine).toBe("lbs per township");
+		expect(data && "scale" in data && data.note).toBe(note);
+	});
+});
+
+describe("shapesPlugin lens hooks", () => {
+	const fillPaint = (gl: FakeGl) =>
+		(layer(gl, "m1:shp:fill") as { paint: Record<string, unknown> }).paint["fill-opacity"];
+
+	it("are there for a shapes plugin, and not for another plugin", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({ source });
+		const hooks = lensParentOf(plugin)!;
+		expect(hooks.choropleth).toBe(true);
+		expect(lensParentOf({ id: "x", setup: () => () => {} })).toBeNull();
+	});
+
+	it("setHidden sets lensHidden feature state and clears it", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin, gl } = await setup({ source });
+		await settle();
+		const hooks = lensParentOf(plugin)!;
+		hooks.setHidden(new Set(["feature:a"]));
+		expect(gl.featureStates.get("m1:shp:shapes/feature:a")).toEqual({ lensHidden: true });
+		expect(JSON.stringify(fillPaint(gl))).toContain("lensHidden");
+		hooks.setHidden(new Set(["feature:b"]));
+		expect(gl.featureStates.get("m1:shp:shapes/feature:a")?.lensHidden).toBeUndefined();
+		expect(gl.featureStates.get("m1:shp:shapes/feature:b")).toEqual({ lensHidden: true });
+		hooks.setHidden(new Set());
+		expect(gl.featureStates.get("m1:shp:shapes/feature:b")?.lensHidden).toBeUndefined();
+	});
+
+	it("before any setHidden the fill paint is today's", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl } = await setup({ source });
+		await settle();
+		expect(fillPaint(gl)).toEqual(opacityExpression(smokeScale, "value", 0.6));
+	});
+
+	it("hidden keys survive a data reload and a restyle", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin, gl, host } = await setup({ source });
+		await settle();
+		lensParentOf(plugin)!.setHidden(new Set(["feature:a"]));
+		source.features = collection(
+			POLYGONS.features.map((f) => ({ props: f.properties, geometry: f.geometry }))
+		);
+		flushSync();
+		expect(gl.featureStates.get("m1:shp:shapes/feature:a")).toEqual({ lensHidden: true });
+		const gl2 = createFakeGl({ styleLoaded: true });
+		host.attach(gl2);
+		await tick();
+		await settle();
+		expect(gl2.featureStates.get("m1:shp:shapes/feature:a")).toEqual({ lensHidden: true });
+		expect(JSON.stringify(fillPaint(gl2))).toContain("lensHidden");
+	});
+
+	it("keys and shown are reactive", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin, gl } = await setup({ source, zoomRange: { max: 11 } });
+		await settle();
+		const hooks = lensParentOf(plugin)!;
+		const seen: string[] = [];
+		const stop = rootEffect(() => void seen.push(`${[...hooks.keys].join(",")}|${hooks.shown}`));
+		flushSync();
+		source.features = collection(
+			[POLYGONS.features[0]].map((f) => ({ props: f.properties, geometry: f.geometry }))
+		);
+		flushSync();
+		gl.jumpTo({ zoom: 12 });
+		gl.emit("zoom", {});
+		flushSync();
+		expect(seen).toEqual(["feature:a,feature:b|true", "feature:a|true", "feature:a|false"]);
+		stop();
 	});
 });

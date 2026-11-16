@@ -7,7 +7,7 @@ import { applyPick, selectionKeys, toggleInSelection } from "../data/selection.j
 import type { FeatureRef, SelectionMode, SpatialSelection } from "../data/types.js";
 import { BasemapState, type BasemapConfig } from "./basemap.svelte.js";
 import type { GlMapLike } from "./gl.js";
-import { InteractionRouter, type Hovered } from "./interactions.svelte.js";
+import { InteractionRouter, type Hovered, type OwnHover } from "./interactions.svelte.js";
 import type { ClickEvent, FeatureHit, FeatureListItem, MapPlugin } from "./plugin.js";
 import { PluginHost } from "./plugin-host.svelte.js";
 import { intersectsBounds, shapeAnchor } from "./shape-view.js";
@@ -216,6 +216,12 @@ export interface MapContext {
 	readonly notice: { message: string; id: number } | null;
 	/** @internal For `PickNotice`: clears the notice. */
 	clearNotice(): void;
+	/** @internal A plugin's own feature under the pointer (`PluginContext.hoverOf`). Reactive. */
+	hoverOf(pluginId: string): OwnHover | null;
+	/** @internal Reactive. The pointer is over this map's pinned card. */
+	readonly pointerInCard: boolean;
+	/** @internal For `MapTooltip`: the pointer entered (true) or left (false) its element. */
+	setPointerInCard(on: boolean): void;
 	/** Closes the pinned card. Does nothing when nothing is pinned. */
 	unpin(): void;
 	/** @internal For `MapView` only: turns pinning on or off. Off also unpins. */
@@ -340,6 +346,8 @@ class MapContextImpl implements MapContext {
 	#focusedPluginId = $state<string | null>(null);
 	#focusedAnchor = $state.raw<[number, number] | null>(null);
 	#pinned = $state.raw<Hovered | null>(null);
+	#pointerInCard = $state(false);
+	#hoverWatched = new Set<string>();
 	#notice = $state.raw<{ message: string; id: number } | null>(null);
 	#noticeCount = 0;
 	#cardEnabled = false;
@@ -374,6 +382,11 @@ class MapContextImpl implements MapContext {
 			providers: { metadata: this.metadata, messages: this.messages, format: this.format },
 			router: this.#router,
 			selectedKeys: (pluginId) => selectionKeys(this.getSelection(pluginId)),
+			card: {
+				pinned: () => this.#pinned,
+				focusedKey: () => this.#focusedKey,
+				pointerInCard: () => this.#pointerInCard
+			},
 			onSettled: () => {
 				// A setup that added a plugin queued another run; that run settles it.
 				if (this.#host.pending) return;
@@ -433,6 +446,23 @@ class MapContextImpl implements MapContext {
 
 	get pinned(): Hovered | null {
 		return this.#pinned;
+	}
+
+	hoverOf(pluginId: string): OwnHover | null {
+		// Watched from the first ask for this map's life (plugins watch through their context).
+		if (!this.#hoverWatched.has(pluginId)) {
+			this.#hoverWatched.add(pluginId);
+			this.#router.watchHover(pluginId);
+		}
+		return this.#router.hoverOf(pluginId);
+	}
+
+	get pointerInCard(): boolean {
+		return this.#pointerInCard;
+	}
+
+	setPointerInCard(on: boolean): void {
+		this.#pointerInCard = on;
 	}
 
 	get notice(): { message: string; id: number } | null {

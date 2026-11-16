@@ -10,6 +10,7 @@ import { defaultMessages } from "../../src/lib/data/messages.js";
 import { NO_LEVEL } from "../../src/lib/data/scale.js";
 import type { Level } from "../../src/lib/data/scale-types.js";
 import MapTooltip from "../../src/lib/ui/MapTooltip.svelte";
+import { parkPointer } from "./park-pointer.js";
 import type { CardContext } from "../../src/lib/ui/card.js";
 
 function level(label: string, color: string): Level {
@@ -447,6 +448,23 @@ describe("MapTooltip card", () => {
 		await expect.element(card).toBeVisible();
 		await expect.element(card.getByRole("button", { name: "Close" })).toBeVisible();
 		expect(getComputedStyle(card.element()).pointerEvents).toBe("auto");
+	});
+
+	it("tells the map while the pointer is over the pinned card", async () => {
+		const setPointerInCard = vi.fn();
+		const map = Object.assign(cardMap(sites(), { pinned: hit("a", "Site A") }), {
+			setPointerInCard
+		});
+		const shown = await render(MapTooltip, { map, project, card: true });
+		const card = page.getByRole("group", { name: "Site A" });
+		await expect.element(card).toBeVisible();
+		await card.hover();
+		expect(setPointerInCard).toHaveBeenLastCalledWith(true);
+		await parkPointer();
+		expect(setPointerInCard).toHaveBeenLastCalledWith(false);
+		await card.hover();
+		shown.unmount();
+		expect(setPointerInCard).toHaveBeenLastCalledWith(false);
 	});
 
 	it("hides the hover while something is pinned", async () => {

@@ -23,6 +23,10 @@ import { asDataURI, SELECTED_OVERLAY_PADDING, selectedOverlay } from "./icons.js
 import {
 	clusterHit,
 	clusterLeaves,
+	COUNT_DOT_RADIUS,
+	COUNT_RADIUS,
+	COUNT_SUM,
+	countClusterLayers,
 	defaultClusterLayers,
 	parseClusterHit,
 	zoomIntoCluster,
@@ -30,7 +34,8 @@ import {
 	type ClusterLayerArgs,
 	type ClusterLayers
 } from "./points-clusters.js";
-import { hitFromProps, SELECTED_OPACITY } from "./shared.js";
+import { hitFromProps, hostLegend, SELECTED_OPACITY } from "./shared.js";
+import { zoomRanged, type ZoomRange } from "./zoom-range.svelte.js";
 import {
 	createScaleResolver,
 	datasetOf,
@@ -104,7 +109,7 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	 * zooming (layer visibility, not layer zoom ranges, so ranges that meet leave no gap on a
 	 * globe). Default: all zooms.
 	 */
-	zoomRange?: { min?: number; max?: number };
+	zoomRange?: ZoomRange;
 	/** How the legend shows a range scale: a gradient (default) or labeled blocks. */
 	legendDisplay?: "gradient" | "blocks";
 	/**
@@ -113,6 +118,17 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	 * it loads.
 	 */
 	legendTitle?: "layer" | "entry-type";
+	/** Already-translated unit line under the legend section's title, e.g. "notices". */
+	legendUnits?: string;
+	/** Host content at the foot of the plugin's legend section. */
+	legendNote?: Snippet;
+	/**
+	 * A number on each marker from a property (e.g. notices per section): a count of 1 is a plain
+	 * dot, 2 or more a larger circle with the number in it (`--background` number and outline).
+	 * Clustered, the bubbles sum it and show the sum the same way, larger, in the scale's first
+	 * level's color; a host `cluster.layers` still wins. Circle markers only (not with `icon`).
+	 */
+	count?: { property: string };
 	/**
 	 * A short text for a feature with no level (e.g. "Level 2 charger"), shown in the feature list,
 	 * its accessible name, and the generic tooltip where "No level" would be. Ignored for a
@@ -153,6 +169,12 @@ const IMAGE_RATIO = 2;
 const ENLARGE = 1.3;
 const DEFAULT_RADIUS = 6;
 const UNCLUSTERED: FilterSpecification = ["!", ["has", "point_count"]];
+/** A count property, 1 where a feature has none (a marker with no count is one). */
+const countOf = (property: string): ExpressionSpecification => [
+	"coalesce",
+	["to-number", ["get", property], 1],
+	1
+];
 /**
  * Points with value-based color: anything with coordinates. Draws circles, or icons by
  * category (one image per category and level color), optionally clustered per group, with a
@@ -160,9 +182,13 @@ const UNCLUSTERED: FilterSpecification = ["!", ["has", "point_count"]];
  */
 export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOptions<P>): MapPlugin {
 	const { id: pluginId, source, layerLabel, icon, cluster } = options;
+	if (options.count && icon) throw new Error("map-sdk: count needs circle markers");
+	const countProp = options.count?.property ?? null;
 	const selectable = options.selectable ?? false;
 	const enlarge = options.selectedStyle === "enlarge";
 	const groupOf = cluster?.groupBy ?? (() => "");
+	const range = zoomRanged(options.zoomRange);
+	const withHostLegend = hostLegend(options.legendUnits, options.legendNote);
 
 	const scales = createScaleResolver(
 		pluginId,
@@ -172,7 +198,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 	);
 	const currentScale = scales.current;
 	const legend = (): LegendData | null => {
-		const data = scales.legend();
+		const data = withHostLegend(scales.legend());
 		return data && "scale" in data && options.legendDisplay
 			? { ...data, display: options.legendDisplay }
 			: data;
@@ -334,7 +360,9 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		let scaleGeneration = -1;
 		let generationKey: string | null = null;
 
-		const markerSize = icon ? icon.size : (options.circle?.radius ?? DEFAULT_RADIUS) * 2;
+		const markerSize = icon
+			? icon.size
+			: (countProp ? COUNT_RADIUS : (options.circle?.radius ?? DEFAULT_RADIUS)) * 2;
 
 		function loadImage(local: string, svg: string, size: number): void {
 			if (images.has(local) || typeof Image === "undefined") return;
@@ -403,43 +431,21 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				spec.cluster = true;
 				spec.clusterRadius = cluster.radius;
 				spec.clusterMaxZoom = cluster.maxZoom;
-				if (cluster.properties) spec.clusterProperties = cluster.properties;
+				const properties: Record<string, unknown> = { ...(cluster.properties ?? {}) };
+				if (countProp) properties[COUNT_SUM] = ["+", countOf(countProp)];
+				if (cluster.properties || countProp) {
+					spec.clusterProperties = properties as GeoJSONSourceSpecification["clusterProperties"];
+				}
 			}
 			return spec;
 		}
 
-		// The zoom range shows and hides the layers by the camera zoom, not with layer
-		// minzoom/maxzoom: on a globe MapLibre uses the next zoom's tiles a little before the camera
-		// gets there and leaves a layer out of tiles at or above its maxzoom, so two plugins whose
-		// ranges meet (fire groups below 10, hotspots from 10) would leave a gap where neither drew.
-		const { min, max } = options.zoomRange ?? {};
-		const ranged = min !== undefined || max !== undefined;
-		const inRange = () => {
-			const zoom = gl.getZoom();
-			return (min === undefined || zoom >= min) && (max === undefined || zoom < max);
-		};
-		let shown = ranged ? inRange() : true;
-
-		/** The spec, hidden while the camera is outside the plugin's zoom range. */
-		function zoomed(spec: LayerSpecWithoutId): LayerSpecWithoutId {
-			if (!ranged) return spec;
-			const layout = (spec as { layout?: Record<string, unknown> }).layout;
-			return {
-				...spec,
-				layout: { ...layout, visibility: shown ? "visible" : "none" }
-			} as LayerSpecWithoutId;
-		}
-
-		const onZoom = () => {
-			if (dead || inRange() === shown) return;
-			shown = !shown;
-			for (const layerId of layers) {
-				if (gl.getLayer(layerId)) {
-					gl.setLayoutProperty(layerId, "visibility", shown ? "visible" : "none");
-				}
-			}
-		};
-		if (ranged) gl.on("zoom", onZoom);
+		const zoomed = range.zoomed;
+		const stopRange = range.track(
+			gl,
+			() => layers,
+			() => dead
+		);
 
 		function removeLayers(): void {
 			for (const layerId of layers.toReversed()) {
@@ -479,12 +485,30 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				...filter,
 				layout: sortKey ? { "circle-sort-key": sortKey as ExpressionSpecification } : {},
 				paint: {
-					"circle-radius": options.circle?.radius ?? DEFAULT_RADIUS,
+					"circle-radius": countProp
+						? ["case", [">=", countOf(countProp), 2], COUNT_RADIUS, COUNT_DOT_RADIUS]
+						: (options.circle?.radius ?? DEFAULT_RADIUS),
 					"circle-color": colorExpression(scale, "value", theme.neutral),
 					"circle-opacity": opacityExpression(scale, "value", 1),
-					"circle-stroke-color": theme.foreground,
-					"circle-stroke-width": 1
+					"circle-stroke-color": countProp ? theme.countMarkerText : theme.foreground,
+					"circle-stroke-width": countProp ? 1.5 : 1
 				}
+			};
+		}
+
+		/** The number on count markers of 2 or more; never interactive (the circle takes the hit). */
+		function countLabelLayer(property: string, sourceId: string): LayerSpecWithoutId {
+			return {
+				type: "symbol",
+				source: sourceId,
+				filter: ["all", UNCLUSTERED, [">=", countOf(property), 2]] as FilterSpecification,
+				layout: {
+					"text-field": ["to-string", ["get", property]],
+					"text-size": 11,
+					"text-allow-overlap": true,
+					"text-ignore-placement": true
+				},
+				paint: { "text-color": theme.countMarkerText }
 			};
 		}
 
@@ -519,7 +543,8 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				}
 			};
 			const added: string[] = [];
-			for (const { local, spec } of (cluster?.layers ?? defaultClusterLayers)(args)) {
+			const make = cluster?.layers ?? (countProp ? countClusterLayers : defaultClusterLayers);
+			for (const { local, spec } of make(args)) {
 				added.push(ctx.addLayer(layerLocal(local, group), zoomed(spec)));
 			}
 			layers.push(...added);
@@ -555,6 +580,16 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				);
 				layers.push(layerId);
 				pointIds.push(layerId);
+			}
+			if (countProp) {
+				for (const group of groups) {
+					layers.push(
+						ctx.addLayer(
+							layerLocal("count", group),
+							zoomed(countLabelLayer(countProp, sources.get(group)!))
+						)
+					);
+				}
 			}
 			pointLayerIds = pointIds;
 			if (!enlarge) {
@@ -715,7 +750,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 
 		return () => {
 			dead = true;
-			if (ranged) gl.off("zoom", onZoom);
+			stopRange();
 			if (options.marksPlaces) gl.off("idle", onIdle);
 			providers = null;
 			live = null;

@@ -43,8 +43,11 @@
 	} from "./date-range-source.svelte.js";
 	import { focusChoices } from "./focus-areas.js";
 	import { TodayOptions } from "./today-options.svelte.js";
+	import PesticidePanel from "./pesticides/PesticidePanel.svelte";
 
 	const maptilerKey = import.meta.env.VITE_MAPTILER_KEY ?? "";
+	/** The pesticide panel's map and lens, for e2e. */
+	let pesticides: object | null = null;
 
 	// Left: fed like the dashboard, from date-range sources. Right: the live monitors store.
 	// Both use the default providers.
@@ -380,6 +383,9 @@
 				todayOptions,
 				schools,
 				rightFocus,
+				get pesticides() {
+					return pesticides;
+				},
 				get lastClick() {
 					return lastClick;
 				}
@@ -638,6 +644,11 @@
 		</div>
 		<MapView map={right} label="Live map" class="demo-map" card={{ actions: liveCardActions }} />
 		<Legend map={right} />
+	</section>
+
+	<section class="demo-panel" aria-labelledby="pesticide-title">
+		<h2 id="pesticide-title" class="text-base">Pesticide use (mock data)</h2>
+		<PesticidePanel {maptilerKey} onready={(exposed) => (pesticides = exposed)} />
 	</section>
 </main>
 

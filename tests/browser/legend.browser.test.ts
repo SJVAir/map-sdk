@@ -1,3 +1,4 @@
+import { createRawSnippet } from "svelte";
 import { afterEach, describe, expect, it, vi, onTestFinished } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
@@ -77,6 +78,48 @@ describe("Legend", () => {
 		await expect.element(page.getByRole("heading", { name: "PM2.5 (µg/m³)" })).toBeVisible();
 		await expect.element(page.getByRole("heading", { name: "Smoke" })).toBeVisible();
 		expect(document.querySelectorAll(".mapsdk-legend-section")).toHaveLength(2);
+	});
+
+	it("a unit line replaces the (units) suffix; the note renders at the section's foot", async () => {
+		applyTheme("light");
+		const note = createRawSnippet(() => ({
+			render: () => '<p>About this data <a href="#about">More</a></p>'
+		}));
+		render(Legend, {
+			map: fakeMap([
+				{
+					id: "townships",
+					legend: () => ({
+						pluginId: "townships",
+						title: "Pesticide use",
+						units: "lbs",
+						scale: pm25Scale,
+						noFigure: true,
+						unitsLine: "lbs per township",
+						note
+					})
+				}
+			])
+		});
+		await expect.element(page.getByRole("heading", { name: "Pesticide use" })).toBeVisible();
+		const units = document.querySelector(".mapsdk-legend-units")!;
+		expect(units.textContent).toBe("lbs per township");
+		expect(document.querySelector("h3")!.textContent).not.toContain("(lbs)");
+		const foot = document.querySelector(".mapsdk-legend-note")!;
+		expect(foot.textContent).toContain("About this data");
+		const noData = document.querySelector(".mapsdk-legend-nofigure")!;
+		expect(noData.compareDocumentPosition(foot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		await expect.element(page.getByRole("link", { name: "More" })).toBeVisible();
+		const results = await axe.run(document.querySelector(".mapsdk-legend")!);
+		expect(results.violations).toEqual([]);
+	});
+
+	it("without a unit line the title keeps (units)", async () => {
+		applyTheme("light");
+		render(Legend, { map });
+		await expect.element(page.getByRole("heading", { name: "PM2.5 (µg/m³)" })).toBeVisible();
+		expect(document.querySelector(".mapsdk-legend-units")).toBeNull();
+		expect(document.querySelector(".mapsdk-legend-note")).toBeNull();
 	});
 
 	it("shows every level's label next to its swatch", async () => {

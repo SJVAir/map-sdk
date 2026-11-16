@@ -1,7 +1,7 @@
 import type { CustomLayerInterface, LayerSpecification } from "@maptiler/sdk";
 import { untrack } from "svelte";
 import type { GlMapLike } from "./gl.js";
-import type { InteractionRouter } from "./interactions.svelte.js";
+import type { Hovered, InteractionRouter } from "./interactions.svelte.js";
 import type { MapPlugin, PluginContext, Providers } from "./plugin.js";
 
 export interface PluginHostOptions {
@@ -15,6 +15,12 @@ export interface PluginHostOptions {
 	 * synchronous one.
 	 */
 	onSettled?: () => void;
+	/** The map's card state, for `PluginContext.pinned`/`focusedKey`/`pointerInCard`. Reactive. */
+	card?: {
+		pinned(): Hovered | null;
+		focusedKey(): string | null;
+		pointerInCard(): boolean;
+	};
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- MapLibre's event payloads vary by type */
@@ -395,8 +401,10 @@ export class PluginHost {
 	}
 
 	#context(pluginId: string, running: Running): PluginContext {
-		const { mapUid, providers, router, selectedKeys } = this.#opts;
+		const { mapUid, providers, router, selectedKeys, card } = this.#opts;
 		const { gl } = running;
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
+		const watched = new Set<string>();
 		const layerAbove = () => this.#layerAbove(pluginId);
 		const id = (local: string) => `${mapUid}:${pluginId}:${local}`;
 		const addTracked = (full: string, layer: LayerSpecification | CustomLayerInterface) => {
@@ -471,6 +479,22 @@ export class PluginHost {
 			},
 			get selectedKeys() {
 				return selectedKeys(pluginId);
+			},
+			hoverOf: (id) => {
+				if (!watched.has(id) && !running.dead) {
+					watched.add(id);
+					running.effects.push(router.watchHover(id));
+				}
+				return router.hoverOf(id);
+			},
+			get pinned() {
+				return card?.pinned() ?? null;
+			},
+			get focusedKey() {
+				return card?.focusedKey() ?? null;
+			},
+			get pointerInCard() {
+				return card?.pointerInCard() ?? false;
 			},
 			coveredAt: (lngLat) =>
 				this.#plugins.some((p) => p.id !== pluginId && p.drawnAt?.(lngLat) === true),

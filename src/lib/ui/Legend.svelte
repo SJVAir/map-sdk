@@ -113,10 +113,13 @@
 			<div class="mapsdk-legend-section">
 				<h3 class="text-sm">
 					{section.title}
-					{#if section.units}
+					{#if section.units && !section.unitsLine}
 						<span class="text-xs">({section.units})</span>
 					{/if}
 				</h3>
+				{#if section.unitsLine}
+					<p class="mapsdk-legend-units text-xs">{section.unitsLine}</p>
+				{/if}
 				{#if background !== null}
 					<LegendBar bar={section.bar} {background} messages={map.messages} />
 				{/if}
@@ -125,6 +128,9 @@
 						<span class="mapsdk-legend-nofigure-swatch" aria-hidden="true"></span>
 						<span>{map.messages("mapsdk_legend_no_figure")}</span>
 					</p>
+				{/if}
+				{#if section.note}
+					<div class="mapsdk-legend-note text-xs">{@render section.note()}</div>
 				{/if}
 			</div>
 		{:else if entry.kind === "symbols"}
@@ -221,6 +227,17 @@
 	.mapsdk-legend-symbol {
 		display: inline-flex;
 		flex: none;
+	}
+
+	.mapsdk-legend-units {
+		margin: 0.0625rem 0 0.375rem;
+		color: var(--muted-foreground, currentColor);
+	}
+
+	.mapsdk-legend-note {
+		margin: 0.5rem 0 0;
+		padding-top: 0.375rem;
+		border-top: 1px solid var(--border, currentColor);
 	}
 
 	/* A region with no figure: outlined, no fill, as on the map. */

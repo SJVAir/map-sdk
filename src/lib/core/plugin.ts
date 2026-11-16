@@ -8,6 +8,7 @@ import type { NO_LEVEL } from "../data/scale.js";
 import type { Level, Scale, ScaleRef } from "../data/scale-types.js";
 import type { DataStatus, FeatureRef } from "../data/types.js";
 import type { GlMapLike } from "./gl.js";
+import type { Hovered, OwnHover } from "./interactions.svelte.js";
 
 export type Providers = {
 	metadata: MetadataProvider;
@@ -115,6 +116,13 @@ export type LegendData =
 			scaleLabel?: string;
 			/** The plugin draws at least one feature with no figure as an outline (`noFigure`). */
 			noFigure?: boolean;
+			/**
+			 * Already-translated unit line under the section's title (e.g. "lbs per township"), in
+			 * place of `units` after the title.
+			 */
+			unitsLine?: string;
+			/** Host content at the foot of the section, below "No data". */
+			note?: Snippet;
 	  }
 	| {
 			pluginId: string;
@@ -196,6 +204,20 @@ export interface PluginContext {
 	 * Reactive.
 	 */
 	coveredAt(lngLat: [number, number]): boolean;
+	/**
+	 * Reactive. `pluginId`'s own topmost feature under the pointer and where the pointer entered
+	 * it, whatever lies on top of it (another plugin's marker, a cluster bubble), hoverable or not,
+	 * and whether the move came from touch. Changes only when the feature or `touch` changes. Null
+	 * off its features. The first call starts watching that plugin until this plugin is torn down;
+	 * moves query nothing extra for plugins nobody watches.
+	 */
+	hoverOf(pluginId: string): OwnHover | null;
+	/** Reactive. The map's pinned card (`MapContext.pinned`). */
+	readonly pinned: Hovered | null;
+	/** Reactive. The map's keyboard-focused list item (`MapContext.focusedKey`). */
+	readonly focusedKey: string | null;
+	/** Reactive. The pointer is over this map's pinned card (the hover tooltip never takes it). */
+	readonly pointerInCard: boolean;
 	/** An `$effect.root` torn down with the plugin. */
 	effect(fn: () => void | (() => void)): void;
 }

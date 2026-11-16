@@ -84,6 +84,47 @@ export function defaultClusterLayers({ sourceId, theme }: ClusterLayerArgs): Clu
 	];
 }
 
+/** Sizes of `pointsPlugin`'s count markers (the Pesticides Explorer's notice markers). */
+export const COUNT_DOT_RADIUS = 7;
+export const COUNT_RADIUS = 11;
+export const COUNT_CLUSTER_RADIUS = 15;
+/** The cluster aggregate that sums a count property. */
+export const COUNT_SUM = "mapsdk:count";
+
+/** Count cluster bubbles: the count markers' look, larger, with the summed count. */
+export function countClusterLayers({ sourceId, scale, theme }: ClusterLayerArgs): ClusterLayers {
+	return [
+		{
+			local: "clusters",
+			spec: {
+				type: "circle",
+				source: sourceId,
+				filter: CLUSTERED,
+				paint: {
+					"circle-radius": COUNT_CLUSTER_RADIUS,
+					"circle-color": scale.levels[0]?.color || theme.neutral,
+					"circle-stroke-color": theme.countMarkerText,
+					"circle-stroke-width": 1.5
+				}
+			}
+		},
+		{
+			local: "cluster-count",
+			spec: {
+				type: "symbol",
+				source: sourceId,
+				filter: CLUSTERED,
+				layout: {
+					"text-field": ["to-string", ["get", COUNT_SUM]],
+					"text-size": 12,
+					"text-allow-overlap": true
+				},
+				paint: { "text-color": theme.countMarkerText }
+			}
+		}
+	];
+}
+
 /** What a cluster hover hit names: the data generation it was hovered in, the id, the group. */
 export interface ClusterRef {
 	generation: number;

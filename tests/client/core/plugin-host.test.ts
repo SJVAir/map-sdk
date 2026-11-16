@@ -998,3 +998,36 @@ describe("PluginHost", () => {
 		});
 	});
 });
+
+describe("the card and hover signals", () => {
+	it("a plugin context reads hoverOf, pinned, focusedKey and pointerInCard", async () => {
+		const router = new InteractionRouter();
+		const card = { pinned: null, focusedKey: "monitor:1", pointerInCard: true };
+		const host = new PluginHost({
+			mapUid: "m1",
+			providers,
+			router,
+			selectedKeys: () => new Set(),
+			card: {
+				pinned: () => card.pinned,
+				focusedKey: () => card.focusedKey,
+				pointerInCard: () => card.pointerInCard
+			}
+		});
+		let seen: PluginContext | null = null;
+		host.add({
+			id: "p",
+			setup(ctx) {
+				seen = ctx;
+				return () => {};
+			}
+		});
+		host.attach(createFakeGl({ styleLoaded: true }));
+		await tick();
+		const ctx = seen as unknown as PluginContext;
+		expect(ctx.hoverOf("p")).toBeNull();
+		expect(ctx.pinned).toBeNull();
+		expect(ctx.focusedKey).toBe("monitor:1");
+		expect(ctx.pointerInCard).toBe(true);
+	});
+});

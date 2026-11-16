@@ -2,7 +2,15 @@ import type { ExpressionSpecification } from "@maptiler/sdk";
 import type { Feature, FeatureCollection, Geometry, Position } from "geojson";
 import { geometryBbox, type Bbox } from "../core/shape-view.js";
 import { untrack } from "svelte";
-import type { FeatureListItem, LegendData, MapPlugin, PluginContext } from "../core/plugin.js";
+import type { Snippet } from "svelte";
+import type {
+	FeatureListItem,
+	LegendData,
+	MapPlugin,
+	PluginContext,
+	Providers
+} from "../core/plugin.js";
+import type { PointsTooltipEnv } from "./points.svelte.js";
 import { decodeRef, selectionId } from "../data/refs.js";
 import { levelFor, NO_LEVEL } from "../data/scale.js";
 import type { Scale } from "../data/scale-types.js";
@@ -14,7 +22,9 @@ import {
 	scaleKey,
 	type Resolved
 } from "./scale-resolution.svelte.js";
-import { hitFromProps, SELECTED_OPACITY } from "./shared.js";
+import { hitFromProps, hostLegend, SELECTED_OPACITY } from "./shared.js";
+import { zoomRanged, type ZoomRange } from "./zoom-range.svelte.js";
+import { LENS_PARENT, type LensParentHooks } from "./lens-hooks.js";
 import { asDataURI, SELECTED_OVERLAY_PADDING, selectedOverlay } from "./icons.js";
 import {
 	colorExpression,
@@ -23,6 +33,9 @@ import {
 	themeColors,
 	type ThemeColors
 } from "./style.js";
+
+/** What shapes tooltip content gets: the same as points' (`PointsTooltipEnv`). */
+export type ShapesTooltipEnv = PointsTooltipEnv;
 
 export interface ShapesOptions<P extends MapFeatureProperties> {
 	id: string;
@@ -54,6 +67,24 @@ export interface ShapesOptions<P extends MapFeatureProperties> {
 	 * (`MapPlugin.hoverable`); list focus still shows it. Default true.
 	 */
 	hoverable?: boolean;
+	/**
+	 * Limits every layer the plugin draws to a zoom range, as `pointsPlugin`'s: visible from `min`
+	 * (inclusive) up to `max` (exclusive) of the camera zoom, so ranges that meet leave no gap on a
+	 * globe. Out of its range the plugin also lists no features and gives no legend. Default: all
+	 * zooms.
+	 */
+	zoomRange?: ZoomRange;
+	/**
+	 * Content for a shape's tooltip and pinned card, below its name; `props` are its source
+	 * properties. A pinned card's links and buttons work.
+	 */
+	tooltip?(item: FeatureListItem, props: P, env: ShapesTooltipEnv): Snippet | undefined;
+	/** The `tooltip` content shows the shape's name itself, so no name header is drawn above it. */
+	tooltipShowsName?: boolean;
+	/** Already-translated unit line under the legend section's title, e.g. "lbs per township". */
+	legendUnits?: string;
+	/** Host content at the foot of the plugin's legend section, below "No data". */
+	legendNote?: Snippet;
 }
 
 /** The check image is drawn at this multiple of its size and scaled down, for sharp HiDPI. */
@@ -66,6 +97,8 @@ const OUTLINE_WIDTH = 1;
 const LINE_WIDTH = 2;
 const SELECTED_WIDTH = 3;
 const LINE_TYPES = ["LineString", "MultiLineString"];
+/** A parent under a lens (`shapesLens`): its fill draws transparent. */
+const LENS_HIDDEN: ExpressionSpecification = ["boolean", ["feature-state", "lensHidden"], false];
 
 /**
  * Drawn as a no-figure outline under `noFigure: "outline"`: a shape that isn't a line, with no level
@@ -152,13 +185,36 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 	const choropleth = mode === "choropleth";
 	const outlineMode = options.outline ?? "theme";
 	const outlineNoFigure = choropleth && options.noFigure === "outline";
+	const range = zoomRanged(options.zoomRange);
+	const withHostLegend = hostLegend(options.legendUnits, options.legendNote);
+
+	// A lens over these shapes (see `lens-hooks.ts`). Plugin-level, so it outlives restyles.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced whole, never mutated
+	let lensHidden: ReadonlySet<string> = new Set();
+	/** The paint has the lens case: set the first time a lens hides something. */
+	let lensPaint = false;
+	/** The current setup's way to apply the hidden set and rebuild its layers. */
+	let lensLive: { apply(): void; rebuild(): void } | null = null;
+	/** Set up on a map now, for a lens over these shapes. */
+	let setUp = $state(false);
+	const parentKeys = $derived(
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced whole, never mutated
+		new Set(
+			(source.features?.features ?? [])
+				.map((f) => f.properties?.refKey)
+				.filter((k): k is string => typeof k === "string")
+		)
+	);
+	/** `paint` hidden under a lens, once a lens has hidden something. */
+	const underLens = <T>(paint: ExpressionSpecification | T): ExpressionSpecification | T =>
+		lensPaint ? (["case", LENS_HIDDEN, 0, paint] as ExpressionSpecification) : paint;
 
 	const scales = createScaleResolver(pluginId, layerLabel, source);
 	/** Plain mode ignores the source's scale. */
 	const currentScale = (): Resolved | null => (choropleth ? scales.current() : NO_SCALE);
 	const legend = (): LegendData | null => {
-		if (!choropleth) return null;
-		const data = scales.legend();
+		if (!choropleth || !range.shown) return null;
+		const data = withHostLegend(scales.legend());
 		if (!outlineNoFigure || !data || !("scale" in data)) return data;
 		const { scale } = data;
 		// Lines are never drawn as outlines, so they never add the "No data" row.
@@ -180,7 +236,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 
 	function features(): FeatureListItem[] {
 		const collection = source.features;
-		if (!collection) return [];
+		if (!collection || !range.shown) return [];
 		const resolved = currentScale();
 		const scale = resolved === null || resolved === "unavailable" ? null : resolved;
 		const precision = choropleth ? scales.precision() : 1;
@@ -212,6 +268,21 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 
 	const toHit = (props: Record<string, unknown>) => hitFromProps(pluginId, props);
 
+	/** The map's providers while set up; tooltips give nothing otherwise. */
+	let providers: Providers | null = null;
+
+	function featureTooltip(item: FeatureListItem): Snippet | undefined {
+		if (!providers || !options.tooltip) return undefined;
+		const props = source.features?.features.find(
+			(f) => f.properties?.refKey === item.refKey
+		)?.properties;
+		if (!props) return undefined;
+		const resolved = currentScale();
+		const scale = resolved === null || resolved === "unavailable" ? null : resolved;
+		const precision = choropleth ? scales.precision() : 1;
+		return options.tooltip(item, props, { ...providers, scale, precision });
+	}
+
 	function setup(ctx: PluginContext): () => void {
 		let dead = false;
 		const { gl } = ctx;
@@ -230,6 +301,12 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 		let interactiveDone = false;
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
 		let applied = new Set<string>();
+		providers = { metadata: ctx.metadata, messages: ctx.messages, format: ctx.format };
+		const stopRange = range.track(
+			gl,
+			() => layers,
+			() => dead
+		);
 
 		function removeLayers(): void {
 			for (const layerId of layers.toReversed()) {
@@ -260,72 +337,96 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 				when: ExpressionSpecification = noFig
 			): ExpressionSpecification | T =>
 				outlineNoFigure ? (["case", when, none, figure] as ExpressionSpecification) : figure;
-			const fill = ctx.addLayer("fill", {
-				type: "fill",
-				source: src,
-				paint: {
-					"fill-color": choropleth ? colorExpression(scale, "value", theme.neutral) : theme.neutral,
-					"fill-opacity": choropleth
-						? unlessNoFigure(opacityExpression(scale, "value", fillOpacity), 0)
-						: fillOpacity
-				}
-			});
+			const fill = ctx.addLayer(
+				"fill",
+				range.zoomed({
+					type: "fill",
+					source: src,
+					paint: {
+						"fill-color": choropleth
+							? colorExpression(scale, "value", theme.neutral)
+							: theme.neutral,
+						"fill-opacity": choropleth
+							? underLens(unlessNoFigure(opacityExpression(scale, "value", fillOpacity), 0))
+							: fillOpacity
+					}
+				})
+			);
 			const byLevel = outlineMode === "level" && choropleth;
 			const outline =
 				outlineMode === "none"
 					? null
-					: ctx.addLayer("outline", {
-							type: "line",
-							source: src,
-							paint: {
-								"line-color": byLevel
-									? unlessNoFigure(
-											colorExpression(scale, "value", theme.neutral),
-											theme.foreground,
-											noFigShape
-										)
-									: lineColor,
-								...(byLevel
-									? {
-											"line-opacity": unlessNoFigure(
-												opacityExpression(scale, "value", fillOpacity),
-												1,
+					: ctx.addLayer(
+							"outline",
+							range.zoomed({
+								type: "line",
+								source: src,
+								paint: {
+									"line-color": byLevel
+										? unlessNoFigure(
+												colorExpression(scale, "value", theme.neutral),
+												theme.foreground,
 												noFigShape
 											)
-										}
-									: {}),
-								"line-width": ["case", isLine, LINE_WIDTH, OUTLINE_WIDTH] as ExpressionSpecification
-							}
-						});
+										: lineColor,
+									...(byLevel
+										? {
+												"line-opacity": underLens(
+													unlessNoFigure(
+														opacityExpression(scale, "value", fillOpacity),
+														1,
+														noFigShape
+													)
+												)
+											}
+										: {}),
+									"line-width": [
+										"case",
+										isLine,
+										LINE_WIDTH,
+										OUTLINE_WIDTH
+									] as ExpressionSpecification
+								}
+							})
+						);
 			// With no outline layer, no-figure features still need their line to be seen.
 			const noFigureLine =
 				outlineNoFigure && outlineMode === "none"
-					? ctx.addLayer("no-figure", {
-							type: "line",
-							source: src,
-							filter: noFigShape,
-							paint: { "line-color": theme.foreground, "line-width": OUTLINE_WIDTH }
-						})
+					? ctx.addLayer(
+							"no-figure",
+							range.zoomed({
+								type: "line",
+								source: src,
+								filter: noFigShape,
+								paint: { "line-color": theme.foreground, "line-width": OUTLINE_WIDTH }
+							})
+						)
 					: null;
-			const selectedLayer = ctx.addLayer("selected", {
-				type: "line",
-				source: src,
-				paint: {
-					"line-color": theme.highlight,
-					"line-width": SELECTED_WIDTH,
-					"line-opacity": SELECTED_OPACITY
-				}
-			});
-			const check = ctx.addLayer("check", {
-				type: "symbol",
-				source: checkSourceId!,
-				layout: {
-					"icon-image": ctx.id("selected"),
-					"icon-size": 1 / IMAGE_RATIO,
-					"icon-allow-overlap": true,
-					"icon-ignore-placement": true
-				}
-			});
+			const selectedLayer = ctx.addLayer(
+				"selected",
+				range.zoomed({
+					type: "line",
+					source: src,
+					paint: {
+						"line-color": theme.highlight,
+						"line-width": SELECTED_WIDTH,
+						"line-opacity": SELECTED_OPACITY
+					}
+				})
+			);
+			const check = ctx.addLayer(
+				"check",
+				range.zoomed({
+					type: "symbol",
+					source: checkSourceId!,
+					layout: {
+						"icon-image": ctx.id("selected"),
+						"icon-size": 1 / IMAGE_RATIO,
+						"icon-allow-overlap": true,
+						"icon-ignore-placement": true
+					}
+				})
+			);
 			layers = [fill, outline ?? noFigureLine, selectedLayer, check].filter(
 				(id): id is string => id !== null
 			);
@@ -395,7 +496,34 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 				buildLayers(scale, sourceId);
 			}
 			applySelection(untrack(() => ctx.selectedKeys));
+			applyLensHidden();
 		}
+
+		/** The `lensHidden` states this setup has set. */
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
+		let lensApplied = new Set<string>();
+		function applyLensHidden(): void {
+			if (!sourceId) return;
+			for (const key of lensApplied) {
+				if (!lensHidden.has(key))
+					gl.removeFeatureState({ source: sourceId, id: key }, "lensHidden");
+			}
+			for (const key of lensHidden) {
+				if (!lensApplied.has(key)) {
+					gl.setFeatureState({ source: sourceId, id: key }, { lensHidden: true });
+				}
+			}
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
+			lensApplied = new Set(lensHidden);
+		}
+		setUp = true;
+		lensLive = {
+			apply: applyLensHidden,
+			rebuild() {
+				const scale = untrack(currentScale);
+				if (sourceId && scale !== null && scale !== "unavailable") buildLayers(scale, sourceId);
+			}
+		};
 
 		if (typeof Image !== "undefined") {
 			const total = CHECK_SIZE + 2 * SELECTED_OVERLAY_PADDING;
@@ -423,6 +551,10 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 
 		return () => {
 			dead = true;
+			stopRange();
+			providers = null;
+			lensLive = null;
+			setUp = false;
 		};
 	}
 
@@ -438,5 +570,34 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 	};
 	if (options.listed ?? true) plugin.features = features;
 	if (options.hoverable === false) plugin.hoverable = false;
+	if (options.tooltip) plugin.tooltip = featureTooltip;
+	const hooks: LensParentHooks = {
+		choropleth,
+		get shown() {
+			return range.shown;
+		},
+		get live() {
+			return setUp;
+		},
+		get keys() {
+			return parentKeys;
+		},
+		geometryOf(refKey) {
+			return (
+				source.features?.features.find((f) => f.properties?.refKey === refKey)?.geometry ?? null
+			);
+		},
+		setHidden(keys) {
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced whole, never mutated
+			lensHidden = new Set(keys);
+			if (!lensPaint && keys.size > 0) {
+				lensPaint = true;
+				lensLive?.rebuild();
+			}
+			lensLive?.apply();
+		}
+	};
+	(plugin as { [LENS_PARENT]?: LensParentHooks })[LENS_PARENT] = hooks;
+	if (options.tooltipShowsName) plugin.tooltipShowsName = true;
 	return plugin;
 }

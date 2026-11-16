@@ -972,3 +972,116 @@ describe("a focus point under a marker, reactively", () => {
 		expect(lengths.at(-1)).toBe(0);
 	});
 });
+
+describe("pointsPlugin legendUnits and legendNote", () => {
+	it("the legend carries them", async () => {
+		const note = (() => {}) as unknown as import("svelte").Snippet;
+		const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
+		const { plugin } = await setup({ source, legendUnits: "notices", legendNote: note });
+		await settle();
+		const data = plugin.legend!();
+		expect(data && "scale" in data && data.unitsLine).toBe("notices");
+		expect(data && "scale" in data && data.note).toBe(note);
+	});
+});
+
+describe("pointsPlugin count", () => {
+	type Counted = Props & { notices: number };
+	const counted = (): TestSource<Counted> =>
+		new TestSource<Counted>({
+			features: points<Counted>([
+				{ refKey: "feature:s1", name: "S1", value: null, notices: 1 },
+				{ refKey: "feature:s2", name: "S2", value: null, notices: 3 }
+			]),
+			scale: pm25Scale
+		});
+	const byId = (gl: FakeGl, suffix: string) =>
+		gl.layers.find((l) => l.id.endsWith(suffix)) as unknown as {
+			filter?: unknown;
+			layout?: Record<string, unknown>;
+			paint?: Record<string, unknown>;
+		};
+	async function countSetup(extra: Partial<PointsOptions<Counted>> = {}) {
+		return setup({ source: counted(), count: { property: "notices" }, ...extra } as never);
+	}
+
+	it("draws a dot for 1 and a numbered circle from 2", async () => {
+		const { gl } = await countSetup();
+		await settle();
+		const dots = byId(gl, ":points");
+		const count = ["coalesce", ["to-number", ["get", "notices"], 1], 1];
+		expect(dots.paint!["circle-radius"]).toEqual(["case", [">=", count, 2], 11, 7]);
+		expect(dots.paint!["circle-stroke-width"]).toBe(1.5);
+		expect(dots.paint!["circle-stroke-color"]).toBe(FALLBACK_THEME_COLORS.countMarkerText);
+		const label = byId(gl, ":count");
+		expect(label.filter).toEqual(["all", ["!", ["has", "point_count"]], [">=", count, 2]]);
+		expect(label.layout!["text-field"]).toEqual(["to-string", ["get", "notices"]]);
+		expect(label.paint!["text-color"]).toBe(FALLBACK_THEME_COLORS.countMarkerText);
+	});
+
+	it("sums in clusters and labels the sum in the same look", async () => {
+		const { gl } = await countSetup({
+			cluster: { radius: 40, maxZoom: 9, properties: { other: ["max", ["get", "value"]] } }
+		});
+		await settle();
+		const spec = [...gl.sources.values()].find(
+			(s) => (s as { cluster?: boolean }).cluster
+		) as unknown as {
+			clusterProperties: Record<string, unknown>;
+		};
+		expect(spec.clusterProperties).toEqual({
+			other: ["max", ["get", "value"]],
+			"mapsdk:count": ["+", ["coalesce", ["to-number", ["get", "notices"], 1], 1]]
+		});
+		const bubbles = byId(gl, ":clusters");
+		expect(bubbles.paint!["circle-radius"]).toBe(15);
+		expect(bubbles.paint!["circle-stroke-color"]).toBe(FALLBACK_THEME_COLORS.countMarkerText);
+		const sum = byId(gl, ":cluster-count");
+		expect(sum.layout!["text-field"]).toEqual(["to-string", ["get", "mapsdk:count"]]);
+	});
+
+	it("a host cluster.layers wins over the count bubbles", async () => {
+		const { gl } = await countSetup({
+			cluster: {
+				radius: 40,
+				maxZoom: 9,
+				layers: ({ sourceId }) => [
+					{
+						local: "mine",
+						spec: { type: "circle", source: sourceId, filter: ["has", "point_count"] }
+					}
+				]
+			}
+		});
+		await settle();
+		expect(gl.layers.some((l) => l.id.includes(":mine"))).toBe(true);
+		expect(gl.layers.some((l) => l.id.includes(":cluster-count"))).toBe(false);
+	});
+
+	it("count with icon throws", () => {
+		expect(() =>
+			pointsPlugin<Counted>({
+				id: "x",
+				layerLabel: "X",
+				source: counted(),
+				count: { property: "notices" },
+				icon: { category: () => "a", draw: () => "", size: 10 }
+			})
+		).toThrow("map-sdk: count needs circle markers");
+	});
+
+	it("without count, circles and bubbles are unchanged", async () => {
+		const { gl } = await setup({
+			source: new TestSource<Props>({ features: points(ROWS), scale: pm25Scale }),
+			cluster: { radius: 40, maxZoom: 9 }
+		});
+		await settle();
+		expect(byId(gl, ":points").paint!["circle-radius"]).toBe(6);
+		expect(byId(gl, ":points").paint!["circle-stroke-width"]).toBe(1);
+		expect(gl.layers.some((l) => l.id.includes(":count"))).toBe(false);
+		expect(byId(gl, ":cluster-count").layout!["text-field"]).toEqual([
+			"get",
+			"point_count_abbreviated"
+		]);
+	});
+});

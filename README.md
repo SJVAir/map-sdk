@@ -247,6 +247,93 @@ map.addPlugin(
 `zoomRange: { min?, max? }` on `pointsPlugin` limits every layer it draws (points, clusters,
 selection) to camera zooms from `min` (inclusive) up to `max` (exclusive), switching live while
 zooming. Two plugins whose ranges meet hand over with no gap, on the globe too.
+`shapesPlugin` takes the same `zoomRange`. Out of its range a shapes plugin also lists no
+features and gives no legend, so townships below zoom 11 and sections from 11 swap in the list,
+the summary and the legend too (`pointsPlugin` keeps listing out of range, as before).
+
+`tooltip(item, props, env)` and `tooltipShowsName` on `shapesPlugin` work as on `pointsPlugin`:
+the snippet is the shape's tooltip and pinned card body (`props` are its source properties; `env`,
+`ShapesTooltipEnv`, has the providers, the resolved `scale` and `precision`). In a pinned card
+(`MapView`'s `card`) its links and buttons work; `card.actions` still adds the host's buttons.
+
+`legendUnits` (already-translated text) and `legendNote` (a `Snippet`) on `shapesPlugin` and
+`pointsPlugin` add a unit line under the legend section's title ("lbs per township"), in place of
+the "(units)" after it, and host content at the section's foot, below "No data". A shared section
+takes its first member's that is set. Without them the section is as before.
+
+`count: { property }` on `pointsPlugin` puts a number on each circle marker (e.g. notices per
+section): a count of 1 is a plain dot, 2 or more a larger circle with the number in it, in
+`--background` (white without it), with a `--background` edge. Clustered, the bubbles sum the
+property (a `clusterProperties` sum named `mapsdk:count`, merged with the host's own) and show the
+sum the same way, larger, in the scale's first level's color; a host `cluster.layers` still wins.
+The list, its accessible names and the generic tooltip are unchanged. Circle markers only: `count`
+with `icon` throws. The number is drawn text, so the basemap style needs glyphs.
+
+```ts
+map.addPlugin(
+	pointsPlugin({
+		id: "notices",
+		source: notices,
+		layerLabel: "Spray notices",
+		count: { property: "count" },
+		cluster: { radius: 40, maxZoom: 8 }
+	})
+);
+```
+
+### Townships that open into sections: `shapesLens`
+
+`shapesLens({ id, parents, source, block, parentOf, layerLabel, ... })` is a plugin of its own,
+added right after a choropleth `shapesPlugin` (the parents, e.g. townships). Hovering a parent
+draws its block's children (e.g. its 3×3 neighbourhood as sections) over the parents, which hide
+where their children are drawn. `block(refKey)` names the parents of a centre's block (itself
+included), `parentOf(props)` a child's parent refKey, and `source` holds the children: the host
+fills it for `lens.center` (map-sdk never fetches), and may keep other blocks in it, since only
+the current block's children are drawn. Until a parent's children arrive it keeps its fill.
+
+- **Hover:** the lens centres on the parent under the pointer, recentres as soon as the pointer is
+  over a neighbour's child, and drops 120 ms after the pointer leaves both. A marker of another
+  plugin on top (a notice inside the block) doesn't drop it, nor does moving onto the card. Esc
+  drops it until the pointer moves to another parent. Hover from touch is ignored.
+- **Pinning:** `lens.pin(refKey)` centres and pins it (a township card's "Show square miles", the
+  keyboard and touch path); hover then doesn't move it. `lens.release()`, Esc, or the pinned card
+  closing or moving outside the block lets it go. A click or tap on a parent opens its card only.
+  While a child's card is pinned, the lens holds where it is. Moving through the feature list
+  never releases a pinned lens, so keyboard users reach its rows.
+- **`lens.center`** and **`lens.pinned`** are reactive. The children are listed (never
+  selectable) only while the lens is pinned, and the lens's legend section shows only while
+  children are drawn; with the same `ScaleRef` as a zoomed-in sections plugin, they share one.
+- Options: `fillOpacity`, `outline`, `noFigure`, `tooltip`, `tooltipShowsName`, `legendUnits` and
+  `legendNote`, as on `shapesPlugin`. The centre parent gets a 2px `--foreground` outline over
+  its children. It throws when `parents` isn't a choropleth `shapesPlugin`.
+
+```ts
+const townships = shapesPlugin({
+	id: "townships",
+	source: townshipSource,
+	layerLabel: "Townships",
+	mode: "choropleth",
+	zoomRange: { max: 11 },
+	legendUnits: "lbs per township"
+});
+const lens = shapesLens({
+	id: "lens",
+	parents: townships,
+	source: lensSource,
+	block: (refKey) => neighbourhood(refKey),
+	parentOf: (props) => townshipOf(props),
+	layerLabel: "Sections",
+	legendUnits: "lbs per section"
+});
+const sections = shapesPlugin({
+	id: "sections",
+	source: sectionSource,
+	layerLabel: "Sections",
+	mode: "choropleth",
+	zoomRange: { min: 11 }
+});
+for (const plugin of [townships, lens, sections]) map.addPlugin(plugin);
+```
 
 `hmsFirePlugin({ id?, source, hotspots?, layerLabel })` draws fires as flame icons sized and
 colored by FRP. With `hotspots`, it switches by itself while zooming, as sjvair.com's map does:
@@ -846,6 +933,27 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.17
+
+- **`shapesLens`**, a new plugin: townships that open into sections around the one under the
+  pointer, with hover, recentring, a grace before it drops, Esc, and `pin`/`release`, for the
+  keyboard and touch. `ShapesLens` (`center`, `pinned`, `pin`, `release`) and
+  `ShapesLensOptions` are exported. See "Townships that open into sections".
+- **`shapesPlugin`:** `zoomRange` (as `pointsPlugin`'s; out of range it also lists nothing and has
+  no legend), `tooltip` and `tooltipShowsName` (the type `ShapesTooltipEnv` is exported),
+  `legendUnits` and `legendNote`.
+- **`pointsPlugin`:** `count: { property }` (numbered markers, summed in clusters as
+  `mapsdk:count`), `legendUnits` and `legendNote`.
+- **Legend:** `LegendData` (scale) and `LegendSection` gain `unitsLine` and `note`; a section with
+  a unit line draws it under the title in place of "(units)", and the note at its foot.
+- **`PluginContext`:** `hoverOf(pluginId)` (a plugin's own feature under the pointer, even beneath
+  another plugin's, with `touch`; watched only once asked, so other maps' moves cost nothing new),
+  `pinned`, `focusedKey` and `pointerInCard`. Writing a plugin's own `PluginContext` wrapper needs
+  them too.
+- `ThemeColors` gains `countMarkerText` (`--background`, white without it), read only by count
+  markers; code that builds its own `ThemeColors` needs it.
+- Nothing changes for a host that sets none of these. No new message keys.
 
 ### 0.1.0-beta.16
 
