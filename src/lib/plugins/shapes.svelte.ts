@@ -24,6 +24,7 @@ import {
 } from "./scale-resolution.svelte.js";
 import { hitFromProps, hostLegend, SELECTED_OPACITY } from "./shared.js";
 import { zoomRanged, type ZoomRange } from "./zoom-range.svelte.js";
+import { LENS_PARENT, type LensParentHooks } from "./lens-hooks.js";
 import { asDataURI, SELECTED_OVERLAY_PADDING, selectedOverlay } from "./icons.js";
 import {
 	colorExpression,
@@ -96,6 +97,8 @@ const OUTLINE_WIDTH = 1;
 const LINE_WIDTH = 2;
 const SELECTED_WIDTH = 3;
 const LINE_TYPES = ["LineString", "MultiLineString"];
+/** A parent under a lens (`shapesLens`): its fill draws transparent. */
+const LENS_HIDDEN: ExpressionSpecification = ["boolean", ["feature-state", "lensHidden"], false];
 
 /**
  * Drawn as a no-figure outline under `noFigure: "outline"`: a shape that isn't a line, with no level
@@ -184,6 +187,25 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 	const outlineNoFigure = choropleth && options.noFigure === "outline";
 	const range = zoomRanged(options.zoomRange);
 	const withHostLegend = hostLegend(options.legendUnits, options.legendNote);
+
+	// A lens over these shapes (see `lens-hooks.ts`). Plugin-level, so it outlives restyles.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced whole, never mutated
+	let lensHidden: ReadonlySet<string> = new Set();
+	/** The paint has the lens case: set the first time a lens hides something. */
+	let lensPaint = false;
+	/** The current setup's way to apply the hidden set and rebuild its layers. */
+	let lensLive: { apply(): void; rebuild(): void } | null = null;
+	const parentKeys = $derived(
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced whole, never mutated
+		new Set(
+			(source.features?.features ?? [])
+				.map((f) => f.properties?.refKey)
+				.filter((k): k is string => typeof k === "string")
+		)
+	);
+	/** `paint` hidden under a lens, once a lens has hidden something. */
+	const underLens = <T>(paint: ExpressionSpecification | T): ExpressionSpecification | T =>
+		lensPaint ? (["case", LENS_HIDDEN, 0, paint] as ExpressionSpecification) : paint;
 
 	const scales = createScaleResolver(pluginId, layerLabel, source);
 	/** Plain mode ignores the source's scale. */
@@ -323,7 +345,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 							? colorExpression(scale, "value", theme.neutral)
 							: theme.neutral,
 						"fill-opacity": choropleth
-							? unlessNoFigure(opacityExpression(scale, "value", fillOpacity), 0)
+							? underLens(unlessNoFigure(opacityExpression(scale, "value", fillOpacity), 0))
 							: fillOpacity
 					}
 				})
@@ -347,10 +369,12 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 										: lineColor,
 									...(byLevel
 										? {
-												"line-opacity": unlessNoFigure(
-													opacityExpression(scale, "value", fillOpacity),
-													1,
-													noFigShape
+												"line-opacity": underLens(
+													unlessNoFigure(
+														opacityExpression(scale, "value", fillOpacity),
+														1,
+														noFigShape
+													)
 												)
 											}
 										: {}),
@@ -470,7 +494,33 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 				buildLayers(scale, sourceId);
 			}
 			applySelection(untrack(() => ctx.selectedKeys));
+			applyLensHidden();
 		}
+
+		/** The `lensHidden` states this setup has set. */
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
+		let lensApplied = new Set<string>();
+		function applyLensHidden(): void {
+			if (!sourceId) return;
+			for (const key of lensApplied) {
+				if (!lensHidden.has(key))
+					gl.removeFeatureState({ source: sourceId, id: key }, "lensHidden");
+			}
+			for (const key of lensHidden) {
+				if (!lensApplied.has(key)) {
+					gl.setFeatureState({ source: sourceId, id: key }, { lensHidden: true });
+				}
+			}
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
+			lensApplied = new Set(lensHidden);
+		}
+		lensLive = {
+			apply: applyLensHidden,
+			rebuild() {
+				const scale = untrack(currentScale);
+				if (sourceId && scale !== null && scale !== "unavailable") buildLayers(scale, sourceId);
+			}
+		};
 
 		if (typeof Image !== "undefined") {
 			const total = CHECK_SIZE + 2 * SELECTED_OVERLAY_PADDING;
@@ -500,6 +550,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 			dead = true;
 			stopRange();
 			providers = null;
+			lensLive = null;
 		};
 	}
 
@@ -516,6 +567,25 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 	if (options.listed ?? true) plugin.features = features;
 	if (options.hoverable === false) plugin.hoverable = false;
 	if (options.tooltip) plugin.tooltip = featureTooltip;
+	const hooks: LensParentHooks = {
+		choropleth,
+		get shown() {
+			return range.shown;
+		},
+		get keys() {
+			return parentKeys;
+		},
+		setHidden(keys) {
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced whole, never mutated
+			lensHidden = new Set(keys);
+			if (!lensPaint && keys.size > 0) {
+				lensPaint = true;
+				lensLive?.rebuild();
+			}
+			lensLive?.apply();
+		}
+	};
+	(plugin as { [LENS_PARENT]?: LensParentHooks })[LENS_PARENT] = hooks;
 	if (options.tooltipShowsName) plugin.tooltipShowsName = true;
 	return plugin;
 }

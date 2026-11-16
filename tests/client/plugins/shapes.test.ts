@@ -13,6 +13,7 @@ import type { Scale, ScaleRef } from "../../../src/lib/data/scale-types.js";
 import type { MapFeatureProperties } from "../../../src/lib/data/types.js";
 import { geometryBbox } from "../../../src/lib/core/shape-view.js";
 import { shapesPlugin, type ShapesOptions } from "../../../src/lib/plugins/shapes.svelte.js";
+import { lensParentOf } from "../../../src/lib/plugins/lens-hooks.js";
 import {
 	colorExpression,
 	FALLBACK_THEME_COLORS,
@@ -848,5 +849,77 @@ describe("shapesPlugin legendUnits and legendNote", () => {
 		const data = plugin.legend!();
 		expect(data && "scale" in data && data.unitsLine).toBe("lbs per township");
 		expect(data && "scale" in data && data.note).toBe(note);
+	});
+});
+
+describe("shapesPlugin lens hooks", () => {
+	const fillPaint = (gl: FakeGl) =>
+		(layer(gl, "m1:shp:fill") as { paint: Record<string, unknown> }).paint["fill-opacity"];
+
+	it("are there for a shapes plugin, and not for another plugin", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({ source });
+		const hooks = lensParentOf(plugin)!;
+		expect(hooks.choropleth).toBe(true);
+		expect(lensParentOf({ id: "x", setup: () => () => {} })).toBeNull();
+	});
+
+	it("setHidden sets lensHidden feature state and clears it", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin, gl } = await setup({ source });
+		await settle();
+		const hooks = lensParentOf(plugin)!;
+		hooks.setHidden(new Set(["feature:a"]));
+		expect(gl.featureStates.get("m1:shp:shapes/feature:a")).toEqual({ lensHidden: true });
+		expect(JSON.stringify(fillPaint(gl))).toContain("lensHidden");
+		hooks.setHidden(new Set(["feature:b"]));
+		expect(gl.featureStates.get("m1:shp:shapes/feature:a")?.lensHidden).toBeUndefined();
+		expect(gl.featureStates.get("m1:shp:shapes/feature:b")).toEqual({ lensHidden: true });
+		hooks.setHidden(new Set());
+		expect(gl.featureStates.get("m1:shp:shapes/feature:b")?.lensHidden).toBeUndefined();
+	});
+
+	it("before any setHidden the fill paint is today's", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl } = await setup({ source });
+		await settle();
+		expect(fillPaint(gl)).toEqual(opacityExpression(smokeScale, "value", 0.6));
+	});
+
+	it("hidden keys survive a data reload and a restyle", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin, gl, host } = await setup({ source });
+		await settle();
+		lensParentOf(plugin)!.setHidden(new Set(["feature:a"]));
+		source.features = collection(
+			POLYGONS.features.map((f) => ({ props: f.properties, geometry: f.geometry }))
+		);
+		flushSync();
+		expect(gl.featureStates.get("m1:shp:shapes/feature:a")).toEqual({ lensHidden: true });
+		const gl2 = createFakeGl({ styleLoaded: true });
+		host.attach(gl2);
+		await tick();
+		await settle();
+		expect(gl2.featureStates.get("m1:shp:shapes/feature:a")).toEqual({ lensHidden: true });
+		expect(JSON.stringify(fillPaint(gl2))).toContain("lensHidden");
+	});
+
+	it("keys and shown are reactive", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin, gl } = await setup({ source, zoomRange: { max: 11 } });
+		await settle();
+		const hooks = lensParentOf(plugin)!;
+		const seen: string[] = [];
+		const stop = rootEffect(() => void seen.push(`${[...hooks.keys].join(",")}|${hooks.shown}`));
+		flushSync();
+		source.features = collection(
+			[POLYGONS.features[0]].map((f) => ({ props: f.properties, geometry: f.geometry }))
+		);
+		flushSync();
+		gl.jumpTo({ zoom: 12 });
+		gl.emit("zoom", {});
+		flushSync();
+		expect(seen).toEqual(["feature:a,feature:b|true", "feature:a|true", "feature:a|false"]);
+		stop();
 	});
 });
