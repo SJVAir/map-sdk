@@ -97,7 +97,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   level, `truncateValues` to cut values off instead of rounding, `marksPlaces` for `drawnAt`,
   answers per point refreshed at the map's `idle`) and `shapesPlugin`
   (fill/`outline`/check overlay, `hoverable`, `noFigure: "outline"` for a no-level feature's
-  unfilled `--foreground` edge, a `no-figure` line layer under `outline: "none"`), plus shared style expressions, scale resolution,
+  unfilled `--foreground` edge, a `no-figure` line layer under `outline: "none"`, and `noFigure` on
+  those polygons' items, by the legend's rule), plus shared style expressions, scale resolution,
   and the exported marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
 - **Presets** (`src/lib/presets/`): `monitorsPlugin` (`detail` passes through; `figureLabel`
   replaces the tooltip's interval note and names a cluster's figure; the reading box gives screen
@@ -149,6 +150,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   MapTooltip, SelectionBar, ViewSummary, and MapControls (zoom buttons only; basemap switching is
   `MapContext`, credits are the engine's). `controls.css` holds the focus ring and motion classes.
   A `FeatureListItem` with `noReading` (the focus point) shows its name alone everywhere.
+  One with `noFigure` (no level) reads "No data" (`mapsdk_legend_no_figure`) in `levelText`,
+  `rowLabel` and `summaryText`, with an unfilled list swatch.
   `feature-list.ts`'s `shownValue` is the one place a row's or tooltip's value text is made; it
   hides a category reading's code, since the level label already says it.
 - **Entries**: `.` (everything, reaches the map engine), `./data` and `./stores` (must not reach

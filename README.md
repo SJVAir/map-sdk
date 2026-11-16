@@ -222,7 +222,10 @@ list's "No level") draws in choropleth mode: `"neutral"` (default) fills it in t
 like the rest; `"outline"` draws no fill and a 1px `--foreground` edge, whatever `outline` is (with
 `"none"`, a line layer for those features alone), so an empty region doesn't read as a figure. It
 is still hovered, clicked and selected like the others. While any shows, the legend section ends
-with a "No data" row: an outlined swatch with no fill. `regionsPlugin` passes `noFigure`,
+with a "No data" row: an outlined swatch with no fill, and those features read "No data" where
+"No level" would be: in the feature list (with the same unfilled swatch), the row's accessible
+name ("Fresno, No data"), the tooltip and the view summary. A no-figure LineString keeps its level
+line and "No level". `regionsPlugin` passes `noFigure`,
 `fillOpacity` (default 0.6) and `outline` (default `"theme"`) through:
 
 ```ts
@@ -286,6 +289,8 @@ a theme change, but not when the card changes color through its own class or sty
 charger") shown where "No level" would be: in the feature list (plain text, no swatch), the row's
 accessible name ("Fresno Station, Level 2 charger"), and the tooltip. A feature with a level
 always shows its level. A plugin of your own sets the same `detail` on its `FeatureListItem`s.
+`noFigure: true` on a `FeatureListItem` (set by `shapesPlugin` under `noFigure: "outline"`) reads
+"No data" there instead, ahead of a `detail`; a level still wins.
 
 `truncateValues: true` on `pointsPlugin` cuts values off at the display precision instead of
 rounding them (`truncate` on each `FeatureListItem`), in the list, its accessible names, and the
@@ -841,6 +846,16 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.16
+
+- **"No data" for no-figure regions:** under `noFigure: "outline"`, a feature drawn as a no-figure
+  outline reads "No data" (`mapsdk_legend_no_figure`) where it read "No level": in the feature
+  list, the row's accessible name ("Fresno, No data", not "Fresno, no reading"), the generic
+  tooltip and the view summary ("2 No data", before any "No level"). Its list swatch is unfilled,
+  like the Legend's. A level's label still wins, and lines keep "No level". `FeatureListItem` gains
+  an optional `noFigure`, which `shapesPlugin` sets. Under `noFigure: "neutral"` (the default),
+  nothing changes. No new message keys or tokens, and the exports are otherwise unchanged.
 
 ### 0.1.0-beta.15
 
