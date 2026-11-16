@@ -1,3 +1,4 @@
+import { SvelteMap } from "svelte/reactivity";
 import type { GlMapLike } from "./gl.js";
 import type { BlockingClick, ClickEvent, FeatureHit } from "./plugin.js";
 
@@ -50,6 +51,12 @@ export interface Hovered {
 	lngLat: [number, number];
 }
 
+/** A plugin's own topmost hit under the pointer (`InteractionRouter.hoverOf`). */
+export interface OwnHover extends Hovered {
+	/** The move came from touch (the browser's emulated mouse events after a tap). */
+	touch: boolean;
+}
+
 /**
  * Routes click and hover events on plugin layers to feature hits. One per map.
  *
@@ -76,12 +83,28 @@ export class InteractionRouter {
 	 */
 	#lastPointerType: string | null = null;
 	#hovered = $state.raw<Hovered | null>(null);
+	/** Each plugin's own topmost hit under the pointer; written only when it changes. */
+	#own = new SvelteMap<string, OwnHover>();
+	/**
+	 * The `pointerType` of the latest `pointerdown` or `pointermove` on the canvas, for marking
+	 * hover from touch. Unlike `#lastPointerType`, a click doesn't clear it.
+	 */
+	#movePointerType: string | null = null;
 	/** Whether the canvas cursor is set to a pointer. */
 	#pointer = false;
 
 	/** The top hit under the pointer and where it is. Reactive, for the tooltip. */
 	get hovered(): Hovered | null {
 		return this.#hovered;
+	}
+
+	/**
+	 * A plugin's own topmost hit under the pointer, whatever lies on top of it (another plugin's
+	 * feature, a blocking layer), hoverable or not. Reactive; changes only when the hit's
+	 * `refKey` or `touch` changes. Null off its features, on `mouseout`, and once detached.
+	 */
+	hoverOf(pluginId: string): OwnHover | null {
+		return this.#own.get(pluginId) ?? null;
 	}
 
 	/** Records the layers whose features `toHit` turns into hits. Returns an unregister function. */
@@ -133,6 +156,9 @@ export class InteractionRouter {
 		return () => {
 			if (!this.#registrations.delete(registration)) return;
 			if (this.#hovered?.hit.pluginId === pluginId) this.#hovered = null;
+			if (![...this.#registrations].some((r) => r.pluginId === pluginId)) {
+				this.#own.delete(pluginId);
+			}
 			// The pointer may have been over this plugin; the next move sets it again.
 			this.#setPointer(false);
 		};
@@ -150,6 +176,7 @@ export class InteractionRouter {
 		gl.on("boxzoomcancel", this.#onBoxZoomCancel);
 		this.#canvas = gl.getCanvas();
 		this.#canvas.addEventListener("pointerdown", this.#onPointerDown);
+		this.#canvas.addEventListener("pointermove", this.#onPointerMove);
 	}
 
 	/** Stops listening and clears `hovered`. */
@@ -163,11 +190,14 @@ export class InteractionRouter {
 		gl.off("boxzoomcancel", this.#onBoxZoomCancel);
 		this.#boxDrawn = false;
 		this.#canvas?.removeEventListener("pointerdown", this.#onPointerDown);
+		this.#canvas?.removeEventListener("pointermove", this.#onPointerMove);
 		this.#setPointer(false);
 		this.#canvas = null;
 		this.#lastPointerType = null;
+		this.#movePointerType = null;
 		this.#gl = null;
 		this.#hovered = null;
+		this.#own.clear();
 	}
 
 	/**
@@ -180,7 +210,15 @@ export class InteractionRouter {
 	}
 
 	/** What is under one point; with `forHover`, non-hoverable features are left out first. */
-	#lookup(point: [number, number], forHover = false): Lookup {
+	/**
+	 * `features`: what a query of every registered layer at `point` returned, to reuse instead of
+	 * querying again (filtered to this lookup's layers).
+	 */
+	#lookup(
+		point: [number, number],
+		forHover = false,
+		features?: ReturnType<GlMapLike["queryRenderedFeatures"]>
+	): Lookup {
 		const none: Lookup = { hits: [], hover: null, blocked: false, blocker: null, blockedBy: null };
 		const gl = this.#gl;
 		if (!gl) return none;
@@ -200,7 +238,9 @@ export class InteractionRouter {
 		let hoverPriority = -Infinity;
 		const seen = new Set<string>();
 		/* eslint-enable svelte/prefer-svelte-reactivity */
-		const features = gl.queryRenderedFeatures(point, { layers: [...byLayer.keys()] });
+		features = features
+			? features.filter((f) => byLayer.has(f.layer.id))
+			: gl.queryRenderedFeatures(point, { layers: [...byLayer.keys()] });
 		const top = features[0] && byLayer.get(features[0].layer.id);
 		if (top?.blocking) {
 			const properties = features[0].properties ?? {};
@@ -277,7 +317,57 @@ export class InteractionRouter {
 
 	#onPointerDown = (e: Event) => {
 		this.#lastPointerType = (e as PointerEvent).pointerType || null;
+		this.#movePointerType = this.#lastPointerType;
 	};
+
+	#onPointerMove = (e: Event) => {
+		this.#movePointerType = (e as PointerEvent).pointerType || null;
+	};
+
+	/** Every registered layer under `point`, topmost first, and which registration owns each. */
+	#queryAll(point: [number, number]) {
+		const gl = this.#gl;
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- a local for one move
+		const byLayer = new Map<string, Registration>();
+		if (!gl) return { features: [], byLayer };
+		for (const registration of this.#registrations) {
+			for (const id of registration.layerIds) {
+				if (!byLayer.has(id) && gl.getLayer(id)) byLayer.set(id, registration);
+			}
+		}
+		const features =
+			byLayer.size === 0 ? [] : gl.queryRenderedFeatures(point, { layers: [...byLayer.keys()] });
+		return { features, byLayer };
+	}
+
+	/** Each plugin's topmost non-blocking hit in `features`; writes only what changed. */
+	#updateOwn(
+		features: ReturnType<GlMapLike["queryRenderedFeatures"]>,
+		byLayer: Map<string, Registration>,
+		lngLat: [number, number]
+	): void {
+		const touch = this.#movePointerType === "touch";
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- a local for one move
+		const next = new Map<string, OwnHover>();
+		for (const feature of features) {
+			const registration = byLayer.get(feature.layer.id);
+			if (!registration || registration.blocking || next.has(registration.pluginId)) continue;
+			const hit = registration.toHit(feature.properties ?? {});
+			if (!hit) continue;
+			next.set(registration.pluginId, {
+				hit: { ...hit, pluginId: registration.pluginId },
+				lngLat,
+				touch
+			});
+		}
+		for (const key of [...this.#own.keys()]) if (!next.has(key)) this.#own.delete(key);
+		for (const [key, own] of next) {
+			const was = this.#own.get(key);
+			if (!was || was.hit.refKey !== own.hit.refKey || was.touch !== own.touch) {
+				this.#own.set(key, own);
+			}
+		}
+	}
 
 	#onClick = (e: PointerEventLike) => {
 		const recorded = this.#lastPointerType;
@@ -380,7 +470,10 @@ export class InteractionRouter {
 	}
 
 	#onMove = (e: PointerEventLike) => {
-		const found = this.#lookup([e.point.x, e.point.y], true);
+		const point: [number, number] = [e.point.x, e.point.y];
+		const { features, byLayer } = this.#queryAll(point);
+		this.#updateOwn(features, byLayer, [e.lngLat.lng, e.lngLat.lat]);
+		const found = this.#lookup(point, true, features);
 		const hit = found.blocked ? (found.hover ?? found.blocker) : found.hover;
 		this.#hovered = hit ? { hit, lngLat: [e.lngLat.lng, e.lngLat.lat] } : null;
 		this.#setPointer(found.blocked || hit !== null);
@@ -388,6 +481,7 @@ export class InteractionRouter {
 
 	#onOut = () => {
 		this.#hovered = null;
+		this.#own.clear();
 		this.#setPointer(false);
 	};
 

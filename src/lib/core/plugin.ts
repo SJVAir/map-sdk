@@ -8,6 +8,7 @@ import type { NO_LEVEL } from "../data/scale.js";
 import type { Level, Scale, ScaleRef } from "../data/scale-types.js";
 import type { DataStatus, FeatureRef } from "../data/types.js";
 import type { GlMapLike } from "./gl.js";
+import type { Hovered, OwnHover } from "./interactions.svelte.js";
 
 export type Providers = {
 	metadata: MetadataProvider;
@@ -196,6 +197,18 @@ export interface PluginContext {
 	 * Reactive.
 	 */
 	coveredAt(lngLat: [number, number]): boolean;
+	/**
+	 * Reactive. `pluginId`'s own topmost feature under the pointer and where, whatever lies on
+	 * top of it (another plugin's marker, a cluster bubble), hoverable or not, and whether the move
+	 * came from touch. Changes only when the feature or `touch` changes. Null off its features.
+	 */
+	hoverOf(pluginId: string): OwnHover | null;
+	/** Reactive. The map's pinned card (`MapContext.pinned`). */
+	readonly pinned: Hovered | null;
+	/** Reactive. The map's keyboard-focused list item (`MapContext.focusedKey`). */
+	readonly focusedKey: string | null;
+	/** Reactive. The pointer is over this map's tooltip or card element. */
+	readonly pointerInCard: boolean;
 	/** An `$effect.root` torn down with the plugin. */
 	effect(fn: () => void | (() => void)): void;
 }

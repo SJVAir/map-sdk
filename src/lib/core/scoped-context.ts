@@ -24,6 +24,16 @@ export function scopedContext(ctx: PluginContext, prefix: string): PluginContext
 			return ctx.selectedKeys;
 		},
 		coveredAt: (lngLat) => ctx.coveredAt(lngLat),
+		hoverOf: (pluginId) => ctx.hoverOf(pluginId),
+		get pinned() {
+			return ctx.pinned;
+		},
+		get focusedKey() {
+			return ctx.focusedKey;
+		},
+		get pointerInCard() {
+			return ctx.pointerInCard;
+		},
 		id: (name) => ctx.id(local(name)),
 		addSource: (name, spec) => ctx.addSource(local(name), spec),
 		addLayer: (name, spec) => ctx.addLayer(local(name), spec),

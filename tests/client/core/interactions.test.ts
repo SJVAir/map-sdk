@@ -1288,3 +1288,121 @@ describe("Shift-click through MapLibre's box zoom", () => {
 		expect(map.getSelection("monitors")).toBeNull();
 	});
 });
+
+describe("hoverOf: a plugin's own hit under the pointer", () => {
+	const move = (gl: FakeGl, x = 1) =>
+		gl.emit("mousemove", { point: { x, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+
+	async function twoPlugins(under: MapPlugin = points("under", "region")) {
+		const map = createMap({ config });
+		map.addPlugin(under);
+		map.addPlugin(points("over"));
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		return { map, gl };
+	}
+
+	it("gives a plugin its own hit under another plugin's feature", async () => {
+		const { map, gl } = await twoPlugins();
+		gl.setRenderedFeatures([rendered(map, "over", "1"), rendered(map, "under", "019")]);
+		move(gl);
+		expect(map.hovered?.hit.pluginId).toBe("over");
+		expect(map.hoverOf("under")?.hit.refKey).toBe("region:county:019");
+		expect(map.hoverOf("under")?.lngLat).toEqual([-119.5, 36.5]);
+		expect(map.hoverOf("over")?.hit.refKey).toBe("monitor:1");
+		expect(map.hoverOf("nobody")).toBeNull();
+	});
+
+	it("sees through a blocking layer", async () => {
+		const map = createMap({ config });
+		map.addPlugin(points("under", "region"));
+		map.addPlugin({
+			id: "bubbles",
+			setup(ctx) {
+				const source = ctx.addSource("src", {
+					type: "geojson",
+					data: { type: "FeatureCollection", features: [] }
+				});
+				ctx.blocking([ctx.addLayer("bubbles", { type: "circle", source })]);
+				return () => {};
+			}
+		});
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		gl.setRenderedFeatures([
+			{
+				layer: { id: `${map.uid}:bubbles:bubbles` },
+				source: `${map.uid}:bubbles:src`,
+				properties: { cluster_id: 1 },
+				geometry: { type: "Point" as const, coordinates: [-119, 36] }
+			},
+			rendered(map, "under", "019")
+		]);
+		move(gl);
+		expect(map.hovered).toBeNull();
+		expect(map.hoverOf("under")?.hit.refKey).toBe("region:county:019");
+	});
+
+	it("counts a non-hoverable plugin", async () => {
+		const quiet = { ...points("under", "region"), hoverable: false };
+		const { map, gl } = await twoPlugins(quiet);
+		gl.setRenderedFeatures([rendered(map, "under", "019")]);
+		move(gl);
+		expect(map.hovered).toBeNull();
+		expect(map.hoverOf("under")?.hit.refKey).toBe("region:county:019");
+	});
+
+	it("is stable across moves within one feature", async () => {
+		const { map, gl } = await twoPlugins();
+		let runs = 0;
+		stops.push(
+			rootEffect(() => {
+				void map.hoverOf("under");
+				runs++;
+			})
+		);
+		flushSync();
+		gl.setRenderedFeatures([rendered(map, "under", "019")]);
+		move(gl, 1);
+		flushSync();
+		move(gl, 2);
+		flushSync();
+		move(gl, 3);
+		flushSync();
+		expect(runs).toBe(2);
+	});
+
+	it("marks hover that comes from touch", async () => {
+		const { map, gl } = await twoPlugins();
+		gl.setRenderedFeatures([rendered(map, "under", "019")]);
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
+		move(gl);
+		expect(map.hoverOf("under")?.touch).toBe(true);
+		// A click after the tap doesn't make later emulated moves look like a mouse.
+		click(gl);
+		move(gl, 2);
+		expect(map.hoverOf("under")?.touch).toBe(true);
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointermove"), { pointerType: "mouse" }));
+		move(gl, 3);
+		expect(map.hoverOf("under")?.touch).toBe(false);
+	});
+
+	it("clears on mouseout, when the plugin is removed, and on detach", async () => {
+		const { map, gl } = await twoPlugins();
+		gl.setRenderedFeatures([rendered(map, "under", "019")]);
+		move(gl);
+		gl.emit("mouseout", {});
+		expect(map.hoverOf("under")).toBeNull();
+		move(gl);
+		map.removePlugin("under");
+		expect(map.hoverOf("under")).toBeNull();
+		map.addPlugin(points("under", "region"));
+		await tick();
+		move(gl);
+		expect(map.hoverOf("under")).not.toBeNull();
+		map.detach();
+		expect(map.hoverOf("under")).toBeNull();
+	});
+});

@@ -255,6 +255,11 @@
 	// A pinned feature that left its plugin's data (a poll dropped it) closes its card. Only one
 	// its plugin listed while pinned: some hits are never listed (HMS fire hotspots), and keep it.
 	let listedKey: string | null = null;
+
+	/** A card removed under the pointer gets no `pointerleave`: say so on removal. */
+	function pointerOutOnRemove() {
+		return () => map.setPointerInCard?.(false);
+	}
 	$effect(() => {
 		if (!pinned || map.focusedKey) return;
 		const { pluginId, refKey } = pinned.hit;
@@ -285,6 +290,9 @@
 		{onfocusin}
 		{onfocusout}
 		{onkeydown}
+		onpointerenter={() => map.setPointerInCard?.(true)}
+		onpointerleave={() => map.setPointerInCard?.(false)}
+		{@attach pointerOutOnRemove}
 	>
 		{#if showName}
 			<div class="mapsdk-tooltip-name">{name}</div>
