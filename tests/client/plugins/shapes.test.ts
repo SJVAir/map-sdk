@@ -22,6 +22,7 @@ import {
 import { createFakeGl, type FakeGl } from "../../fixtures/fake-gl.js";
 import { smokeScale } from "../../fixtures/scales.js";
 import { TestSource } from "../../fixtures/sources.svelte.js";
+import { rootEffect } from "../../fixtures/effects.svelte.js";
 
 type Props = MapFeatureProperties;
 
@@ -733,5 +734,64 @@ describe("shapesPlugin noFigure", () => {
 		).features.map((f) => (f.geometry as GeoJSON.Point).coordinates);
 		expect(checks).toEqual([[1, 1]]);
 		expect(layerIds(gl)).toContain("m1:shp:selected");
+	});
+});
+
+describe("shapesPlugin zoomRange", () => {
+	const visibility = (l: unknown) =>
+		(l as { layout?: { visibility?: string } }).layout?.visibility ?? "visible";
+	const zoomTo = (gl: FakeGl, zoom: number) => {
+		gl.jumpTo({ zoom });
+		gl.emit("zoom", {});
+	};
+
+	it("hides the layers out of range and shows them in range", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl } = await setup({ source, zoomRange: { max: 11 } });
+		zoomTo(gl, 12);
+		await settle();
+		expect(gl.layers.length).toBeGreaterThan(1);
+		expect(new Set(gl.layers.map(visibility))).toEqual(new Set(["none"]));
+		zoomTo(gl, 10);
+		expect(new Set(gl.layers.map(visibility))).toEqual(new Set(["visible"]));
+		for (const l of gl.layers) {
+			expect(l).not.toHaveProperty("minzoom");
+			expect(l).not.toHaveProperty("maxzoom");
+		}
+	});
+
+	it("builds its layers hidden when set up out of range", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl } = await setup({ source, zoomRange: { min: 11 } });
+		await settle();
+		expect(new Set(gl.layers.map(visibility))).toEqual(new Set(["none"]));
+	});
+
+	it("out of its zoomRange, lists nothing and has no legend", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl, plugin } = await setup({ source, zoomRange: { max: 11 } });
+		await settle();
+		const counts: number[] = [];
+		const stop = rootEffect(() => void counts.push(plugin.features!().length));
+		flushSync();
+		expect(plugin.legend!()).not.toBeNull();
+		zoomTo(gl, 12);
+		flushSync();
+		expect(plugin.features!()).toEqual([]);
+		expect(plugin.legend!()).toBeNull();
+		zoomTo(gl, 10);
+		flushSync();
+		expect(plugin.features!()).toHaveLength(2);
+		expect(plugin.legend!()).not.toBeNull();
+		expect(counts).toEqual([2, 0, 2]);
+		stop();
+	});
+
+	it("without zoomRange, shapes are unchanged", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl } = await setup({ source });
+		await settle();
+		for (const l of gl.layers) expect(l).not.toHaveProperty("layout.visibility");
+		expect(gl.listeners.filter((l) => l.type === "zoom")).toEqual([]);
 	});
 });

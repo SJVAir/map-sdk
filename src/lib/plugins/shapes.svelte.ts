@@ -15,6 +15,7 @@ import {
 	type Resolved
 } from "./scale-resolution.svelte.js";
 import { hitFromProps, SELECTED_OPACITY } from "./shared.js";
+import { zoomRanged, type ZoomRange } from "./zoom-range.svelte.js";
 import { asDataURI, SELECTED_OVERLAY_PADDING, selectedOverlay } from "./icons.js";
 import {
 	colorExpression,
@@ -54,6 +55,13 @@ export interface ShapesOptions<P extends MapFeatureProperties> {
 	 * (`MapPlugin.hoverable`); list focus still shows it. Default true.
 	 */
 	hoverable?: boolean;
+	/**
+	 * Limits every layer the plugin draws to a zoom range, as `pointsPlugin`'s: visible from `min`
+	 * (inclusive) up to `max` (exclusive) of the camera zoom, so ranges that meet leave no gap on a
+	 * globe. Out of its range the plugin also lists no features and gives no legend. Default: all
+	 * zooms.
+	 */
+	zoomRange?: ZoomRange;
 }
 
 /** The check image is drawn at this multiple of its size and scaled down, for sharp HiDPI. */
@@ -152,12 +160,13 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 	const choropleth = mode === "choropleth";
 	const outlineMode = options.outline ?? "theme";
 	const outlineNoFigure = choropleth && options.noFigure === "outline";
+	const range = zoomRanged(options.zoomRange);
 
 	const scales = createScaleResolver(pluginId, layerLabel, source);
 	/** Plain mode ignores the source's scale. */
 	const currentScale = (): Resolved | null => (choropleth ? scales.current() : NO_SCALE);
 	const legend = (): LegendData | null => {
-		if (!choropleth) return null;
+		if (!choropleth || !range.shown) return null;
 		const data = scales.legend();
 		if (!outlineNoFigure || !data || !("scale" in data)) return data;
 		const { scale } = data;
@@ -180,7 +189,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 
 	function features(): FeatureListItem[] {
 		const collection = source.features;
-		if (!collection) return [];
+		if (!collection || !range.shown) return [];
 		const resolved = currentScale();
 		const scale = resolved === null || resolved === "unavailable" ? null : resolved;
 		const precision = choropleth ? scales.precision() : 1;
@@ -230,6 +239,11 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 		let interactiveDone = false;
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
 		let applied = new Set<string>();
+		const stopRange = range.track(
+			gl,
+			() => layers,
+			() => dead
+		);
 
 		function removeLayers(): void {
 			for (const layerId of layers.toReversed()) {
@@ -260,72 +274,94 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 				when: ExpressionSpecification = noFig
 			): ExpressionSpecification | T =>
 				outlineNoFigure ? (["case", when, none, figure] as ExpressionSpecification) : figure;
-			const fill = ctx.addLayer("fill", {
-				type: "fill",
-				source: src,
-				paint: {
-					"fill-color": choropleth ? colorExpression(scale, "value", theme.neutral) : theme.neutral,
-					"fill-opacity": choropleth
-						? unlessNoFigure(opacityExpression(scale, "value", fillOpacity), 0)
-						: fillOpacity
-				}
-			});
+			const fill = ctx.addLayer(
+				"fill",
+				range.zoomed({
+					type: "fill",
+					source: src,
+					paint: {
+						"fill-color": choropleth
+							? colorExpression(scale, "value", theme.neutral)
+							: theme.neutral,
+						"fill-opacity": choropleth
+							? unlessNoFigure(opacityExpression(scale, "value", fillOpacity), 0)
+							: fillOpacity
+					}
+				})
+			);
 			const byLevel = outlineMode === "level" && choropleth;
 			const outline =
 				outlineMode === "none"
 					? null
-					: ctx.addLayer("outline", {
-							type: "line",
-							source: src,
-							paint: {
-								"line-color": byLevel
-									? unlessNoFigure(
-											colorExpression(scale, "value", theme.neutral),
-											theme.foreground,
-											noFigShape
-										)
-									: lineColor,
-								...(byLevel
-									? {
-											"line-opacity": unlessNoFigure(
-												opacityExpression(scale, "value", fillOpacity),
-												1,
+					: ctx.addLayer(
+							"outline",
+							range.zoomed({
+								type: "line",
+								source: src,
+								paint: {
+									"line-color": byLevel
+										? unlessNoFigure(
+												colorExpression(scale, "value", theme.neutral),
+												theme.foreground,
 												noFigShape
 											)
-										}
-									: {}),
-								"line-width": ["case", isLine, LINE_WIDTH, OUTLINE_WIDTH] as ExpressionSpecification
-							}
-						});
+										: lineColor,
+									...(byLevel
+										? {
+												"line-opacity": unlessNoFigure(
+													opacityExpression(scale, "value", fillOpacity),
+													1,
+													noFigShape
+												)
+											}
+										: {}),
+									"line-width": [
+										"case",
+										isLine,
+										LINE_WIDTH,
+										OUTLINE_WIDTH
+									] as ExpressionSpecification
+								}
+							})
+						);
 			// With no outline layer, no-figure features still need their line to be seen.
 			const noFigureLine =
 				outlineNoFigure && outlineMode === "none"
-					? ctx.addLayer("no-figure", {
-							type: "line",
-							source: src,
-							filter: noFigShape,
-							paint: { "line-color": theme.foreground, "line-width": OUTLINE_WIDTH }
-						})
+					? ctx.addLayer(
+							"no-figure",
+							range.zoomed({
+								type: "line",
+								source: src,
+								filter: noFigShape,
+								paint: { "line-color": theme.foreground, "line-width": OUTLINE_WIDTH }
+							})
+						)
 					: null;
-			const selectedLayer = ctx.addLayer("selected", {
-				type: "line",
-				source: src,
-				paint: {
-					"line-color": theme.highlight,
-					"line-width": SELECTED_WIDTH,
-					"line-opacity": SELECTED_OPACITY
-				}
-			});
-			const check = ctx.addLayer("check", {
-				type: "symbol",
-				source: checkSourceId!,
-				layout: {
-					"icon-image": ctx.id("selected"),
-					"icon-size": 1 / IMAGE_RATIO,
-					"icon-allow-overlap": true,
-					"icon-ignore-placement": true
-				}
-			});
+			const selectedLayer = ctx.addLayer(
+				"selected",
+				range.zoomed({
+					type: "line",
+					source: src,
+					paint: {
+						"line-color": theme.highlight,
+						"line-width": SELECTED_WIDTH,
+						"line-opacity": SELECTED_OPACITY
+					}
+				})
+			);
+			const check = ctx.addLayer(
+				"check",
+				range.zoomed({
+					type: "symbol",
+					source: checkSourceId!,
+					layout: {
+						"icon-image": ctx.id("selected"),
+						"icon-size": 1 / IMAGE_RATIO,
+						"icon-allow-overlap": true,
+						"icon-ignore-placement": true
+					}
+				})
+			);
 			layers = [fill, outline ?? noFigureLine, selectedLayer, check].filter(
 				(id): id is string => id !== null
 			);
@@ -423,6 +459,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 
 		return () => {
 			dead = true;
+			stopRange();
 		};
 	}
 

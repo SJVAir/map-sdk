@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { config as maptilerConfig } from "@maptiler/sdk";
-import { MapView, createMap, pointsPlugin } from "../../src/lib/index.js";
+import { MapView, createMap, pointsPlugin, shapesPlugin } from "../../src/lib/index.js";
 import type { GlMapLike } from "../../src/lib/core/gl.js";
 import type { MapContext } from "../../src/lib/core/create-map.svelte.js";
 import { staticSource } from "../../src/lib/data/static-source.js";
@@ -99,6 +99,68 @@ describe("zoomRange on the globe", () => {
 			await vi.waitFor(() =>
 				expect(map.featuresAt({ x, y }).map((h) => h.refKey)).toEqual([
 					zoom < 10 ? "monitor:below" : "monitor:above"
+				])
+			);
+		}
+	);
+
+	/** A square around the center as a choropleth shape, drawn only within `zoomRange`. */
+	function shape(id: string, zoomRange: { min?: number; max?: number }) {
+		const d = 0.01;
+		const [x, y] = center;
+		return shapesPlugin<MapFeatureProperties>({
+			id,
+			layerLabel: id,
+			mode: "choropleth",
+			zoomRange,
+			source: staticSource(
+				{
+					type: "FeatureCollection",
+					features: [
+						{
+							type: "Feature",
+							geometry: {
+								type: "Polygon",
+								coordinates: [
+									[
+										[x - d, y - d],
+										[x + d, y - d],
+										[x + d, y + d],
+										[x - d, y + d],
+										[x - d, y - d]
+									]
+								]
+							},
+							properties: { refKey: `region:county:${id}`, name: id, value: 10 }
+						}
+					]
+				},
+				pm25Scale
+			)
+		});
+	}
+
+	it.each([10.97, 10.995, 11.01])(
+		"shapes ranges meeting at 11 leave no gap at zoom %s",
+		async (zoom) => {
+			const map = createMap({
+				config: {
+					maptilerKey: "test-key",
+					basemaps: { styles: [{ id: "a", style }], defaultId: "a" },
+					projection: "globe",
+					initialView: { center, zoom, bearing: 0, pitch: 0 }
+				}
+			});
+			map.addPlugin(shape("townships", { max: 11 }));
+			map.addPlugin(shape("sections", { min: 11 }));
+			const attached = trackAttach(map);
+			await render(MapView, { map, class: "globe-map" });
+			const gl = attached[0] as GlMapLike;
+			await vi.waitFor(() => expect(map.ready).toBe(true), { timeout: 5000 });
+			const { x, y } = gl.project(center);
+			await vi.waitFor(() =>
+				expect(map.featuresAt({ x, y }).map((h) => h.refKey)).toEqual([
+					zoom < 11 ? "region:county:townships" : "region:county:sections"
 				])
 			);
 		}
