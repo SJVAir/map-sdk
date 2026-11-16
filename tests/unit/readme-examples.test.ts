@@ -18,6 +18,7 @@ import {
 	pointsPlugin,
 	regionsPlugin,
 	schoolsPlugin,
+	shapesLens,
 	shapesPlugin,
 	withCrosshair
 } from "../../src/lib/index.js";
@@ -105,6 +106,60 @@ describe("README examples", () => {
 		map.movePlugin("sites");
 		expect(map.plugins.map((p) => p.id)).toEqual(["regions", "sites"]);
 		map.destroy();
+	});
+
+	it("townships that open into sections: shapesLens", () => {
+		const empty = { type: "FeatureCollection" as const, features: [] };
+		const townshipSource = staticSource(empty, { dataset: "pesticides", entryType: "township" });
+		const lensSource = staticSource(empty, { dataset: "pesticides", entryType: "section" });
+		const sectionSource = staticSource(empty, { dataset: "pesticides", entryType: "section" });
+		const neighbourhood = (refKey: string) => [refKey];
+		const townshipOf = (props: { refKey: string }) => props.refKey.replace(/-\d+$/, "");
+		const map = createMap({ config: { maptilerKey: "" } });
+		const townships = shapesPlugin({
+			id: "townships",
+			source: townshipSource,
+			layerLabel: "Townships",
+			mode: "choropleth",
+			zoomRange: { max: 11 },
+			legendUnits: "lbs per township"
+		});
+		const lens = shapesLens({
+			id: "lens",
+			parents: townships,
+			source: lensSource,
+			block: (refKey) => neighbourhood(refKey),
+			parentOf: (props) => townshipOf(props),
+			layerLabel: "Sections",
+			legendUnits: "lbs per section"
+		});
+		const sections = shapesPlugin({
+			id: "sections",
+			source: sectionSource,
+			layerLabel: "Sections",
+			mode: "choropleth",
+			zoomRange: { min: 11 }
+		});
+		for (const plugin of [townships, lens, sections]) map.addPlugin(plugin);
+		expect(map.plugins.map((p) => p.id)).toEqual(["townships", "lens", "sections"]);
+		expect(lens.center).toBeNull();
+		expect(lens.pinned).toBe(false);
+		map.destroy();
+	});
+
+	it("notice markers with a count, summed in clusters", () => {
+		const notices = staticSource(
+			{ type: "FeatureCollection" as const, features: [] },
+			{ dataset: "pesticides", entryType: "notices" }
+		);
+		const plugin = pointsPlugin({
+			id: "notices",
+			source: notices,
+			layerLabel: "Spray notices",
+			count: { property: "count" },
+			cluster: { radius: 40, maxZoom: 8 }
+		});
+		expect(plugin.id).toBe("notices");
 	});
 
 	it("regions with no figure drawn as outlines", () => {

@@ -70,7 +70,10 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   and popups only).
   It has no GL map of its own; `MapView` attaches one. `plugin.ts` defines `MapPlugin`
   (`hoverPriority`, `tooltipShowsName`, `hoverable`, `properties` for `featureclick`, `drawnAt`)
-  and `PluginContext` (`addCustomLayer`, `coveredAt`: another plugin draws a marker exactly there);
+  and `PluginContext` (`addCustomLayer`, `coveredAt`: another plugin draws a marker exactly there;
+  `hoverOf(pluginId)`: that plugin's own topmost feature under the pointer even beneath another's,
+  with `touch`, from the router's `watchHover` so unwatched plugins cost moves nothing; `pinned`,
+  `focusedKey`, `pointerInCard` from `MapTooltip`'s card);
   `scoped-context.ts`'s internal `scopedContext` lets a preset run a nested plugin under a prefix. `shape-view.ts` is the shape-aware
   in-view test (`intersectsBounds`, `geometryBbox`) and the in-view anchor (`shapeAnchor`); focusing
   a shape that overlaps the view with its label point off-screen keeps the camera and sets
@@ -95,10 +98,19 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 - **Plugins** (`src/lib/plugins/`): the general `pointsPlugin` (icons, clusters; `selectedStyle`,
   `icon.mutedColor`, `zoomRange`, `legendDisplay`, `legendTitle`, `detail` for features with no
   level, `truncateValues` to cut values off instead of rounding, `marksPlaces` for `drawnAt`,
-  answers per point refreshed at the map's `idle`) and `shapesPlugin`
-  (fill/`outline`/check overlay, `hoverable`, `noFigure: "outline"` for a no-level feature's
+  answers per point refreshed at the map's `idle`; `count` numbers circle markers and sums them in
+  clusters as `mapsdk:count`, in `countMarkerText` (`--background`)) and `shapesPlugin`
+  (`zoomRange` from `zoom-range.svelte.ts`, shared with points; out of range it lists nothing and
+  has no legend; `tooltip`; `lens-hooks.ts`'s symbol-keyed hooks for a lens: `shown`, `live`,
+  `keys`, `geometryOf`, `setHidden` by the `lensHidden` feature state, the paint's case added only
+  once a lens hides something) and `shapesLens` (`shapes-lens.svelte.ts`: its own plugin after the
+  parents, an inner `shapesPlugin` over the block's children, the centre outline, a scoped Esc;
+  rules in `lens-state.svelte.ts`, no GL: Explorer hover with a 120 ms grace, `pin`/`release`,
+  a click opens a card only, touch hover ignored; children listed only while pinned). Both take
+  `legendUnits`/`legendNote` (`shared.ts`'s `hostLegend`). `shapesPlugin` also has
+  fill/`outline`/check overlay, `hoverable`, `noFigure: "outline"` for a no-level feature's
   unfilled `--foreground` edge, a `no-figure` line layer under `outline: "none"`, and `noFigure` on
-  those polygons' items, by the legend's rule), plus shared style expressions, scale resolution,
+  those polygons' items, by the legend's rule. Plus shared style expressions, scale resolution,
   and the exported marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
 - **Presets** (`src/lib/presets/`): `monitorsPlugin` (`detail` passes through; `figureLabel`
   replaces the tooltip's interval note and names a cluster's figure; the reading box gives screen
@@ -143,7 +155,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   AttributionControl, with data credits from `ui/data-credits.svelte.ts`; `GlMap` keeps each compact
   credits control folded (a `MutationObserver` per control, all disconnected on `remove()`) unless the person opened them with ⓘ, until a drag, and
   across `setDataCredits` replacements.
-- **UI** (`src/lib/ui/`): Legend (`order`, `framed`; blocks legends are one labeled bar; `symbols`
+- **UI** (`src/lib/ui/`): Legend (`order`, `framed`; a section's `unitsLine` replaces "(units)" and its
+  `note` snippet sits at the foot, a shared section taking the first set; blocks legends are one labeled bar; `symbols`
   legends a row per symbol; `legend-data.ts`'s `shareSections` makes one section per equal
   `ScaleRef`, from `LegendData`'s `scaleRef`/`scaleLabel`, which the scale resolver sets, and a
   "No data" row from `noFigure`), FeatureList,
