@@ -2,7 +2,15 @@ import type { ExpressionSpecification } from "@maptiler/sdk";
 import type { Feature, FeatureCollection, Geometry, Position } from "geojson";
 import { geometryBbox, type Bbox } from "../core/shape-view.js";
 import { untrack } from "svelte";
-import type { FeatureListItem, LegendData, MapPlugin, PluginContext } from "../core/plugin.js";
+import type { Snippet } from "svelte";
+import type {
+	FeatureListItem,
+	LegendData,
+	MapPlugin,
+	PluginContext,
+	Providers
+} from "../core/plugin.js";
+import type { PointsTooltipEnv } from "./points.svelte.js";
 import { decodeRef, selectionId } from "../data/refs.js";
 import { levelFor, NO_LEVEL } from "../data/scale.js";
 import type { Scale } from "../data/scale-types.js";
@@ -24,6 +32,9 @@ import {
 	themeColors,
 	type ThemeColors
 } from "./style.js";
+
+/** What shapes tooltip content gets: the same as points' (`PointsTooltipEnv`). */
+export type ShapesTooltipEnv = PointsTooltipEnv;
 
 export interface ShapesOptions<P extends MapFeatureProperties> {
 	id: string;
@@ -62,6 +73,13 @@ export interface ShapesOptions<P extends MapFeatureProperties> {
 	 * zooms.
 	 */
 	zoomRange?: ZoomRange;
+	/**
+	 * Content for a shape's tooltip and pinned card, below its name; `props` are its source
+	 * properties. A pinned card's links and buttons work.
+	 */
+	tooltip?(item: FeatureListItem, props: P, env: ShapesTooltipEnv): Snippet | undefined;
+	/** The `tooltip` content shows the shape's name itself, so no name header is drawn above it. */
+	tooltipShowsName?: boolean;
 }
 
 /** The check image is drawn at this multiple of its size and scaled down, for sharp HiDPI. */
@@ -221,6 +239,21 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 
 	const toHit = (props: Record<string, unknown>) => hitFromProps(pluginId, props);
 
+	/** The map's providers while set up; tooltips give nothing otherwise. */
+	let providers: Providers | null = null;
+
+	function featureTooltip(item: FeatureListItem): Snippet | undefined {
+		if (!providers || !options.tooltip) return undefined;
+		const props = source.features?.features.find(
+			(f) => f.properties?.refKey === item.refKey
+		)?.properties;
+		if (!props) return undefined;
+		const resolved = currentScale();
+		const scale = resolved === null || resolved === "unavailable" ? null : resolved;
+		const precision = choropleth ? scales.precision() : 1;
+		return options.tooltip(item, props, { ...providers, scale, precision });
+	}
+
 	function setup(ctx: PluginContext): () => void {
 		let dead = false;
 		const { gl } = ctx;
@@ -239,6 +272,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 		let interactiveDone = false;
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
 		let applied = new Set<string>();
+		providers = { metadata: ctx.metadata, messages: ctx.messages, format: ctx.format };
 		const stopRange = range.track(
 			gl,
 			() => layers,
@@ -460,6 +494,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 		return () => {
 			dead = true;
 			stopRange();
+			providers = null;
 		};
 	}
 
@@ -475,5 +510,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 	};
 	if (options.listed ?? true) plugin.features = features;
 	if (options.hoverable === false) plugin.hoverable = false;
+	if (options.tooltip) plugin.tooltip = featureTooltip;
+	if (options.tooltipShowsName) plugin.tooltipShowsName = true;
 	return plugin;
 }

@@ -795,3 +795,46 @@ describe("shapesPlugin zoomRange", () => {
 		expect(gl.listeners.filter((l) => l.type === "zoom")).toEqual([]);
 	});
 });
+
+describe("shapesPlugin tooltip", () => {
+	it("gets the item, its source props and the env", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const content = (() => {}) as unknown as import("svelte").Snippet;
+		const tooltip = vi.fn(() => content);
+		const { plugin } = await setup({ source, tooltip });
+		await settle();
+		const item = plugin.features!()[0];
+		expect(plugin.tooltip!(item)).toBe(content);
+		const [gotItem, props, env] = tooltip.mock.calls[0] as unknown as [
+			unknown,
+			Props,
+			{ scale: unknown; precision: number; messages: unknown }
+		];
+		expect(gotItem).toBe(item);
+		expect(props.refKey).toBe(item.refKey);
+		expect(props.name).toBe("Alpha");
+		expect(env.scale).toEqual(smokeScale);
+		expect(env.messages).toBe(defaultMessages);
+	});
+
+	it("gives nothing once torn down", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const tooltip = vi.fn(() => (() => {}) as unknown as import("svelte").Snippet);
+		const { plugin, host } = await setup({ source, tooltip });
+		await settle();
+		const item = plugin.features!()[0];
+		host.remove("shp");
+		expect(plugin.tooltip!(item)).toBeUndefined();
+	});
+
+	it("tooltipShowsName sets the plugin flag; without a tooltip there is none", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const named = await setup({ source, tooltip: () => undefined, tooltipShowsName: true });
+		expect(named.plugin.tooltipShowsName).toBe(true);
+		const bare = await setup({
+			source: new TestSource<Props>({ features: POLYGONS, scale: smokeScale })
+		});
+		expect(bare.plugin.tooltip).toBeUndefined();
+		expect(bare.plugin.tooltipShowsName).toBeUndefined();
+	});
+});
