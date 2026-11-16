@@ -752,3 +752,187 @@ test.describe("phone", () => {
 		await expect(credits).toContainText("© MapTiler");
 	});
 });
+
+test.describe("pesticide map", () => {
+	const MILE_LNG = 1 / 55.4;
+	const MILE_LAT = 1 / 69;
+	const ORIGIN: [number, number] = [-120.1, 36.45];
+	/** The middle of township (row, col) of the demo's mock grid. */
+	const township = (r: number, c: number): [number, number] => [
+		ORIGIN[0] + (c * 6 + 3) * MILE_LNG,
+		ORIGIN[1] + (r * 6 + 3) * MILE_LAT
+	];
+
+	interface Pesticides {
+		map: DemoContext & {
+			focusFeature(refKey: string, pluginId: string): void;
+		};
+		lens: { center: string | null; pinned: boolean };
+		noticeTotal: number;
+	}
+
+	async function ready(page: Page) {
+		await page.waitForFunction(() => {
+			const p = (window as unknown as { __mapsdkDemo?: { pesticides?: Pesticides } }).__mapsdkDemo
+				?.pesticides;
+			return p?.map.ready;
+		});
+		await page.evaluate(() => {
+			const p = (window as unknown as { __mapsdkDemo: { pesticides: Pesticides } }).__mapsdkDemo
+				.pesticides;
+			p.map.gl.getCanvas().scrollIntoView({ block: "center" });
+		});
+	}
+
+	async function jump(page: Page, center: [number, number], zoom: number) {
+		await page.evaluate(
+			([at, z]) =>
+				new Promise<void>((resolve) => {
+					const p = (window as unknown as { __mapsdkDemo: { pesticides: Pesticides } }).__mapsdkDemo
+						.pesticides;
+					p.map.gl.once("idle", () => resolve());
+					p.map.gl.jumpTo({ center: at, zoom: z });
+				}),
+			[center, zoom] as const
+		);
+	}
+
+	async function pagePoint(page: Page, lngLat: [number, number]) {
+		return page.evaluate((at) => {
+			const p = (window as unknown as { __mapsdkDemo: { pesticides: Pesticides } }).__mapsdkDemo
+				.pesticides;
+			const pt = p.map.gl.project(at);
+			const box = p.map.gl.getCanvas().getBoundingClientRect();
+			return { x: box.left + pt.x, y: box.top + pt.y };
+		}, lngLat);
+	}
+
+	/** The plugin ids drawn at a map point. */
+	async function drawnAt(page: Page, lngLat: [number, number]) {
+		return page.evaluate((at) => {
+			const p = (window as unknown as { __mapsdkDemo: { pesticides: Pesticides } }).__mapsdkDemo
+				.pesticides;
+			const gl = p.map.gl as unknown as {
+				project(a: [number, number]): { x: number; y: number };
+				queryRenderedFeatures(pt: [number, number]): Array<{ layer: { id: string } }>;
+			};
+			const pt = gl.project(at);
+			return [
+				...new Set(gl.queryRenderedFeatures([pt.x, pt.y]).map((f) => f.layer.id.split(":")[1]))
+			];
+		}, lngLat);
+	}
+
+	test("townships below 11, sections from 11", async ({ page }) => {
+		await ready(page);
+		const at = township(2, 3);
+		await jump(page, at, 10);
+		expect(await drawnAt(page, at)).toContain("townships");
+		expect(await drawnAt(page, at)).not.toContain("sections");
+		await jump(page, at, 11.5);
+		expect(await drawnAt(page, at)).toContain("sections");
+		expect(await drawnAt(page, at)).not.toContain("townships");
+	});
+
+	test("hover raises the lens and moving recentres it", async ({ page }) => {
+		await ready(page);
+		await jump(page, township(2, 3), 9.5);
+		const a = await pagePoint(page, township(2, 3));
+		await page.mouse.move(a.x, a.y);
+		await expect
+			.poll(() =>
+				page.evaluate(
+					() =>
+						(window as unknown as { __mapsdkDemo: { pesticides: Pesticides } }).__mapsdkDemo
+							.pesticides.lens.center
+				)
+			)
+			.toBe("feature:T2-3");
+		const b = await pagePoint(page, township(2, 4));
+		await page.mouse.move(b.x, b.y, { steps: 4 });
+		await expect
+			.poll(() =>
+				page.evaluate(
+					() =>
+						(window as unknown as { __mapsdkDemo: { pesticides: Pesticides } }).__mapsdkDemo
+							.pesticides.lens.center
+				)
+			)
+			.toBe("feature:T2-4");
+	});
+
+	test("Show square miles pins the lens; Esc releases it", async ({ page }) => {
+		await ready(page);
+		await jump(page, township(2, 3), 9.5);
+		await page.evaluate(() =>
+			(
+				window as unknown as { __mapsdkDemo: { pesticides: Pesticides } }
+			).__mapsdkDemo.pesticides.map.focusFeature("feature:T2-3", "townships")
+		);
+		const card = page.getByRole("group", { name: "Township T2-3" });
+		await card.getByRole("button", { name: "Show square miles" }).click();
+		await expect
+			.poll(() =>
+				page.evaluate(
+					() =>
+						(window as unknown as { __mapsdkDemo: { pesticides: Pesticides } }).__mapsdkDemo
+							.pesticides.lens.pinned
+				)
+			)
+			.toBe(true);
+		expect(
+			await page.evaluate(
+				() =>
+					(window as unknown as { __mapsdkDemo: { pesticides: Pesticides } }).__mapsdkDemo
+						.pesticides.lens.center
+			)
+		).toBe("feature:T2-3");
+		await page.keyboard.press("Escape");
+		await expect
+			.poll(() =>
+				page.evaluate(
+					() =>
+						(window as unknown as { __mapsdkDemo: { pesticides: Pesticides } }).__mapsdkDemo
+							.pesticides.lens.pinned
+				)
+			)
+			.toBe(false);
+	});
+
+	test("notice counts and the cluster sum", async ({ page }) => {
+		await ready(page);
+		await jump(page, township(3, 3), 7);
+		const { sum, total, hasCountLayer } = await page.evaluate(() => {
+			const p = (window as unknown as { __mapsdkDemo: { pesticides: Pesticides } }).__mapsdkDemo
+				.pesticides;
+			const gl = p.map.gl as unknown as {
+				getLayer(id: string): unknown;
+				queryRenderedFeatures(options?: { layers: string[] }): Array<{
+					layer: { id: string };
+					properties: Record<string, unknown>;
+				}>;
+				getStyle(): { layers: Array<{ id: string }> };
+			};
+			const ids = gl.getStyle().layers.map((l) => l.id);
+			const clusters = ids.filter((id) => id.endsWith(":notices:clusters"));
+			const points = ids.filter((id) => id.endsWith(":notices:points"));
+			const features = gl.queryRenderedFeatures({ layers: [...clusters, ...points] });
+			const sum = features.reduce(
+				(n, f) =>
+					n +
+					Number(
+						f.layer.id.endsWith(":clusters") ? f.properties["mapsdk:count"] : f.properties.count
+					),
+				0
+			);
+			return {
+				sum,
+				total: p.noticeTotal,
+				hasCountLayer: ids.some((id) => id.endsWith(":notices:count"))
+			};
+		});
+		expect(hasCountLayer).toBe(true);
+		expect(total).toBeGreaterThan(0);
+		expect(sum).toBe(total);
+	});
+});
