@@ -183,3 +183,54 @@ describe("shareSections", () => {
 		expect(titles(out)).toEqual(["status", "PM2.5"]);
 	});
 });
+
+describe("unit line and note", () => {
+	const PM25 = { dataset: "air-quality", entryType: "pm25" };
+	const note = (() => {}) as unknown as import("svelte").Snippet;
+	const other = (() => {}) as unknown as import("svelte").Snippet;
+	const entry = (data: Partial<LegendData> & { pluginId: string }): LegendEntry => ({
+		kind: "scale",
+		section: legendSection(
+			{
+				title: data.pluginId,
+				units: "lbs",
+				scale: pm25Scale,
+				scaleRef: PM25,
+				...data
+			} as LegendData,
+			format
+		)!
+	});
+
+	it("legendSection carries unitsLine and note", () => {
+		const section = legendSection(
+			{
+				pluginId: "t",
+				title: "T",
+				units: "lbs",
+				scale: pm25Scale,
+				unitsLine: "lbs per township",
+				note
+			},
+			format
+		)!;
+		expect(section.unitsLine).toBe("lbs per township");
+		expect(section.note).toBe(note);
+		const plain = legendSection(
+			{ pluginId: "t", title: "T", units: "lbs", scale: pm25Scale },
+			format
+		)!;
+		expect(plain).not.toHaveProperty("unitsLine");
+		expect(plain).not.toHaveProperty("note");
+	});
+
+	it("a shared section takes the first set unitsLine and note", () => {
+		const [shared] = shareSections([
+			entry({ pluginId: "a" }),
+			entry({ pluginId: "b", unitsLine: "lbs per section", note }),
+			entry({ pluginId: "c", unitsLine: "other", note: other })
+		]);
+		expect(shared.kind === "scale" && shared.section.unitsLine).toBe("lbs per section");
+		expect(shared.kind === "scale" && shared.section.note).toBe(note);
+	});
+});

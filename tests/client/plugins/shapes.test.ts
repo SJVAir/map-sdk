@@ -838,3 +838,15 @@ describe("shapesPlugin tooltip", () => {
 		expect(bare.plugin.tooltipShowsName).toBeUndefined();
 	});
 });
+
+describe("shapesPlugin legendUnits and legendNote", () => {
+	it("the legend carries them", async () => {
+		const note = (() => {}) as unknown as import("svelte").Snippet;
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({ source, legendUnits: "lbs per township", legendNote: note });
+		await settle();
+		const data = plugin.legend!();
+		expect(data && "scale" in data && data.unitsLine).toBe("lbs per township");
+		expect(data && "scale" in data && data.note).toBe(note);
+	});
+});

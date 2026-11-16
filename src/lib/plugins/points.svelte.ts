@@ -30,7 +30,7 @@ import {
 	type ClusterLayerArgs,
 	type ClusterLayers
 } from "./points-clusters.js";
-import { hitFromProps, SELECTED_OPACITY } from "./shared.js";
+import { hitFromProps, hostLegend, SELECTED_OPACITY } from "./shared.js";
 import { zoomRanged, type ZoomRange } from "./zoom-range.svelte.js";
 import {
 	createScaleResolver,
@@ -114,6 +114,10 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	 * it loads.
 	 */
 	legendTitle?: "layer" | "entry-type";
+	/** Already-translated unit line under the legend section's title, e.g. "notices". */
+	legendUnits?: string;
+	/** Host content at the foot of the plugin's legend section. */
+	legendNote?: Snippet;
 	/**
 	 * A short text for a feature with no level (e.g. "Level 2 charger"), shown in the feature list,
 	 * its accessible name, and the generic tooltip where "No level" would be. Ignored for a
@@ -165,6 +169,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 	const enlarge = options.selectedStyle === "enlarge";
 	const groupOf = cluster?.groupBy ?? (() => "");
 	const range = zoomRanged(options.zoomRange);
+	const withHostLegend = hostLegend(options.legendUnits, options.legendNote);
 
 	const scales = createScaleResolver(
 		pluginId,
@@ -174,7 +179,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 	);
 	const currentScale = scales.current;
 	const legend = (): LegendData | null => {
-		const data = scales.legend();
+		const data = withHostLegend(scales.legend());
 		return data && "scale" in data && options.legendDisplay
 			? { ...data, display: options.legendDisplay }
 			: data;

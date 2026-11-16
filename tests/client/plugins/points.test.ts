@@ -972,3 +972,15 @@ describe("a focus point under a marker, reactively", () => {
 		expect(lengths.at(-1)).toBe(0);
 	});
 });
+
+describe("pointsPlugin legendUnits and legendNote", () => {
+	it("the legend carries them", async () => {
+		const note = (() => {}) as unknown as import("svelte").Snippet;
+		const source = new TestSource<Props>({ features: points(ROWS), scale: pm25Scale });
+		const { plugin } = await setup({ source, legendUnits: "notices", legendNote: note });
+		await settle();
+		const data = plugin.legend!();
+		expect(data && "scale" in data && data.unitsLine).toBe("notices");
+		expect(data && "scale" in data && data.note).toBe(note);
+	});
+});

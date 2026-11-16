@@ -22,7 +22,7 @@ import {
 	scaleKey,
 	type Resolved
 } from "./scale-resolution.svelte.js";
-import { hitFromProps, SELECTED_OPACITY } from "./shared.js";
+import { hitFromProps, hostLegend, SELECTED_OPACITY } from "./shared.js";
 import { zoomRanged, type ZoomRange } from "./zoom-range.svelte.js";
 import { asDataURI, SELECTED_OVERLAY_PADDING, selectedOverlay } from "./icons.js";
 import {
@@ -80,6 +80,10 @@ export interface ShapesOptions<P extends MapFeatureProperties> {
 	tooltip?(item: FeatureListItem, props: P, env: ShapesTooltipEnv): Snippet | undefined;
 	/** The `tooltip` content shows the shape's name itself, so no name header is drawn above it. */
 	tooltipShowsName?: boolean;
+	/** Already-translated unit line under the legend section's title, e.g. "lbs per township". */
+	legendUnits?: string;
+	/** Host content at the foot of the plugin's legend section, below "No data". */
+	legendNote?: Snippet;
 }
 
 /** The check image is drawn at this multiple of its size and scaled down, for sharp HiDPI. */
@@ -179,13 +183,14 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 	const outlineMode = options.outline ?? "theme";
 	const outlineNoFigure = choropleth && options.noFigure === "outline";
 	const range = zoomRanged(options.zoomRange);
+	const withHostLegend = hostLegend(options.legendUnits, options.legendNote);
 
 	const scales = createScaleResolver(pluginId, layerLabel, source);
 	/** Plain mode ignores the source's scale. */
 	const currentScale = (): Resolved | null => (choropleth ? scales.current() : NO_SCALE);
 	const legend = (): LegendData | null => {
 		if (!choropleth || !range.shown) return null;
-		const data = scales.legend();
+		const data = withHostLegend(scales.legend());
 		if (!outlineNoFigure || !data || !("scale" in data)) return data;
 		const { scale } = data;
 		// Lines are never drawn as outlines, so they never add the "No data" row.

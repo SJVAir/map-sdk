@@ -116,6 +116,13 @@ export type LegendData =
 			scaleLabel?: string;
 			/** The plugin draws at least one feature with no figure as an outline (`noFigure`). */
 			noFigure?: boolean;
+			/**
+			 * Already-translated unit line under the section's title (e.g. "lbs per township"), in
+			 * place of `units` after the title.
+			 */
+			unitsLine?: string;
+			/** Host content at the foot of the section, below "No data". */
+			note?: Snippet;
 	  }
 	| {
 			pluginId: string;

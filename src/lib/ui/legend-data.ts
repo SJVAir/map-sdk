@@ -1,4 +1,5 @@
 import { mix } from "color2k";
+import type { Snippet } from "svelte";
 import type { LegendData } from "../core/plugin.js";
 import type { FormatProvider } from "../data/format.js";
 import type { ScaleRef } from "../data/scale-types.js";
@@ -24,6 +25,10 @@ export interface LegendSection {
 	scaleName?: string;
 	/** Ends with a "No data" row: a member draws features with no figure as outlines. */
 	noFigure: boolean;
+	/** A unit line under the title, in place of `units` after it. */
+	unitsLine?: string;
+	/** Host content at the section's foot, below "No data". */
+	note?: Snippet;
 }
 
 export type LegendEntry =
@@ -72,7 +77,9 @@ export function legendSection(data: LegendData, format: FormatProvider): LegendS
 		...(data.scaleRef && { scaleRef: data.scaleRef }),
 		...(data.scaleLabel && { scaleLabel: data.scaleLabel }),
 		...(scale.label && { scaleName: scale.label }),
-		noFigure: data.noFigure === true
+		noFigure: data.noFigure === true,
+		...(data.unitsLine && { unitsLine: data.unitsLine }),
+		...(data.note && { note: data.note })
 	};
 }
 
@@ -106,7 +113,18 @@ export function shareSections(entries: LegendEntry[]): LegendEntry[] {
 		// The scale's own label stands in until the metadata's arrives, so the title doesn't flip.
 		const title = item.find((s) => s.scaleLabel)?.scaleLabel ?? (first.scaleName || first.title);
 		const noFigure = item.some((s) => s.noFigure);
-		return { kind: "scale", section: { ...first, title, noFigure } };
+		const unitsLine = item.find((s) => s.unitsLine)?.unitsLine;
+		const note = item.find((s) => s.note)?.note;
+		return {
+			kind: "scale",
+			section: {
+				...first,
+				title,
+				noFigure,
+				...(unitsLine && { unitsLine }),
+				...(note && { note })
+			}
+		};
 	});
 }
 
