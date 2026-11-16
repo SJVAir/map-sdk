@@ -403,6 +403,8 @@ export class PluginHost {
 	#context(pluginId: string, running: Running): PluginContext {
 		const { mapUid, providers, router, selectedKeys, card } = this.#opts;
 		const { gl } = running;
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
+		const watched = new Set<string>();
 		const layerAbove = () => this.#layerAbove(pluginId);
 		const id = (local: string) => `${mapUid}:${pluginId}:${local}`;
 		const addTracked = (full: string, layer: LayerSpecification | CustomLayerInterface) => {
@@ -478,7 +480,13 @@ export class PluginHost {
 			get selectedKeys() {
 				return selectedKeys(pluginId);
 			},
-			hoverOf: (id) => router.hoverOf(id),
+			hoverOf: (id) => {
+				if (!watched.has(id) && !running.dead) {
+					watched.add(id);
+					running.effects.push(router.watchHover(id));
+				}
+				return router.hoverOf(id);
+			},
 			get pinned() {
 				return card?.pinned() ?? null;
 			},

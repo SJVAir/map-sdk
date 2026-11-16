@@ -51,7 +51,10 @@ export interface Hovered {
 	lngLat: [number, number];
 }
 
-/** A plugin's own topmost hit under the pointer (`InteractionRouter.hoverOf`). */
+/**
+ * A plugin's own topmost hit under the pointer (`InteractionRouter.hoverOf`). `lngLat` is where
+ * the pointer entered the feature, not where it is now.
+ */
 export interface OwnHover extends Hovered {
 	/** The move came from touch (the browser's emulated mouse events after a tap). */
 	touch: boolean;
@@ -90,6 +93,11 @@ export class InteractionRouter {
 	 * hover from touch. Unlike `#lastPointerType`, a click doesn't clear it.
 	 */
 	#movePointerType: string | null = null;
+	/** Plugins whose own hover someone watches (`watchHover`), with how many watchers. */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
+	#watched = new Map<string, number>();
+	/** Where pointer types are read from: the canvas's container, so DOM markers count too. */
+	#pointerRoot: EventTarget | null = null;
 	/** Whether the canvas cursor is set to a pointer. */
 	#pointer = false;
 
@@ -99,12 +107,32 @@ export class InteractionRouter {
 	}
 
 	/**
-	 * A plugin's own topmost hit under the pointer, whatever lies on top of it (another plugin's
-	 * feature, a blocking layer), hoverable or not. Reactive; changes only when the hit's
-	 * `refKey` or `touch` changes. Null off its features, on `mouseout`, and once detached.
+	 * A watched plugin's own topmost hit under the pointer (see `watchHover`), whatever lies on top
+	 * of it (another plugin's feature, a blocking layer), hoverable or not, and where the pointer
+	 * entered it. Reactive; changes only when the hit's `refKey` or `touch` changes. Null off its
+	 * features, on `mouseout`, once detached, and for a plugin nobody watches.
 	 */
 	hoverOf(pluginId: string): OwnHover | null {
 		return this.#own.get(pluginId) ?? null;
+	}
+
+	/**
+	 * Starts keeping `hoverOf(pluginId)`; until someone watches a plugin, moves cost what they did
+	 * before (only hoverable layers are queried). Returns the unwatch.
+	 */
+	watchHover(pluginId: string): () => void {
+		this.#watched.set(pluginId, (this.#watched.get(pluginId) ?? 0) + 1);
+		let done = false;
+		return () => {
+			if (done) return;
+			done = true;
+			const left = (this.#watched.get(pluginId) ?? 1) - 1;
+			if (left > 0) this.#watched.set(pluginId, left);
+			else {
+				this.#watched.delete(pluginId);
+				this.#own.delete(pluginId);
+			}
+		};
 	}
 
 	/** Records the layers whose features `toHit` turns into hits. Returns an unregister function. */
@@ -176,7 +204,9 @@ export class InteractionRouter {
 		gl.on("boxzoomcancel", this.#onBoxZoomCancel);
 		this.#canvas = gl.getCanvas();
 		this.#canvas.addEventListener("pointerdown", this.#onPointerDown);
-		this.#canvas.addEventListener("pointermove", this.#onPointerMove);
+		this.#pointerRoot = this.#canvas.parentElement ?? this.#canvas;
+		this.#pointerRoot.addEventListener("pointerdown", this.#onPointerType);
+		this.#pointerRoot.addEventListener("pointermove", this.#onPointerType);
 	}
 
 	/** Stops listening and clears `hovered`. */
@@ -190,7 +220,9 @@ export class InteractionRouter {
 		gl.off("boxzoomcancel", this.#onBoxZoomCancel);
 		this.#boxDrawn = false;
 		this.#canvas?.removeEventListener("pointerdown", this.#onPointerDown);
-		this.#canvas?.removeEventListener("pointermove", this.#onPointerMove);
+		this.#pointerRoot?.removeEventListener("pointerdown", this.#onPointerType);
+		this.#pointerRoot?.removeEventListener("pointermove", this.#onPointerType);
+		this.#pointerRoot = null;
 		this.#setPointer(false);
 		this.#canvas = null;
 		this.#lastPointerType = null;
@@ -317,20 +349,23 @@ export class InteractionRouter {
 
 	#onPointerDown = (e: Event) => {
 		this.#lastPointerType = (e as PointerEvent).pointerType || null;
-		this.#movePointerType = this.#lastPointerType;
 	};
 
-	#onPointerMove = (e: Event) => {
+	#onPointerType = (e: Event) => {
 		this.#movePointerType = (e as PointerEvent).pointerType || null;
 	};
 
-	/** Every registered layer under `point`, topmost first, and which registration owns each. */
+	/**
+	 * The layers under `point` a move needs, topmost first, and which registration owns each:
+	 * hoverable ones, plus every layer of a watched plugin.
+	 */
 	#queryAll(point: [number, number]) {
 		const gl = this.#gl;
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- a local for one move
 		const byLayer = new Map<string, Registration>();
 		if (!gl) return { features: [], byLayer };
 		for (const registration of this.#registrations) {
+			if (!registration.hoverable && !this.#watched.has(registration.pluginId)) continue;
 			for (const id of registration.layerIds) {
 				if (!byLayer.has(id) && gl.getLayer(id)) byLayer.set(id, registration);
 			}
@@ -352,6 +387,7 @@ export class InteractionRouter {
 		for (const feature of features) {
 			const registration = byLayer.get(feature.layer.id);
 			if (!registration || registration.blocking || next.has(registration.pluginId)) continue;
+			if (!this.#watched.has(registration.pluginId)) continue;
 			const hit = registration.toHit(feature.properties ?? {});
 			if (!hit) continue;
 			next.set(registration.pluginId, {

@@ -1300,6 +1300,8 @@ describe("hoverOf: a plugin's own hit under the pointer", () => {
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
 		await tick();
+		map.hoverOf("under");
+		map.hoverOf("over");
 		return { map, gl };
 	}
 
@@ -1331,6 +1333,7 @@ describe("hoverOf: a plugin's own hit under the pointer", () => {
 		const gl = createFakeGl({ styleLoaded: true });
 		map.attach(gl);
 		await tick();
+		map.hoverOf("under");
 		gl.setRenderedFeatures([
 			{
 				layer: { id: `${map.uid}:bubbles:bubbles` },
@@ -1404,5 +1407,94 @@ describe("hoverOf: a plugin's own hit under the pointer", () => {
 		expect(map.hoverOf("under")).not.toBeNull();
 		map.detach();
 		expect(map.hoverOf("under")).toBeNull();
+	});
+});
+
+describe("hoverOf costs nothing until a plugin asks", () => {
+	const move = (gl: FakeGl) =>
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+
+	it("queries only hoverable layers on a move while nobody watches", async () => {
+		const map = createMap({ config });
+		map.addPlugin({ ...points("quiet", "region"), hoverable: false });
+		map.addPlugin(points("loud"));
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		const queried: string[][] = [];
+		const query = gl.queryRenderedFeatures.bind(gl);
+		gl.queryRenderedFeatures = (point, options) => {
+			queried.push([...(options?.layers ?? [])]);
+			return query(point, options);
+		};
+		move(gl);
+		expect(queried).toEqual([[`${map.uid}:loud:points`]]);
+		queried.length = 0;
+		map.hoverOf("quiet");
+		move(gl);
+		expect(queried).toEqual([[`${map.uid}:quiet:points`, `${map.uid}:loud:points`]]);
+	});
+
+	it("makes no query on a move over only non-hoverable layers nobody watches", async () => {
+		const map = createMap({ config });
+		map.addPlugin({ ...points("quiet", "region"), hoverable: false });
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		let queries = 0;
+		const query = gl.queryRenderedFeatures.bind(gl);
+		gl.queryRenderedFeatures = (point, options) => {
+			queries++;
+			return query(point, options);
+		};
+		move(gl);
+		expect(queries).toBe(0);
+	});
+
+	it("a plugin context's watch ends with the plugin", async () => {
+		const map = createMap({ config });
+		map.addPlugin({ ...points("quiet", "region"), hoverable: false });
+		let ctxHover: ((id: string) => unknown) | null = null;
+		map.addPlugin({
+			id: "watcher",
+			setup(ctx) {
+				ctxHover = ctx.hoverOf;
+				ctx.hoverOf("quiet");
+				return () => {};
+			}
+		});
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		expect(ctxHover).not.toBeNull();
+		let queries = 0;
+		const query = gl.queryRenderedFeatures.bind(gl);
+		gl.queryRenderedFeatures = (point, options) => {
+			queries++;
+			return query(point, options);
+		};
+		move(gl);
+		expect(queries).toBe(1);
+		map.removePlugin("watcher");
+		move(gl);
+		expect(queries).toBe(1);
+	});
+
+	it("reads the pointer type from the canvas container, so DOM markers count", async () => {
+		const map = createMap({ config });
+		map.addPlugin(points("under", "region"));
+		const gl = createFakeGl({ styleLoaded: true });
+		const container = new EventTarget();
+		Object.defineProperty(gl.canvas, "parentElement", { value: container });
+		map.attach(gl);
+		await tick();
+		map.hoverOf("under");
+		gl.setRenderedFeatures([rendered(map, "under", "019")]);
+		container.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
+		move(gl);
+		expect(map.hoverOf("under")?.touch).toBe(true);
+		container.dispatchEvent(Object.assign(new Event("pointermove"), { pointerType: "mouse" }));
+		move(gl);
+		expect(map.hoverOf("under")?.touch).toBe(false);
 	});
 });

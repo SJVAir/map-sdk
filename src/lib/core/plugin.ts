@@ -198,16 +198,18 @@ export interface PluginContext {
 	 */
 	coveredAt(lngLat: [number, number]): boolean;
 	/**
-	 * Reactive. `pluginId`'s own topmost feature under the pointer and where, whatever lies on
-	 * top of it (another plugin's marker, a cluster bubble), hoverable or not, and whether the move
-	 * came from touch. Changes only when the feature or `touch` changes. Null off its features.
+	 * Reactive. `pluginId`'s own topmost feature under the pointer and where the pointer entered
+	 * it, whatever lies on top of it (another plugin's marker, a cluster bubble), hoverable or not,
+	 * and whether the move came from touch. Changes only when the feature or `touch` changes. Null
+	 * off its features. The first call starts watching that plugin until this plugin is torn down;
+	 * moves query nothing extra for plugins nobody watches.
 	 */
 	hoverOf(pluginId: string): OwnHover | null;
 	/** Reactive. The map's pinned card (`MapContext.pinned`). */
 	readonly pinned: Hovered | null;
 	/** Reactive. The map's keyboard-focused list item (`MapContext.focusedKey`). */
 	readonly focusedKey: string | null;
-	/** Reactive. The pointer is over this map's tooltip or card element. */
+	/** Reactive. The pointer is over this map's pinned card (the hover tooltip never takes it). */
 	readonly pointerInCard: boolean;
 	/** An `$effect.root` torn down with the plugin. */
 	effect(fn: () => void | (() => void)): void;

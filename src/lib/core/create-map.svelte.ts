@@ -218,7 +218,7 @@ export interface MapContext {
 	clearNotice(): void;
 	/** @internal A plugin's own feature under the pointer (`PluginContext.hoverOf`). Reactive. */
 	hoverOf(pluginId: string): OwnHover | null;
-	/** @internal Reactive. The pointer is over this map's tooltip or card element. */
+	/** @internal Reactive. The pointer is over this map's pinned card. */
 	readonly pointerInCard: boolean;
 	/** @internal For `MapTooltip`: the pointer entered (true) or left (false) its element. */
 	setPointerInCard(on: boolean): void;
@@ -347,6 +347,8 @@ class MapContextImpl implements MapContext {
 	#focusedAnchor = $state.raw<[number, number] | null>(null);
 	#pinned = $state.raw<Hovered | null>(null);
 	#pointerInCard = $state(false);
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
+	#hoverWatched = new Set<string>();
 	#notice = $state.raw<{ message: string; id: number } | null>(null);
 	#noticeCount = 0;
 	#cardEnabled = false;
@@ -448,6 +450,11 @@ class MapContextImpl implements MapContext {
 	}
 
 	hoverOf(pluginId: string): OwnHover | null {
+		// Watched from the first ask for this map's life (plugins watch through their context).
+		if (!this.#hoverWatched.has(pluginId)) {
+			this.#hoverWatched.add(pluginId);
+			this.#router.watchHover(pluginId);
+		}
 		return this.#router.hoverOf(pluginId);
 	}
 
