@@ -9,6 +9,7 @@ import type { Scale, ScaleRef } from "../../../src/lib/data/scale-types.js";
 import type { MapFeatureProperties } from "../../../src/lib/data/types.js";
 import { calHeatScorePlugin } from "../../../src/lib/presets/calheatscore.js";
 import { forecastZonesPlugin } from "../../../src/lib/presets/forecast-zones.js";
+import { levelKeyExpression, opacityExpression } from "../../../src/lib/plugins/style.js";
 import { regionsPlugin } from "../../../src/lib/presets/regions.js";
 import { createFakeGl } from "../../fixtures/fake-gl.js";
 import { heatScale } from "../../fixtures/scales.js";
@@ -141,5 +142,47 @@ describe.each(PRESETS)("%s", (_name, factory, defaultId, ref) => {
 		await Promise.resolve();
 		await Promise.resolve();
 		expect(onselectionchange).toHaveBeenCalledWith({ kind: "regions", ids: ["zipcode:93721"] });
+	});
+});
+
+describe("regionsPlugin shape options", () => {
+	async function attach(plugin: MapPlugin) {
+		const map = createMap({ config: { maptilerKey: "test-key" } });
+		map.addPlugin(plugin);
+		const gl = createFakeGl({ styleLoaded: true });
+		map.attach(gl);
+		await tick();
+		const fill = gl.layers.find((l) => l.id.endsWith(":fill")) as Extract<
+			LayerSpecification,
+			{ type: "fill" }
+		>;
+		return { gl, fill, ids: gl.layers.map((l) => l.id.split(":").at(-1)) };
+	}
+
+	it("passes noFigure, fillOpacity and outline to the shapes", async () => {
+		const source = new TestSource<Props>({ features: ZIP, scale: heatScale });
+		const { fill, ids } = await attach(
+			regionsPlugin({
+				source,
+				layerLabel: "Counties",
+				noFigure: "outline",
+				fillOpacity: 0.4,
+				outline: "none"
+			})
+		);
+		expect(ids).toEqual(["fill", "no-figure", "selected", "check"]);
+		expect(fill.paint!["fill-opacity"]).toEqual([
+			"case",
+			["==", levelKeyExpression(heatScale, "value"), ""],
+			0,
+			opacityExpression(heatScale, "value", 0.4)
+		]);
+	});
+
+	it("keeps today's paint with nothing set", async () => {
+		const source = new TestSource<Props>({ features: ZIP, scale: heatScale });
+		const { fill, ids } = await attach(regionsPlugin({ source, layerLabel: "Counties" }));
+		expect(ids).toEqual(["fill", "outline", "selected", "check"]);
+		expect(fill.paint!["fill-opacity"]).toEqual(opacityExpression(heatScale, "value", 0.6));
 	});
 });
