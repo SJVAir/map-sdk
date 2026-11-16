@@ -1,6 +1,7 @@
 import { mix } from "color2k";
 import type { LegendData } from "../core/plugin.js";
 import type { FormatProvider } from "../data/format.js";
+import type { ScaleRef } from "../data/scale-types.js";
 import type { DataStatus } from "../data/types.js";
 
 export type LegendBar =
@@ -15,6 +16,12 @@ export interface LegendSection {
 	title: string;
 	units: string;
 	bar: LegendBar;
+	/** The plugin's scale reference; sections with equal references are shown as one. */
+	scaleRef?: ScaleRef;
+	/** The entry type's label: a shared section's title. */
+	scaleLabel?: string;
+	/** Ends with a "No data" row: a member draws features with no figure as outlines. */
+	noFigure: boolean;
 }
 
 export type LegendEntry =
@@ -55,7 +62,48 @@ export function legendSection(data: LegendData, format: FormatProvider): LegendS
 								: ""
 					}))
 				};
-	return { pluginId: data.pluginId, title: data.title, units: data.units, bar };
+	return {
+		pluginId: data.pluginId,
+		title: data.title,
+		units: data.units,
+		bar,
+		...(data.scaleRef && { scaleRef: data.scaleRef }),
+		...(data.scaleLabel && { scaleLabel: data.scaleLabel }),
+		noFigure: data.noFigure === true
+	};
+}
+
+const sameRef = (a: ScaleRef, b: ScaleRef) =>
+	a.dataset === b.dataset && a.entryType === b.entryType;
+
+/**
+ * One section per shared scale reference, at its first member's place; the others close up. A
+ * shared section is titled with the first member's `scaleLabel` that is set (else the first
+ * title), and has the "No data" row when any member does. A section that shares with none, and
+ * status and symbol entries, are kept as they are.
+ */
+export function shareSections(entries: LegendEntry[]): LegendEntry[] {
+	const groups: LegendSection[][] = [];
+	const out: Array<LegendEntry | LegendSection[]> = [];
+	for (const entry of entries) {
+		const ref = entry.kind === "scale" ? entry.section.scaleRef : undefined;
+		const group = ref && groups.find((g) => sameRef(g[0].scaleRef!, ref));
+		if (entry.kind !== "scale" || !ref) out.push(entry);
+		else if (group) group.push(entry.section);
+		else {
+			const created = [entry.section];
+			groups.push(created);
+			out.push(created);
+		}
+	}
+	return out.map((item): LegendEntry => {
+		if (!Array.isArray(item)) return item;
+		const [first] = item;
+		if (item.length === 1) return { kind: "scale", section: first };
+		const title = item.find((s) => s.scaleLabel)?.scaleLabel ?? first.title;
+		const noFigure = item.some((s) => s.noFigure);
+		return { kind: "scale", section: { ...first, title, noFigure } };
+	});
 }
 
 /**

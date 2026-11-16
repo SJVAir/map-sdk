@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createDefaultFormat } from "../../../src/lib/data/format.js";
-import { legendSection, swatchOverBackground } from "../../../src/lib/ui/legend-data.js";
+import {
+	legendSection,
+	shareSections,
+	swatchOverBackground,
+	type LegendEntry
+} from "../../../src/lib/ui/legend-data.js";
+import type { LegendData } from "../../../src/lib/core/plugin.js";
 import { burnScale, pm25Scale, smokeScale } from "../../fixtures/scales.js";
 
 const format = createDefaultFormat();
@@ -82,5 +88,89 @@ describe("swatchOverBackground", () => {
 			format
 		);
 		expect(section?.bar.kind).toBe("gradient");
+	});
+});
+
+describe("shareSections", () => {
+	const PM25 = { dataset: "air-quality", entryType: "pm25" };
+	const scaleEntry = (data: Partial<LegendData> & { pluginId: string }): LegendEntry => ({
+		kind: "scale",
+		section: legendSection(
+			{ title: data.pluginId, units: "µg/m³", scale: pm25Scale, ...data } as LegendData,
+			format
+		)!
+	});
+	const titles = (entries: LegendEntry[]) =>
+		entries.map((e) => (e.kind === "scale" ? e.section.title : e.kind));
+	const smoke: LegendEntry = {
+		kind: "scale",
+		section: legendSection(
+			{ pluginId: "smoke", title: "Smoke", units: "", scale: smokeScale },
+			format
+		)!
+	};
+
+	it("merges sections with the same ScaleRef at the first one's place", () => {
+		const out = shareSections([
+			scaleEntry({ pluginId: "regions", title: "Counties", scaleRef: PM25 }),
+			smoke,
+			scaleEntry({ pluginId: "monitors", title: "PM2.5", scaleRef: PM25, scaleLabel: "PM2.5" })
+		]);
+		expect(titles(out)).toEqual(["PM2.5", "Smoke"]);
+		expect(out[0].kind === "scale" && out[0].section.pluginId).toBe("regions");
+		expect(out[0].kind === "scale" && out[0].section.units).toBe("µg/m³");
+	});
+
+	it("keeps a lone section's title", () => {
+		const out = shareSections([
+			scaleEntry({ pluginId: "regions", title: "Counties", scaleRef: PM25, scaleLabel: "PM2.5" })
+		]);
+		expect(titles(out)).toEqual(["Counties"]);
+	});
+
+	it("falls back to the first title when no member has a label", () => {
+		const out = shareSections([
+			scaleEntry({ pluginId: "regions", title: "Counties", scaleRef: PM25 }),
+			scaleEntry({ pluginId: "monitors", title: "Monitors", scaleRef: PM25 })
+		]);
+		expect(titles(out)).toEqual(["Counties"]);
+	});
+
+	it("doesn't merge different entry types, datasets, or a literal scale", () => {
+		const out = shareSections([
+			scaleEntry({ pluginId: "a", title: "A", scaleRef: PM25 }),
+			scaleEntry({ pluginId: "b", title: "B", scaleRef: { ...PM25, entryType: "o3" } }),
+			scaleEntry({ pluginId: "c", title: "C", scaleRef: { ...PM25, dataset: "other" } }),
+			scaleEntry({ pluginId: "d", title: "D" })
+		]);
+		expect(titles(out)).toEqual(["A", "B", "C", "D"]);
+	});
+
+	it("noFigure is true when any member has it", () => {
+		const out = shareSections([
+			scaleEntry({ pluginId: "monitors", title: "PM2.5", scaleRef: PM25 }),
+			scaleEntry({ pluginId: "regions", title: "Counties", scaleRef: PM25, noFigure: true })
+		]);
+		expect(out[0].kind === "scale" && out[0].section.noFigure).toBe(true);
+		expect(
+			shareSections([scaleEntry({ pluginId: "x", title: "X", scaleRef: PM25 })]).map(
+				(e) => e.kind === "scale" && e.section.noFigure
+			)
+		).toEqual([false]);
+	});
+
+	it("a loading member doesn't drop the shared section", () => {
+		const loading: LegendEntry = {
+			kind: "status",
+			pluginId: "fires",
+			layer: "Fires",
+			status: { state: "loading" }
+		};
+		const out = shareSections([
+			loading,
+			scaleEntry({ pluginId: "regions", title: "Counties", scaleRef: PM25 }),
+			scaleEntry({ pluginId: "monitors", title: "PM2.5", scaleRef: PM25, scaleLabel: "PM2.5" })
+		]);
+		expect(titles(out)).toEqual(["status", "PM2.5"]);
 	});
 });

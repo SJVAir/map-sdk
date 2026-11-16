@@ -35,6 +35,7 @@
 	"mapsdk_loading": "Loading",
 	"mapsdk_error_retry": "Try again",
 	"mapsdk_legend_label": "Legend",
+	"mapsdk_legend_no_figure": "No data",
 	"mapsdk_legend_threshold": "from {value}",
 	"mapsdk_controls_label": "Map controls",
 	"mapsdk_selection_label": "Selection",
