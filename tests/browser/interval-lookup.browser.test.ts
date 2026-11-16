@@ -18,16 +18,28 @@ afterEach(() => {
 	errors.mockClear();
 });
 
-async function setUp(interval: MetadataProvider["monitorTypeInterval"] | null) {
+async function setUp(
+	interval: MetadataProvider["monitorTypeInterval"] | null,
+	extra: Partial<Parameters<typeof monitorsPlugin>[0]> = {}
+) {
 	const base = createDefaultMetadata();
 	const metadata: MetadataProvider = { ...base };
 	if (interval) metadata.monitorTypeInterval = interval;
 	else delete metadata.monitorTypeInterval;
 	const source = new TestSource({
-		features: points([monitor("1", "purpleair", 12), monitor("2", "airnow", 20)]),
+		features: points([
+			monitor("1", "purpleair", 12),
+			monitor("2", "airnow", 20),
+			monitor("3", "airnow", null)
+		]),
 		scale: pm25Scale
 	});
-	const plugin = monitorsPlugin({ source, layerLabel: "Monitors", clustered: false });
+	const plugin = monitorsPlugin({
+		source,
+		layerLabel: "Monitors",
+		clustered: false,
+		...extra
+	});
 	const map = createMap({ config: { maptilerKey: "test-key" }, metadata });
 	map.addPlugin(plugin);
 	map.attach(createFakeGl({ styleLoaded: true }));
@@ -107,5 +119,14 @@ describe("the tooltips' interval lookup", () => {
 		resolve("2 min");
 		await new Promise((r) => setTimeout(r, 50));
 		expect(text()).not.toContain("avg)");
+	});
+});
+
+describe("monitorsPlugin's tooltip options", () => {
+	it("shows the detail for a monitor with no level", async () => {
+		const { open } = await setUp(null, { detail: () => "Not enough data" });
+		open(2);
+		await expect.element(page.getByText("Not enough data")).toBeVisible();
+		expect(text()).not.toContain("No level");
 	});
 });

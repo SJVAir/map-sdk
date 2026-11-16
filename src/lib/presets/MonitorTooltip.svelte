@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { levelText } from "../ui/feature-list.js";
 	import { formatValue } from "../ui/value-format.js";
 	import type { FeatureListItem } from "../core/plugin.js";
 	import type { FormatProvider } from "../data/format.js";
@@ -58,7 +59,7 @@
 			<span>{time.at}</span>
 		{/if}
 		<span class="mapsdk-monitor-name text-lg">{item.name}</span>
-		<span>{level ? level.label : messages("mapsdk_no_level")}</span>
+		<span>{levelText(item, messages).text}</span>
 		{#if time}
 			<span class="mapsdk-monitor-ago text-base">{time.ago}</span>
 		{/if}

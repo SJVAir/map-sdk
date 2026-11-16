@@ -44,6 +44,12 @@ export interface MonitorsPluginOptions {
 	selectedStyle?: "ring" | "enlarge";
 	/** Cluster each monitor type below zoom 9. Default true. */
 	clustered?: boolean;
+	/**
+	 * A short, already-translated text for a monitor with no level (e.g. "Not enough data"),
+	 * shown in the feature list, its accessible name, and the tooltip where "No level" would be.
+	 * Ignored for a monitor with a level. Unset: "No level", as before.
+	 */
+	detail?(props: MonitorFeatureProperties): string | undefined;
 }
 
 export type MonitorShape = "circle" | "square" | "triangle";
@@ -262,6 +268,7 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 		legendTitle: "entry-type",
 		selectable: options.selectable ?? true,
 		selectedStyle: options.selectedStyle,
+		detail: options.detail,
 		icon: {
 			category,
 			draw(cat, color) {

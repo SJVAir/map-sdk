@@ -133,6 +133,34 @@ describe("MonitorTooltip", () => {
 	});
 });
 
+describe("MonitorTooltip detail", () => {
+	const props = (value: FeatureListItem["value"], detail?: string) => ({
+		item: { ...item(value), ...(detail && { detail }) },
+		timestamp: null,
+		scale: pm25Scale,
+		messages: defaultMessages,
+		format,
+		interval: null
+	});
+
+	it("shows the detail where No level would be", async () => {
+		render(MonitorTooltip, props(null, "Not enough data"));
+		await expect.element(page.getByText("Not enough data")).toBeVisible();
+		expect(document.body.textContent).not.toContain("No level");
+	});
+
+	it("shows No level without a detail", async () => {
+		render(MonitorTooltip, props(null));
+		await expect.element(page.getByText("No level")).toBeVisible();
+	});
+
+	it("a level's label wins over the detail", async () => {
+		render(MonitorTooltip, props(12.6, "Not enough data"));
+		await expect.element(page.getByText("Moderate")).toBeVisible();
+		expect(document.body.textContent).not.toContain("Not enough data");
+	});
+});
+
 describe("MonitorTooltip interval note", () => {
 	it("monitor tooltip shows (1 hour avg) for airnow", async () => {
 		render(MonitorTooltip, {
