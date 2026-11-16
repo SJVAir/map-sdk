@@ -1,6 +1,6 @@
 import type { MapPlugin } from "../core/plugin.js";
-import type { DataSource } from "../data/types.js";
-import { shapesPlugin } from "../plugins/shapes.svelte.js";
+import type { DataSource, MapFeatureProperties } from "../data/types.js";
+import { shapesPlugin, type ShapesOptions } from "../plugins/shapes.svelte.js";
 
 export interface RegionsPluginOptions {
 	/** Default "regions". */
@@ -10,6 +10,16 @@ export interface RegionsPluginOptions {
 	layerLabel: string;
 	/** Default true. */
 	selectable?: boolean;
+	/**
+	 * A region with no figure (no level on the scale): `"neutral"` (default) fills it in the
+	 * neutral color; `"outline"` draws it as an outline with no fill, and the Legend adds a
+	 * "No data" row while any shows. See `shapesPlugin`.
+	 */
+	noFigure?: ShapesOptions<MapFeatureProperties>["noFigure"];
+	/** Fill opacity where a level sets none. Default 0.6. */
+	fillOpacity?: number;
+	/** The regions' edge: `"theme"` (default), `"level"` or `"none"`. See `shapesPlugin`. */
+	outline?: ShapesOptions<MapFeatureProperties>["outline"];
 }
 
 /**
@@ -30,6 +40,9 @@ export function regionsPlugin(options: RegionsPluginOptions): MapPlugin {
 		source: options.source,
 		layerLabel: options.layerLabel,
 		mode: "choropleth",
-		selectable: options.selectable ?? true
+		selectable: options.selectable ?? true,
+		noFigure: options.noFigure,
+		fillOpacity: options.fillOpacity,
+		outline: options.outline
 	});
 }

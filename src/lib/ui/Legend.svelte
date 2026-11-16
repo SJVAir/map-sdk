@@ -4,7 +4,7 @@
 	import type { MapContext } from "../core/create-map.svelte.js";
 	import { watchTheme } from "../view/create-gl-map.js";
 	import LegendBar from "./LegendBar.svelte";
-	import { legendSection, type LegendEntry } from "./legend-data.js";
+	import { legendSection, shareSections, type LegendEntry } from "./legend-data.js";
 
 	let {
 		map,
@@ -34,27 +34,29 @@
 	let background = $state<string | null>(null);
 
 	/**
-	 * A section per plugin with a scale, and a status line per plugin still loading or failing, in
-	 * `order`.
+	 * A section per plugin with a scale (one per shared scale reference), and a status line per
+	 * plugin still loading or failing, in `order`.
 	 */
-	const entries = $derived(
-		(order === "top-first" ? [...map.plugins].reverse() : map.plugins).flatMap(
-			(plugin): LegendEntry[] => {
-				const data = plugin.legend?.();
-				if (!data) return [];
-				if ("status" in data) {
-					if (data.status.state === "ready") return [];
-					const layer = plugin.label ?? plugin.id;
-					return [{ kind: "status", pluginId: data.pluginId, layer, status: data.status }];
+	const entries = $derived.by(() =>
+		shareSections(
+			(order === "top-first" ? [...map.plugins].reverse() : map.plugins).flatMap(
+				(plugin): LegendEntry[] => {
+					const data = plugin.legend?.();
+					if (!data) return [];
+					if ("status" in data) {
+						if (data.status.state === "ready") return [];
+						const layer = plugin.label ?? plugin.id;
+						return [{ kind: "status", pluginId: data.pluginId, layer, status: data.status }];
+					}
+					if ("symbols" in data) {
+						if (data.symbols.length === 0) return [];
+						const { pluginId, title, symbols } = data;
+						return [{ kind: "symbols", pluginId, title, symbols }];
+					}
+					const section = legendSection(data, map.format);
+					return section ? [{ kind: "scale", section }] : [];
 				}
-				if ("symbols" in data) {
-					if (data.symbols.length === 0) return [];
-					const { pluginId, title, symbols } = data;
-					return [{ kind: "symbols", pluginId, title, symbols }];
-				}
-				const section = legendSection(data, map.format);
-				return section ? [{ kind: "scale", section }] : [];
-			}
+			)
 		)
 	);
 
@@ -117,6 +119,12 @@
 				</h3>
 				{#if background !== null}
 					<LegendBar bar={section.bar} {background} messages={map.messages} />
+				{/if}
+				{#if section.noFigure}
+					<p class="mapsdk-legend-nofigure text-sm">
+						<span class="mapsdk-legend-nofigure-swatch" aria-hidden="true"></span>
+						<span>{map.messages("mapsdk_legend_no_figure")}</span>
+					</p>
 				{/if}
 			</div>
 		{:else if entry.kind === "symbols"}
@@ -213,6 +221,24 @@
 	.mapsdk-legend-symbol {
 		display: inline-flex;
 		flex: none;
+	}
+
+	/* A region with no figure: outlined, no fill, as on the map. */
+	.mapsdk-legend-nofigure {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.375rem;
+		margin: 0.5rem 0 0;
+	}
+
+	.mapsdk-legend-nofigure-swatch {
+		flex: none;
+		width: 1rem;
+		height: 0.75rem;
+		box-sizing: border-box;
+		border: 1px solid var(--foreground);
+		background: transparent;
 	}
 
 	.mapsdk-legend-status {

@@ -191,12 +191,43 @@ Selected points show a highlight ring and check mark by default. `selectedStyle:
 `pointsPlugin` or `monitorsPlugin` instead draws the selected icon at 1.3x with no ring (icon
 points only), as sjvair.com's map does today.
 
+Two `monitorsPlugin` options, both unset by default: `detail(props)` gives a monitor with no
+level a short text (e.g. "Not enough data") shown in the list, its accessible name, and the
+tooltip where "No level" would be; `figureLabel` names what the figure is (e.g.
+"24-hour average") in the tooltip, under the value, in place of the "(1 hour avg)" note, and in a
+cluster's tooltip above "(cluster avg)". To name
+it in the list too, pass it as `MapView`'s `featureList={{ note }}`, which screen readers hear
+once, with the list:
+
+```ts
+map.addPlugin(
+	monitorsPlugin({
+		source: monitors.dataSource,
+		layerLabel: "Monitors",
+		detail: (props) => (props.value === null ? "Not enough data" : undefined),
+		figureLabel: "24-hour average"
+	})
+);
+```
+
 `outline` on `shapesPlugin` is `"theme"` (default, a 1px `--foreground` edge), `"level"` (the edge
 in each level's color at the fill's opacity; choropleth only), or `"none"` (no outline layer).
 `hmsSmokePlugin` uses `"level"`. `hoverable: false` on `shapesPlugin` sets the plugin's
 `hoverable` (see [Writing a plugin](#writing-a-plugin)): hovering a shape shows no tooltip and
 doesn't hide what is beneath it, while focusing it from the feature list still pins its tooltip.
 `hmsSmokePlugin` uses it, so a plume, which can cover much of the map, never pops up a tooltip.
+
+`noFigure` on `shapesPlugin` sets how a feature with no figure (no level on the scale, as the
+list's "No level") draws in choropleth mode: `"neutral"` (default) fills it in the neutral color
+like the rest; `"outline"` draws no fill and a 1px `--foreground` edge, whatever `outline` is (with
+`"none"`, a line layer for those features alone), so an empty region doesn't read as a figure. It
+is still hovered, clicked and selected like the others. While any shows, the legend section ends
+with a "No data" row: an outlined swatch with no fill. `regionsPlugin` passes `noFigure`,
+`fillOpacity` (default 0.6) and `outline` (default `"theme"`) through:
+
+```ts
+map.addPlugin(regionsPlugin({ source, layerLabel: "Counties", noFigure: "outline" }));
+```
 
 ```ts
 map.addPlugin(
@@ -231,7 +262,11 @@ legend (also every category scale, such as smoke) is one outlined bar of contigu
 each level's label under its segment; long labels wrap. `legendTitle: "layer" | "entry-type"` sets
 the legend section's title: `layerLabel` (default) or the entry type's label from the metadata
 provider (`monitorsPlugin` uses the latter, so its section reads "PM2.5"; `layerLabel` still names
-the layer in the list, selection bar and summary). `Legend` takes `order` (`"bottom-first"`,
+the layer in the list, selection bar and summary). Plugins whose data sources have the same
+`ScaleRef` as their `scale` (the same `dataset` and `entryType`, such as monitors and a region fill
+of one pollutant) share one legend section, at the first one's place, titled with the entry type's
+label once the metadata gives it. A source with a literal `Scale` never shares: two plugins with
+literal scales show two sections, even when the scales are equal. `Legend` takes `order` (`"bottom-first"`,
 default, or `"top-first"`) and `framed` (`true`, default, draws its own card; `false` draws no
 border, background, padding or fixed width, so a host's own card frames it). The framed legend
 and the feature list panel are 21rem wide at most, and never wider than the map less 2rem (the
@@ -455,7 +490,9 @@ would never see it.
 ```
 
 `search` (a snippet) sits last on the wide toolbar and beside the options button on the narrow
-one. The toolbar's own glyphs (chevron, sliders, close) are Lucide's (ISC; `chevron-down` and `x`
+one. On the narrow bar its slot fills the rest of the bar, so it has a definite width: a field caps
+itself to the room left with `max-width: 100%` (Tailwind `max-w-full`) beside its own maximum. The
+slot's empty part lets the pointer through to the map. The toolbar's own glyphs (chevron, sliders, close) are Lucide's (ISC; `chevron-down` and `x`
 derive from Feather, MIT).
 
 ## Data sources
@@ -804,6 +841,37 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.15
+
+- **Regions with no figure:** `noFigure` on `shapesPlugin` (`"neutral"`, default, today's look, or
+  `"outline"`: no fill and a `--foreground` edge). `regionsPlugin` gains `noFigure` (default
+  `"neutral"`), `fillOpacity` (default 0.6) and `outline` (default `"theme"`), passed through to
+  `shapesPlugin`. See "Plugins and draw order".
+- **One legend section per shared scale.** Sections share only when each plugin's data source has a
+  `ScaleRef` (`{ dataset, entryType }`) as its `scale`, and the two are equal; the shared section is
+  titled with the entry type's label. If either source has a literal `Scale`, the legend shows two
+  sections, as before. Hosts don't build this: the plugins take the reference from the source. A
+  "No data" row ends a section while a member draws no-figure features as outlines.
+- **`monitorsPlugin`'s `detail` and `figureLabel`**, both unset by default (today's look):
+  `detail(props)` stands where "No level" would be, in the list and the tooltip; `figureLabel`
+  replaces the tooltip's "(N avg)" note and names the figure in a cluster's tooltip. The list gets
+  nothing new: pass the label as `featureList={{ note }}`. See "Plugins and draw order".
+- **Screen readers hear a pause in the reading box** between the value and each line under it
+  ("12, 24-hour average"; "20, (cluster avg)"), from the new message key `mapsdk_reading_pause`
+  (", "). Nothing changes on screen.
+- **`LegendData`** (for plugin authors): the scale form gains the optional `scaleRef`,
+  `scaleLabel` (the entry type's metadata label) and `noFigure`.
+- **The credits start folded on narrow maps.** The engine opened its compact credits when a narrow
+  map first showed them (and again whenever the dataset credits changed), covering what a host
+  draws in that corner. Now they start folded; the ⓘ button opens them (by touch or keyboard), and
+  a change of dataset credits keeps them as the person left them. A drag still folds them. Wide
+  maps are unchanged.
+- **The options toolbar:** a checkbox row with children shows the group row's chevron (closed while
+  off). On the narrow bar the `search` slot fills the rest of the bar, so a field can cap itself
+  with `max-width: 100%`. The wide bar is unchanged.
+- **New message keys:** `mapsdk_legend_no_figure` ("No data") and `mapsdk_reading_pause` (", ").
+- Nothing is removed or renamed, and there are no new theme tokens.
 
 ### 0.1.0-beta.14
 

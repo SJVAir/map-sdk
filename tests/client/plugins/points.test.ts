@@ -146,7 +146,8 @@ describe("pointsPlugin", () => {
 			pluginId: "pts",
 			title: "Monitors",
 			units: "µg/m³",
-			scale: pm25Scale
+			scale: pm25Scale,
+			scaleRef: PM25_REF
 		});
 	});
 
@@ -251,6 +252,24 @@ describe("pointsPlugin", () => {
 		expect(plugin.features!()[0].precision).toBe(0);
 		source.scale = smokeScale;
 		expect(plugin.features!()[0].precision).toBe(1);
+	});
+
+	it("an entry-type legend carries its ScaleRef and the label as scaleLabel", async () => {
+		const meta = {
+			scale: vi.fn(() => Promise.resolve(pm25Scale)),
+			entryType: vi.fn(() => Promise.resolve({ label: "PM2.5", units: "µg/m³", precision: 1 }))
+		} as unknown as MetadataProvider;
+		const source = new TestSource<Props>({
+			features: points([{ refKey: "monitor:a", name: "Alpha", value: 7.971 }]),
+			scale: PM25_REF
+		});
+		const { plugin } = await setup({ source, legendTitle: "entry-type" }, meta);
+		await settle();
+		expect(plugin.legend!()).toMatchObject({
+			title: "PM2.5",
+			scaleRef: PM25_REF,
+			scaleLabel: "PM2.5"
+		});
 	});
 
 	// Shown by the camera zoom, not layer minzoom/maxzoom: on a globe, MapLibre uses the next

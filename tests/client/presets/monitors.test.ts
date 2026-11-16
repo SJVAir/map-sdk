@@ -468,3 +468,29 @@ describe("monitorsPlugin", () => {
 		expect(gl.layers.some((l) => l.id.includes("cluster"))).toBe(false);
 	});
 });
+
+describe("monitorsPlugin detail", () => {
+	async function listed(detail?: (props: MonitorFeatureProperties) => string | undefined) {
+		const source = new TestSource<MonitorFeatureProperties>({
+			features: points(MONITORS),
+			scale: pm25Scale
+		});
+		const map = createMap({ config: { maptilerKey: "test-key" } });
+		const plugin = monitorsPlugin({ source, layerLabel: "Monitors", detail });
+		map.addPlugin(plugin);
+		map.attach(createFakeGl({ styleLoaded: true }));
+		await tick();
+		return plugin.features!();
+	}
+
+	it("gives each listed monitor the detail's text", async () => {
+		const items = await listed((p) => `Not enough data (${p.name})`);
+		expect(items.length).toBeGreaterThan(0);
+		for (const item of items) expect(item.detail).toBe(`Not enough data (${item.name})`);
+	});
+
+	it("gives no detail when unset", async () => {
+		const items = await listed();
+		expect(items.some((item) => "detail" in item)).toBe(false);
+	});
+});

@@ -237,9 +237,17 @@ describe("featureList position", () => {
 		await vi.waitFor(() =>
 			expect(rectOf(panel).bottom).toBeCloseTo(cornerEdge("bottom-right") - 8, 0)
 		);
-		const before = cornerEdge("bottom-right");
-		// The engine collapses the credits on a narrow map, where they wrap and grow taller.
+		// On a narrow map the credits start folded; opened, they wrap and grow taller.
 		root().style.width = "200px";
+		const attribution = () => document.querySelector<HTMLElement>(".maplibregl-ctrl-attrib")!;
+		await vi.waitFor(() =>
+			expect(attribution().classList.contains("maplibregl-compact")).toBe(true)
+		);
+		await vi.waitFor(() =>
+			expect(rectOf(panel).bottom).toBeCloseTo(cornerEdge("bottom-right") - 8, 0)
+		);
+		const before = cornerEdge("bottom-right");
+		attribution().querySelector<HTMLElement>(".maplibregl-ctrl-attrib-button")!.click();
 		await vi.waitFor(() => expect(cornerEdge("bottom-right")).toBeLessThan(before));
 		await vi.waitFor(() =>
 			expect(rectOf(panel).bottom).toBeCloseTo(cornerEdge("bottom-right") - 8, 0)

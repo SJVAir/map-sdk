@@ -90,11 +90,17 @@ export function createScaleResolver<P extends MapFeatureProperties>(
 			return { pluginId, status: unavailable };
 		}
 		if (scale === NO_SCALE) return null;
-		const title =
-			entryTypeTitle && hint !== null && hint.input === source.scale && hint.label
-				? hint.label
-				: layerLabel;
-		return { pluginId, title, units: scale.units, scale };
+		const input = source.scale;
+		const label = hint !== null && hint.input === input && hint.label ? hint.label : null;
+		const title = entryTypeTitle && label ? label : layerLabel;
+		return {
+			pluginId,
+			title,
+			units: scale.units,
+			scale,
+			...(input !== null && !isScale(input) && { scaleRef: input }),
+			...(label && { scaleLabel: label })
+		};
 	}
 
 	function precision(): number {

@@ -489,3 +489,69 @@ describe("symbol legends with equal labels", () => {
 		);
 	});
 });
+
+describe("shared sections", () => {
+	const PM25 = { dataset: "air-quality", entryType: "pm25" };
+	const sharedMap = (noFigure: boolean) =>
+		fakeMap([
+			{
+				id: "regions",
+				legend: () => ({
+					pluginId: "regions",
+					title: "Counties",
+					units: "µg/m³",
+					scale: pm25Scale,
+					scaleRef: PM25,
+					...(noFigure && { noFigure: true })
+				})
+			},
+			{
+				id: "monitors",
+				legend: () => ({
+					pluginId: "monitors",
+					title: "PM2.5",
+					units: "µg/m³",
+					scale: pm25Scale,
+					scaleRef: PM25,
+					scaleLabel: "PM2.5"
+				})
+			}
+		]);
+
+	it("draws one section for two plugins with the same ScaleRef", async () => {
+		applyTheme("light");
+		render(Legend, { map: sharedMap(false) });
+		await expect.element(page.getByRole("heading", { name: "PM2.5 (µg/m³)" })).toBeVisible();
+		expect(document.querySelectorAll(".mapsdk-legend-section")).toHaveLength(1);
+		expect(page.getByRole("heading", { name: /Counties/ }).elements()).toHaveLength(0);
+	});
+
+	it("ends the section with a No data row while a member has noFigure", async () => {
+		applyTheme("light");
+		render(Legend, { map: sharedMap(true) });
+		const row = page.getByText("No data");
+		await expect.element(row).toBeVisible();
+		const section = document.querySelector(".mapsdk-legend-section")!;
+		expect(section.contains(row.element())).toBe(true);
+		const swatch = section.querySelector<HTMLElement>(".mapsdk-legend-nofigure-swatch")!;
+		expect(swatch.getAttribute("aria-hidden")).toBe("true");
+		const style = getComputedStyle(swatch);
+		expect(style.borderTopWidth).toBe("1px");
+		expect(style.borderTopStyle).toBe("solid");
+		expect(style.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+	});
+
+	it("shows no row without noFigure", async () => {
+		render(Legend, { map: sharedMap(false) });
+		await expect.element(page.getByRole("heading", { name: "PM2.5 (µg/m³)" })).toBeVisible();
+		expect(page.getByText("No data").elements()).toHaveLength(0);
+	});
+
+	it("has no axe violations with a shared section and its row", async () => {
+		applyTheme("light");
+		render(Legend, { map: sharedMap(true) });
+		await expect.element(page.getByText("No data")).toBeVisible();
+		const result = await axe.run(document.querySelector(".mapsdk-legend")!);
+		expect(result.violations).toEqual([]);
+	});
+});

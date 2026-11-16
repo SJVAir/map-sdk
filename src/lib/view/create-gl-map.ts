@@ -140,11 +140,85 @@ class GlMap extends MaptilerMap {
 		credits: string;
 	} | null;
 
+	/**
+	 * Whether the person has the compact credits open (by the ⓘ button), until a drag folds them.
+	 * Declared without an initializer, like `attribution` (read as false until set).
+	 */
+	declare creditsOpen: boolean | undefined;
+	/** Watches each attribution control on the map, to keep it folded unless opened. */
+	declare creditsWatches: Map<HTMLElement, MutationObserver> | undefined;
+
 	/** Notes the SDK's own attribution control, which it adds while constructing the map. */
 	override addControl(...args: Parameters<MaptilerMap["addControl"]>): this {
 		const [control] = args;
-		if (control instanceof AttributionControlMLGL) this.attribution = { control, credits: "[]" };
-		return super.addControl(...args);
+		const isAttribution = control instanceof AttributionControlMLGL;
+		if (isAttribution && !this.attribution) this.attribution = { control, credits: "[]" };
+		super.addControl(...args);
+		if (isAttribution) this.keepCreditsFolded();
+		return this;
+	}
+
+	override removeControl(...args: Parameters<MaptilerMap["removeControl"]>): this {
+		super.removeControl(...args);
+		// The removed control's container has left the page: stop watching it.
+		for (const [container, watch] of this.creditsWatches ?? []) {
+			if (container.isConnected) continue;
+			watch.disconnect();
+			this.creditsWatches!.delete(container);
+		}
+		return this;
+	}
+
+	/** MapLibre removes its controls directly here, not through `removeControl`. */
+	override remove(): void {
+		for (const watch of this.creditsWatches?.values() ?? []) watch.disconnect();
+		this.creditsWatches?.clear();
+		super.remove();
+	}
+
+	/**
+	 * MapLibre opens the compact credits whenever a control first goes compact (a narrow map), and
+	 * `setDataCredits` makes a new control. Fold them each time, as MapLibre's own button leaves them
+	 * (no `open`, no `maplibregl-compact-show`), unless the person opened them: then the new
+	 * control stays open, as MapLibre leaves it. A drag clears the choice, as it folds them.
+	 */
+	private keepCreditsFolded(): void {
+		if (this.creditsOpen === undefined) {
+			this.creditsOpen = false;
+			this.on("drag", () => (this.creditsOpen = false));
+		}
+		this.creditsWatches ??= new Map();
+		const containers = this.getContainer().querySelectorAll<HTMLElement>(".maplibregl-ctrl-attrib");
+		for (const container of containers) {
+			if (!this.creditsWatches.has(container)) this.watchCredits(container);
+		}
+	}
+
+	/** Keeps one attribution control's container folded unless the person opened it. */
+	private watchCredits(container: HTMLElement): void {
+		const SHOW = "maplibregl-compact-show";
+		const fold = () => {
+			if (this.creditsOpen || !container.classList.contains(SHOW)) return;
+			// Folded as MapLibre's button leaves it: no `open`, so the summary reads collapsed.
+			container.removeAttribute("open");
+			container.classList.remove(SHOW);
+		};
+		// The person's choice, before MapLibre's button handler toggles it (the fold would run
+		// between that handler and a later listener, at the microtask checkpoint).
+		container.addEventListener(
+			"click",
+			(event) => {
+				const onButton = (event.target as Element).closest(".maplibregl-ctrl-attrib-button");
+				if (onButton && container.classList.contains("maplibregl-compact")) {
+					this.creditsOpen = !container.classList.contains(SHOW);
+				}
+			},
+			{ capture: true }
+		);
+		const watch = new MutationObserver(fold);
+		watch.observe(container, { attributes: true, attributeFilter: ["class"] });
+		this.creditsWatches!.set(container, watch);
+		fold();
 	}
 
 	override setStyle(...args: Parameters<SetStyle>): this {

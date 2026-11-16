@@ -16,6 +16,7 @@ import { shapesPlugin, type ShapesOptions } from "../../../src/lib/plugins/shape
 import {
 	colorExpression,
 	FALLBACK_THEME_COLORS,
+	levelKeyExpression,
 	opacityExpression
 } from "../../../src/lib/plugins/style.js";
 import { createFakeGl, type FakeGl } from "../../fixtures/fake-gl.js";
@@ -32,14 +33,15 @@ beforeEach(() => metaSpy.mockClear());
 async function setup(
 	options: Partial<ShapesOptions<Props>> & { source: TestSource<Props> },
 	meta: Scale | "unavailable" | Promise<Scale> = smokeScale,
-	spy = vi.fn()
+	spy = vi.fn(),
+	entryType: () => Promise<unknown> = () => Promise.resolve("unavailable")
 ) {
 	const selected = new SvelteMap<string, ReadonlySet<string>>();
 	const router = new InteractionRouter();
 	const providers: Providers = {
 		metadata: {
 			scale: spy.mockImplementation(() => Promise.resolve(meta)),
-			entryType: () => Promise.resolve("unavailable")
+			entryType
 		} as unknown as MetadataProvider,
 		messages: defaultMessages,
 		format: {} as FormatProvider
@@ -114,6 +116,29 @@ afterEach(() => {
 });
 
 describe("shapesPlugin", () => {
+	it("legend carries the source's ScaleRef", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
+		const { plugin } = await setup({ source });
+		await settle();
+		expect(plugin.legend!()).toMatchObject({ scaleRef: SMOKE_REF });
+	});
+
+	it("legend has no scaleRef for a literal scale", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({ source });
+		expect("scaleRef" in plugin.legend!()!).toBe(false);
+		expect("scaleLabel" in plugin.legend!()!).toBe(false);
+	});
+
+	it("legend carries the entry type's label once known", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
+		const { plugin } = await setup({ source }, smokeScale, vi.fn(), () =>
+			Promise.resolve({ label: "Smoke density", units: "", precision: 1 })
+		);
+		await settle();
+		expect(plugin.legend!()).toMatchObject({ scaleLabel: "Smoke density", title: "Smoke" });
+	});
+
 	it("fills by the scale in choropleth mode, with per-level opacity", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
 		const scale = Promise.withResolvers<Scale>();
@@ -137,7 +162,8 @@ describe("shapesPlugin", () => {
 			pluginId: "shp",
 			title: "Smoke",
 			units: "",
-			scale: smokeScale
+			scale: smokeScale,
+			scaleRef: SMOKE_REF
 		});
 	});
 
@@ -465,5 +491,174 @@ describe("shapesPlugin", () => {
 		expect(data.features.map((f) => f.properties!.refKey)).toEqual(["feature:z"]);
 		expect(gl2.featureStates.get("m1:shp:shapes/feature:z")).toEqual({ selected: true });
 		expect(checkPoints(gl2)).toEqual([[31, 31]]);
+	});
+});
+
+describe("shapesPlugin noFigure", () => {
+	// Alpha's value 1 has no level on the smoke category scale; Bravo's "heavy" has one.
+	const noFig = ["==", levelKeyExpression(smokeScale, "value"), ""];
+	const isLine = ["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false];
+	const fillOf = (gl: FakeGl) =>
+		layer(gl, "m1:shp:fill") as Extract<LayerSpecification, { type: "fill" }>;
+	const lineOf = (gl: FakeGl, id: string) =>
+		layer(gl, id) as Extract<LayerSpecification, { type: "line" }>;
+	const WITH_LEVELS = collection([
+		{
+			props: { refKey: "feature:b", name: "Bravo", value: "heavy" },
+			geometry: { type: "Polygon", coordinates: [square(5, 5, 2)] }
+		}
+	]);
+
+	it("noFigure outline zeroes the fill where there is no level", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl } = await setup({ source, noFigure: "outline" });
+		expect(fillOf(gl).paint!["fill-opacity"]).toEqual([
+			"case",
+			noFig,
+			0,
+			opacityExpression(smokeScale, "value", 0.6)
+		]);
+		expect(fillOf(gl).paint!["fill-color"]).toEqual(
+			colorExpression(smokeScale, "value", FALLBACK_THEME_COLORS.neutral)
+		);
+	});
+
+	it("noFigure neutral (default) keeps today's paint", async () => {
+		for (const noFigure of [undefined, "neutral"] as const) {
+			const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+			const { gl, plugin } = await setup({ source, noFigure });
+			expect(fillOf(gl).paint!["fill-opacity"]).toEqual(
+				opacityExpression(smokeScale, "value", 0.6)
+			);
+			expect(layerIds(gl)).toEqual([
+				"m1:shp:fill",
+				"m1:shp:outline",
+				"m1:shp:selected",
+				"m1:shp:check"
+			]);
+			expect("noFigure" in plugin.legend!()!).toBe(false);
+		}
+	});
+
+	it("noFigure outline with outline level draws no-figure lines in the foreground", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl } = await setup({ source, noFigure: "outline", outline: "level" });
+		const outline = lineOf(gl, "m1:shp:outline");
+		// Only polygons: a no-figure LineString keeps its level-mode line.
+		const noFigShape = ["all", ["!", isLine], noFig];
+		expect(outline.paint!["line-color"]).toEqual([
+			"case",
+			noFigShape,
+			FALLBACK_THEME_COLORS.foreground,
+			colorExpression(smokeScale, "value", FALLBACK_THEME_COLORS.neutral)
+		]);
+		expect(outline.paint!["line-opacity"]).toEqual([
+			"case",
+			noFigShape,
+			1,
+			opacityExpression(smokeScale, "value", 0.6)
+		]);
+	});
+
+	it("noFigure outline with outline theme keeps today's outline", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl } = await setup({ source, noFigure: "outline" });
+		expect(lineOf(gl, "m1:shp:outline").paint!["line-color"]).toEqual([
+			"case",
+			isLine,
+			colorExpression(smokeScale, "value", FALLBACK_THEME_COLORS.neutral),
+			FALLBACK_THEME_COLORS.foreground
+		]);
+	});
+
+	it("noFigure outline with outline none adds a no-figure line layer", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl } = await setup({ source, noFigure: "outline", outline: "none" });
+		expect(layerIds(gl)).toEqual([
+			"m1:shp:fill",
+			"m1:shp:no-figure",
+			"m1:shp:selected",
+			"m1:shp:check"
+		]);
+		const line = lineOf(gl, "m1:shp:no-figure");
+		expect(line.type).toBe("line");
+		expect(line.filter).toEqual(["all", ["!", isLine], noFig]);
+		expect(line.paint!["line-color"]).toBe(FALLBACK_THEME_COLORS.foreground);
+		expect(line.paint!["line-width"]).toBe(1);
+	});
+
+	it("plain mode ignores noFigure", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
+		const { gl, plugin } = await setup(
+			{ source, mode: "plain", noFigure: "outline", outline: "none" },
+			smokeScale,
+			metaSpy
+		);
+		expect(layerIds(gl)).toEqual(["m1:shp:fill", "m1:shp:selected", "m1:shp:check"]);
+		expect(fillOf(gl).paint!["fill-opacity"]).toBe(0.6);
+		expect(plugin.legend!()).toBeNull();
+	});
+
+	it("legend flags noFigure while a feature has no level", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({ source, noFigure: "outline" });
+		expect(plugin.legend!()).toMatchObject({ noFigure: true });
+	});
+
+	it("legend leaves no-figure lines out of the No data flag", async () => {
+		const source = new TestSource<Props>({
+			features: collection([
+				...WITH_LEVELS.features.map((f) => ({ props: f.properties!, geometry: f.geometry })),
+				{
+					props: { refKey: "feature:l", name: "Line", value: 1 },
+					geometry: {
+						type: "LineString",
+						coordinates: [
+							[0, 0],
+							[1, 1]
+						]
+					}
+				}
+			]),
+			scale: smokeScale
+		});
+		const { plugin } = await setup({ source, noFigure: "outline" });
+		expect("noFigure" in plugin.legend!()!).toBe(false);
+	});
+
+	it("noFigure flag clears when every feature has a level", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({ source, noFigure: "outline" });
+		source.features = WITH_LEVELS;
+		flushSync();
+		expect("noFigure" in plugin.legend!()!).toBe(false);
+	});
+
+	it("rebuilt layers keep the no-figure paint", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl } = await setup({ source, noFigure: "outline" });
+		const next: Scale = { ...smokeScale, levels: smokeScale.levels.slice(0, 2) };
+		source.scale = next;
+		flushSync();
+		expect(fillOf(gl).paint!["fill-opacity"]).toEqual([
+			"case",
+			["==", levelKeyExpression(next, "value"), ""],
+			0,
+			opacityExpression(next, "value", 0.6)
+		]);
+	});
+
+	it("selected no-figure region keeps its ring", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { gl, selected } = await setup({ source, noFigure: "outline", selectable: true });
+		selected.set("shp", new SvelteSet(["feature:a"]));
+		flushSync();
+		expect(gl.featureStates.get("m1:shp:shapes/feature:a")).toEqual({ selected: true });
+		const checks = (
+			(gl.sources.get("m1:shp:check") as GeoJSONSourceSpecification)
+				.data as FeatureCollection<Geometry>
+		).features.map((f) => (f.geometry as GeoJSON.Point).coordinates);
+		expect(checks).toEqual([[1, 1]]);
+		expect(layerIds(gl)).toContain("m1:shp:selected");
 	});
 });

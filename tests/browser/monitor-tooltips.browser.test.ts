@@ -44,7 +44,7 @@ describe("MonitorTooltip", () => {
 			format,
 			interval: null
 		});
-		const text = document.body.textContent!.replace(/\s+/g, " ");
+		const text = document.body.textContent!.replace(/\s+/g, " ").replace(/ ,/g, ",");
 		expect(text).toContain("PM2.5 12");
 		expect(text).toContain("Fresno Garland");
 		expect(text).toContain("1:00 pm Tuesday Nov 03, 2026");
@@ -76,7 +76,9 @@ describe("MonitorTooltip", () => {
 			format,
 			interval: null
 		});
-		expect(document.body.textContent!.replace(/\s+/g, " ")).toContain("PM2.5 12");
+		expect(document.body.textContent!.replace(/\s+/g, " ").replace(/ ,/g, ",")).toContain(
+			"PM2.5 12"
+		);
 		expect(document.body.textContent).not.toContain("12.6");
 	});
 
@@ -89,7 +91,9 @@ describe("MonitorTooltip", () => {
 			format,
 			interval: null
 		});
-		expect(document.body.textContent!.replace(/\s+/g, " ")).toContain("PM2.5 9");
+		expect(document.body.textContent!.replace(/\s+/g, " ").replace(/ ,/g, ",")).toContain(
+			"PM2.5 9"
+		);
 		expect(document.body.textContent).toContain("Moderate");
 		const box = page.getByText("9", { exact: true }).element().parentElement!;
 		expect(getComputedStyle(box).backgroundColor).toBe("rgb(255, 255, 0)");
@@ -133,6 +137,34 @@ describe("MonitorTooltip", () => {
 	});
 });
 
+describe("MonitorTooltip detail", () => {
+	const props = (value: FeatureListItem["value"], detail?: string) => ({
+		item: { ...item(value), ...(detail && { detail }) },
+		timestamp: null,
+		scale: pm25Scale,
+		messages: defaultMessages,
+		format,
+		interval: null
+	});
+
+	it("shows the detail where No level would be", async () => {
+		render(MonitorTooltip, props(null, "Not enough data"));
+		await expect.element(page.getByText("Not enough data")).toBeVisible();
+		expect(document.body.textContent).not.toContain("No level");
+	});
+
+	it("shows No level without a detail", async () => {
+		render(MonitorTooltip, props(null));
+		await expect.element(page.getByText("No level")).toBeVisible();
+	});
+
+	it("a level's label wins over the detail", async () => {
+		render(MonitorTooltip, props(12.6, "Not enough data"));
+		await expect.element(page.getByText("Moderate")).toBeVisible();
+		expect(document.body.textContent).not.toContain("Not enough data");
+	});
+});
+
 describe("MonitorTooltip interval note", () => {
 	it("monitor tooltip shows (1 hour avg) for airnow", async () => {
 		render(MonitorTooltip, {
@@ -156,6 +188,47 @@ describe("MonitorTooltip interval note", () => {
 			interval: null
 		});
 		expect(document.body.textContent).not.toContain("avg)");
+	});
+});
+
+describe("MonitorTooltip figure label", () => {
+	const props = (value: FeatureListItem["value"], figureLabel?: string) => ({
+		item: item(value),
+		timestamp: null,
+		scale: pm25Scale,
+		messages: defaultMessages,
+		format,
+		interval: "1 hour",
+		figureLabel
+	});
+
+	it("replaces the interval line under the value", async () => {
+		render(MonitorTooltip, props(12.6, "24-hour average"));
+		const label = page.getByText("24-hour average");
+		await expect.element(label).toBeVisible();
+		expect(
+			label.element().parentElement!.textContent!.replace(/\s+/g, " ").replace(/ ,/g, ",")
+		).toContain("PM2.5 12, 24-hour average");
+		expect(document.body.textContent).not.toContain("(1 hour avg)");
+	});
+
+	it("screen readers hear the value and the label apart; the pause isn't seen", async () => {
+		render(MonitorTooltip, props(12.6, "24-hour average"));
+		await expect.element(page.getByText("24-hour average")).toBeVisible();
+		const pause = document.querySelector<HTMLElement>(".mapsdk-reading-pause")!;
+		expect(pause.textContent).toBe(", ");
+		expect(pause.getBoundingClientRect().width).toBeLessThanOrEqual(1);
+	});
+
+	it("figure label shows with no reading", async () => {
+		render(MonitorTooltip, props(null, "24-hour average"));
+		await expect.element(page.getByText("No reading")).toBeVisible();
+		await expect.element(page.getByText("24-hour average")).toBeVisible();
+	});
+
+	it("keeps the interval line when unset", async () => {
+		render(MonitorTooltip, props(12.6));
+		await expect.element(page.getByText("(1 hour avg)")).toBeVisible();
 	});
 });
 
@@ -213,9 +286,23 @@ describe("MonitorClusterTooltip", () => {
 			metadata
 		});
 		await expect.element(page.getByText("2 monitors", { exact: true })).toBeVisible();
-		const text = document.body.textContent!.replace(/\s+/g, " ");
-		expect(text).toContain("PM2.5 20 (cluster avg)");
+		const text = document.body.textContent!.replace(/\s+/g, " ").replace(/ ,/g, ",");
+		expect(text).toContain("PM2.5 20, (cluster avg)");
 		expect(text).toContain("Moderate");
+	});
+
+	it("names the figure under the average with figureLabel", async () => {
+		render(MonitorClusterTooltip, {
+			cluster: cluster(rows, coords, () => new Promise(() => {})),
+			scale: pm25Scale,
+			messages: defaultMessages,
+			format,
+			metadata,
+			figureLabel: "24-hour average"
+		});
+		await expect.element(page.getByText("24-hour average")).toBeVisible();
+		const text = document.body.textContent!.replace(/\s+/g, " ").replace(/ ,/g, ",");
+		expect(text).toContain("PM2.5 20, 24-hour average, (cluster avg)");
 	});
 
 	it("takes the level from the unrounded average, as the bubble does", async () => {
@@ -229,8 +316,8 @@ describe("MonitorClusterTooltip", () => {
 			metadata
 		});
 		await expect.element(page.getByText("2 monitors", { exact: true })).toBeVisible();
-		const text = document.body.textContent!.replace(/\s+/g, " ");
-		expect(text).toContain("PM2.5 9 (cluster avg)");
+		const text = document.body.textContent!.replace(/\s+/g, " ").replace(/ ,/g, ",");
+		expect(text).toContain("PM2.5 9, (cluster avg)");
 		expect(text).toContain("Moderate");
 		expect(text).not.toContain("Good");
 	});
@@ -245,8 +332,8 @@ describe("MonitorClusterTooltip", () => {
 			metadata
 		});
 		await expect.element(page.getByText(/^Max:/)).toBeVisible();
-		const text = document.body.textContent!.replace(/\s+/g, " ");
-		expect(text).toContain("PM2.5 16 (cluster avg)");
+		const text = document.body.textContent!.replace(/\s+/g, " ").replace(/ ,/g, ",");
+		expect(text).toContain("PM2.5 16, (cluster avg)");
 		expect(text).toContain("Max: 24.93 µg/m³");
 		expect(text).toContain("Min: 8.02 µg/m³");
 	});
@@ -289,7 +376,7 @@ describe("MonitorClusterTooltip", () => {
 			metadata
 		});
 		await expect.element(page.getByText("SJVAir PurpleAir Monitors")).toBeVisible();
-		const text = document.body.textContent!.replace(/\s+/g, " ");
+		const text = document.body.textContent!.replace(/\s+/g, " ").replace(/ ,/g, ",");
 		const tri: Array<[number, number]> = [
 			[-119.7, 36.7],
 			[-119.6, 36.7],
@@ -298,7 +385,7 @@ describe("MonitorClusterTooltip", () => {
 		const expected = convertArea(area(polygon([[...tri, tri[0]]])), "meters", "miles").toFixed(3);
 		expect(text).toContain(`3 monitors within a ${expected} mi² area`);
 		expect(text).not.toContain("covering");
-		expect(text).toContain("PM2.5 15 (cluster avg)");
+		expect(text).toContain("PM2.5 15, (cluster avg)");
 		expect(text).toContain("Moderate");
 		expect(text).toContain("Max: 20 µg/m³");
 		expect(text).toContain("Min: 10 µg/m³");
@@ -432,9 +519,9 @@ describe("CollocationTooltip", () => {
 			referenceInterval: "1 hour",
 			colocatedInterval: "2 min"
 		});
-		const text = document.body.textContent!.replace(/\s+/g, " ");
-		expect(text).toContain("PM2.5 12 (1 hour avg)");
-		expect(text).toContain("PM2.5 40 (2 min avg)");
+		const text = document.body.textContent!.replace(/\s+/g, " ").replace(/ ,/g, ",");
+		expect(text).toContain("PM2.5 12, (1 hour avg)");
+		expect(text).toContain("PM2.5 40, (2 min avg)");
 		expect(text).toContain("1:00 pm Tuesday Nov 03, 2026");
 		expect(text).toContain("1:02 pm Tuesday Nov 03, 2026");
 		// The reference monitor's own name, not the site's.

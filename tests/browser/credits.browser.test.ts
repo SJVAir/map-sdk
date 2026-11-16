@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
+import { page, userEvent } from "vitest/browser";
 import axe from "axe-core";
 import { config as maptilerConfig } from "@maptiler/sdk";
 import { MapView, createMap } from "../../src/lib/index.js";
@@ -111,17 +112,148 @@ describe("credits", () => {
 		expect(container.querySelector("img")).toBeNull();
 	});
 
-	it("a narrow map starts with credits open and collapses on drag", async () => {
+	const shown = () => attrib()!.classList.contains("maplibregl-compact-show");
+	const button = () => attrib()!.querySelector<HTMLElement>(".maplibregl-ctrl-attrib-button")!;
+	const fire = (gl: GlMapLike, type: string) =>
+		(gl as unknown as { fire(type: string): void }).fire(type);
+
+	/** A narrow map whose data credits arrive when `credits.resolve` is called. */
+	async function narrowWithLateCredits() {
+		const credits = Promise.withResolvers<string>();
+		const map = newMap({ attribution: () => credits.promise });
+		map.addPlugin(dataPlugin("air-quality"));
+		const attached = trackAttach(map);
+		await render(MapView, { map, class: "narrow-map" });
+		await whenLoaded(attached[0]);
+		await vi.waitFor(() => expect(attrib()?.classList.contains("maplibregl-compact")).toBe(true));
+		return { gl: attached[0], credits };
+	}
+
+	it("a narrow map starts with its credits folded", async () => {
 		const map = newMap();
 		const attached = trackAttach(map);
 		await render(MapView, { map, class: "narrow-map" });
 		await whenLoaded(attached[0]);
 		await vi.waitFor(() => expect(attrib()?.classList.contains("maplibregl-compact")).toBe(true));
-		expect(attrib()!.classList.contains("maplibregl-compact-show")).toBe(true);
-		(attached[0] as unknown as { fire(type: string): void }).fire("drag");
-		await vi.waitFor(() =>
-			expect(attrib()!.classList.contains("maplibregl-compact-show")).toBe(false)
+		await new Promise((r) => setTimeout(r, 50));
+		expect(shown()).toBe(false);
+		await expect.element(page.getByLabelText("Toggle attribution")).toBeVisible();
+	});
+
+	it("the credits button opens them by keyboard", async () => {
+		await narrowWithLateCredits();
+		button().focus();
+		await userEvent.keyboard("{Enter}");
+		await vi.waitFor(() => expect(shown()).toBe(true));
+		await expect.element(page.getByText("© MapTiler")).toBeVisible();
+	});
+
+	it("folded credits are announced as collapsed, and open ones as expanded", async () => {
+		const { credits } = await narrowWithLateCredits();
+		credits.resolve("SJVAir");
+		await vi.waitFor(() => expect(attrib()?.textContent).toContain("SJVAir"));
+		await new Promise((r) => setTimeout(r, 50));
+		expect(shown()).toBe(false);
+		expect(attrib()!.hasAttribute("open")).toBe(false);
+		button().focus();
+		await userEvent.keyboard("{Enter}");
+		await vi.waitFor(() => expect(shown()).toBe(true));
+		expect(attrib()!.hasAttribute("open")).toBe(true);
+		await userEvent.keyboard("{Enter}");
+		await vi.waitFor(() => expect(shown()).toBe(false));
+		expect(attrib()!.hasAttribute("open")).toBe(false);
+	});
+
+	it("a credits change keeps folded credits folded", async () => {
+		const { credits } = await narrowWithLateCredits();
+		credits.resolve("SJVAir");
+		await vi.waitFor(() => expect(attrib()?.textContent).toContain("SJVAir"));
+		await new Promise((r) => setTimeout(r, 50));
+		expect(shown()).toBe(false);
+	});
+
+	it("a credits change keeps opened credits open", async () => {
+		const { credits } = await narrowWithLateCredits();
+		await userEvent.click(button());
+		await vi.waitFor(() => expect(shown()).toBe(true));
+		credits.resolve("SJVAir");
+		await vi.waitFor(() => expect(attrib()?.textContent).toContain("SJVAir"));
+		await new Promise((r) => setTimeout(r, 50));
+		expect(shown()).toBe(true);
+		await expect.element(page.getByText(/SJVAir/)).toBeVisible();
+	});
+
+	it("a drag folds opened credits, and a later credits change keeps them folded", async () => {
+		const { gl, credits } = await narrowWithLateCredits();
+		await userEvent.click(button());
+		await vi.waitFor(() => expect(shown()).toBe(true));
+		fire(gl, "drag");
+		await vi.waitFor(() => expect(shown()).toBe(false));
+		credits.resolve("SJVAir");
+		await vi.waitFor(() => expect(attrib()?.textContent).toContain("SJVAir"));
+		await new Promise((r) => setTimeout(r, 50));
+		expect(shown()).toBe(false);
+	});
+
+	it("a host's second credits control on a narrow map starts folded too", async () => {
+		const { gl } = await narrowWithLateCredits();
+		const { AttributionControl } = await import("@maptiler/sdk");
+		(gl as unknown as { addControl(c: unknown): void }).addControl(
+			new AttributionControl({ customAttribution: "Host credits" })
 		);
+		const all = () => [...document.querySelectorAll<HTMLElement>(".maplibregl-ctrl-attrib")];
+		await vi.waitFor(() => expect(all()).toHaveLength(2));
+		const second = all().find((c) => c.textContent!.includes("Host credits"))!;
+		await vi.waitFor(() => expect(second.classList.contains("maplibregl-compact")).toBe(true));
+		await new Promise((r) => setTimeout(r, 50));
+		expect(second.classList.contains("maplibregl-compact-show")).toBe(false);
+		// Widened and narrowed again, MapLibre reopens each control; both stay folded.
+		const box = document.querySelector<HTMLElement>(".narrow-map")!;
+		const resize = () => (gl as unknown as { resize(): void }).resize();
+		box.classList.replace("narrow-map", "wide-map");
+		resize();
+		await vi.waitFor(() =>
+			expect(all().some((c) => c.classList.contains("maplibregl-compact"))).toBe(false)
+		);
+		box.classList.replace("wide-map", "narrow-map");
+		resize();
+		await vi.waitFor(() =>
+			expect(all().every((c) => c.classList.contains("maplibregl-compact"))).toBe(true)
+		);
+		await new Promise((r) => setTimeout(r, 50));
+		expect(all().map((c) => c.classList.contains("maplibregl-compact-show"))).toEqual([
+			false,
+			false
+		]);
+	});
+
+	it("stops watching the credits once the GL map is removed", async () => {
+		const map = newMap();
+		const attached = trackAttach(map);
+		const { rerender } = await render(MapView, { map, class: "narrow-map" });
+		await whenLoaded(attached[0]);
+		await vi.waitFor(() => expect(attrib()?.classList.contains("maplibregl-compact")).toBe(true));
+		const old = attrib()!;
+		await rerender({ active: false });
+		expect(old.isConnected).toBe(false);
+		old.classList.add("maplibregl-compact-show");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(old.classList.contains("maplibregl-compact-show")).toBe(true);
+	});
+
+	it("narrowing after load stays folded", async () => {
+		const map = newMap();
+		const attached = trackAttach(map);
+		await render(MapView, { map, class: "wide-map" });
+		await whenLoaded(attached[0]);
+		await vi.waitFor(() => expect(attrib()).not.toBeNull());
+		expect(attrib()!.classList.contains("maplibregl-compact")).toBe(false);
+		const box = document.querySelector<HTMLElement>(".wide-map")!;
+		box.classList.replace("wide-map", "narrow-map");
+		(attached[0] as unknown as { resize(): void }).resize();
+		await vi.waitFor(() => expect(attrib()!.classList.contains("maplibregl-compact")).toBe(true));
+		await new Promise((r) => setTimeout(r, 50));
+		expect(shown()).toBe(false);
 	});
 
 	it("a wide map shows the full credits line", async () => {

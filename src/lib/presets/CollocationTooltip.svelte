@@ -76,6 +76,7 @@
 	{#each sides as entry, i (i)}
 		<div class="mapsdk-collocation-row" class:reverse={i === 1}>
 			<MonitorReadingBox
+				{messages}
 				color={entry.color}
 				header={scale?.label ?? ""}
 				value={entry.reading ?? messages("mapsdk_no_reading")}

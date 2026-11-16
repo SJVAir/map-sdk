@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { levelText } from "../ui/feature-list.js";
 	import { formatValue } from "../ui/value-format.js";
 	import type { FeatureListItem } from "../core/plugin.js";
 	import type { FormatProvider } from "../data/format.js";
@@ -24,9 +25,11 @@
 		 * out.
 		 */
 		interval: string | null;
+		/** What the figure is (e.g. "24-hour average"); replaces the interval note when set. */
+		figureLabel?: string;
 	}
 
-	let { item, timestamp, scale, messages, format, interval }: Props = $props();
+	let { item, timestamp, scale, messages, format, interval, figureLabel }: Props = $props();
 
 	// A level with an empty color shows its label in the neutral box.
 	const level = $derived(item.level !== NO_LEVEL ? item.level : null);
@@ -47,18 +50,20 @@
 
 <div class="mapsdk-monitor-tip mapsdk-tooltip-wide">
 	<MonitorReadingBox
+		{messages}
 		color={level?.color || null}
 		header={scale?.label ?? ""}
 		value={reading ?? messages("mapsdk_no_reading")}
 		large={reading !== null}
-		subheading={interval ? messages("mapsdk_monitor_interval_avg", { interval }) : undefined}
+		subheading={figureLabel ||
+			(interval ? messages("mapsdk_monitor_interval_avg", { interval }) : undefined)}
 	/>
 	<div class="mapsdk-monitor-detail">
 		{#if time}
 			<span>{time.at}</span>
 		{/if}
 		<span class="mapsdk-monitor-name text-lg">{item.name}</span>
-		<span>{level ? level.label : messages("mapsdk_no_level")}</span>
+		<span>{levelText(item, messages).text}</span>
 		{#if time}
 			<span class="mapsdk-monitor-ago text-base">{time.ago}</span>
 		{/if}

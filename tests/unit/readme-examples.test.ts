@@ -107,6 +107,33 @@ describe("README examples", () => {
 		map.destroy();
 	});
 
+	it("regions with no figure drawn as outlines", () => {
+		const regions: FeatureCollection<
+			Point,
+			{ refKey: string; name: string; value: number | null }
+		> = { type: "FeatureCollection", features: [] };
+		const map = createMap({ config: { maptilerKey: "k" } });
+		const source = staticSource(regions, { dataset: "air-quality", entryType: "pm25" });
+		map.addPlugin(regionsPlugin({ source, layerLabel: "Counties", noFigure: "outline" }));
+		expect(map.plugins[0].id).toBe("regions");
+		map.destroy();
+	});
+
+	it("monitors with a detail and a figure label", () => {
+		const monitors = createMonitorsStore();
+		const map = createMap({ config: { maptilerKey: "k" } });
+		map.addPlugin(
+			monitorsPlugin({
+				source: monitors.dataSource,
+				layerLabel: "Monitors",
+				detail: (props) => (props.value === null ? "Not enough data" : undefined),
+				figureLabel: "24-hour average"
+			})
+		);
+		expect(map.plugins[0].id).toBe("monitors");
+		map.destroy();
+	});
+
 	it("a shapes layer that takes no hover", () => {
 		const plumes: FeatureCollection<Point, { refKey: string; name: string; value: string }> = {
 			type: "FeatureCollection",

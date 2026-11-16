@@ -69,7 +69,7 @@ function fire(value: number, name: string, extra: Partial<FeatureListItem> = {})
 	};
 }
 
-const text = () => document.body.textContent!.replace(/\s+/g, " ").trim();
+const text = () => document.body.textContent!.replace(/\s+/g, " ").replace(/ ,/g, ",").trim();
 
 describe("FireTooltip", () => {
 	it("a group shows the box: title, cut-off average in its level color, Average, name, level", async () => {
@@ -79,7 +79,7 @@ describe("FireTooltip", () => {
 			messages: defaultMessages,
 			format
 		});
-		expect(text()).toBe("Fire (MW) 62.4 Average 3 fire detections 50–149 MW");
+		expect(text()).toBe("Fire (MW) 62.4, Average 3 fire detections 50–149 MW");
 		const box = page.getByText("62.4").element().parentElement!;
 		expect(getComputedStyle(box).backgroundColor).toBe("rgb(255, 69, 0)");
 	});
@@ -111,7 +111,7 @@ describe("FireTooltip", () => {
 			messages: defaultMessages,
 			format
 		});
-		expect(text()).toBe("Fire (MW) 9.9 Average 2 fire detections <10 MW");
+		expect(text()).toBe("Fire (MW) 9.9, Average 2 fire detections <10 MW");
 	});
 
 	it("a level with no units has no trailing space", async () => {

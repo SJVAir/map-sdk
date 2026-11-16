@@ -23,6 +23,7 @@ const sized = document.createElement("style");
 sized.textContent = [
 	".wide-map { width: 1000px; height: 500px; }",
 	".narrow-map { width: 300px; height: 400px; }",
+	".phone-map { width: 390px; height: 700px; }",
 	".short-map { width: 1000px; height: 220px; }",
 	".mid-map { width: 800px; height: 400px; }",
 	".root-1024 { width: 1024px; height: 500px; }",
@@ -96,7 +97,9 @@ function groups(): OptionGroup[] {
 	];
 }
 
-async function setup(props: { class?: string; featureList?: unknown; withToolbar?: boolean } = {}) {
+async function setup(
+	props: { class?: string; featureList?: unknown; withToolbar?: boolean; searchWidth?: string } = {}
+) {
 	const state = new ToolbarState({ groups: groups(), values: { pollutant: "pm25" } });
 	const map = newMap();
 	const screen = await render(MapViewWithToolbar, { map, state, ...props } as never);
@@ -324,6 +327,46 @@ describe("OptionsToolbar in MapView, review fixes", () => {
 		expect(list.closest("[inert]")).not.toBeNull();
 		await page.getByRole("button", { name: "Close map options" }).click();
 		expect(list.closest("[inert]")).toBeNull();
+	});
+});
+
+describe("OptionsToolbar search slot", () => {
+	const slot = () => document.querySelector<HTMLElement>(".mapsdk-options-search")!;
+	const bar = () => document.querySelector<HTMLElement>("[data-mapsdk-toolbar-bar]")!;
+	const field = () => document.querySelector<HTMLElement>("[data-test-search]")!;
+	const openButton = () => document.querySelector<HTMLElement>(".mapsdk-options-open")!;
+
+	it("the narrow search slot fills the bar beside the options button", async () => {
+		await setup({ class: "phone-map", searchWidth: "100%" });
+		await vi.waitFor(() => expect(slot()).not.toBeNull());
+		const room = bar().getBoundingClientRect().width - openButton().getBoundingClientRect().width;
+		expect(slot().getBoundingClientRect().width).toBeCloseTo(room - 8, 0);
+		expect(slot().getBoundingClientRect().top).toBe(openButton().getBoundingClientRect().top);
+	});
+
+	it("a full-width field caps at the room left", async () => {
+		await setup({ class: "phone-map", searchWidth: "100%" });
+		await vi.waitFor(() => expect(field()).not.toBeNull());
+		const width = field().getBoundingClientRect().width;
+		expect(width).toBeCloseTo(slot().getBoundingClientRect().width, 0);
+		expect(width).toBeLessThan(302);
+	});
+
+	it("the slot's empty part lets the pointer through", async () => {
+		await setup({ class: "phone-map", searchWidth: "4rem" });
+		await vi.waitFor(() => expect(field()).not.toBeNull());
+		const box = slot().getBoundingClientRect();
+		const hit = document.elementFromPoint(box.right - 4, box.top + box.height / 2)!;
+		expect(slot().contains(hit)).toBe(false);
+		const own = field().getBoundingClientRect();
+		expect(document.elementFromPoint(own.left + 4, own.top + own.height / 2)).toBe(field());
+	});
+
+	it("the wide bar's search slot is unchanged", async () => {
+		await setup({ searchWidth: "10rem" });
+		await vi.waitFor(() => expect(slot()).not.toBeNull());
+		expect(getComputedStyle(slot()).flexGrow).toBe("0");
+		expect(getComputedStyle(slot()).pointerEvents).toBe("auto");
 	});
 });
 

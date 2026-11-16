@@ -300,15 +300,11 @@ const LAYERS = [
 	"HMS smoke",
 	"HMS fire"
 ];
-/** Each layer's legend heading: its layer label, then the units if the scale has any. */
-const LEGEND_SECTIONS = [
-	/^PM2\.5/,
-	/^Counties/,
-	/^CalHeatScore/,
-	/^Forecast zones/,
-	/^Smoke/,
-	/^Fires/
-];
+/**
+ * Each legend section's heading: its title, then the units if the scale has any. Counties share
+ * the monitors' PM2.5 scale reference, so they share the PM2.5 section.
+ */
+const LEGEND_SECTIONS = [/^PM2\.5/, /^CalHeatScore/, /^Forecast zones/, /^Smoke/, /^Fires/];
 
 for (const theme of ["light", "dark"] as const) {
 	test(`no WCAG 2.2 AA violations in the ${theme} theme`, async ({ page }) => {
@@ -324,6 +320,8 @@ for (const theme of ["light", "dark"] as const) {
 		for (const heading of LEGEND_SECTIONS) {
 			await expect(panel.getByRole("heading", { level: 3, name: heading })).toBeVisible();
 		}
+		await expect(panel.getByRole("heading", { level: 3, name: /^PM2\.5/ })).toHaveCount(1);
+		await expect(panel.getByRole("heading", { level: 3, name: /^Counties/ })).toHaveCount(0);
 		for (const heading of [/^PM2\.5/, /^Fires/, /^Smoke/]) {
 			await expect(
 				todayPanel(page).getByRole("heading", { level: 3, name: heading })
@@ -737,5 +735,20 @@ test.describe("toolbar on touch", () => {
 		await expect(trigger).toHaveAttribute("aria-expanded", "true");
 		await trigger.tap();
 		await expect(trigger).toHaveAttribute("aria-expanded", "false");
+	});
+});
+
+test.describe("phone", () => {
+	test.use({ viewport: { width: 390, height: 844 } });
+
+	test("the credits start folded, one tap away", async ({ page }) => {
+		const map = todayMap(page);
+		const credits = map.locator(".maplibregl-ctrl-attrib");
+		await credits.scrollIntoViewIfNeeded();
+		await expect(credits).toHaveClass(/maplibregl-compact/);
+		await expect(credits).not.toHaveClass(/maplibregl-compact-show/);
+		await credits.getByLabel("Toggle attribution").click();
+		await expect(credits).toHaveClass(/maplibregl-compact-show/);
+		await expect(credits).toContainText("© MapTiler");
 	});
 });

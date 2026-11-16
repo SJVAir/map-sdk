@@ -53,6 +53,11 @@
 			/>
 			{#if row.icon}<OptionIcon icon={row.icon} />{/if}
 			<span class="mapsdk-option-label">{row.label}</span>
+			{#if row.children?.length}
+				<span class="mapsdk-option-chevron" class:mapsdk-option-chevron-closed={!on}>
+					<Glyph name="chevronDown" />
+				</span>
+			{/if}
 		</label>
 		{#if row.children?.length && on}
 			<div class="mapsdk-option-children"><Self rows={row.children} {menuId} {groupLabel} /></div>
