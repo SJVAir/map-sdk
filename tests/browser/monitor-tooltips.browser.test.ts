@@ -187,6 +187,39 @@ describe("MonitorTooltip interval note", () => {
 	});
 });
 
+describe("MonitorTooltip figure label", () => {
+	const props = (value: FeatureListItem["value"], figureLabel?: string) => ({
+		item: item(value),
+		timestamp: null,
+		scale: pm25Scale,
+		messages: defaultMessages,
+		format,
+		interval: "1 hour",
+		figureLabel
+	});
+
+	it("replaces the interval line under the value", async () => {
+		render(MonitorTooltip, props(12.6, "24-hour average"));
+		const label = page.getByText("24-hour average");
+		await expect.element(label).toBeVisible();
+		expect(label.element().parentElement!.textContent!.replace(/\s+/g, " ")).toContain(
+			"PM2.5 12 24-hour average"
+		);
+		expect(document.body.textContent).not.toContain("(1 hour avg)");
+	});
+
+	it("figure label shows with no reading", async () => {
+		render(MonitorTooltip, props(null, "24-hour average"));
+		await expect.element(page.getByText("No reading")).toBeVisible();
+		await expect.element(page.getByText("24-hour average")).toBeVisible();
+	});
+
+	it("keeps the interval line when unset", async () => {
+		render(MonitorTooltip, props(12.6));
+		await expect.element(page.getByText("(1 hour avg)")).toBeVisible();
+	});
+});
+
 describe("MonitorTooltip with an empty-color level", () => {
 	it("shows the level's label in a neutral box", async () => {
 		const unknown = { ...pm25Scale.levels[1], label: "Unknown", color: "" };

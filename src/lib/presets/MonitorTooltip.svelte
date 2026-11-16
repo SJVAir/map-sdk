@@ -25,9 +25,11 @@
 		 * out.
 		 */
 		interval: string | null;
+		/** What the figure is (e.g. "24-hour average"); replaces the interval note when set. */
+		figureLabel?: string;
 	}
 
-	let { item, timestamp, scale, messages, format, interval }: Props = $props();
+	let { item, timestamp, scale, messages, format, interval, figureLabel }: Props = $props();
 
 	// A level with an empty color shows its label in the neutral box.
 	const level = $derived(item.level !== NO_LEVEL ? item.level : null);
@@ -52,7 +54,8 @@
 		header={scale?.label ?? ""}
 		value={reading ?? messages("mapsdk_no_reading")}
 		large={reading !== null}
-		subheading={interval ? messages("mapsdk_monitor_interval_avg", { interval }) : undefined}
+		subheading={figureLabel ||
+			(interval ? messages("mapsdk_monitor_interval_avg", { interval }) : undefined)}
 	/>
 	<div class="mapsdk-monitor-detail">
 		{#if time}

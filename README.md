@@ -191,6 +191,24 @@ Selected points show a highlight ring and check mark by default. `selectedStyle:
 `pointsPlugin` or `monitorsPlugin` instead draws the selected icon at 1.3x with no ring (icon
 points only), as sjvair.com's map does today.
 
+Two `monitorsPlugin` options, both unset by default: `detail(props)` gives a monitor with no
+level a short text (e.g. "Not enough data") shown in the list, its accessible name, and the
+tooltip where "No level" would be; `figureLabel` names what the figure is (e.g.
+"24-hour average") in the tooltip, under the value, in place of the "(1 hour avg)" note. To name
+it in the list too, pass it as `MapView`'s `featureList={{ note }}`, which screen readers hear
+once, with the list:
+
+```ts
+map.addPlugin(
+	monitorsPlugin({
+		source: monitors.dataSource,
+		layerLabel: "Monitors",
+		detail: (props) => (props.value === null ? "Not enough data" : undefined),
+		figureLabel: "24-hour average"
+	})
+);
+```
+
 `outline` on `shapesPlugin` is `"theme"` (default, a 1px `--foreground` edge), `"level"` (the edge
 in each level's color at the fill's opacity; choropleth only), or `"none"` (no outline layer).
 `hmsSmokePlugin` uses `"level"`. `hoverable: false` on `shapesPlugin` sets the plugin's
@@ -834,6 +852,10 @@ local sjvair.com stack at `http://localhost:8000`.
   titled with the entry type's label. If either source has a literal `Scale`, the legend shows two
   sections, as before. Hosts don't build this: the plugins take the reference from the source. A
   "No data" row ends a section while a member draws no-figure features as outlines.
+- **`monitorsPlugin`'s `detail` and `figureLabel`**, both unset by default (today's look):
+  `detail(props)` stands where "No level" would be, in the list and the tooltip; `figureLabel`
+  replaces the tooltip's "(N avg)" note. The list gets nothing new: pass the label as
+  `featureList={{ note }}`. See "Plugins and draw order".
 - **`LegendData`** (for plugin authors): the scale form gains the optional `scaleRef`,
   `scaleLabel` (the entry type's metadata label) and `noFigure`.
 - **The credits start folded on narrow maps.** The engine opened its compact credits when a narrow

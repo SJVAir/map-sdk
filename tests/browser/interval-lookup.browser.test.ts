@@ -129,4 +129,13 @@ describe("monitorsPlugin's tooltip options", () => {
 		await expect.element(page.getByText("Not enough data")).toBeVisible();
 		expect(text()).not.toContain("No level");
 	});
+
+	it("shows the figure label in place of the interval line", async () => {
+		const lookup = vi.fn(async () => "1 hour");
+		const { open } = await setUp(lookup, { figureLabel: "24-hour average" });
+		open();
+		await expect.element(page.getByText("24-hour average")).toBeVisible();
+		await new Promise((r) => setTimeout(r, 50));
+		expect(text()).not.toContain("avg)");
+	});
 });

@@ -50,6 +50,12 @@ export interface MonitorsPluginOptions {
 	 * Ignored for a monitor with a level. Unset: "No level", as before.
 	 */
 	detail?(props: MonitorFeatureProperties): string | undefined;
+	/**
+	 * An already-translated name for what the figure is (e.g. "24-hour average"), shown in the
+	 * tooltip under the value in place of the "(N avg)" interval note. Unset: the interval note,
+	 * as before. For the list, pass it as `MapView`'s `featureList={{ note }}`.
+	 */
+	figureLabel?: string;
 }
 
 export type MonitorShape = "circle" | "square" | "triangle";
@@ -261,6 +267,7 @@ export function intervalLookup(): (
 export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 	const clustered = options.clustered ?? true;
 	const intervalFor = intervalLookup();
+	const figureLabel = options.figureLabel?.trim() || undefined;
 	return pointsPlugin<MonitorFeatureProperties>({
 		id: options.id ?? "monitors",
 		source: options.source,
@@ -314,9 +321,12 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 					scale: env.scale,
 					messages: env.messages,
 					format: env.format,
-					interval: null
+					interval: null,
+					figureLabel
 				},
-				intervalFor(props.type, env.metadata).then((interval) => ({ interval }))
+				figureLabel
+					? undefined
+					: intervalFor(props.type, env.metadata).then((interval) => ({ interval }))
 			)
 	});
 }

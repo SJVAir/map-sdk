@@ -99,7 +99,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   (fill/`outline`/check overlay, `hoverable`, `noFigure: "outline"` for a no-level feature's
   unfilled `--foreground` edge, a `no-figure` line layer under `outline: "none"`), plus shared style expressions, scale resolution,
   and the exported marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
-- **Presets** (`src/lib/presets/`): `monitorsPlugin`, `collocationSitesPlugin`, `regionsPlugin`,
+- **Presets** (`src/lib/presets/`): `monitorsPlugin` (`detail` passes through; `figureLabel`
+  replaces the tooltip's interval note), `collocationSitesPlugin`, `regionsPlugin`,
   `calHeatScorePlugin`, `forecastZonesPlugin` (`regionsPlugin` passes `noFigure`/`fillOpacity`/
   `outline` through), `hmsSmokePlugin`, `hmsFirePlugin` (groups, then
   hotspots from zoom 10), `focusAreaPlugin` (`focus-area.svelte.ts`: an area's slate outline and
