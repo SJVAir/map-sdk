@@ -335,4 +335,28 @@ describe("createLensState", () => {
 		expect(state.center).toBeNull();
 		expect(state.pinned).toBe(false);
 	});
+
+	it("list focus moving the card outside the block keeps a pinned lens; a click there releases it", () => {
+		const { inputs, state } = lens();
+		inputs.card = hover("parents", "T1");
+		inputs.focus = "T1";
+		state.pin("T1");
+		step();
+		// Arrowing down the list: the next row is a township outside the block.
+		inputs.focus = "T3";
+		inputs.card = hover("parents", "T3", false, [50, 0]);
+		step();
+		expect(state.pinned).toBe(true);
+		inputs.focus = "monitor:9";
+		inputs.card = hover("monitors", "monitor:9", false, [80, 0]);
+		step();
+		expect(state.pinned).toBe(true);
+		// Leaving the list, then a click on a feature outside the block.
+		inputs.focus = null;
+		step();
+		expect(state.pinned).toBe(true);
+		inputs.card = hover("monitors", "monitor:8", false, [90, 0]);
+		step();
+		expect(state.pinned).toBe(false);
+	});
 });

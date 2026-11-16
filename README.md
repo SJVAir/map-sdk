@@ -950,8 +950,9 @@ local sjvair.com stack at `http://localhost:8000`.
   another plugin's, with `touch`; watched only once asked, so other maps' moves cost nothing new),
   `pinned`, `focusedKey` and `pointerInCard`. Writing a plugin's own `PluginContext` wrapper needs
   them too.
-- Nothing changes for a host that sets none of these. No new message keys; `--background` is read
-  only by count markers.
+- `ThemeColors` gains `countMarkerText` (`--background`, white without it), read only by count
+  markers; code that builds its own `ThemeColors` needs it.
+- Nothing changes for a host that sets none of these. No new message keys.
 
 ### 0.1.0-beta.16
 

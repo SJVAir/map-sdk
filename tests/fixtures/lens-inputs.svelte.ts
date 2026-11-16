@@ -23,6 +23,7 @@ export class FakeLensInputs implements LensInputs {
 	childHover = $state.raw<OwnHover | null>(null);
 	card = $state.raw<Hovered | null>(null);
 	inCard = $state(false);
+	focus = $state<string | null>(null);
 	shown = $state(true);
 	live = $state(true);
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced whole, never mutated
@@ -47,6 +48,9 @@ export class FakeLensInputs implements LensInputs {
 	}
 	blockHas(refKey: string) {
 		return refKey === "T1" || refKey === "T2";
+	}
+	focusedKey() {
+		return this.focus;
 	}
 	pointerInCard() {
 		return this.inCard;

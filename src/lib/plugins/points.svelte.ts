@@ -169,6 +169,12 @@ const IMAGE_RATIO = 2;
 const ENLARGE = 1.3;
 const DEFAULT_RADIUS = 6;
 const UNCLUSTERED: FilterSpecification = ["!", ["has", "point_count"]];
+/** A count property, 1 where a feature has none (a marker with no count is one). */
+const countOf = (property: string): ExpressionSpecification => [
+	"coalesce",
+	["to-number", ["get", property], 1],
+	1
+];
 /**
  * Points with value-based color: anything with coordinates. Draws circles, or icons by
  * category (one image per category and level color), optionally clustered per group, with a
@@ -354,7 +360,9 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		let scaleGeneration = -1;
 		let generationKey: string | null = null;
 
-		const markerSize = icon ? icon.size : (options.circle?.radius ?? DEFAULT_RADIUS) * 2;
+		const markerSize = icon
+			? icon.size
+			: (countProp ? COUNT_RADIUS : (options.circle?.radius ?? DEFAULT_RADIUS)) * 2;
 
 		function loadImage(local: string, svg: string, size: number): void {
 			if (images.has(local) || typeof Image === "undefined") return;
@@ -424,7 +432,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				spec.clusterRadius = cluster.radius;
 				spec.clusterMaxZoom = cluster.maxZoom;
 				const properties: Record<string, unknown> = { ...(cluster.properties ?? {}) };
-				if (countProp) properties[COUNT_SUM] = ["+", ["get", countProp]];
+				if (countProp) properties[COUNT_SUM] = ["+", countOf(countProp)];
 				if (cluster.properties || countProp) {
 					spec.clusterProperties = properties as GeoJSONSourceSpecification["clusterProperties"];
 				}
@@ -478,7 +486,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				layout: sortKey ? { "circle-sort-key": sortKey as ExpressionSpecification } : {},
 				paint: {
 					"circle-radius": countProp
-						? ["case", [">=", ["get", countProp], 2], COUNT_RADIUS, COUNT_DOT_RADIUS]
+						? ["case", [">=", countOf(countProp), 2], COUNT_RADIUS, COUNT_DOT_RADIUS]
 						: (options.circle?.radius ?? DEFAULT_RADIUS),
 					"circle-color": colorExpression(scale, "value", theme.neutral),
 					"circle-opacity": opacityExpression(scale, "value", 1),
@@ -493,7 +501,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 			return {
 				type: "symbol",
 				source: sourceId,
-				filter: ["all", UNCLUSTERED, [">=", ["get", property], 2]] as FilterSpecification,
+				filter: ["all", UNCLUSTERED, [">=", countOf(property), 2]] as FilterSpecification,
 				layout: {
 					"text-field": ["to-string", ["get", property]],
 					"text-size": 11,

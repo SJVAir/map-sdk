@@ -229,7 +229,6 @@
 		flex: none;
 	}
 
-	/* A region with no figure: outlined, no fill, as on the map. */
 	.mapsdk-legend-units {
 		margin: 0.0625rem 0 0.375rem;
 		color: var(--muted-foreground, currentColor);
@@ -241,6 +240,7 @@
 		border-top: 1px solid var(--border, currentColor);
 	}
 
+	/* A region with no figure: outlined, no fill, as on the map. */
 	.mapsdk-legend-nofigure {
 		display: flex;
 		align-items: center;

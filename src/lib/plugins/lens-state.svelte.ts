@@ -18,6 +18,8 @@ export interface LensInputs {
 	/** `refKey` is one of the current block's parents. */
 	blockHas(refKey: string): boolean;
 	pinnedCard(): Hovered | null;
+	/** The keyboard-focused list item: a card it moves never releases a pinned lens. */
+	focusedKey(): string | null;
 	pointerInCard(): boolean;
 	/** The parents are set up and inside their zoom range. */
 	inRange(): boolean;
@@ -78,6 +80,7 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 		const shown = inputs.inRange();
 		const keys = inputs.parentKeys();
 		const card = inputs.pinnedCard();
+		const focused = inputs.focusedKey() !== null;
 		untrack(() => {
 			const fromMouse = (h: OwnHover | null) => (h && !h.touch ? h : null);
 			const overChild = fromMouse(child);
@@ -96,8 +99,10 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 			}
 			if (pinned) {
 				held = false;
-				// Only a change of card lets go: a card already pinned when `pin` came stays accepted.
-				if (!cardChanged || (card !== null && cardInLens(card))) return;
+				// Only a change of card lets go: a card already pinned when `pin` came stays accepted,
+				// and so does one moved by list focus (keyboard users walk past rows outside the block
+				// to reach the sections).
+				if (!cardChanged || focused || (card !== null && cardInLens(card))) return;
 				// Closed, or moved outside the block: the hover takes over at once (the old centre
 				// stays down until the pointer leaves it).
 				drop("center");

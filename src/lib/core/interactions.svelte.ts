@@ -241,8 +241,8 @@ export class InteractionRouter {
 		return found.blocked ? [] : found.hits;
 	}
 
-	/** What is under one point; with `forHover`, non-hoverable features are left out first. */
 	/**
+	 * What is under one point; with `forHover`, non-hoverable features are left out first.
 	 * `features`: what a query of every registered layer at `point` returned, to reuse instead of
 	 * querying again (filtered to this lookup's layers).
 	 */

@@ -295,4 +295,19 @@ describe("shapesLens", () => {
 		await settle();
 		expect(lens.pinned).toBe(false);
 	});
+
+	it("draws children whose block parent isn't in the parents' data (the host's block decides)", async () => {
+		const grid = lensGrid();
+		const { map, gl, lens } = await setUp({
+			block: (refKey) => [refKey, "feature:T9-9"],
+			parentOf: (props) =>
+				props.refKey.startsWith(`${parentKey(0, 0)}-`) ? "feature:T9-9" : grid.parentOf(props)
+		});
+		lens.pin(parentKey(2, 2));
+		await settle();
+		const drawn = lensData(gl, map);
+		expect(drawn).toHaveLength(8);
+		expect(drawn.filter((k) => k.startsWith(`${parentKey(0, 0)}-`))).toHaveLength(4);
+		expect(hiddenParents(gl, map)).toEqual([parentKey(2, 2)]);
+	});
 });

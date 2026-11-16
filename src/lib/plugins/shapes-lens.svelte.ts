@@ -89,6 +89,7 @@ export function shapesLens<C extends MapFeatureProperties>(
 		},
 		blockHas: (refKey) => blockKeys.has(refKey),
 		pinnedCard: () => ctxRef?.pinned ?? null,
+		focusedKey: () => ctxRef?.focusedKey ?? null,
 		pointerInCard: () => ctxRef?.pointerInCard ?? false,
 		inRange: () => hooks.shown && hooks.live,
 		parentKeys: () => hooks.keys
@@ -167,7 +168,9 @@ export function shapesLens<C extends MapFeatureProperties>(
 		// resolved, so their layers exist), so the block never shows empty.
 		ctx.effect(() => {
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt whole, never mutated
-			const parents = new Set(innerReady() ? childParents.values() : []);
+			const parents = new Set(
+				innerReady() ? [...childParents.values()].filter((key) => hooks.keys.has(key)) : []
+			);
 			untrack(() => hooks.setHidden(parents));
 		});
 
@@ -201,7 +204,13 @@ export function shapesLens<C extends MapFeatureProperties>(
 			const onKey = (e: KeyboardEvent) => {
 				if (e.key !== "Escape" || e.defaultPrevented) return;
 				const active = document.activeElement;
-				if (container && active && active !== document.body && !container.contains(active)) return;
+				const inMap = !!container && !!active && container.contains(active);
+				const onBody = !active || active === document.body;
+				if (!inMap && !onBody) return;
+				// A card pinned over a hover lens takes Esc first; the hold ends when it closes.
+				if (!state.pinned && untrack(() => ctx.pinned) !== null) return;
+				// A pinned lens lets go only for an Esc from its own map.
+				if (state.pinned && !inMap) return;
 				state.escape();
 			};
 			document.addEventListener("keydown", onKey);

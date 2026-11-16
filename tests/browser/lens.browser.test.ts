@@ -193,6 +193,19 @@ describe("shapesLens in a browser", () => {
 		expect(a.lens.pinned).toBe(true);
 	});
 
+	it("Esc with a section card pinned over a hover lens closes the card first", async () => {
+		const { lens, pointAt, clickAt } = await lensMap();
+		await pointAt(at(2, 2));
+		await vi.waitFor(() => expect(lens.center).toBe(parentKey(2, 2)));
+		await clickAt(at(2, 2, 3));
+		const section = page.getByRole("group", { name: "T2-2 S3" });
+		await expect.element(section).toBeVisible();
+		(document.activeElement as HTMLElement | null)?.blur();
+		await userEvent.keyboard("{Escape}");
+		await expect.element(section).not.toBeInTheDocument();
+		expect(lens.center).toBe(parentKey(2, 2));
+	});
+
 	it("Show square miles pins it, a section card opens inside it, and Esc releases it", async () => {
 		const { lens, clickAt, pointAt, gl } = await lensMap();
 		await clickAt(at(4, 4));

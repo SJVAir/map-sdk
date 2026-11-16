@@ -1009,15 +1009,12 @@ describe("pointsPlugin count", () => {
 		const { gl } = await countSetup();
 		await settle();
 		const dots = byId(gl, ":points");
-		expect(dots.paint!["circle-radius"]).toEqual(["case", [">=", ["get", "notices"], 2], 11, 7]);
+		const count = ["coalesce", ["to-number", ["get", "notices"], 1], 1];
+		expect(dots.paint!["circle-radius"]).toEqual(["case", [">=", count, 2], 11, 7]);
 		expect(dots.paint!["circle-stroke-width"]).toBe(1.5);
 		expect(dots.paint!["circle-stroke-color"]).toBe(FALLBACK_THEME_COLORS.countMarkerText);
 		const label = byId(gl, ":count");
-		expect(label.filter).toEqual([
-			"all",
-			["!", ["has", "point_count"]],
-			[">=", ["get", "notices"], 2]
-		]);
+		expect(label.filter).toEqual(["all", ["!", ["has", "point_count"]], [">=", count, 2]]);
 		expect(label.layout!["text-field"]).toEqual(["to-string", ["get", "notices"]]);
 		expect(label.paint!["text-color"]).toBe(FALLBACK_THEME_COLORS.countMarkerText);
 	});
@@ -1034,7 +1031,7 @@ describe("pointsPlugin count", () => {
 		};
 		expect(spec.clusterProperties).toEqual({
 			other: ["max", ["get", "value"]],
-			"mapsdk:count": ["+", ["get", "notices"]]
+			"mapsdk:count": ["+", ["coalesce", ["to-number", ["get", "notices"], 1], 1]]
 		});
 		const bubbles = byId(gl, ":clusters");
 		expect(bubbles.paint!["circle-radius"]).toBe(15);
