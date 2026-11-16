@@ -120,6 +120,47 @@ describe("the tooltips' interval lookup", () => {
 		await new Promise((r) => setTimeout(r, 50));
 		expect(text()).not.toContain("avg)");
 	});
+
+	it("a blank figure label keeps the interval line", async () => {
+		const { open } = await setUp(async () => "1 hour", { figureLabel: "  " });
+		open();
+		await expect.poll(text).toContain("(1 hour avg)");
+	});
+
+	it("names the figure in a cluster's tooltip too", async () => {
+		const source = new TestSource({
+			features: points([monitor("1", "purpleair", 12), monitor("2", "purpleair", 20)]),
+			scale: pm25Scale
+		});
+		const plugin = monitorsPlugin({
+			source,
+			layerLabel: "Monitors",
+			figureLabel: "24-hour average"
+		});
+		const map = createMap({ config: { maptilerKey: "test-key" } });
+		map.addPlugin(plugin);
+		const gl = createFakeGl({ styleLoaded: true });
+		const getSource = gl.getSource.bind(gl);
+		gl.getSource = (id: string) => {
+			const found = getSource(id) as object | undefined;
+			return found && { ...found, getClusterLeaves: () => new Promise(() => {}) };
+		};
+		map.attach(gl);
+		await tick();
+		const layer = `${map.uid}:monitors:cluster-icon:purpleair`;
+		gl.setRenderedFeatures([
+			{
+				layer: { id: layer },
+				source: "",
+				properties: { cluster: true, cluster_id: 7, point_count: 2, sumValues: 32, countValues: 2 },
+				geometry: { type: "Point", coordinates: [-119.5, 36.5] }
+			}
+		]);
+		gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+		render(SnippetHost, { snippet: plugin.hoverTooltip!(map.hovered!.hit)! });
+		await expect.element(page.getByText("24-hour average")).toBeVisible();
+		expect(text()).toContain("(cluster avg)");
+	});
 });
 
 describe("monitorsPlugin's tooltip options", () => {
@@ -137,5 +178,6 @@ describe("monitorsPlugin's tooltip options", () => {
 		await expect.element(page.getByText("24-hour average")).toBeVisible();
 		await new Promise((r) => setTimeout(r, 50));
 		expect(text()).not.toContain("avg)");
+		expect(lookup).not.toHaveBeenCalled();
 	});
 });

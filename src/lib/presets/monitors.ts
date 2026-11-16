@@ -52,7 +52,8 @@ export interface MonitorsPluginOptions {
 	detail?(props: MonitorFeatureProperties): string | undefined;
 	/**
 	 * An already-translated name for what the figure is (e.g. "24-hour average"), shown in the
-	 * tooltip under the value in place of the "(N avg)" interval note. Unset: the interval note,
+	 * tooltip under the value in place of the "(N avg)" interval note, and in a cluster's tooltip
+	 * above "(cluster avg)". Unset: the interval note,
 	 * as before. For the list, pass it as `MapView`'s `featureList={{ note }}`.
 	 */
 	figureLabel?: string;
@@ -307,7 +308,8 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 							scale: env.scale,
 							messages: env.messages,
 							format: env.format,
-							metadata: env.metadata
+							metadata: env.metadata,
+							figureLabel
 						})
 				}
 			: undefined,

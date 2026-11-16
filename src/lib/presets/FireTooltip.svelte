@@ -34,6 +34,7 @@
 
 <div class="mapsdk-fire-tip mapsdk-tooltip-wide">
 	<MonitorReadingBox
+		{messages}
 		color={level?.color || null}
 		{header}
 		value={value ?? messages("mapsdk_no_reading")}

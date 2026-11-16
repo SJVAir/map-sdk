@@ -22,9 +22,11 @@
 		messages: MessageProvider;
 		format: FormatProvider;
 		metadata: MetadataProvider;
+		/** What the monitors' figures are (e.g. "24-hour average"), above "(cluster avg)". */
+		figureLabel?: string;
 	}
 
-	let { cluster, scale, messages, format, metadata }: Props = $props();
+	let { cluster, scale, messages, format, metadata, figureLabel }: Props = $props();
 
 	/** From the cluster's monitors, once they load. */
 	interface Leaves {
@@ -108,10 +110,12 @@
 
 <div class="mapsdk-monitor-tip mapsdk-tooltip-wide">
 	<MonitorReadingBox
+		{messages}
 		color={level?.color || null}
 		header={scale?.label ?? ""}
 		value={average ?? messages("mapsdk_no_reading")}
 		large={average !== null}
+		figure={figureLabel}
 		subheading={messages("mapsdk_monitor_cluster_average")}
 	/>
 	<div class="mapsdk-monitor-detail">

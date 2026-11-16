@@ -50,6 +50,7 @@
 
 <div class="mapsdk-monitor-tip mapsdk-tooltip-wide">
 	<MonitorReadingBox
+		{messages}
 		color={level?.color || null}
 		header={scale?.label ?? ""}
 		value={reading ?? messages("mapsdk_no_reading")}

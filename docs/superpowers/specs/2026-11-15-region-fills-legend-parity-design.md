@@ -219,3 +219,20 @@ Client specs: `monitorsPlugin` passes `detail` to its listed features, and gives
 Browser specs: `MonitorTooltip` shows the detail where "No level" was, and "No level" without one;
 the figure label replaces the interval line, with or without a reading, and the interval line
 stays when it's unset; through `monitorsPlugin`'s tooltip, `figureLabel` reaches the tooltip.
+
+### After the review (the user's decision, 2026-11-15: fix all seven review minors in this beta)
+
+- **Screen readers hear a pause** in `MonitorReadingBox` before each line under the value, from
+  `mapsdk_reading_pause` (", "), visually hidden: "12, 24-hour average". Every tooltip that uses
+  the box gets it (monitor, cluster, collocation, fire). Nothing changes on screen.
+- **Clusters name the figure:** with `figureLabel` set, a cluster's tooltip shows it on its own
+  line above "(cluster avg)".
+- **A blank `figureLabel`** keeps the interval note; the interval lookup is skipped only when a
+  label is set (tested).
+- **Credits:** every attribution control on the map is kept folded (a host's own one too), and
+  the watches stop when the GL map is removed.
+- **No-figure lines:** with `outline: "level"`, a LineString with no level keeps its level line;
+  only polygons switch to `--foreground`. Lines never add the "No data" row.
+- **Shared section title:** until a member's entry-type label arrives, a shared section is titled
+  with the scale's own label (else the first member's title), so it doesn't flip from "Counties"
+  to "PM2.5".

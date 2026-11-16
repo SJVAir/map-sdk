@@ -100,7 +100,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   unfilled `--foreground` edge, a `no-figure` line layer under `outline: "none"`), plus shared style expressions, scale resolution,
   and the exported marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
 - **Presets** (`src/lib/presets/`): `monitorsPlugin` (`detail` passes through; `figureLabel`
-  replaces the tooltip's interval note), `collocationSitesPlugin`, `regionsPlugin`,
+  replaces the tooltip's interval note and names a cluster's figure; the reading box gives screen
+  readers a `mapsdk_reading_pause` before each line under the value), `collocationSitesPlugin`, `regionsPlugin`,
   `calHeatScorePlugin`, `forecastZonesPlugin` (`regionsPlugin` passes `noFigure`/`fillOpacity`/
   `outline` through), `hmsSmokePlugin`, `hmsFirePlugin` (groups, then
   hotspots from zoom 10), `focusAreaPlugin` (`focus-area.svelte.ts`: an area's slate outline and
@@ -138,8 +139,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `featureList` (`boolean` or `{ position, reveal, note }`; `list-placement.ts`; the button stacks clear
   of the controls in its corner, measured with a `ResizeObserver`). It sets `--mapsdk-map-width`,
   which caps the list panel and framed legend at the map's width. Credits come from the engine's
-  AttributionControl, with data credits from `ui/data-credits.svelte.ts`; `GlMap` keeps the compact
-  credits folded (a `MutationObserver`) unless the person opened them with ⓘ, until a drag, and
+  AttributionControl, with data credits from `ui/data-credits.svelte.ts`; `GlMap` keeps each compact
+  credits control folded (a `MutationObserver` per control, all disconnected on `remove()`) unless the person opened them with ⓘ, until a drag, and
   across `setDataCredits` replacements.
 - **UI** (`src/lib/ui/`): Legend (`order`, `framed`; blocks legends are one labeled bar; `symbols`
   legends a row per symbol; `legend-data.ts`'s `shareSections` makes one section per equal

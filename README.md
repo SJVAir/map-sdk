@@ -194,7 +194,8 @@ points only), as sjvair.com's map does today.
 Two `monitorsPlugin` options, both unset by default: `detail(props)` gives a monitor with no
 level a short text (e.g. "Not enough data") shown in the list, its accessible name, and the
 tooltip where "No level" would be; `figureLabel` names what the figure is (e.g.
-"24-hour average") in the tooltip, under the value, in place of the "(1 hour avg)" note. To name
+"24-hour average") in the tooltip, under the value, in place of the "(1 hour avg)" note, and in a
+cluster's tooltip above "(cluster avg)". To name
 it in the list too, pass it as `MapView`'s `featureList={{ note }}`, which screen readers hear
 once, with the list:
 
@@ -854,8 +855,11 @@ local sjvair.com stack at `http://localhost:8000`.
   "No data" row ends a section while a member draws no-figure features as outlines.
 - **`monitorsPlugin`'s `detail` and `figureLabel`**, both unset by default (today's look):
   `detail(props)` stands where "No level" would be, in the list and the tooltip; `figureLabel`
-  replaces the tooltip's "(N avg)" note. The list gets nothing new: pass the label as
-  `featureList={{ note }}`. See "Plugins and draw order".
+  replaces the tooltip's "(N avg)" note and names the figure in a cluster's tooltip. The list gets
+  nothing new: pass the label as `featureList={{ note }}`. See "Plugins and draw order".
+- **Screen readers hear a pause in the reading box** between the value and each line under it
+  ("12, 24-hour average"; "20, (cluster avg)"), from the new message key `mapsdk_reading_pause`
+  (", "). Nothing changes on screen.
 - **`LegendData`** (for plugin authors): the scale form gains the optional `scaleRef`,
   `scaleLabel` (the entry type's metadata label) and `noFigure`.
 - **The credits start folded on narrow maps.** The engine opened its compact credits when a narrow
@@ -866,7 +870,7 @@ local sjvair.com stack at `http://localhost:8000`.
 - **The options toolbar:** a checkbox row with children shows the group row's chevron (closed while
   off). On the narrow bar the `search` slot fills the rest of the bar, so a field can cap itself
   with `max-width: 100%`. The wide bar is unchanged.
-- **New message key:** `mapsdk_legend_no_figure` ("No data").
+- **New message keys:** `mapsdk_legend_no_figure` ("No data") and `mapsdk_reading_pause` (", ").
 - Nothing is removed or renamed, and there are no new theme tokens.
 
 ### 0.1.0-beta.14
