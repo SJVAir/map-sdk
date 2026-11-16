@@ -275,6 +275,21 @@
 		pointer-events: auto;
 	}
 
+	/*
+	 * Narrow: the search slot fills the rest of the bar beside the options button, so it has a
+	 * definite width a field can cap itself to (`max-width: 100%`). Its empty part lets the
+	 * pointer through to the map; its own children take it.
+	 */
+	.mapsdk-options[data-layout="narrow"] .mapsdk-options-search {
+		flex: 1 1 0;
+		min-width: 0;
+		pointer-events: none;
+	}
+
+	.mapsdk-options[data-layout="narrow"] .mapsdk-options-search > :global(*) {
+		pointer-events: auto;
+	}
+
 	.mapsdk-options-open,
 	.mapsdk-options-close {
 		display: flex;
