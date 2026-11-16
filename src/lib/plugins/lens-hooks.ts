@@ -9,6 +9,8 @@ export interface LensParentHooks {
 	readonly choropleth: boolean;
 	/** Reactive: inside its zoom range (true without one). */
 	readonly shown: boolean;
+	/** Reactive: set up on a map now (false before setup and after teardown). */
+	readonly live: boolean;
 	/** Reactive: the parents' refKeys in the latest data. */
 	readonly keys: ReadonlySet<string>;
 	/** Reactive: a parent's geometry in the latest data, or null. */

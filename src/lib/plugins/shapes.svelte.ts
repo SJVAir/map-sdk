@@ -195,6 +195,8 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 	let lensPaint = false;
 	/** The current setup's way to apply the hidden set and rebuild its layers. */
 	let lensLive: { apply(): void; rebuild(): void } | null = null;
+	/** Set up on a map now, for a lens over these shapes. */
+	let setUp = $state(false);
 	const parentKeys = $derived(
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced whole, never mutated
 		new Set(
@@ -514,6 +516,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
 			lensApplied = new Set(lensHidden);
 		}
+		setUp = true;
 		lensLive = {
 			apply: applyLensHidden,
 			rebuild() {
@@ -551,6 +554,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 			stopRange();
 			providers = null;
 			lensLive = null;
+			setUp = false;
 		};
 	}
 
@@ -571,6 +575,9 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 		choropleth,
 		get shown() {
 			return range.shown;
+		},
+		get live() {
+			return setUp;
 		},
 		get keys() {
 			return parentKeys;

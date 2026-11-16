@@ -25,6 +25,20 @@ export class TestSource<
 	}
 }
 
+/** A `DataSource` whose features are deep `$state` (proxied), as some hosts keep them. */
+export class DeepSource<
+	P extends MapFeatureProperties = MapFeatureProperties
+> implements DataSource<P> {
+	status = $state.raw<DataStatus>({ state: "ready" });
+	features = $state<FeatureCollection<Geometry, P> | null>(null);
+	scale = $state.raw<ScaleRef | Scale | null>(null);
+
+	constructor(init: { features: FeatureCollection<Geometry, P>; scale: ScaleRef | Scale }) {
+		this.features = init.features;
+		this.scale = init.scale;
+	}
+}
+
 /** A point feature collection, one feature per property row (with an optional `lngLat`). */
 export function points<P extends MapFeatureProperties>(
 	rows: Array<P & { lngLat?: [number, number] }>

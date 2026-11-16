@@ -173,6 +173,26 @@ describe("shapesLens in a browser", () => {
 		expect(lens.center).toBeNull();
 	});
 
+	it("an Esc something else took, or one in another map, leaves a pinned lens", async () => {
+		const a = await lensMap();
+		const b = await lensMap();
+		a.lens.pin(parentKey(2, 2));
+		b.lens.pin(parentKey(1, 1));
+		await settle(50);
+		a.canvas.focus();
+		const taken = (e: KeyboardEvent) => e.preventDefault();
+		document.addEventListener("keydown", taken, { capture: true });
+		document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+		document.removeEventListener("keydown", taken, { capture: true });
+		await settle(50);
+		expect(a.lens.pinned).toBe(true);
+		// Focus in map b: Esc there releases b's lens only.
+		b.canvas.focus();
+		await userEvent.keyboard("{Escape}");
+		await vi.waitFor(() => expect(b.lens.pinned).toBe(false));
+		expect(a.lens.pinned).toBe(true);
+	});
+
 	it("Show square miles pins it, a section card opens inside it, and Esc releases it", async () => {
 		const { lens, clickAt, pointAt, gl } = await lensMap();
 		await clickAt(at(4, 4));

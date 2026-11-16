@@ -13,7 +13,7 @@ import { createDefaultFormat } from "../../../src/lib/data/format.js";
 import { createFakeGl, type FakeGl } from "../../fixtures/fake-gl.js";
 import { lensGrid, parentKey } from "../../fixtures/lens-grid.js";
 import { pm25Scale } from "../../fixtures/scales.js";
-import { TestSource } from "../../fixtures/sources.svelte.js";
+import { DeepSource, TestSource } from "../../fixtures/sources.svelte.js";
 
 type Props = MapFeatureProperties;
 const SECTIONS: ScaleRef = { dataset: "pesticides", entryType: "section-lbs" };
@@ -40,11 +40,15 @@ async function setUp(
 		tooltip?: () => Snippet | undefined;
 		block?: (refKey: string) => string[];
 		parentOf?: (p: Props) => string | null;
+		deep?: boolean;
+		meta?: MetadataProvider;
 	} = {}
 ) {
 	const grid = lensGrid();
-	const map = createMap({ config, metadata });
-	const parentsSource = new TestSource<Props>({ features: grid.parents, scale: TOWNSHIPS });
+	const map = createMap({ config, metadata: opts.meta ?? metadata });
+	const parentsSource = opts.deep
+		? new DeepSource<Props>({ features: grid.parents, scale: TOWNSHIPS })
+		: new TestSource<Props>({ features: grid.parents, scale: TOWNSHIPS });
 	const childSource = new TestSource<Props>({
 		features: opts.children ?? grid.children,
 		scale: SECTIONS
@@ -247,5 +251,48 @@ describe("shapesLens", () => {
 		const message = "map-sdk: shapesLens needs a choropleth shapesPlugin as parents";
 		expect(() => make(plain)).toThrow(message);
 		expect(() => make({ id: "x", setup: () => () => {} })).toThrow(message);
+	});
+
+	it("removing the parents drops and releases the lens", async () => {
+		const { map, lens } = await setUp();
+		lens.pin(parentKey(2, 2));
+		await settle();
+		map.removePlugin("parents");
+		await settle();
+		expect(lens.center).toBeNull();
+		expect(lens.pinned).toBe(false);
+		expect(lens.features!()).toEqual([]);
+	});
+
+	it("draws the centre outline from a deep $state parents source", async () => {
+		const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+		const { map, gl, lens } = await setUp({ deep: true });
+		lens.pin(parentKey(1, 1));
+		await settle();
+		const data = (gl.sources.get(`${map.uid}:lens:center`) as GeoJSONSourceSpecification)
+			.data as FeatureCollection;
+		expect(data.features).toHaveLength(1);
+		expect(errors).not.toHaveBeenCalled();
+		errors.mockRestore();
+	});
+
+	it("keeps the parents filled while the children's scale is unresolved", async () => {
+		const meta = {
+			scale: vi.fn((ref: ScaleRef) =>
+				ref.entryType === SECTIONS.entryType ? new Promise(() => {}) : Promise.resolve(pm25Scale)
+			),
+			entryType: vi.fn(() => Promise.resolve("unavailable"))
+		} as unknown as MetadataProvider;
+		const { map, gl, lens } = await setUp({ meta });
+		lens.pin(parentKey(2, 2));
+		await settle();
+		expect(hiddenParents(gl, map)).toEqual([]);
+	});
+
+	it("refuses a pin for an unknown parent", async () => {
+		const { lens } = await setUp();
+		lens.pin("feature:nowhere");
+		await settle();
+		expect(lens.pinned).toBe(false);
 	});
 });

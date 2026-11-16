@@ -87,12 +87,19 @@ export function shapesLens<C extends MapFeatureProperties>(
 				return geometry !== null && containsPoint(geometry, lngLat);
 			});
 		},
+		blockHas: (refKey) => blockKeys.has(refKey),
 		pinnedCard: () => ctxRef?.pinned ?? null,
-		focusedKey: () => ctxRef?.focusedKey ?? null,
 		pointerInCard: () => ctxRef?.pointerInCard ?? false,
-		inRange: () => hooks.shown,
+		inRange: () => hooks.shown && hooks.live,
 		parentKeys: () => hooks.keys
 	});
+
+	const showing = $derived(state.center !== null);
+	/** The children's scale has resolved, so their layers are built. */
+	const innerReady = (): boolean => {
+		const data = inner.legend?.();
+		return !!data && "scale" in data;
+	};
 
 	const blockKeys = $derived.by(() => {
 		const center = state.center;
@@ -156,36 +163,46 @@ export function shapesLens<C extends MapFeatureProperties>(
 			});
 		};
 
-		// The parents beneath hide only where a child is drawn, so the block never shows empty.
+		// The parents beneath hide only where a child is drawn (and the children's scale has
+		// resolved, so their layers exist), so the block never shows empty.
 		ctx.effect(() => {
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt whole, never mutated
-			const parents = new Set(childParents.values());
+			const parents = new Set(innerReady() ? childParents.values() : []);
 			untrack(() => hooks.setHidden(parents));
 		});
 
-		// The centre parent's outline over the children, while any are drawn.
+		// The centre parent's outline over the children, while any are drawn. It's re-added on top
+		// when the centre changes or the children's layers come, not on every data change.
+		let raisedFor: string | null = null;
 		ctx.effect(() => {
 			const center = state.center;
-			const geometry = center && filtered ? hooks.geometryOf(center) : null;
+			const ready = innerReady();
+			const geometry = center && filtered && ready ? hooks.geometryOf(center) : null;
 			untrack(() => {
+				const key = geometry ? center : null;
+				if (key !== null && key !== raisedFor) raiseOutline();
+				raisedFor = key;
 				const data: FeatureCollection = geometry
 					? {
 							type: "FeatureCollection",
 							features: [{ type: "Feature", geometry, properties: {} } as Feature]
 						}
 					: EMPTY;
-				if (geometry) raiseOutline();
 				(
 					ctx.gl.getSource(centerSource) as { setData(d: FeatureCollection): void } | undefined
-				)?.setData(structuredClone(data));
+				)?.setData($state.snapshot(data) as FeatureCollection);
 			});
 		});
 
-		// Esc anywhere on the page dismisses the lens (WCAG 1.4.13), while one shows.
+		// Esc dismisses the lens (WCAG 1.4.13) while one shows: from this map, or with focus on
+		// nothing, never an Esc something else took (the list's, a host dialog's) or another map's.
 		ctx.effect(() => {
-			if (state.center === null || typeof document === "undefined") return;
+			if (!showing || typeof document === "undefined") return;
 			const onKey = (e: KeyboardEvent) => {
-				if (e.key === "Escape") state.escape();
+				if (e.key !== "Escape" || e.defaultPrevented) return;
+				const active = document.activeElement;
+				if (container && active && active !== document.body && !container.contains(active)) return;
+				state.escape();
 			};
 			document.addEventListener("keydown", onKey);
 			return () => document.removeEventListener("keydown", onKey);

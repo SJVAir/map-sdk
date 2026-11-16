@@ -263,4 +263,76 @@ describe("createLensState", () => {
 		step(1000);
 		expect(state.center).toBe("T1");
 	});
+
+	it("pin is refused out of range or for an unknown parent", () => {
+		const { inputs, state } = lens();
+		inputs.shown = false;
+		step();
+		state.pin("T1");
+		step();
+		expect(state.center).toBeNull();
+		expect(state.pinned).toBe(false);
+		inputs.shown = true;
+		step();
+		state.pin("T9");
+		step();
+		expect(state.center).toBeNull();
+		expect(state.pinned).toBe(false);
+	});
+
+	it("pin while a card outside the block is pinned stays pinned through later moves", () => {
+		const { inputs, state } = lens();
+		inputs.card = hover("monitors", "monitor:9", false, [80, 0]);
+		step();
+		state.pin("T1");
+		step();
+		inputs.parentHover = hover("parents", "T2");
+		step();
+		inputs.parentHover = hover("parents", "T3");
+		step();
+		expect(state.pinned).toBe(true);
+		inputs.card = null;
+		step();
+		expect(state.pinned).toBe(false);
+	});
+
+	it("Esc with the pointer over a neighbour's child keeps the lens down until the hover changes", () => {
+		const { inputs, state } = lens();
+		state.pin("T1");
+		inputs.parentHover = hover("parents", "T2");
+		inputs.childHover = hover("lens", "T2-S1");
+		step();
+		state.escape();
+		// The children go, so the pointer is over the neighbour township alone.
+		inputs.childHover = null;
+		step(1000);
+		expect(state.center).toBeNull();
+		inputs.parentHover = hover("parents", "T3");
+		step();
+		expect(state.center).toBe("T3");
+	});
+
+	it("a lens released by its card moving to another township follows the hover at once", () => {
+		const { inputs, state } = lens();
+		inputs.card = hover("parents", "T1");
+		state.pin("T1");
+		step();
+		inputs.parentHover = hover("parents", "T3");
+		step();
+		// The person picks a township outside the block (blockX: inside is x < 10).
+		inputs.card = hover("parents", "T3", false, [50, 0]);
+		step();
+		expect(state.pinned).toBe(false);
+		expect(state.center).toBe("T3");
+	});
+
+	it("the parents detaching drops and releases the lens", () => {
+		const { inputs, state } = lens();
+		state.pin("T1");
+		step();
+		inputs.live = false;
+		step();
+		expect(state.center).toBeNull();
+		expect(state.pinned).toBe(false);
+	});
 });

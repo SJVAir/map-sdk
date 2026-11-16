@@ -15,10 +15,11 @@ export interface LensInputs {
 	childParent(refKey: string): string | null;
 	/** `lngLat` lies inside a drawn child or a parent of the current block. */
 	inBlock(lngLat: [number, number]): boolean;
+	/** `refKey` is one of the current block's parents. */
+	blockHas(refKey: string): boolean;
 	pinnedCard(): Hovered | null;
-	focusedKey(): string | null;
 	pointerInCard(): boolean;
-	/** The parents are inside their zoom range. */
+	/** The parents are set up and inside their zoom range. */
 	inRange(): boolean;
 	/** The parents' refKeys in their latest data. */
 	parentKeys(): ReadonlySet<string>;
@@ -32,8 +33,14 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 	let center = $state<string | null>(null);
 	let pinned = $state(false);
 	let held = $state(false);
-	/** After Esc (or a release under the pointer): this parent doesn't raise it again until the hover changes. */
-	let suppressed: string | null = null;
+	/**
+	 * After Esc or a release: these parents (the old centre, and the one under the pointer then)
+	 * don't raise the lens again until the hover moves to another one, or off.
+	 */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
+	const suppressed = new Set<string>();
+	/** The parent under the pointer at the last run. */
+	let lastTarget: string | null = null;
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	/** The pinned card's key at the last run, to see a card close while pinned. */
 	let lastCard: string | null = null;
@@ -42,16 +49,25 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 		if (timer !== null) clearTimeout(timer);
 		timer = null;
 	};
-	const drop = (suppress: boolean) => {
+	/** `suppress`: the old centre, plus the parent under the pointer with `"pointer"`. */
+	const drop = (suppress: false | "center" | "pointer") => {
 		cancel();
-		if (suppress && center !== null) suppressed = center;
+		if (suppress) {
+			suppressed.clear();
+			if (center !== null) suppressed.add(center);
+			if (suppress === "pointer" && lastTarget !== null) suppressed.add(lastTarget);
+		}
 		center = null;
 		pinned = false;
 	};
 
-	/** The card (or focused item) belongs to the lens: a drawn child, or a feature inside the block. */
-	const cardInLens = (card: Hovered | null): boolean =>
-		card !== null && (card.hit.pluginId === inputs.lensId || inputs.inBlock(card.lngLat));
+	/** The card belongs to the lens: a drawn child, a parent of the block, or a feature inside it. */
+	const cardInLens = (card: Hovered | null): boolean => {
+		if (card === null) return false;
+		if (card.hit.pluginId === inputs.lensId) return true;
+		if (card.hit.pluginId === inputs.parentsId) return inputs.blockHas(card.hit.refKey);
+		return inputs.inBlock(card.lngLat);
+	};
 	const isChildCard = (card: Hovered | null): boolean =>
 		card !== null && card.hit.pluginId !== inputs.parentsId && cardInLens(card);
 
@@ -62,10 +78,16 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 		const shown = inputs.inRange();
 		const keys = inputs.parentKeys();
 		const card = inputs.pinnedCard();
-		const focus = inputs.focusedKey();
 		untrack(() => {
+			const fromMouse = (h: OwnHover | null) => (h && !h.touch ? h : null);
+			const overChild = fromMouse(child);
+			const overParent = fromMouse(parent);
+			const target = overChild
+				? (inputs.childParent(overChild.hit.refKey) ?? overParent?.hit.refKey ?? null)
+				: (overParent?.hit.refKey ?? null);
+			lastTarget = target;
 			const cardKey = card ? `${card.hit.pluginId}\n${card.hit.refKey}` : null;
-			const cardClosed = lastCard !== null && cardKey === null;
+			const cardChanged = cardKey !== lastCard;
 			lastCard = cardKey;
 			if (!shown || (center !== null && !keys.has(center))) {
 				drop(false);
@@ -74,21 +96,17 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 			}
 			if (pinned) {
 				held = false;
-				if (cardClosed || (card !== null && !cardInLens(card))) drop(true);
-				return;
+				// Only a change of card lets go: a card already pinned when `pin` came stays accepted.
+				if (!cardChanged || (card !== null && cardInLens(card))) return;
+				// Closed, or moved outside the block: the hover takes over at once (the old centre
+				// stays down until the pointer leaves it).
+				drop("center");
 			}
 			// A pinned card on a child (or a feature inside the block) keeps the lens where it is, so
-			// the card's feature doesn't vanish under it. A focused child does too.
-			held =
-				center !== null && (isChildCard(card) || (focus !== null && child?.hit.refKey === focus));
-			const fromMouse = (h: OwnHover | null) => (h && !h.touch ? h : null);
-			const overChild = fromMouse(child);
-			const overParent = fromMouse(parent);
-			const target = overChild
-				? (inputs.childParent(overChild.hit.refKey) ?? overParent?.hit.refKey ?? null)
-				: (overParent?.hit.refKey ?? null);
-			if (suppressed !== null && target !== suppressed) suppressed = null;
-			if (target !== null && target === suppressed) return;
+			// the card's feature doesn't vanish under it.
+			held = center !== null && isChildCard(card);
+			if (target === null || !suppressed.has(target)) suppressed.clear();
+			if (target !== null && suppressed.has(target)) return;
 			if (target !== null) {
 				cancel();
 				if (!held && keys.has(target)) center = target;
@@ -120,18 +138,24 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 		get held(): boolean {
 			return held;
 		},
+		/** Refused while the parents are out of range or `refKey` isn't one of them. */
 		pin(refKey: string): void {
+			if (!untrack(() => inputs.inRange()) || !untrack(() => inputs.parentKeys()).has(refKey))
+				return;
 			cancel();
-			suppressed = null;
+			suppressed.clear();
 			center = refKey;
 			pinned = true;
+			// The card pinned now (the township's, whose button called this) is accepted.
+			const card = untrack(() => inputs.pinnedCard());
+			lastCard = card ? `${card.hit.pluginId}\n${card.hit.refKey}` : null;
 		},
 		release(): void {
-			drop(true);
+			drop("pointer");
 		},
 		/** Esc: drops an unpinned lens (until the hover changes) and releases a pinned one. */
 		escape(): void {
-			if (center !== null) drop(true);
+			if (center !== null) drop("pointer");
 		},
 		start(): () => void {
 			const stop = $effect.root(() => {
@@ -143,8 +167,9 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 				cancel();
 				if (!pinned) center = null;
 				held = false;
-				suppressed = null;
+				suppressed.clear();
 				lastCard = null;
+				lastTarget = null;
 			};
 		}
 	};

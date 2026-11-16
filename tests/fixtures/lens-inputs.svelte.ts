@@ -22,9 +22,9 @@ export class FakeLensInputs implements LensInputs {
 	parentHover = $state.raw<OwnHover | null>(null);
 	childHover = $state.raw<OwnHover | null>(null);
 	card = $state.raw<Hovered | null>(null);
-	focus = $state<string | null>(null);
 	inCard = $state(false);
 	shown = $state(true);
+	live = $state(true);
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced whole, never mutated
 	keys = $state.raw<ReadonlySet<string>>(new Set(["T1", "T2", "T3"]));
 	/** lngLat x inside the block (a crude stand-in for the geometry test). */
@@ -45,14 +45,14 @@ export class FakeLensInputs implements LensInputs {
 	pinnedCard() {
 		return this.card;
 	}
-	focusedKey() {
-		return this.focus;
+	blockHas(refKey: string) {
+		return refKey === "T1" || refKey === "T2";
 	}
 	pointerInCard() {
 		return this.inCard;
 	}
 	inRange() {
-		return this.shown;
+		return this.shown && this.live;
 	}
 	parentKeys() {
 		return this.keys;
