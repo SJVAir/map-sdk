@@ -14,6 +14,8 @@ export interface ThemeColors {
 	highlightForeground: string;
 	/** Marker and cluster outlines and cluster counts: `--foreground`. */
 	foreground: string;
+	/** Count markers' outline and number (`pointsPlugin`'s `count`): `--background`. */
+	countMarkerText: string;
 	/** Markers drawn muted by default (see `icon.mutedColor`): `--muted-foreground`. */
 	mutedForeground: string;
 	/**
@@ -40,6 +42,7 @@ export const FALLBACK_THEME_COLORS: Readonly<ThemeColors> = {
 	highlight: "#2563eb",
 	highlightForeground: "#ffffff",
 	foreground: "#111827",
+	countMarkerText: "#ffffff",
 	mutedForeground: "#6b7280",
 	// The user's decision (2026-11-11), an exception to the theme-token rule: the focus area's
 	// colors are fixed (sjvair.com's explorers' white casing and wash, their county-line slate),
@@ -59,6 +62,7 @@ const THEME_TOKENS: Record<keyof ThemeColors, string[]> = {
 	highlight: ["--highlight", "--primary"],
 	highlightForeground: ["--highlight-foreground", "--primary-foreground"],
 	foreground: ["--foreground"],
+	countMarkerText: ["--background"],
 	mutedForeground: ["--muted-foreground"],
 	focusArea: ["--focus-area"],
 	focusAreaCasing: ["--focus-area-casing"],

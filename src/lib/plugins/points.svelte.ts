@@ -23,6 +23,10 @@ import { asDataURI, SELECTED_OVERLAY_PADDING, selectedOverlay } from "./icons.js
 import {
 	clusterHit,
 	clusterLeaves,
+	COUNT_DOT_RADIUS,
+	COUNT_RADIUS,
+	COUNT_SUM,
+	countClusterLayers,
 	defaultClusterLayers,
 	parseClusterHit,
 	zoomIntoCluster,
@@ -119,6 +123,13 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	/** Host content at the foot of the plugin's legend section. */
 	legendNote?: Snippet;
 	/**
+	 * A number on each marker from a property (e.g. notices per section): a count of 1 is a plain
+	 * dot, 2 or more a larger circle with the number in it (`--background` number and outline).
+	 * Clustered, the bubbles sum it and show the sum the same way, larger, in the scale's first
+	 * level's color; a host `cluster.layers` still wins. Circle markers only (not with `icon`).
+	 */
+	count?: { property: string };
+	/**
 	 * A short text for a feature with no level (e.g. "Level 2 charger"), shown in the feature list,
 	 * its accessible name, and the generic tooltip where "No level" would be. Ignored for a
 	 * feature with a level.
@@ -165,6 +176,8 @@ const UNCLUSTERED: FilterSpecification = ["!", ["has", "point_count"]];
  */
 export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOptions<P>): MapPlugin {
 	const { id: pluginId, source, layerLabel, icon, cluster } = options;
+	if (options.count && icon) throw new Error("map-sdk: count needs circle markers");
+	const countProp = options.count?.property ?? null;
 	const selectable = options.selectable ?? false;
 	const enlarge = options.selectedStyle === "enlarge";
 	const groupOf = cluster?.groupBy ?? (() => "");
@@ -410,7 +423,11 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				spec.cluster = true;
 				spec.clusterRadius = cluster.radius;
 				spec.clusterMaxZoom = cluster.maxZoom;
-				if (cluster.properties) spec.clusterProperties = cluster.properties;
+				const properties = {
+					...cluster.properties,
+					...(countProp && { [COUNT_SUM]: ["+", ["get", countProp]] })
+				} as GeoJSONSourceSpecification["clusterProperties"];
+				if (cluster.properties || countProp) spec.clusterProperties = properties;
 			}
 			return spec;
 		}
@@ -460,12 +477,30 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				...filter,
 				layout: sortKey ? { "circle-sort-key": sortKey as ExpressionSpecification } : {},
 				paint: {
-					"circle-radius": options.circle?.radius ?? DEFAULT_RADIUS,
+					"circle-radius": countProp
+						? ["case", [">=", ["get", countProp], 2], COUNT_RADIUS, COUNT_DOT_RADIUS]
+						: (options.circle?.radius ?? DEFAULT_RADIUS),
 					"circle-color": colorExpression(scale, "value", theme.neutral),
 					"circle-opacity": opacityExpression(scale, "value", 1),
-					"circle-stroke-color": theme.foreground,
-					"circle-stroke-width": 1
+					"circle-stroke-color": countProp ? theme.countMarkerText : theme.foreground,
+					"circle-stroke-width": countProp ? 1.5 : 1
 				}
+			};
+		}
+
+		/** The number on count markers of 2 or more; never interactive (the circle takes the hit). */
+		function countLabelLayer(property: string, sourceId: string): LayerSpecWithoutId {
+			return {
+				type: "symbol",
+				source: sourceId,
+				filter: ["all", UNCLUSTERED, [">=", ["get", property], 2]],
+				layout: {
+					"text-field": ["to-string", ["get", property]],
+					"text-size": 11,
+					"text-allow-overlap": true,
+					"text-ignore-placement": true
+				},
+				paint: { "text-color": theme.countMarkerText }
 			};
 		}
 
@@ -500,7 +535,8 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				}
 			};
 			const added: string[] = [];
-			for (const { local, spec } of (cluster?.layers ?? defaultClusterLayers)(args)) {
+			const make = cluster?.layers ?? (countProp ? countClusterLayers : defaultClusterLayers);
+			for (const { local, spec } of make(args)) {
 				added.push(ctx.addLayer(layerLocal(local, group), zoomed(spec)));
 			}
 			layers.push(...added);
@@ -536,6 +572,16 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 				);
 				layers.push(layerId);
 				pointIds.push(layerId);
+			}
+			if (countProp) {
+				for (const group of groups) {
+					layers.push(
+						ctx.addLayer(
+							layerLocal("count", group),
+							zoomed(countLabelLayer(countProp, sources.get(group)!))
+						)
+					);
+				}
 			}
 			pointLayerIds = pointIds;
 			if (!enlarge) {
