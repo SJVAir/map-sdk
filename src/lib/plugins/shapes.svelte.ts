@@ -575,6 +575,11 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 		get keys() {
 			return parentKeys;
 		},
+		geometryOf(refKey) {
+			return (
+				source.features?.features.find((f) => f.properties?.refKey === refKey)?.geometry ?? null
+			);
+		},
 		setHidden(keys) {
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced whole, never mutated
 			lensHidden = new Set(keys);

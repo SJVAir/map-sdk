@@ -137,11 +137,11 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 			const stop = $effect.root(() => {
 				$effect(run);
 			});
+			// A pinned lens outlives a teardown (a restyle sets it up again); a hover lens doesn't.
 			return () => {
 				stop();
 				cancel();
-				center = null;
-				pinned = false;
+				if (!pinned) center = null;
 				held = false;
 				suppressed = null;
 				lastCard = null;

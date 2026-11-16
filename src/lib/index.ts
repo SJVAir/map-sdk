@@ -32,6 +32,8 @@ export { colorExpression, levelKeyExpression, opacityExpression } from "./plugin
 export type { ThemeColors, ValueInput } from "./plugins/style.js";
 export { shapesPlugin } from "./plugins/shapes.svelte.js";
 export type { ShapesOptions, ShapesTooltipEnv } from "./plugins/shapes.svelte.js";
+export { shapesLens } from "./plugins/shapes-lens.svelte.js";
+export type { ShapesLens, ShapesLensOptions } from "./plugins/shapes-lens.svelte.js";
 export { monitorShape, monitorsPlugin } from "./presets/monitors.js";
 export type { MonitorShape, MonitorsPluginOptions } from "./presets/monitors.js";
 export { regionsPlugin } from "./presets/regions.js";

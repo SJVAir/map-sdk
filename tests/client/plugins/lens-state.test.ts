@@ -249,4 +249,18 @@ describe("createLensState", () => {
 		expect(vi.getTimerCount()).toBe(0);
 		expect(state.center).toBeNull();
 	});
+
+	it("a pinned lens survives a teardown and a new start", () => {
+		const inputs = new FakeLensInputs();
+		const state = createLensState(inputs);
+		const stop = state.start();
+		state.pin("T1");
+		step();
+		stop();
+		expect(state.center).toBe("T1");
+		expect(state.pinned).toBe(true);
+		stops.push(state.start());
+		step(1000);
+		expect(state.center).toBe("T1");
+	});
 });

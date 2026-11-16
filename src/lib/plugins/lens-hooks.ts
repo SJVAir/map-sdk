@@ -1,3 +1,4 @@
+import type { Geometry } from "geojson";
 import type { MapPlugin } from "../core/plugin.js";
 
 /** Where a `shapesPlugin` keeps the hooks a lens over it uses. Internal to map-sdk. */
@@ -10,6 +11,8 @@ export interface LensParentHooks {
 	readonly shown: boolean;
 	/** Reactive: the parents' refKeys in the latest data. */
 	readonly keys: ReadonlySet<string>;
+	/** Reactive: a parent's geometry in the latest data, or null. */
+	geometryOf(refKey: string): Geometry | null;
 	/**
 	 * Draws these parents' fill (and level outline) transparent, by the `lensHidden` feature state.
 	 * The paint gains the case the first time a non-empty set comes; until then it's unchanged.
