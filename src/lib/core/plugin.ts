@@ -5,7 +5,7 @@ import type { FormatProvider } from "../data/format.js";
 import type { MessageProvider } from "../data/messages.js";
 import type { MetadataProvider } from "../data/metadata.js";
 import type { NO_LEVEL } from "../data/scale.js";
-import type { Level, Scale } from "../data/scale-types.js";
+import type { Level, Scale, ScaleRef } from "../data/scale-types.js";
 import type { DataStatus, FeatureRef } from "../data/types.js";
 import type { GlMapLike } from "./gl.js";
 
@@ -100,6 +100,15 @@ export type LegendData =
 			 * gradient for range scales and blocks for category scales.
 			 */
 			display?: "gradient" | "blocks";
+			/**
+			 * The source's scale reference, when its scale came from the metadata (absent for a
+			 * literal `Scale`). The Legend shows one section for plugins with equal references.
+			 */
+			scaleRef?: ScaleRef;
+			/** The entry type's label from the metadata once known: a shared section's title. */
+			scaleLabel?: string;
+			/** The plugin draws at least one feature with no figure as an outline (`noFigure`). */
+			noFigure?: boolean;
 	  }
 	| {
 			pluginId: string;

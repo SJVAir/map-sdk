@@ -32,14 +32,15 @@ beforeEach(() => metaSpy.mockClear());
 async function setup(
 	options: Partial<ShapesOptions<Props>> & { source: TestSource<Props> },
 	meta: Scale | "unavailable" | Promise<Scale> = smokeScale,
-	spy = vi.fn()
+	spy = vi.fn(),
+	entryType: () => Promise<unknown> = () => Promise.resolve("unavailable")
 ) {
 	const selected = new SvelteMap<string, ReadonlySet<string>>();
 	const router = new InteractionRouter();
 	const providers: Providers = {
 		metadata: {
 			scale: spy.mockImplementation(() => Promise.resolve(meta)),
-			entryType: () => Promise.resolve("unavailable")
+			entryType
 		} as unknown as MetadataProvider,
 		messages: defaultMessages,
 		format: {} as FormatProvider
@@ -114,6 +115,29 @@ afterEach(() => {
 });
 
 describe("shapesPlugin", () => {
+	it("legend carries the source's ScaleRef", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
+		const { plugin } = await setup({ source });
+		await settle();
+		expect(plugin.legend!()).toMatchObject({ scaleRef: SMOKE_REF });
+	});
+
+	it("legend has no scaleRef for a literal scale", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({ source });
+		expect("scaleRef" in plugin.legend!()!).toBe(false);
+		expect("scaleLabel" in plugin.legend!()!).toBe(false);
+	});
+
+	it("legend carries the entry type's label once known", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
+		const { plugin } = await setup({ source }, smokeScale, vi.fn(), () =>
+			Promise.resolve({ label: "Smoke density", units: "", precision: 1 })
+		);
+		await settle();
+		expect(plugin.legend!()).toMatchObject({ scaleLabel: "Smoke density", title: "Smoke" });
+	});
+
 	it("fills by the scale in choropleth mode, with per-level opacity", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
 		const scale = Promise.withResolvers<Scale>();
@@ -137,7 +161,8 @@ describe("shapesPlugin", () => {
 			pluginId: "shp",
 			title: "Smoke",
 			units: "",
-			scale: smokeScale
+			scale: smokeScale,
+			scaleRef: SMOKE_REF
 		});
 	});
 
