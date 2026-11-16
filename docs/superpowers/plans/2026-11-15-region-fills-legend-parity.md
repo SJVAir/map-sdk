@@ -190,3 +190,65 @@ Folding is what MapLibre's own toggle does to close: set the container's `open` 
 - [ ] **Step 6: Commit** `0.1.0-beta.15: region fills with no-figure regions, a shared Legend section, and parity fixes`.
 
 After Task 8: a fresh whole-branch review on the most capable model, fixes, then push/PR/merge/release, each with the user's yes.
+
+## Addendum (2026-11-15): Tasks 9-10, the monitors' detail and figure label
+
+Spec: the spec's "Addendum" (sections 7 and 8). Constraints as above: both options unset by
+default, today's look kept; no new message keys; the list gets nothing new (hosts use
+`featureList={{ note }}`).
+
+Review Focus additions:
+
+6. `figureLabel` set with no reading ("No reading" in the box): the label still shows under it
+   (Task 10 test `figure label shows with no reading`).
+7. `detail` set on a monitor that has a level: the level's label wins, as in the list (Task 9
+   test `a level's label wins over the detail`).
+
+### Task 9: `monitorsPlugin` passes `detail` through, and `MonitorTooltip` shows it
+
+**Files:**
+- Modify: `src/lib/presets/monitors.ts` (`MonitorsPluginOptions`, `monitorsPlugin`)
+- Modify: `src/lib/presets/MonitorTooltip.svelte`
+- Test: `tests/client/presets/monitors.test.ts`, `tests/browser/monitor-tooltips.browser.test.ts`
+
+**Interfaces:**
+- Produces: `MonitorsPluginOptions.detail?(props: MonitorFeatureProperties): string | undefined`.
+
+- [ ] **Step 1: Client tests** in `describe("monitorsPlugin detail")`: `detail` given → every
+  `plugin.features!()` item's `detail` is its return value; unset → no item has `detail`.
+- [ ] **Step 2: Browser tests** in `describe("MonitorTooltip")`: an item with `NO_LEVEL` and
+  `detail: "Not enough data"` shows "Not enough data" and not "No level"; without a detail it shows
+  "No level"; `a level's label wins over the detail` (level Moderate plus a detail → "Moderate",
+  no detail text).
+- [ ] **Step 3: Run both** — FAIL (no option; tooltip ignores detail).
+- [ ] **Step 4: Implement:** pass `detail: options.detail` to `pointsPlugin`; in the tooltip the
+  level place is `levelText(item, messages).text` (`ui/feature-list.ts`), the list's own rule.
+- [ ] **Step 5: Run both** — PASS. Commit `Monitors: detail passes through to the list and the tooltip`.
+
+### Task 10: `monitorsPlugin`'s `figureLabel` in the tooltip, and the docs
+
+**Files:**
+- Modify: `src/lib/presets/monitors.ts`, `src/lib/presets/MonitorTooltip.svelte`
+- Modify: `README.md` (Changes for beta.15, the monitors paragraph), `tests/unit/readme-examples.test.ts`, `CLAUDE.md` (presets line)
+- Test: `tests/browser/monitor-tooltips.browser.test.ts`, `tests/client/presets/monitors.test.ts`
+
+**Interfaces:**
+- Produces: `MonitorsPluginOptions.figureLabel?: string`; `MonitorTooltip`'s new prop
+  `figureLabel?: string`.
+
+- [ ] **Step 1: Browser tests:** `figureLabel: "24-hour average"` with `interval: "1 hour"` →
+  shows "24-hour average", not "(1 hour avg)"; `figure label shows with no reading` (value null);
+  unset with `interval: "1 hour"` → "(1 hour avg)" as today.
+- [ ] **Step 2: Client test:** `monitorsPlugin({ ..., figureLabel })`'s `tooltip` snippet is
+  rendered with `figureLabel` (mount the returned snippet's component props the way the existing
+  tooltip tests reach them, or render it in a browser test through `componentSnippet`).
+- [ ] **Step 3: Run** — FAIL.
+- [ ] **Step 4: Implement:** the reading box's `subheading` is `figureLabel` when set, else
+  today's interval line; `monitorsPlugin` passes `figureLabel` into the tooltip props.
+- [ ] **Step 5: Docs:** README Changes bullet for both options (unset by default; the list note for
+  the label); a `monitorsPlugin({ ..., detail, figureLabel })` example and its type-check in
+  `readme-examples.test.ts`; the CLAUDE.md presets line.
+- [ ] **Step 6: Run everything** (`npm run format && npm run lint && npm run check && npm test &&
+  npm run test:bundle`) — PASS. Commit `Monitors: figureLabel names the figure in the tooltip`.
+
+After Task 10: re-run the whole-branch review on the most capable model.

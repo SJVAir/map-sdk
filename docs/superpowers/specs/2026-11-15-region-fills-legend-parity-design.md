@@ -183,3 +183,39 @@ keyboard. e2e: the demo at phone width with the attribution folded.
 - How the attribution fold detects the compact state (see 4).
 - The "No data" swatch's exact size and line width, within the Legend's existing swatch look.
 - Where the grouping helper lives (`legend-data.ts` is the natural home).
+
+## Addendum (2026-11-15): the monitors' detail and figure label
+
+Two more optional `monitorsPlugin` options, asked for by the dashboard's Map tile and confirmed by
+the user (2026-11-15). Today's look stays the default.
+
+### 7. `monitorsPlugin` passes `detail` through
+
+- `MonitorsPluginOptions.detail?(props: MonitorFeatureProperties): string | undefined`, passed
+  straight to `pointsPlugin`'s `detail` (e.g. "Not enough data"). Unset: no detail, as today.
+- The list row, its accessible name and the generic tooltip already show it where "No level"
+  would be (`levelText`). `MonitorTooltip` shows it there too: a level's label, else the
+  item's `detail`, else "No level".
+
+### 8. `monitorsPlugin`'s `figureLabel`
+
+- `MonitorsPluginOptions.figureLabel?: string`: an already-translated name for what the figure is
+  (e.g. "24-hour average"; the dashboard passes the scale's `daily_statistic_label`).
+- **Tooltip** (the user's decision, 2026-11-15, from a mockup): when set, it replaces the
+  "({interval} avg)" line under the value in `MonitorTooltip`'s reading box, with or without a
+  reading. Unset keeps today's interval line. It is plain text, read in order with the box.
+- **List**: nothing new. A host that wants the label in the list passes it as
+  `featureList={{ note }}`, which already shows above the rows and describes the listbox, so
+  screen readers hear it once. Row accessible names are unchanged. (Rejected: the label in every
+  row and every row's accessible name, which repeats the same words for every monitor.)
+
+### Public API changes
+
+- `MonitorsPluginOptions.detail?` and `.figureLabel?`, both unset by default.
+
+### Testing
+
+Client specs: `monitorsPlugin` passes `detail` to its listed features, and gives none when unset.
+Browser specs: `MonitorTooltip` shows the detail where "No level" was, and "No level" without one;
+the figure label replaces the interval line, with or without a reading, and the interval line
+stays when it's unset; through `monitorsPlugin`'s tooltip, `figureLabel` reaches the tooltip.
