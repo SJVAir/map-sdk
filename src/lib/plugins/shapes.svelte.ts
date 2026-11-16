@@ -2,7 +2,7 @@ import type { ExpressionSpecification } from "@maptiler/sdk";
 import type { Feature, FeatureCollection, Geometry, Position } from "geojson";
 import { geometryBbox, type Bbox } from "../core/shape-view.js";
 import { untrack } from "svelte";
-import type { FeatureListItem, MapPlugin, PluginContext } from "../core/plugin.js";
+import type { FeatureListItem, LegendData, MapPlugin, PluginContext } from "../core/plugin.js";
 import { decodeRef, selectionId } from "../data/refs.js";
 import { levelFor, NO_LEVEL } from "../data/scale.js";
 import type { Scale } from "../data/scale-types.js";
@@ -16,7 +16,13 @@ import {
 } from "./scale-resolution.svelte.js";
 import { hitFromProps, SELECTED_OPACITY } from "./shared.js";
 import { asDataURI, SELECTED_OVERLAY_PADDING, selectedOverlay } from "./icons.js";
-import { colorExpression, opacityExpression, themeColors, type ThemeColors } from "./style.js";
+import {
+	colorExpression,
+	levelKeyExpression,
+	opacityExpression,
+	themeColors,
+	type ThemeColors
+} from "./style.js";
 
 export interface ShapesOptions<P extends MapFeatureProperties> {
 	id: string;
@@ -36,6 +42,13 @@ export interface ShapesOptions<P extends MapFeatureProperties> {
 	 * (so LineString geometries are not drawn either).
 	 */
 	outline?: "theme" | "level" | "none";
+	/**
+	 * How a feature with no figure (no level on the scale, as the list's "No level") draws in
+	 * choropleth mode. `neutral` (default) fills it in the neutral color like any other;
+	 * `outline` draws no fill and a `--foreground` outline, whatever `outline` is (with `none`, a
+	 * line layer for those features alone), and the legend gets a "No data" row while any shows.
+	 */
+	noFigure?: "neutral" | "outline";
 	/**
 	 * False: hovering a shape shows no tooltip and doesn't hide what is beneath it
 	 * (`MapPlugin.hoverable`); list focus still shows it. Default true.
@@ -125,11 +138,21 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 	const fillOpacity = options.fillOpacity ?? DEFAULT_FILL_OPACITY;
 	const choropleth = mode === "choropleth";
 	const outlineMode = options.outline ?? "theme";
+	const outlineNoFigure = choropleth && options.noFigure === "outline";
 
 	const scales = createScaleResolver(pluginId, layerLabel, source);
 	/** Plain mode ignores the source's scale. */
 	const currentScale = (): Resolved | null => (choropleth ? scales.current() : NO_SCALE);
-	const legend = () => (choropleth ? scales.legend() : null);
+	const legend = (): LegendData | null => {
+		if (!choropleth) return null;
+		const data = scales.legend();
+		if (!outlineNoFigure || !data || !("scale" in data)) return data;
+		const { scale } = data;
+		const some = source.features?.features.some(
+			(f) => f.geometry && f.properties && levelFor(f.properties.value, scale) === NO_LEVEL
+		);
+		return some ? { ...data, noFigure: true } : data;
+	};
 
 	// Each feature's label point and bbox, measured once per feature object (once per data load):
 	// `features()` runs on every move. Per plugin instance, so two maps share nothing.
@@ -214,12 +237,21 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 						theme.foreground
 					] as ExpressionSpecification)
 				: theme.foreground;
+			// A feature with no level: no fill and a foreground line under `noFigure: "outline"`.
+			const noFig = ["==", levelKeyExpression(scale, "value"), ""] as ExpressionSpecification;
+			const unlessNoFigure = <T>(
+				figure: ExpressionSpecification | T,
+				none: string | number
+			): ExpressionSpecification | T =>
+				outlineNoFigure ? (["case", noFig, none, figure] as ExpressionSpecification) : figure;
 			const fill = ctx.addLayer("fill", {
 				type: "fill",
 				source: src,
 				paint: {
 					"fill-color": choropleth ? colorExpression(scale, "value", theme.neutral) : theme.neutral,
-					"fill-opacity": choropleth ? opacityExpression(scale, "value", fillOpacity) : fillOpacity
+					"fill-opacity": choropleth
+						? unlessNoFigure(opacityExpression(scale, "value", fillOpacity), 0)
+						: fillOpacity
 				}
 			});
 			const byLevel = outlineMode === "level" && choropleth;
@@ -230,13 +262,30 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 							type: "line",
 							source: src,
 							paint: {
-								"line-color": byLevel ? colorExpression(scale, "value", theme.neutral) : lineColor,
+								"line-color": byLevel
+									? unlessNoFigure(colorExpression(scale, "value", theme.neutral), theme.foreground)
+									: lineColor,
 								...(byLevel
-									? { "line-opacity": opacityExpression(scale, "value", fillOpacity) }
+									? {
+											"line-opacity": unlessNoFigure(
+												opacityExpression(scale, "value", fillOpacity),
+												1
+											)
+										}
 									: {}),
 								"line-width": ["case", isLine, LINE_WIDTH, OUTLINE_WIDTH] as ExpressionSpecification
 							}
 						});
+			// With no outline layer, no-figure features still need their line to be seen.
+			const noFigureLine =
+				outlineNoFigure && outlineMode === "none"
+					? ctx.addLayer("no-figure", {
+							type: "line",
+							source: src,
+							filter: ["all", ["!", isLine], noFig],
+							paint: { "line-color": theme.foreground, "line-width": OUTLINE_WIDTH }
+						})
+					: null;
 			const selectedLayer = ctx.addLayer("selected", {
 				type: "line",
 				source: src,
@@ -256,7 +305,9 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 					"icon-ignore-placement": true
 				}
 			});
-			layers = outline ? [fill, outline, selectedLayer, check] : [fill, selectedLayer, check];
+			layers = [fill, outline ?? noFigureLine, selectedLayer, check].filter(
+				(id): id is string => id !== null
+			);
 			// Layer ids repeat across rebuilds; register them once.
 			if (!interactiveDone) {
 				interactiveDone = true;
