@@ -20,6 +20,8 @@ export interface LegendSection {
 	scaleRef?: ScaleRef;
 	/** The entry type's label: a shared section's title. */
 	scaleLabel?: string;
+	/** The scale's own label: a shared section's title until a `scaleLabel` is known. */
+	scaleName?: string;
 	/** Ends with a "No data" row: a member draws features with no figure as outlines. */
 	noFigure: boolean;
 }
@@ -69,6 +71,7 @@ export function legendSection(data: LegendData, format: FormatProvider): LegendS
 		bar,
 		...(data.scaleRef && { scaleRef: data.scaleRef }),
 		...(data.scaleLabel && { scaleLabel: data.scaleLabel }),
+		...(scale.label && { scaleName: scale.label }),
 		noFigure: data.noFigure === true
 	};
 }
@@ -78,8 +81,8 @@ const sameRef = (a: ScaleRef, b: ScaleRef) =>
 
 /**
  * One section per shared scale reference, at its first member's place; the others close up. A
- * shared section is titled with the first member's `scaleLabel` that is set (else the first
- * title), and has the "No data" row when any member does. A section that shares with none, and
+ * shared section is titled with the first member's `scaleLabel` that is set (else the scale's
+ * own label, else the first title), and has the "No data" row when any member does. A section that shares with none, and
  * status and symbol entries, are kept as they are.
  */
 export function shareSections(entries: LegendEntry[]): LegendEntry[] {
@@ -100,7 +103,8 @@ export function shareSections(entries: LegendEntry[]): LegendEntry[] {
 		if (!Array.isArray(item)) return item;
 		const [first] = item;
 		if (item.length === 1) return { kind: "scale", section: first };
-		const title = item.find((s) => s.scaleLabel)?.scaleLabel ?? first.title;
+		// The scale's own label stands in until the metadata's arrives, so the title doesn't flip.
+		const title = item.find((s) => s.scaleLabel)?.scaleLabel ?? (first.scaleName || first.title);
 		const noFigure = item.some((s) => s.noFigure);
 		return { kind: "scale", section: { ...first, title, noFigure } };
 	});

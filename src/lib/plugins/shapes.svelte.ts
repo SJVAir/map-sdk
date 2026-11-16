@@ -148,8 +148,13 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 		const data = scales.legend();
 		if (!outlineNoFigure || !data || !("scale" in data)) return data;
 		const { scale } = data;
+		// Lines are never drawn as outlines, so they never add the "No data" row.
 		const some = source.features?.features.some(
-			(f) => f.geometry && f.properties && levelFor(f.properties.value, scale) === NO_LEVEL
+			(f) =>
+				f.geometry &&
+				!LINE_TYPES.includes(f.geometry.type) &&
+				f.properties &&
+				levelFor(f.properties.value, scale) === NO_LEVEL
 		);
 		return some ? { ...data, noFigure: true } : data;
 	};
@@ -239,11 +244,14 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 				: theme.foreground;
 			// A feature with no level: no fill and a foreground line under `noFigure: "outline"`.
 			const noFig = ["==", levelKeyExpression(scale, "value"), ""] as ExpressionSpecification;
+			// The outline's no-figure case: polygons only, so LineStrings keep their level line.
+			const noFigShape = ["all", ["!", isLine], noFig] as ExpressionSpecification;
 			const unlessNoFigure = <T>(
 				figure: ExpressionSpecification | T,
-				none: string | number
+				none: string | number,
+				when: ExpressionSpecification = noFig
 			): ExpressionSpecification | T =>
-				outlineNoFigure ? (["case", noFig, none, figure] as ExpressionSpecification) : figure;
+				outlineNoFigure ? (["case", when, none, figure] as ExpressionSpecification) : figure;
 			const fill = ctx.addLayer("fill", {
 				type: "fill",
 				source: src,
@@ -263,13 +271,18 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 							source: src,
 							paint: {
 								"line-color": byLevel
-									? unlessNoFigure(colorExpression(scale, "value", theme.neutral), theme.foreground)
+									? unlessNoFigure(
+											colorExpression(scale, "value", theme.neutral),
+											theme.foreground,
+											noFigShape
+										)
 									: lineColor,
 								...(byLevel
 									? {
 											"line-opacity": unlessNoFigure(
 												opacityExpression(scale, "value", fillOpacity),
-												1
+												1,
+												noFigShape
 											)
 										}
 									: {}),
@@ -282,7 +295,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 					? ctx.addLayer("no-figure", {
 							type: "line",
 							source: src,
-							filter: ["all", ["!", isLine], noFig],
+							filter: noFigShape,
 							paint: { "line-color": theme.foreground, "line-width": OUTLINE_WIDTH }
 						})
 					: null;

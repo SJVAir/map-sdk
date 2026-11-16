@@ -544,15 +544,17 @@ describe("shapesPlugin noFigure", () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
 		const { gl } = await setup({ source, noFigure: "outline", outline: "level" });
 		const outline = lineOf(gl, "m1:shp:outline");
+		// Only polygons: a no-figure LineString keeps its level-mode line.
+		const noFigShape = ["all", ["!", isLine], noFig];
 		expect(outline.paint!["line-color"]).toEqual([
 			"case",
-			noFig,
+			noFigShape,
 			FALLBACK_THEME_COLORS.foreground,
 			colorExpression(smokeScale, "value", FALLBACK_THEME_COLORS.neutral)
 		]);
 		expect(outline.paint!["line-opacity"]).toEqual([
 			"case",
-			noFig,
+			noFigShape,
 			1,
 			opacityExpression(smokeScale, "value", 0.6)
 		]);
@@ -601,6 +603,27 @@ describe("shapesPlugin noFigure", () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
 		const { plugin } = await setup({ source, noFigure: "outline" });
 		expect(plugin.legend!()).toMatchObject({ noFigure: true });
+	});
+
+	it("legend leaves no-figure lines out of the No data flag", async () => {
+		const source = new TestSource<Props>({
+			features: collection([
+				...WITH_LEVELS.features.map((f) => ({ props: f.properties!, geometry: f.geometry })),
+				{
+					props: { refKey: "feature:l", name: "Line", value: 1 },
+					geometry: {
+						type: "LineString",
+						coordinates: [
+							[0, 0],
+							[1, 1]
+						]
+					}
+				}
+			]),
+			scale: smokeScale
+		});
+		const { plugin } = await setup({ source, noFigure: "outline" });
+		expect("noFigure" in plugin.legend!()!).toBe(false);
 	});
 
 	it("noFigure flag clears when every feature has a level", async () => {

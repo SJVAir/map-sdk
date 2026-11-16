@@ -145,8 +145,8 @@ class GlMap extends MaptilerMap {
 	 * Declared without an initializer, like `attribution` (read as false until set).
 	 */
 	declare creditsOpen: boolean | undefined;
-	/** Watches the attribution control now on the map, to keep it folded unless opened. */
-	declare creditsWatch: MutationObserver | undefined;
+	/** Watches each attribution control on the map, to keep it folded unless opened. */
+	declare creditsWatches: Map<HTMLElement, MutationObserver> | undefined;
 
 	/** Notes the SDK's own attribution control, which it adds while constructing the map. */
 	override addControl(...args: Parameters<MaptilerMap["addControl"]>): this {
@@ -159,11 +159,21 @@ class GlMap extends MaptilerMap {
 	}
 
 	override removeControl(...args: Parameters<MaptilerMap["removeControl"]>): this {
-		if (args[0] instanceof AttributionControlMLGL) {
-			this.creditsWatch?.disconnect();
-			this.creditsWatch = undefined;
+		super.removeControl(...args);
+		// The removed control's container has left the page: stop watching it.
+		for (const [container, watch] of this.creditsWatches ?? []) {
+			if (container.isConnected) continue;
+			watch.disconnect();
+			this.creditsWatches!.delete(container);
 		}
-		return super.removeControl(...args);
+		return this;
+	}
+
+	/** MapLibre removes its controls directly here, not through `removeControl`. */
+	override remove(): void {
+		for (const watch of this.creditsWatches?.values() ?? []) watch.disconnect();
+		this.creditsWatches?.clear();
+		super.remove();
 	}
 
 	/**
@@ -173,12 +183,19 @@ class GlMap extends MaptilerMap {
 	 * control stays open, as MapLibre leaves it. A drag clears the choice, as it folds them.
 	 */
 	private keepCreditsFolded(): void {
-		const container = this.getContainer().querySelector<HTMLElement>(".maplibregl-ctrl-attrib");
-		if (!container) return;
 		if (this.creditsOpen === undefined) {
 			this.creditsOpen = false;
 			this.on("drag", () => (this.creditsOpen = false));
 		}
+		this.creditsWatches ??= new Map();
+		const containers = this.getContainer().querySelectorAll<HTMLElement>(".maplibregl-ctrl-attrib");
+		for (const container of containers) {
+			if (!this.creditsWatches.has(container)) this.watchCredits(container);
+		}
+	}
+
+	/** Keeps one attribution control's container folded unless the person opened it. */
+	private watchCredits(container: HTMLElement): void {
 		const SHOW = "maplibregl-compact-show";
 		const fold = () => {
 			if (this.creditsOpen || !container.classList.contains(SHOW)) return;
@@ -198,9 +215,9 @@ class GlMap extends MaptilerMap {
 			},
 			{ capture: true }
 		);
-		this.creditsWatch?.disconnect();
-		this.creditsWatch = new MutationObserver(fold);
-		this.creditsWatch.observe(container, { attributes: true, attributeFilter: ["class"] });
+		const watch = new MutationObserver(fold);
+		watch.observe(container, { attributes: true, attributeFilter: ["class"] });
+		this.creditsWatches!.set(container, watch);
 		fold();
 	}
 

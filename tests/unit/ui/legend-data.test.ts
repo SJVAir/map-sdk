@@ -128,10 +128,19 @@ describe("shareSections", () => {
 		expect(titles(out)).toEqual(["Counties"]);
 	});
 
-	it("falls back to the first title when no member has a label", () => {
+	it("is titled with the scale's own label until a member's label arrives, so it doesn't flip", () => {
 		const out = shareSections([
 			scaleEntry({ pluginId: "regions", title: "Counties", scaleRef: PM25 }),
 			scaleEntry({ pluginId: "monitors", title: "Monitors", scaleRef: PM25 })
+		]);
+		expect(titles(out)).toEqual(["PM2.5"]);
+	});
+
+	it("falls back to the first title when neither a member nor the scale has a label", () => {
+		const unlabeled = { ...pm25Scale, label: "" };
+		const out = shareSections([
+			scaleEntry({ pluginId: "regions", title: "Counties", scaleRef: PM25, scale: unlabeled }),
+			scaleEntry({ pluginId: "monitors", title: "Monitors", scaleRef: PM25, scale: unlabeled })
 		]);
 		expect(titles(out)).toEqual(["Counties"]);
 	});
