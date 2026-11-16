@@ -347,7 +347,6 @@ class MapContextImpl implements MapContext {
 	#focusedAnchor = $state.raw<[number, number] | null>(null);
 	#pinned = $state.raw<Hovered | null>(null);
 	#pointerInCard = $state(false);
-	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
 	#hoverWatched = new Set<string>();
 	#notice = $state.raw<{ message: string; id: number } | null>(null);
 	#noticeCount = 0;
