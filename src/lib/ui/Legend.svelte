@@ -237,7 +237,7 @@
 		width: 1rem;
 		height: 0.75rem;
 		box-sizing: border-box;
-		border: 1px solid var(--foreground);
+		border: var(--swatch-outline-width, 1px) solid var(--swatch-outline-color, var(--foreground));
 		background: transparent;
 	}
 

@@ -27,9 +27,13 @@ wrapping `regionsPlugin`'s `features()`.
   level. `shapesPlugin` sets it; a host's own plugin may set it too. (Rejected: filling `detail`,
   which needs messages in `features()`, turns the row into a detail row, and collides with a
   host's wrapper.)
-- **Which items:** the same rule as `legend()`'s "No data" row: choropleth, `noFigure: "outline"`,
-  a resolved scale, a geometry that isn't a LineString or MultiLineString, and no level for its
-  value. Lines keep "No level".
+- **Which items:** the features the map draws as no-figure outlines: choropleth,
+  `noFigure: "outline"`, a scale the layers are built with, a geometry that isn't a LineString or
+  MultiLineString, and no level for its value. It's the same predicate (`drawnAsNoFigure`) as
+  `legend()`'s "No data" row. Lines keep "No level". A source with no scale (`scale: null`) draws
+  every polygon as an outline, so every polygon gets "No data", though the legend has no section
+  then (the user's choice after review, 2026-11-15). While the scale is unavailable nothing is
+  drawn and nothing is flagged.
 - **Accessible name:** an outlined row with no value is "Fresno, No data"
   (`mapsdk_list_row_level`), not "Fresno, no reading". With a value, it's
   "Fresno, 5 µg/m³, No data".

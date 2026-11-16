@@ -685,9 +685,26 @@ describe("shapesPlugin noFigure", () => {
 	it("features() drops the flag once the feature has a level", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
 		const { plugin } = await setup({ source, noFigure: "outline" });
-		source.features = WITH_LEVELS;
+		expect(flags(plugin)).toEqual({ Alpha: true, Bravo: undefined });
+		// The same regions reloaded, with Alpha now at a level.
+		source.features = collection(
+			POLYGONS.features.map((f) => ({
+				props:
+					f.properties!.name === "Alpha" ? { ...f.properties!, value: "light" } : f.properties!,
+				geometry: f.geometry
+			}))
+		);
 		flushSync();
-		expect(flags(plugin)).toEqual({ Bravo: undefined });
+		expect(flags(plugin)).toEqual({ Alpha: undefined, Bravo: undefined });
+	});
+
+	it("features() flags every polygon when the source has no scale", async () => {
+		// The map draws every region as an outline then (no level on an empty scale), and the
+		// legend has no section, so it has no "No data" row either.
+		const source = new TestSource<Props>({ features: WITH_LINE, scale: null });
+		const { plugin } = await setup({ source, noFigure: "outline" });
+		expect(flags(plugin)).toEqual({ Alpha: true, Bravo: true, Line: undefined });
+		expect(plugin.legend!()).toBeNull();
 	});
 
 	it("rebuilt layers keep the no-figure paint", async () => {

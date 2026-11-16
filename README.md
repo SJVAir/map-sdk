@@ -856,6 +856,9 @@ local sjvair.com stack at `http://localhost:8000`.
   like the Legend's. A level's label still wins, and lines keep "No level". `FeatureListItem` gains
   an optional `noFigure`, which `shapesPlugin` sets. Under `noFigure: "neutral"` (the default),
   nothing changes. No new message keys or tokens, and the exports are otherwise unchanged.
+- The Legend's "No data" swatch takes its edge from `--swatch-outline-width` and
+  `--swatch-outline-color` (falling back to 1px `--foreground`, as before), like the list's
+  swatches.
 
 ### 0.1.0-beta.15
 
