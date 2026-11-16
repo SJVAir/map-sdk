@@ -298,7 +298,8 @@ the current block's children are drawn. Until a parent's children arrive it keep
 - **Pinning:** `lens.pin(refKey)` centres and pins it (a township card's "Show square miles", the
   keyboard and touch path); hover then doesn't move it. `lens.release()`, Esc, or the pinned card
   closing or moving outside the block lets it go. A click or tap on a parent opens its card only.
-  While a child's card is pinned, the lens holds where it is. Moving through the feature list
+  While a child's card, or a card on another plugin's feature inside the block (a notice), is
+  pinned, the lens holds where it is. Moving through the feature list
   never releases a pinned lens, so keyboard users reach its rows.
 - **`lens.center`** and **`lens.pinned`** are reactive. The children are listed (never
   selectable) only while the lens is pinned, and the lens's legend section shows only while
@@ -933,6 +934,12 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.18
+
+- **`shapesLens`:** a pinned card on another plugin's feature inside the lens's block (a spray
+  notice) holds an unpinned hover lens where it is, as a section's card does; in beta.17 only a
+  section's card held it. A township's card still doesn't. No API change.
 
 ### 0.1.0-beta.17
 

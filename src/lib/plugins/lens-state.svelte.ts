@@ -70,9 +70,9 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 		if (card.hit.pluginId === inputs.parentsId) return inputs.blockHas(card.hit.refKey);
 		return inputs.inBlock(card.lngLat);
 	};
-	/** A card on one of the lens's own children (a section). */
-	const isChildCard = (card: Hovered | null): boolean =>
-		card !== null && card.hit.pluginId === inputs.lensId;
+	/** A card that holds a hover lens: one of its children (a section), or another plugin's feature inside the block (a notice). */
+	const holdsLens = (card: Hovered | null): boolean =>
+		card !== null && card.hit.pluginId !== inputs.parentsId && cardInLens(card);
 
 	function run(): void {
 		const parent = inputs.parent();
@@ -108,9 +108,9 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 				// stays down until the pointer leaves it).
 				drop("center");
 			}
-			// A pinned card on a child keeps a hover lens where it is, so the card's section doesn't
-			// vanish under it. Not other cards (a notice): their features draw above the lens.
-			held = center !== null && isChildCard(card);
+			// A pinned card on a child, or on a feature inside the block (a notice), keeps a hover lens
+			// where it is while the card is open. A township's card doesn't.
+			held = center !== null && holdsLens(card);
 			if (target === null || !suppressed.has(target)) suppressed.clear();
 			if (target !== null && suppressed.has(target)) return;
 			if (target !== null) {
@@ -140,7 +140,7 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 		get pinned(): boolean {
 			return pinned;
 		},
-		/** Reactive: a hover lens held in place by a pinned card on one of its children. */
+		/** Reactive: a hover lens held in place by a pinned card on a child or a feature inside the block. */
 		get held(): boolean {
 			return held;
 		},

@@ -246,11 +246,11 @@ section with the zoomed-in sections plugin. Its children are never selectable. I
   card closing (Close, a click on nothing) or moving to a feature that is neither a parent of the
   block nor a drawn child nor another plugin's feature inside the block. Clicking a lens child
   pins that child's card and the lens stays pinned. With the lens unpinned, a pinned card on a
-  drawn child also holds the lens where it is, so the card's section doesn't vanish under it; the
-  hold ends when that card closes. A card on another plugin's feature (a notice) doesn't hold it:
-  those draw above the lens (the user, 2026-11-16, after the final review). List focus moving the
-  card never releases a pinned lens, so keyboard users can walk the list to the sections (the
-  final review's finding, fixed the same day).
+  drawn child, or on another plugin's feature inside the block (a notice), also holds the lens
+  where it is; the hold ends when that card closes. A township's card doesn't. (0.1.0-beta.17 held
+  for section cards only; the user restored notice cards for 0.1.0-beta.18, 2026-11-16, matching
+  the dashboard's spec.) List focus moving the card never releases a pinned lens, so keyboard
+  users can walk the list to the sections (the final review's finding, fixed the same day).
 - **Only in range.** The lens never shows while the parents are out of their `zoomRange`, and drops
   (and releases) if the zoom leaves it.
 - **The lens or its parents detaching, or the map detaching** drops the lens with no timer left
