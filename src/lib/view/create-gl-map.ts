@@ -168,8 +168,8 @@ class GlMap extends MaptilerMap {
 
 	/**
 	 * MapLibre opens the compact credits whenever a control first goes compact (a narrow map), and
-	 * `setDataCredits` makes a new control. Fold them each time, as MapLibre's own button does
-	 * (`open` set, `maplibregl-compact-show` removed), unless the person opened them: then the new
+	 * `setDataCredits` makes a new control. Fold them each time, as MapLibre's own button leaves them
+	 * (no `open`, no `maplibregl-compact-show`), unless the person opened them: then the new
 	 * control stays open, as MapLibre leaves it. A drag clears the choice, as it folds them.
 	 */
 	private keepCreditsFolded(): void {
@@ -182,7 +182,8 @@ class GlMap extends MaptilerMap {
 		const SHOW = "maplibregl-compact-show";
 		const fold = () => {
 			if (this.creditsOpen || !container.classList.contains(SHOW)) return;
-			container.setAttribute("open", "");
+			// Folded as MapLibre's button leaves it: no `open`, so the summary reads collapsed.
+			container.removeAttribute("open");
 			container.classList.remove(SHOW);
 		};
 		// The person's choice, before MapLibre's button handler toggles it (the fold would run

@@ -31,7 +31,8 @@ The same beta carries three fixes from the user's monitor-map 5.0 parity review 
   drawing; the dashboard's or monitor-map's own code.
 - Anti-goals: any visible change for a caller that sets nothing new (monitor-map 5.0 and the
   dashboard), except the three parity fixes, which every host gets: the folded attribution, the
-  chevron, and the narrow search slot's width. Meaning by colour alone. Credits that can't be
+  chevron, and the narrow search slot's width. A shared Legend section needs no opt-in either: it
+  appears whenever two plugins' sources carry equal `ScaleRef`s (no current caller does). Meaning by colour alone. Credits that can't be
   reached by touch or keyboard.
 
 ## Decisions (the user's, 2026-11-15)

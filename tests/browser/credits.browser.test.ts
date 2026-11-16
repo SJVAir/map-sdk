@@ -148,6 +148,22 @@ describe("credits", () => {
 		await expect.element(page.getByText("© MapTiler")).toBeVisible();
 	});
 
+	it("folded credits are announced as collapsed, and open ones as expanded", async () => {
+		const { credits } = await narrowWithLateCredits();
+		credits.resolve("SJVAir");
+		await vi.waitFor(() => expect(attrib()?.textContent).toContain("SJVAir"));
+		await new Promise((r) => setTimeout(r, 50));
+		expect(shown()).toBe(false);
+		expect(attrib()!.hasAttribute("open")).toBe(false);
+		button().focus();
+		await userEvent.keyboard("{Enter}");
+		await vi.waitFor(() => expect(shown()).toBe(true));
+		expect(attrib()!.hasAttribute("open")).toBe(true);
+		await userEvent.keyboard("{Enter}");
+		await vi.waitFor(() => expect(shown()).toBe(false));
+		expect(attrib()!.hasAttribute("open")).toBe(false);
+	});
+
 	it("a credits change keeps folded credits folded", async () => {
 		const { credits } = await narrowWithLateCredits();
 		credits.resolve("SJVAir");
