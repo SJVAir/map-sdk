@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, onTestFinished } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
 import axe from "axe-core";
@@ -539,6 +539,23 @@ describe("shared sections", () => {
 		expect(style.borderTopWidth).toBe("1px");
 		expect(style.borderTopStyle).toBe("solid");
 		expect(style.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+	});
+
+	it("outlines the No data swatch with the swatch outline tokens, like the list", async () => {
+		applyTheme("light");
+		const root = document.documentElement.style;
+		root.setProperty("--swatch-outline-color", "rgb(10, 120, 30)");
+		root.setProperty("--swatch-outline-width", "2px");
+		onTestFinished(() => {
+			root.removeProperty("--swatch-outline-color");
+			root.removeProperty("--swatch-outline-width");
+		});
+		render(Legend, { map: sharedMap(true) });
+		await expect.element(page.getByText("No data")).toBeVisible();
+		const swatch = document.querySelector<HTMLElement>(".mapsdk-legend-nofigure-swatch")!;
+		const style = getComputedStyle(swatch);
+		expect(style.borderTopColor).toBe("rgb(10, 120, 30)");
+		expect(style.borderTopWidth).toBe("2px");
 	});
 
 	it("shows no row without noFigure", async () => {

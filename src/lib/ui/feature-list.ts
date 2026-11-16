@@ -93,8 +93,8 @@ export function typeaheadIndex(items: FeatureListItem[], query: string, from: nu
 }
 
 /**
- * What stands in an item's level place: its level's label, else its `detail`, else "No level".
- * Nothing (`"omit"`) for a place with no reading.
+ * What stands in an item's level place: its level's label, else "No data" for a no-figure outline
+ * (`noFigure`), else its `detail`, else "No level". Nothing (`"omit"`) for a place with no reading.
  */
 export function levelText(
 	item: FeatureListItem,
@@ -103,6 +103,7 @@ export function levelText(
 	if (item.noReading) return { kind: "omit", text: "" };
 	const level = shownLevel(item);
 	if (level) return { kind: "level", text: level.label };
+	if (item.noFigure) return { kind: "none", text: messages("mapsdk_legend_no_figure") };
 	const detail = item.detail?.trim();
 	if (detail) return { kind: "detail", text: detail };
 	return { kind: "none", text: messages("mapsdk_no_level") };
@@ -118,8 +119,8 @@ export function rowLabel(
 	const level = levelText(item, messages);
 	const value = shownValue(item, format);
 	if (value === null) {
-		// A category reading: its level is its value.
-		if (item.value !== null && level.kind === "level")
+		// A category reading: its level is its value. A no-figure outline says "No data".
+		if ((item.value !== null && level.kind === "level") || (item.noFigure && level.kind === "none"))
 			return messages("mapsdk_list_row_level", { name: item.name, level: level.text });
 		return level.kind === "detail"
 			? messages("mapsdk_list_row_detail", { name: item.name, detail: level.text })

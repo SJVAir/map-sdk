@@ -2,6 +2,7 @@ import { createRawSnippet } from "svelte";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
+import axe from "axe-core";
 import type { MapContext } from "../../src/lib/core/create-map.svelte.js";
 import type { FeatureListItem, MapPlugin } from "../../src/lib/core/plugin.js";
 import { createDefaultFormat } from "../../src/lib/data/format.js";
@@ -147,6 +148,15 @@ describe("MapTooltip", () => {
 		render(MapTooltip, { map, project });
 		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Gray 12.34 µg/m³ Unknown");
 		expect(page.getByText("Unknown").element().classList.contains("neutral")).toBe(true);
+	});
+
+	it("shows No data for a noFigure item, with no axe violations", async () => {
+		const region = { ...item("a", "Gray", NO_LEVEL), noFigure: true };
+		const map = fakeMap([region], { focusedKey: "a" });
+		render(MapTooltip, { map, project });
+		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Gray 12.34 µg/m³ No data");
+		const result = await axe.run(page.getByRole("tooltip").element());
+		expect(result.violations).toEqual([]);
 	});
 
 	it("shows No level for NO_LEVEL", async () => {

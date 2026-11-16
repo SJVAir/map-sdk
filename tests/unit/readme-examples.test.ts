@@ -173,6 +173,8 @@ describe("README examples", () => {
 		expect(plugin.id).toBe("ev");
 		const row: Pick<FeatureListItem, "detail"> = { detail: "Level 2 charger" };
 		expect(row.detail).toBe("Level 2 charger");
+		const region: Pick<FeatureListItem, "noFigure"> = { noFigure: true };
+		expect(region.noFigure).toBe(true);
 	});
 
 	it("writing a plugin: setup through the context, features for the list", () => {

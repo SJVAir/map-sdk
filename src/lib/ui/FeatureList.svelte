@@ -369,6 +369,7 @@
 							<span
 								class="mapsdk-list-swatch"
 								class:neutral={!level?.color}
+								class:nofigure={row.noFigure && !level}
 								style:background={level?.color || undefined}
 							></span>
 						{/if}
@@ -499,6 +500,11 @@
 
 	.mapsdk-list-swatch.neutral {
 		background: var(--muted);
+	}
+
+	/* A no-figure outline: unfilled, like the Legend's "No data" swatch. */
+	.mapsdk-list-swatch.nofigure {
+		background: transparent;
 	}
 
 	.mapsdk-list-empty {
