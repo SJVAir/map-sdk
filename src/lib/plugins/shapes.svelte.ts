@@ -67,6 +67,19 @@ const LINE_WIDTH = 2;
 const SELECTED_WIDTH = 3;
 const LINE_TYPES = ["LineString", "MultiLineString"];
 
+/**
+ * Drawn as a no-figure outline under `noFigure: "outline"`: a shape that isn't a line, with no level
+ * on `scale`. Lines keep their level line. The legend's "No data" row and the items' `noFigure`.
+ */
+function drawnAsNoFigure(feature: Feature<Geometry | null>, scale: Scale): boolean {
+	return (
+		!!feature.geometry &&
+		!LINE_TYPES.includes(feature.geometry.type) &&
+		!!feature.properties &&
+		levelFor(feature.properties.value, scale) === NO_LEVEL
+	);
+}
+
 /** Twice the signed area of a ring, absolute. */
 function ringArea(ring: Position[]): number {
 	let sum = 0;
@@ -149,13 +162,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 		if (!outlineNoFigure || !data || !("scale" in data)) return data;
 		const { scale } = data;
 		// Lines are never drawn as outlines, so they never add the "No data" row.
-		const some = source.features?.features.some(
-			(f) =>
-				f.geometry &&
-				!LINE_TYPES.includes(f.geometry.type) &&
-				f.properties &&
-				levelFor(f.properties.value, scale) === NO_LEVEL
-		);
+		const some = source.features?.features.some((f) => drawnAsNoFigure(f, scale));
 		return some ? { ...data, noFigure: true } : data;
 	};
 
@@ -196,7 +203,8 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 				lngLat,
 				geometry: feature.geometry,
 				...(bbox && { bbox }),
-				selectable: selectable && selectionId(ref) !== null
+				selectable: selectable && selectionId(ref) !== null,
+				...(outlineNoFigure && scale && drawnAsNoFigure(feature, scale) && { noFigure: true })
 			});
 		}
 		return items;
