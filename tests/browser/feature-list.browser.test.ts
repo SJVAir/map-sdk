@@ -1,5 +1,5 @@
 import { createRawSnippet } from "svelte";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
 import axe from "axe-core";
@@ -451,6 +451,53 @@ describe("FeatureList", () => {
 		map.updateView(map.camera, { west: 0, south: 0, east: 1, north: 1 });
 		await expect.element(page.getByText("Nothing on the map in this view")).toBeVisible();
 		result = await axe.run(document.querySelector(".mapsdk-list")!);
+		expect(result.violations).toEqual([]);
+	});
+
+	/** Theme tokens on the page, so a muted fill and the swatch outline have real colours. */
+	function withTokens() {
+		const root = document.documentElement.style;
+		root.setProperty("--muted", "rgb(200, 200, 200)");
+		root.setProperty("--foreground", "rgb(20, 30, 40)");
+		onTestFinished(() => {
+			root.removeProperty("--muted");
+			root.removeProperty("--foreground");
+		});
+	}
+
+	it("shows a noFigure row as No data with an unfilled swatch", async () => {
+		withTokens();
+		const region = item("9", "Fresno", { value: null, level: NO_LEVEL, noFigure: true });
+		const { map } = newMap("single", [region]);
+		render(FeatureList, { map });
+		const row = page.getByRole("option", { name: "Fresno, No data", exact: true });
+		await expect.element(row).toBeInTheDocument();
+		expect(option("Fresno").textContent).toContain("No data");
+		expect(option("Fresno").textContent).not.toContain("No level");
+		const swatch = option("Fresno").querySelector<HTMLElement>(".mapsdk-list-swatch")!;
+		const style = getComputedStyle(swatch);
+		expect(style.backgroundColor).toBe("rgba(0, 0, 0, 0)");
+		expect(style.outlineColor).toBe("rgb(20, 30, 40)");
+	});
+
+	it("keeps the neutral filled swatch for a no-level row without noFigure", async () => {
+		withTokens();
+		const region = item("9", "Fresno", { value: null, level: NO_LEVEL });
+		const { map } = newMap("single", [region]);
+		render(FeatureList, { map });
+		await expect
+			.element(page.getByRole("option", { name: "Fresno, no reading" }))
+			.toBeInTheDocument();
+		const swatch = option("Fresno").querySelector<HTMLElement>(".mapsdk-list-swatch")!;
+		expect(getComputedStyle(swatch).backgroundColor).toBe("rgb(200, 200, 200)");
+	});
+
+	it("has no axe violations with a noFigure row", async () => {
+		const region = item("9", "Fresno", { value: null, level: NO_LEVEL, noFigure: true });
+		const { map } = newMap("single", [region, ...SITES]);
+		render(FeatureList, { map });
+		await focusList();
+		const result = await axe.run(document.querySelector(".mapsdk-list")!);
 		expect(result.violations).toEqual([]);
 	});
 
