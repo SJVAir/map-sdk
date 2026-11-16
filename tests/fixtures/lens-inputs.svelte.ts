@@ -25,6 +25,7 @@ export class FakeLensInputs implements LensInputs {
 	focus = $state<string | null>(null);
 	inCard = $state(false);
 	shown = $state(true);
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced whole, never mutated
 	keys = $state.raw<ReadonlySet<string>>(new Set(["T1", "T2", "T3"]));
 	/** lngLat x inside the block (a crude stand-in for the geometry test). */
 	blockX = $state(10);
