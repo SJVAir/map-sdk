@@ -51,7 +51,9 @@ and mobile use this package).
    title, in the legend's secondary text colour, in place of today's "(units)" after the title.
    The note sits at the foot of the section, below "No data". Without a unit line, today's look
    stays.
-7. **Approach B for the lens** (below).
+7. **Approach B for the lens** (below), as its own plugin.
+8. **A click or tap opens a card only; only `pin` pins the lens** (the dashboard's spec 5; this
+   replaces the Explorer's tap-to-pin from the builder check, with no option to keep it).
 
 ## Approaches considered (for the lens)
 
@@ -69,11 +71,14 @@ and mobile use this package).
   snippets anyway, so it adds little over B.
 
 The user picked B: the lens rules are where the bugs live, and B keeps them in map-sdk while every
-data and content choice stays with the host.
+data and content choice stays with the host. Planning then showed that a lens inside the parents'
+plugin mixes two kinds of feature in one list, legend and summary line ("12 Townships" counting
+sections), so the user made the lens its own plugin, `shapesLens` (section 4).
 
 ## Goals
 
-- `shapesPlugin`: `zoomRange`, a rich `tooltip`, `legendUnits`, `legendNote`, and `lens`.
+- `shapesPlugin`: `zoomRange`, a rich `tooltip`, `legendUnits` and `legendNote`.
+- `shapesLens`: the lens, its own plugin over a choropleth `shapesPlugin`.
 - `pointsPlugin`: a count label on markers (`count`), summed in clusters, in the Explorer's look;
   plus `legendUnits` and `legendNote`.
 - The legend: the unit line and the note, per section; shared sections take the first member's.
@@ -151,16 +156,28 @@ legendNote?: Snippet;
   owns its content (a link, a help button).
 - `shareSections`: a shared section takes the first member's `unitsLine` and the first member's
   `note` that are set, the same rule as `scaleLabel`.
-- The lens (below) takes its own `legendUnits` and `legendNote`.
+- The lens (`shapesLens`, below) takes its own `legendUnits` and `legendNote`.
 
-### 4. `shapesPlugin({ lens })`
+### 4. `shapesLens({ parents, … })`
 
-A shapes plugin with `lens` draws parent shapes (townships) that open into child shapes (sections)
-around the one under the pointer.
+A lens is its own plugin, added right after its parents' plugin. It draws child shapes
+(sections) around the parent (township) under the pointer, and hides those parents beneath it.
+The user, 2026-11-16 (after the spec's first approval): a separate layer, so the list, the legend,
+the cards and the view summary treat sections as sections through the code that already exists,
+instead of the parents' plugin carrying a second kind of feature.
 
 ```ts
-lens?: {
-	/** The children. The host fills it for `lens.center`, typically on a short debounce. */
+const townships = shapesPlugin({ id: "townships", mode: "choropleth", zoomRange: { max: 11 }, … });
+const lens = shapesLens({ id: "lens", parents: townships, source, block, parentOf, layerLabel, … });
+createMap({ plugins: [townships, lens, sections, notices] });
+```
+
+```ts
+export interface ShapesLensOptions<C extends MapFeatureProperties> {
+	id: string;
+	/** The parents' plugin (a `shapesPlugin`, choropleth). Add the lens right after it. */
+	parents: MapPlugin;
+	/** The children. The host fills it for `center`, typically on a short debounce. */
 	source: DataSource<C>;
 	/** The parents whose children the lens shows when centred on `refKey`, itself included. */
 	block(refKey: string): string[];
@@ -175,102 +192,98 @@ lens?: {
 	tooltipShowsName?: boolean;
 	legendUnits?: string;
 	legendNote?: Snippet;
-};
-```
+}
 
-Choropleth only (a `plain` plugin with `lens` throws at creation). The children are drawn by the
-plugin itself, coloured by the lens source's own scale (the dashboard passes the section
-`ScaleRef`; it then shares a legend section with the zoomed-in sections plugin).
-
-**What the host gets back.** `shapesPlugin` returns `ShapesPlugin`, a `MapPlugin` plus, with
-`lens`:
-
-```ts
-lens: {
+export interface ShapesLens extends MapPlugin {
 	/** Reactive: the parent the lens is centred on, or null. */
 	readonly center: string | null;
-	/** Reactive: the lens is pinned (by `pin`, or a lens card). */
+	/** Reactive: pinned by `pin`. */
 	readonly pinned: boolean;
 	/** Centres the lens on `refKey` and pins it ("Show square miles"). */
 	pin(refKey: string): void;
 	/** Unpins and drops the lens. */
 	release(): void;
-};
+}
 ```
 
-The control is on the plugin, not `MapContext`, so two lensed plugins never share one, and nothing
-changes for hosts without a lens. (This replaces the `map.lens` name in the brainstorm's sketch.)
+`shapesLens` throws when `parents` isn't a choropleth `shapesPlugin` (it needs the parents'
+internal hooks: their source for feature state, their shown-in-range flag). The lens draws its
+children with the shapes drawing already there (fill, outline mode, `noFigure`), coloured by its
+own source's scale; the dashboard passes the section `ScaleRef`, so the lens shares a legend
+section with the zoomed-in sections plugin. Its children are never selectable. It has its own
+`legend()`, `tooltip` and hit plugin id, so cards, list and summary need nothing new.
 
-**The rules** (the Explorer's, from `section-map.js`):
+**The rules** (the Explorer's hover, the dashboard's pinning; the user, 2026-11-16):
 
-- **Hover raises it.** When the map's hover is one of this plugin's parents, the lens centres on it
-  (unless pinned).
-- **Recentring.** When the hover is one of the lens's children whose `parentOf` isn't the centre,
-  the lens recentres on that parent (unless pinned). The hover follows `map.hovered` (the router's
-  result), not layer `mousemove` listeners, so the Explorer's listener-order fixes aren't needed.
-- **What counts as "over the lens".** The lens follows this plugin's own topmost feature under
-  the pointer (a parent or a drawn child), even when another plugin's marker is on top of it (a
-  notice or monitor inside the block): the user, 2026-11-16 (builder check, 1a), so resting on a
-  notice inside the lens never drops it. This needs the router to give each plugin its own hit
-  under the pointer, not only the top hit (see `PluginContext` below).
-- **Grace.** When the pointer is over none of the plugin's parents and the lens's children (off
-  the map, or over another plugin's feature with nothing of this plugin beneath), the lens drops
-  after 120 ms (the Explorer's `LENS_CLEAR_DELAY_MS`), unless the pointer comes back first or the
-  lens is pinned. Moving between a parent and its children never drops it. A recentre after the
-  clear was scheduled cancels it.
-- **Pinning.** The lens is pinned while `pin()` set it, or while the pinned card (`map.pinned`) or
-  the keyboard-focused item is the centre parent, one of the lens's children, or another plugin's
-  feature lying inside a drawn child or a parent of the block (a notice card opened inside a
-  pinned lens keeps it pinned; the user, 1a). While pinned, hover doesn't move it. It is released
-  when `release()` is called, or when the pinned card closes (Esc, Close, a click on nothing) or
-  moves to a feature outside the block. Clicking a lens child pins that child's card, and the lens
-  stays pinned.
-- **Only in range.** The lens never shows while the plugin is out of its `zoomRange`, and drops if
-  the zoom leaves the range.
-- **Touch and clicks.** A tap raises the lens, as in the Explorer (the user, 1a on the touch
-  question): the browser's emulated hover after the tap centres it, and the tap pins the parent's
-  card, which pins the lens. A mouse click on a parent does the same. The next tap or click on a
-  child pins the child's card, and the lens stays. No touch special case: hover from touch is
-  treated like any hover. "Show square miles" (`lens.pin(refKey)`) is then the keyboard path
-  (list focus gives no hover), and still works for any input.
-- **The plugin detaching, its source emptying, or the map detaching** drops the lens with no
-  timer left running.
+- **What counts as "over the lens".** The lens follows the topmost parent or drawn child under
+  the pointer, even when another plugin's marker is on top of it (a notice or monitor inside the
+  block), so resting on a notice inside the lens never drops it (the user, 1a). This needs the
+  router to give each plugin its own hit under the pointer, not only the top hit (see
+  `PluginContext` below).
+- **Hover raises it.** When the pointer is over a parent, the lens centres on it (unless pinned).
+- **Recentring.** When the pointer is over a drawn child whose `parentOf` isn't the centre, the
+  lens recentres on that parent (unless pinned).
+- **Grace.** When the pointer is over no parent and no drawn child (off the map, or over another
+  plugin's feature with neither beneath it), the lens drops after 120 ms (the Explorer's
+  `LENS_CLEAR_DELAY_MS`), unless the pointer comes back first or the lens is pinned. Moving between
+  a parent and its children never drops it. A recentre after the clear was scheduled cancels it.
+- **The card is part of the hover (WCAG 1.4.13, hoverable).** While the pointer is over the map's
+  tooltip or card element, the lens keeps its centre: moving from the lens onto the township's
+  card never drops it, and the grace starts only when the pointer leaves the card for somewhere
+  that isn't over the lens.
+- **Esc dismisses (WCAG 1.4.13, dismissible).** Esc while an unpinned lens shows drops it without
+  moving the pointer; it doesn't come back until the pointer is over a different parent or leaves
+  and returns. (Esc on a pinned card keeps today's behaviour: it closes the card, and below.)
+- **A click or tap opens a card only** (the dashboard's spec 5, Part 2: "On touch, a tap opens
+  the card and never the lens directly"; the user chose this over 2a, with no option to keep the
+  Explorer's tap). A click on a parent pins its card and doesn't pin the lens; mouse hover still
+  moves the unpinned lens. **Hover that comes from touch is ignored by the lens** (the browser's
+  emulated mouse events after a tap), so on touch the lens appears only through `pin`. The router
+  knows a touch from its `pointerdown` pointer type; it marks hover from touch (see `PluginContext`).
+- **Pinning.** `pin(refKey)` centres the lens there and pins it; the township card's "Show square
+  miles" calls it, for keyboard and touch alike. While pinned, hover doesn't move it. It is
+  released by `release()` (the host calls it when another township is picked), Esc, or the pinned
+  card closing (Close, a click on nothing) or moving to a feature that is neither a parent of the
+  block nor a drawn child nor another plugin's feature inside the block. Clicking a lens child
+  pins that child's card and the lens stays pinned. With the lens unpinned, a pinned card on a
+  drawn child (or a feature inside the block) also holds the lens where it is, so the card's
+  feature doesn't vanish under it; the hold ends when that card closes.
+- **Only in range.** The lens never shows while the parents are out of their `zoomRange`, and drops
+  (and releases) if the zoom leaves it.
+- **The lens or its parents detaching, or the map detaching** drops the lens with no timer left
+  running.
 
 **Drawing.**
 
 - Children are drawn only when `parentOf` is in `block(center)`, so a host can leave neighbouring
   blocks in the source (its cache) and stale data for an earlier centre never shows.
-- A parent in the block loses its fill only once at least one of its children is drawn (by feature
-  state, so no data reload). Until the children arrive, the parents keep their colours: the block
-  never shows empty.
-- The child layers draw above the parent fill and outline, in the plugin's draw slot, and are
-  interactive under the same plugin id. The centre parent's outline draws over the children (a
-  2px `--foreground` line, the Explorer's hovered-township outline).
-- Children use the shapes drawing already there (fill, outline mode, `noFigure`), built from the
-  lens's own scale.
+- A parent in the block loses its fill only once at least one of its children is drawn (feature
+  state on the parents' source, so no data reload). Until the children arrive, the parents keep
+  their colours: the block never shows empty.
+- The lens's layers sit in its own draw slot, right above the parents. The centre parent's
+  outline draws over the children (a 2px `--foreground` line, the Explorer's hovered-township
+  outline), as a lens layer.
 
 **Listing, cards and legend.**
 
-- `features()` lists the children while the lens is **pinned** (so keyboard users reach the
-  sections after "Show square miles"), and doesn't list them while it's only hovered (so the list
-  doesn't churn under a moving pointer). Child items have `selectable: false`.
-- `tooltip(item)` dispatches by the item: a child's to `lens.tooltip`, a parent's to the plugin's
-  `tooltip`. `tooltipShowsName` the same way.
-- `legend()` gives the parent section; while children are drawn it also gives the lens's section.
-  `MapPlugin.legend` returns one `LegendData` today, so this needs `legend()` to be able to return
-  several (an array), or an equivalent the Legend reads. `shareSections` then merges the lens's
-  section with the zoomed-in sections plugin's when their `ScaleRef`s are equal.
+- `features()` lists the drawn children only while the lens is **pinned** (so keyboard users reach
+  the sections after "Show square miles"), and lists nothing while it's only hovered (so the list
+  doesn't churn under a moving pointer). Items have `selectable: false`.
+- `legend()` gives the lens's section while children are drawn, and `null` otherwise (decision 3).
+- The view summary needs nothing: the lens is a plugin with its own `layerLabel`, and it sets
+  `summarizeEmpty: false`, so the summary has no "0 Sections" line while the lens is down.
 
 **What `PluginContext` needs.** Read-only and additive:
 
-- a reactive `ownHover`: this plugin's own topmost hit under the pointer and where (a
-  `Hovered | null`), whatever lies on top of it, including when the top hit is another plugin's
-  or a blocking layer's (a cluster bubble). Null off the map and on `mouseout`. The router already
-  queries every registered layer under the pointer on each move; it keeps the topmost hit per
-  plugin alongside `hovered`. A non-hoverable plugin still gets its own.
-- reactive `pinned` and `focusedKey` (the map's), so the plugin can apply the pinning rule.
-
-`map.hovered`, the tooltip, the cursor and every other plugin are unchanged.
+- `hoverOf(pluginId: string): (Hovered & { touch: boolean }) | null`, reactive: that plugin's own
+  topmost hit under the pointer and where, whatever lies on top of it (another plugin's marker, a
+  blocking layer such as a cluster bubble), and whether the move came from touch. Null off the
+  map and on `mouseout`. It changes only when the hit's refKey, or `touch`, changes, not on every
+  move. A non-hoverable plugin's features count. `map.hovered`, the tooltip, the cursor and every
+  other plugin are unchanged.
+- `pinned` and `focusedKey`, reactive (the map's).
+- `pointerInCard`, reactive: the pointer is over this map's tooltip or card element (`MapTooltip`
+  reports it).
 
 ### 5. `pointsPlugin({ count })`
 
@@ -304,26 +317,6 @@ frame (16 ms) on the dev machine, do the deferred faster in-view test (skip the 
 label point or whole bbox is inside the view) in this beta; otherwise report the number to the
 coordinator for `DEFERRED.md`.
 
-## Constraints
-
-- Svelte 5 runes; tokens only for colour, with the fixed exceptions in `CLAUDE.md`; every string a
-  `mapsdk_*` key (this design adds none: units, labels and notes are the host's).
-- Colour never alone: lens children keep the outline and the legend's labels.
-- `prefers-reduced-motion`: the lens has no animation.
-- Two maps share nothing: lens state is per plugin instance and per map.
-- `test:bundle`: `./data` and `./stores` stay off the map engine (nothing here touches them).
-- README "Changes", token list, examples and `tests/unit/readme-examples.test.ts`; CLAUDE.md
-  architecture lines; version `0.1.0-beta.17` in the same PR.
-
-## Left to the builder
-
-- Internal structure of the lens (a nested `shapesPlugin` through `scopedContext`, as `hmsFirePlugin`
-  nests, or the layers built in place).
-- The multi-section `legend()` shape, as long as existing plugins' `legend()` still works.
-- Count marker sizes and text size.
-- Test layout across `unit`, `client`, `browser` and e2e. Hover rules need browser tests with the
-  real pointer (`park-pointer.ts` in `afterEach`).
-
 ### 7. The demo (the user, 2026-11-16: yes)
 
 The demo gets a pesticide map: mock townships and sections (a small grid of square polygons in
@@ -337,3 +330,22 @@ cluster sum property (not drawn text: the e2e style has no glyphs).
 
 This doesn't add the older features the deferred "demo page doesn't show the newer opt-in
 features" lists; that entry stays open for the coordinator, with this work noted.
+
+## Constraints
+
+- Svelte 5 runes; tokens only for colour, with the fixed exceptions in `CLAUDE.md`; every string a
+  `mapsdk_*` key (this design adds none: units, labels and notes are the host's).
+- Colour never alone: lens children keep the outline and the legend's labels.
+- `prefers-reduced-motion`: the lens has no animation.
+- Two maps share nothing: lens state is per plugin instance and per map.
+- `test:bundle`: `./data` and `./stores` stay off the map engine (nothing here touches them).
+- README "Changes", token list, examples and `tests/unit/readme-examples.test.ts`; CLAUDE.md
+  architecture lines; version `0.1.0-beta.17` in the same PR.
+
+## Left to the builder
+
+- Internal structure of the lens (wrapping an inner `shapesPlugin` for the children, or the
+  layers built in place) and of the parents' internal hooks.
+- Count marker sizes and text size.
+- Test layout across `unit`, `client`, `browser` and e2e. Hover rules need browser tests with the
+  real pointer (`park-pointer.ts` in `afterEach`).
