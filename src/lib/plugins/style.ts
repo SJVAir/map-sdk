@@ -1,4 +1,5 @@
 import type { ExpressionSpecification } from "@maptiler/sdk";
+import { readableColor } from "color2k";
 import type { Level, Scale } from "../data/scale-types.js";
 
 /** Theme token read at plugin setup (getComputedStyle on the container) for unmatched values. */
@@ -14,7 +15,7 @@ export interface ThemeColors {
 	highlightForeground: string;
 	/** Marker and cluster outlines and cluster counts: `--foreground`. */
 	foreground: string;
-	/** Count markers' outline and number (`pointsPlugin`'s `count`): `--background`. */
+	/** Count markers' and count bubbles' edge (`pointsPlugin`'s `count`): `--background`. */
 	countMarkerText: string;
 	/** Markers drawn muted by default (see `icon.mutedColor`): `--muted-foreground`. */
 	mutedForeground: string;
@@ -264,6 +265,21 @@ export function colorExpression(
 	neutral: string
 ): ExpressionSpecification {
 	return levelLookup(scale, property, neutral, (level) => level.color || null);
+}
+
+/**
+ * Black or white per level, whichever reads better on the level's color (color2k's
+ * `readableColor`, as the level chips use), and on `neutral` where no level or color applies. For
+ * text drawn on a level-colored marker, such as `pointsPlugin`'s count (WCAG 1.4.3).
+ */
+export function readableTextExpression(
+	scale: Scale,
+	property: "value",
+	neutral: string
+): ExpressionSpecification {
+	return levelLookup(scale, property, readableColor(neutral), (level) =>
+		level.color ? readableColor(level.color) : null
+	);
 }
 
 /** Opacity per level, or the plain `fallback` number when no level sets one. */

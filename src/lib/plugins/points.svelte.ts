@@ -46,6 +46,7 @@ import {
 	colorExpression,
 	levelKeyExpression,
 	opacityExpression,
+	readableTextExpression,
 	themeColors,
 	type ThemeColors
 } from "./style.js";
@@ -497,7 +498,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 		}
 
 		/** The number on count markers of 2 or more; never interactive (the circle takes the hit). */
-		function countLabelLayer(property: string, sourceId: string): LayerSpecWithoutId {
+		function countLabelLayer(property: string, scale: Scale, sourceId: string): LayerSpecWithoutId {
 			return {
 				type: "symbol",
 				source: sourceId,
@@ -508,7 +509,8 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 					"text-allow-overlap": true,
 					"text-ignore-placement": true
 				},
-				paint: { "text-color": theme.countMarkerText }
+				// Black or white by the level's color (WCAG 1.4.3); the edge stays --background.
+				paint: { "text-color": readableTextExpression(scale, "value", theme.neutral) }
 			};
 		}
 
@@ -586,7 +588,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 					layers.push(
 						ctx.addLayer(
 							layerLocal("count", group),
-							zoomed(countLabelLayer(countProp, sources.get(group)!))
+							zoomed(countLabelLayer(countProp, scale, sources.get(group)!))
 						)
 					);
 				}

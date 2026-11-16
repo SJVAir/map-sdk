@@ -8,6 +8,7 @@ import {
 	levelKeyExpression,
 	NEUTRAL_COLOR_VAR,
 	opacityExpression,
+	readableTextExpression,
 	themeColors
 } from "../../../src/lib/plugins/style.js";
 import { burnScale, fireScale, heatScale, pm25Scale, smokeScale } from "../../fixtures/scales.js";
@@ -254,5 +255,30 @@ describe("the school markers' count text contrast", () => {
 
 	it("white 12px bold on the school fill is at least 4.5:1", () => {
 		expect(contrast("#ffffff", FALLBACK_THEME_COLORS.schoolMarker)).toBeGreaterThanOrEqual(4.5);
+	});
+});
+
+describe("readableTextExpression", () => {
+	// Count numbers (0.1.0-beta.19): black or white, whichever reads better on the level's color.
+	const black = "rgba(0,0,0,1)";
+	const white = "rgba(255,255,255,1)";
+
+	it("gives black on a light level and white on a dark one", () => {
+		const expr = readableTextExpression(pm25Scale, "value", "#9ca3af");
+		expect(evaluate(expr, 5)).toBe(black); // Good, #00e400
+		expect(evaluate(expr, 300)).toBe(white); // Hazardous, #7e0023
+	});
+
+	it("falls back by the neutral color, so a light and a dark theme each read", () => {
+		expect(evaluate(readableTextExpression(pm25Scale, "value", "#e5e7eb"), null)).toBe(black);
+		expect(evaluate(readableTextExpression(pm25Scale, "value", "#1f2937"), null)).toBe(white);
+	});
+
+	it("gives black on the notices' pink, not --background (WCAG 1.4.3)", () => {
+		const pink: typeof smokeScale = {
+			...smokeScale,
+			levels: [{ ...smokeScale.levels[0], key: "notice", value: "notice", color: "#e64980" }]
+		};
+		expect(evaluate(readableTextExpression(pink, "value", "#9ca3af"), "notice")).toBe(black);
 	});
 });

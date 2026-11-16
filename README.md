@@ -263,7 +263,8 @@ takes its first member's that is set. Without them the section is as before.
 
 `count: { property }` on `pointsPlugin` puts a number on each circle marker (e.g. notices per
 section): a count of 1 is a plain dot, 2 or more a larger circle with the number in it, in
-`--background` (white without it), with a `--background` edge. Clustered, the bubbles sum the
+black or white, whichever reads better on the level's color (WCAG 1.4.3), with a `--background`
+edge (white without it). Clustered, the bubbles sum the
 property (a `clusterProperties` sum named `mapsdk:count`, merged with the host's own) and show the
 sum the same way, larger, in the scale's first level's color; a host `cluster.layers` still wins.
 The list, its accessible names and the generic tooltip are unchanged. Circle markers only: `count`
@@ -934,6 +935,16 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.19
+
+- **Count numbers read on every level color:** `pointsPlugin`'s `count` markers and count cluster
+  bubbles draw their number in black or white, whichever contrasts more with the marker's color
+  (color2k's `readableColor`, as the level chips use; for a feature with no level, the neutral
+  color), instead of `--background`. On the spray notices' pink (`#e64980`), `--background` gave
+  3.43:1 in the light theme; black gives 5.63:1 in both. The `--background` edge stays.
+  `readableTextExpression(scale, "value", neutral)`, the expression it uses, is exported beside
+  `colorExpression` for a plugin's own text on level colors.
 
 ### 0.1.0-beta.18
 

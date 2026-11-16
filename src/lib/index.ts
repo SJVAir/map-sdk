@@ -28,7 +28,12 @@ export type {
 	PointsTooltipEnv
 } from "./plugins/points.svelte.js";
 export type { ClusterLayers } from "./plugins/points-clusters.js";
-export { colorExpression, levelKeyExpression, opacityExpression } from "./plugins/style.js";
+export {
+	colorExpression,
+	levelKeyExpression,
+	opacityExpression,
+	readableTextExpression
+} from "./plugins/style.js";
 export type { ThemeColors, ValueInput } from "./plugins/style.js";
 export { shapesPlugin } from "./plugins/shapes.svelte.js";
 export type { ShapesOptions, ShapesTooltipEnv } from "./plugins/shapes.svelte.js";

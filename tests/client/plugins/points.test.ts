@@ -15,6 +15,7 @@ import { pointsPlugin, type PointsOptions } from "../../../src/lib/plugins/point
 import {
 	colorExpression,
 	FALLBACK_THEME_COLORS,
+	readableTextExpression,
 	levelKeyExpression
 } from "../../../src/lib/plugins/style.js";
 import { focusAreaPlugin } from "../../../src/lib/presets/focus-area.svelte.js";
@@ -1016,7 +1017,10 @@ describe("pointsPlugin count", () => {
 		const label = byId(gl, ":count");
 		expect(label.filter).toEqual(["all", ["!", ["has", "point_count"]], [">=", count, 2]]);
 		expect(label.layout!["text-field"]).toEqual(["to-string", ["get", "notices"]]);
-		expect(label.paint!["text-color"]).toBe(FALLBACK_THEME_COLORS.countMarkerText);
+		// Black or white by the level's color (WCAG 1.4.3); the edge stays --background.
+		expect(label.paint!["text-color"]).toEqual(
+			readableTextExpression(pm25Scale, "value", FALLBACK_THEME_COLORS.neutral)
+		);
 	});
 
 	it("sums in clusters and labels the sum in the same look", async () => {
@@ -1037,6 +1041,8 @@ describe("pointsPlugin count", () => {
 		expect(bubbles.paint!["circle-radius"]).toBe(15);
 		expect(bubbles.paint!["circle-stroke-color"]).toBe(FALLBACK_THEME_COLORS.countMarkerText);
 		const sum = byId(gl, ":cluster-count");
+		// pm25's first level is a light green: a black number.
+		expect(sum.paint!["text-color"]).toBe("#000");
 		expect(sum.layout!["text-field"]).toEqual(["to-string", ["get", "mapsdk:count"]]);
 	});
 
