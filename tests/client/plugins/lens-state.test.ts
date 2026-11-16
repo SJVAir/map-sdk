@@ -170,16 +170,20 @@ describe("createLensState", () => {
 		expect(state.center).toBe("T3");
 	});
 
-	it("a notice card inside the block holds the lens; one outside doesn't", () => {
+	it("only a section card holds a hover lens; a notice card inside the block doesn't", () => {
+		// The user, 2026-11-16: notices draw above the lens and never vanish under it.
 		const { inputs, state } = lens();
 		inputs.parentHover = hover("parents", "T1");
 		step();
 		inputs.card = hover("notices", "feature:n1", false, [1, 1]);
 		step();
-		expect(state.held).toBe(true);
-		inputs.card = hover("notices", "feature:n2", false, [50, 1]);
-		step();
 		expect(state.held).toBe(false);
+		inputs.parentHover = hover("parents", "T3");
+		step();
+		expect(state.center).toBe("T3");
+		inputs.card = hover("lens", "T3-S2");
+		step();
+		expect(state.held).toBe(true);
 	});
 
 	it("a pinned lens is released when the pinned card closes or moves outside the block", () => {

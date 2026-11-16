@@ -70,8 +70,9 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 		if (card.hit.pluginId === inputs.parentsId) return inputs.blockHas(card.hit.refKey);
 		return inputs.inBlock(card.lngLat);
 	};
+	/** A card on one of the lens's own children (a section). */
 	const isChildCard = (card: Hovered | null): boolean =>
-		card !== null && card.hit.pluginId !== inputs.parentsId && cardInLens(card);
+		card !== null && card.hit.pluginId === inputs.lensId;
 
 	function run(): void {
 		const parent = inputs.parent();
@@ -107,8 +108,8 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 				// stays down until the pointer leaves it).
 				drop("center");
 			}
-			// A pinned card on a child (or a feature inside the block) keeps the lens where it is, so
-			// the card's feature doesn't vanish under it.
+			// A pinned card on a child keeps a hover lens where it is, so the card's section doesn't
+			// vanish under it. Not other cards (a notice): their features draw above the lens.
 			held = center !== null && isChildCard(card);
 			if (target === null || !suppressed.has(target)) suppressed.clear();
 			if (target !== null && suppressed.has(target)) return;
@@ -139,7 +140,7 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 		get pinned(): boolean {
 			return pinned;
 		},
-		/** Reactive: held in place by a pinned card on a child or a feature inside the block. */
+		/** Reactive: a hover lens held in place by a pinned card on one of its children. */
 		get held(): boolean {
 			return held;
 		},
