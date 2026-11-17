@@ -373,7 +373,8 @@ more says "Average". A feature with a `count` (`FireFeatureProperties`, which th
 groups carry) is a group. Fire values are cut off at the display precision, not rounded, in the
 tooltip, the list and its accessible names, so 9.96 MW reads "9.9" beside "<10".
 
-`legendDisplay: "gradient" | "blocks"` on `pointsPlugin` sets how the legend draws a range scale
+`legendDisplay: "gradient" | "blocks"` on `pointsPlugin`, `shapesPlugin` and `shapesLens` sets
+how the legend draws a range scale
 (default a gradient; `hmsFirePlugin` uses `"blocks"`, labeled with the levels' own labels). A blocks
 legend (also every category scale, such as smoke) is one outlined bar of contiguous segments with
 each level's label under its segment; long labels wrap. `legendTitle: "layer" | "entry-type"` sets
@@ -623,7 +624,10 @@ A `DataSource` is `{ status, features, scale }`: a load status (`loading`, `read
 and level labels) or a full `Scale`. A value the scale doesn't cover (null, negative) draws neutral
 and reads "No level"; a level with an empty color draws neutral with its own label. While a
 source loads, fails, or is unavailable, the legend says so (a failure offers "Try again", which
-calls `status.retry()`). Values are shown with the metadata's display precision, except in the
+calls `status.retry()`). An unavailable status's `reason` is a code for your own logic; give it an
+already-translated `message` (`{ state: "unavailable", reason: "filter-gone", message }`) and the
+legend shows it under the layer's name in place of the generic "isn't available right now", with
+the plugin's `legendNote` below. Values are shown with the metadata's display precision, except in the
 monitor, cluster, and collocation tooltips, which match monitor-map: the reading and a cluster's
 average are whole numbers, and a cluster's max and min are as reported. Fire values are cut off
 rather than rounded (see `truncateValues`). On a category scale, a value that is its level's code
@@ -978,6 +982,12 @@ local sjvair.com stack at `http://localhost:8000`.
 - **`shapesLens`:** a hover lens held by a section's or notice's card stays held when the card is
   swapped for its centre township's, until that card closes or moves on. A township's card pinned
   any other way still doesn't hold it.
+- **`legendDisplay`** on `shapesPlugin` and `shapesLens`, as on `pointsPlugin`: `"blocks"` draws
+  a range scale as labeled blocks (a gradient's tick labels run together with many classes).
+  Default unchanged. Plugins that share a legend section take the first one's display.
+- **The legend's unavailable row:** the layer's name as its heading, then the source's new
+  optional `message` (`DataStatus` `unavailable`), else the generic line, then the plugin's
+  `legendNote` (hidden until beta.19). Every unavailable row gains the heading.
 - **The card:** when a click or key inside the card swaps it, focus moves to the card itself (labelled with the new name, with a focus ring; focusable only then), so the swap is
   announced; Close and Esc still hand focus back to where it was before the card.
 

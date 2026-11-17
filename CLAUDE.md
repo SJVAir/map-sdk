@@ -113,7 +113,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   a click opens a card only, touch hover ignored; a section or notice card's hold carries over
   when the card is swapped for the centre parent's; children listed only while pinned, but
   `itemFor` gives a drawn child's item to the tooltip and card either way). Both take
-  `legendUnits`/`legendNote` (`shared.ts`'s `hostLegend`). `shapesPlugin` also has
+  `legendUnits`/`legendNote` (`shared.ts`'s `hostLegend`, which keeps the note on an unavailable
+  status) and `legendDisplay`. `shapesPlugin` also has
   fill/`outline`/check overlay, `hoverable`, `noFigure: "outline"` for a no-level feature's
   unfilled `--foreground` edge, a `no-figure` line layer under `outline: "none"`, and `noFigure` on
   those polygons' items, by the legend's rule. Plus shared style expressions, scale resolution,

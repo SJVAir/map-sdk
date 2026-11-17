@@ -117,3 +117,17 @@ browser projects.
 - **The review's minors, fixed.** Focus moves to the card only for a swap a click or key inside
   the card caused (not a `pin` from host code elsewhere); pinning the feature already pinned is a
   no-op; the README examples test covers a successful `pin`.
+
+## Added to beta.20: two legend changes (the user, 2026-11-17)
+
+Raised by the dashboard from 5b on the local stack: pesticide use's 8 classes drew as a gradient
+whose tick labels ran together.
+
+- **`legendDisplay?: "gradient" | "blocks"`** on `shapesPlugin` and `shapesLens`, as on
+  `pointsPlugin`. Hosts that set nothing see no change.
+- **The unavailable status row** (DEFERRED "map-sdk's legend status row ignores the unavailable
+  reason", due with this legend change; the user chose to fix it). `DataStatus`'s `unavailable`
+  gains an optional `message`: already-translated host text, shown under the layer's name (a
+  heading, now on every unavailable row) in place of the generic line. `reason` stays a code and
+  is never shown. The plugin's `legendNote` shows under the row (`hostLegend` keeps it on an
+  unavailable status). The user approved the layout from a text sketch; screenshots followed.
