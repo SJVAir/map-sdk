@@ -950,6 +950,172 @@ describe("pinned card", () => {
 		expect(map.pinned?.hit.refKey).toBe("monitor:a");
 	});
 
+	describe("pin()", () => {
+		const listed = () => [item("a"), { ...item("b"), lngLat: [-118, 35] as [number, number] }];
+
+		async function pinSetUp() {
+			const map = createMap({ config });
+			map.addPlugin({ ...points("monitors"), features: listed }, { selectionMode: "single" });
+			const gl = createFakeGl({ styleLoaded: true });
+			map.attach(gl);
+			await tick();
+			map.setCardEnabled(true);
+			return { map, gl };
+		}
+
+		it("pins a listed feature at its own anchor, with no move or featureclick", async () => {
+			const { map, gl } = await pinSetUp();
+			gl.setRenderedFeatures([rendered(map, "monitors", "a")]);
+			click(gl);
+			expect(map.pinned?.lngLat).toEqual([-119, 36]);
+			const selection = map.getSelection("monitors");
+			const featureclick = vi.fn();
+			map.on("featureclick", featureclick);
+			const moves = gl.moves.length;
+			expect(map.pin("monitors", "monitor:b")).toBe(true);
+			expect(map.pinned?.hit).toEqual({
+				pluginId: "monitors",
+				ref: { kind: "monitor", id: "b" },
+				refKey: "monitor:b",
+				name: "Site b"
+			});
+			// Where MapTooltip draws a listed item's card, never the open card's point (review,
+			// 2026-11-17: an inherited point drew nowhere and misled the lens's inBlock).
+			expect(map.pinned?.lngLat).toEqual([-118, 35]);
+			expect(gl.moves.length).toBe(moves);
+			expect(featureclick).not.toHaveBeenCalled();
+			expect(map.getSelection("monitors")).toEqual(selection);
+			expect(map.focusedKey).toBeNull();
+		});
+
+		it("with no card open pins at anchorFor(item)", async () => {
+			const { map } = await pinSetUp();
+			expect(map.pin("monitors", "monitor:b")).toBe(true);
+			expect(map.pinned?.lngLat).toEqual(map.anchorFor(listed()[1]));
+		});
+
+		it("keeps the card in place when the open card's point lies on the new feature's shape", async () => {
+			// The user, 2026-11-17: "In township" swaps the card exactly in place.
+			const square = (x: number, y: number, size: number): FeatureListItem => ({
+				...item(`${x}`),
+				refKey: `region:county:${x}`,
+				ref: { kind: "region", type: "county", code: `${x}` },
+				name: `Area ${x}`,
+				lngLat: [x + size / 4, y + size / 4],
+				geometry: {
+					type: "Polygon",
+					coordinates: [
+						[
+							[x, y],
+							[x + size, y],
+							[x + size, y + size],
+							[x, y + size],
+							[x, y]
+						]
+					]
+				}
+			});
+			const around = square(-120, 35, 2);
+			const far = square(-110, 30, 1);
+			const { map, gl } = await pinSetUp();
+			map.addPlugin({ ...points("areas", "region"), features: () => [around, far] });
+			gl.setRenderedFeatures([rendered(map, "monitors", "a")]);
+			click(gl);
+			expect(map.pin("areas", around.refKey)).toBe(true);
+			expect(map.pinned?.lngLat).toEqual([-119, 36]);
+			expect(map.pinned?.inPlace).toBe(true);
+			// From a card kept in place, a feature whose shape doesn't hold that point goes to its own.
+			expect(map.pin("areas", far.refKey)).toBe(true);
+			expect(map.pinned?.lngLat).toEqual(map.anchorFor(far));
+			expect(map.pinned?.inPlace).toBeFalsy();
+		});
+
+		it("while a list row is focused, keeps the place the focused card is drawn at", async () => {
+			// Review, 2026-11-17: MapTooltip draws a focused row's card at focusedAnchor, fixed at
+			// focus time; after a pan, anchorFor(item) is another point.
+			const rect = (
+				id: string,
+				w: number,
+				e: number,
+				label: [number, number]
+			): FeatureListItem => ({
+				...item(id),
+				refKey: `region:county:${id}`,
+				ref: { kind: "region", type: "county", code: id },
+				name: `Area ${id}`,
+				lngLat: label,
+				geometry: {
+					type: "Polygon",
+					coordinates: [
+						[
+							[w, 36],
+							[e, 36],
+							[e, 37],
+							[w, 37],
+							[w, 36]
+						]
+					]
+				}
+			});
+			const row = rect("a", -120, -119, [-119.5, 36.5]);
+			const around = rect("b", -119.8, -119.4, [-119.6, 36.5]);
+			const { map, gl } = await pinSetUp();
+			map.addPlugin({ ...points("areas", "region"), features: () => [row, around] });
+			map.focusFeature(row.refKey, "areas");
+			expect(map.focusedAnchor).toEqual([-119.5, 36.5]);
+			gl.easeTo({ center: [-116.5, 36.7] });
+			expect(map.anchorFor(row)).not.toEqual([-119.5, 36.5]);
+			expect(map.pin("areas", around.refKey)).toBe(true);
+			expect(map.pinned?.inPlace).toBe(true);
+			expect(map.pinned?.lngLat).toEqual([-119.5, 36.5]);
+		});
+
+		it("a point feature never keeps the open card's place", async () => {
+			const { map, gl } = await pinSetUp();
+			gl.setRenderedFeatures([rendered(map, "monitors", "a")]);
+			click(gl);
+			map.pin("monitors", "monitor:b");
+			expect(map.pinned?.lngLat).toEqual([-118, 35]);
+			expect(map.pinned?.inPlace).toBeFalsy();
+		});
+
+		it("refuses with the card off, an unknown plugin, hoverable: false, or an unlisted key", async () => {
+			const { map } = await pinSetUp();
+			map.addPlugin({ ...points("smoke"), hoverable: false, features: listed });
+			map.pin("monitors", "monitor:a");
+			const before = map.pinned;
+			expect(map.pin("nope", "monitor:b")).toBe(false);
+			expect(map.pin("smoke", "monitor:b")).toBe(false);
+			expect(map.pin("monitors", "monitor:zzz")).toBe(false);
+			expect(map.pinned).toBe(before);
+			map.setCardEnabled(false);
+			expect(map.pin("monitors", "monitor:b")).toBe(false);
+			expect(map.pinned).toBeNull();
+		});
+
+		it("while a list row is focused sets pinned and leaves the focus", async () => {
+			const { map } = await pinSetUp();
+			map.focusFeature("monitor:a", "monitors");
+			expect(map.pin("monitors", "monitor:b")).toBe(true);
+			expect(map.focusedKey).toBe("monitor:a");
+			expect(map.pinned?.hit.refKey).toBe("monitor:b");
+		});
+
+		it("pinning the feature already pinned changes nothing", async () => {
+			const { map } = await pinSetUp();
+			map.pin("monitors", "monitor:a");
+			const before = map.pinned;
+			expect(map.pin("monitors", "monitor:a")).toBe(true);
+			expect(map.pinned).toBe(before);
+		});
+
+		it("refuses after destroy", async () => {
+			const { map } = await pinSetUp();
+			map.destroy();
+			expect(map.pin("monitors", "monitor:a")).toBe(false);
+		});
+	});
+
 	it("unpins when the pinned feature's plugin is removed", async () => {
 		const { map, gl } = await cardSetUp();
 		gl.setRenderedFeatures([rendered(map, "monitors", "a")]);

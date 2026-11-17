@@ -133,7 +133,12 @@ export type LegendData =
 			 */
 			symbols: Array<{ label: string; markup: string }>;
 	  }
-	| { pluginId: string; status: DataStatus };
+	| {
+			pluginId: string;
+			status: DataStatus;
+			/** The plugin's `legendNote`, shown under an unavailable status. */
+			note?: Snippet;
+	  };
 
 export interface ClickEvent {
 	hits: FeatureHit[];
@@ -280,4 +285,9 @@ export interface MapPlugin {
 	 * hit from `PluginContext.blocking`).
 	 */
 	hoverTooltip?(hit: FeatureHit): Snippet | undefined;
+	/**
+	 * The item for a feature this plugin draws but doesn't list (a hover lens's sections), so its
+	 * tooltip and card show its `tooltip` content and value. Not listed, never focused or selected.
+	 */
+	itemFor?(refKey: string): FeatureListItem | undefined;
 }

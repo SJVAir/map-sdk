@@ -47,7 +47,7 @@ afterEach(async () => {
 });
 afterAll(() => sized.remove());
 
-async function lensMap(withNotice = false) {
+async function lensMap(withNotice = false, inTownship = false) {
 	const grid = lensGrid({ origin: ORIGIN, size: SIZE });
 	const map = createMap({
 		config: {
@@ -99,12 +99,27 @@ async function lensMap(withNotice = false) {
 			})
 		);
 	}
+	// With `inTownship`, a section card's "In township" (the dashboard's): the township's card in
+	// place of the section's, through `map.pin`.
 	const actions = createRawSnippet<[CardContext]>((ctx) => ({
-		render: () => `<button type="button">Show square miles</button>`,
-		setup: (button) => {
-			const onClick = () => lens.pin(ctx().refKey);
-			button.addEventListener("click", onClick);
-			return () => button.removeEventListener("click", onClick);
+		render: () =>
+			inTownship
+				? `<span><button type="button">Show square miles</button><button type="button">In township</button></span>`
+				: `<button type="button">Show square miles</button>`,
+		setup: (el) => {
+			const [square, township] =
+				el instanceof HTMLButtonElement ? [el] : el.querySelectorAll("button");
+			const onSquare = () => lens.pin(ctx().refKey);
+			const onTownship = () => {
+				const parent = grid.parentOf({ refKey: ctx().refKey } as Props);
+				if (ctx().pluginId === "lens" && parent) map.pin("parents", parent);
+			};
+			square.addEventListener("click", onSquare);
+			township?.addEventListener("click", onTownship);
+			return () => {
+				square.removeEventListener("click", onSquare);
+				township?.removeEventListener("click", onTownship);
+			};
 		}
 	}));
 	const attached: GlMapLike[] = [];
@@ -232,6 +247,85 @@ describe("shapesLens in a browser", () => {
 		await userEvent.keyboard("{Escape}");
 		await expect.element(section).not.toBeInTheDocument();
 		await vi.waitFor(() => expect(lens.pinned).toBe(false));
+	});
+
+	it("a section card's township button swaps in its township's card and keeps the hover lens", async () => {
+		const { lens, gl, pointAt, clickAt } = await lensMap(false, true);
+		await pointAt(at(2, 2));
+		await vi.waitFor(() => expect(lens.center).toBe(parentKey(2, 2)));
+		await clickAt(at(2, 2, 3));
+		const section = page.getByRole("group", { name: "T2-2 S3" });
+		await expect.element(section).toBeVisible();
+		// The lens's tooltip body shows under a hover lens too (the user, 2026-11-17, beta.20).
+		await expect.element(section.getByRole("link", { name: "Open the section" })).toBeVisible();
+		const { lng, lat } = gl.getCenter();
+		const was = section.element().getBoundingClientRect();
+		await section.getByRole("button", { name: "In township" }).click();
+		const township = page.getByRole("group", { name: "T2-2" });
+		await expect.element(township).toBeVisible();
+		await expect.element(section).not.toBeInTheDocument();
+		// Exactly in place (the user, 2026-11-17): the same anchor, centred over the same point.
+		const now = township.element().getBoundingClientRect();
+		expect(Math.abs(now.left + now.width / 2 - (was.left + was.width / 2))).toBeLessThan(1);
+		expect(Math.min(Math.abs(now.bottom - was.bottom), Math.abs(now.top - was.top))).toBeLessThan(
+			1
+		);
+		expect(gl.getCenter().lng).toBe(lng);
+		expect(gl.getCenter().lat).toBe(lat);
+		// A township outside the block the card doesn't cover.
+		const box = township.element().getBoundingClientRect();
+		const canvasBox = gl.getCanvas().getBoundingClientRect();
+		const free = (
+			[
+				[0, 0],
+				[0, 2],
+				[0, 4],
+				[2, 0],
+				[2, 4],
+				[4, 0],
+				[4, 2],
+				[4, 4]
+			] as const
+		).find(([r, c]) => {
+			const { x, y } = gl.project(at(r, c));
+			const [px, py] = [x + canvasBox.left, y + canvasBox.top];
+			return px < box.left - 8 || px > box.right + 8 || py < box.top - 8 || py > box.bottom + 8;
+		})!;
+		await pointAt(at(free[0], free[1]));
+		await settle(300);
+		expect(lens.center).toBe(parentKey(2, 2));
+		expect(lens.pinned).toBe(false);
+		await userEvent.keyboard("{Escape}");
+		await expect.element(township).not.toBeInTheDocument();
+		await pointAt(at(free[0], free[1], 0));
+		await vi.waitFor(() => expect(lens.center).toBe(parentKey(free[0], free[1])));
+	});
+
+	it("hovering a section under a hover lens shows its tooltip body", async () => {
+		const { lens, pointAt } = await lensMap();
+		await pointAt(at(2, 2));
+		await vi.waitFor(() => expect(lens.center).toBe(parentKey(2, 2)));
+		await pointAt(at(2, 2, 1));
+		await vi.waitFor(() =>
+			expect(document.querySelector(".mapsdk-tooltip")?.textContent).toContain("Section figures")
+		);
+	});
+
+	it("keyboard: the township button moves focus into the township's card and keeps a pinned lens", async () => {
+		const { lens, clickAt } = await lensMap(false, true);
+		await clickAt(at(2, 2));
+		const township = page.getByRole("group", { name: "T2-2" });
+		await township.getByRole("button", { name: "Show square miles" }).click();
+		expect(lens.pinned).toBe(true);
+		await clickAt(at(2, 2, 0));
+		const section = page.getByRole("group", { name: "T2-2 S0" });
+		const button = section.getByRole("button", { name: "In township" });
+		await expect.element(button).toBeVisible();
+		(button.element() as HTMLElement).focus();
+		await userEvent.keyboard("{Enter}");
+		await expect.element(township).toHaveFocus();
+		expect(lens.pinned).toBe(true);
+		expect(lens.center).toBe(parentKey(2, 2));
 	});
 
 	it("a touch tap opens the card only", async () => {

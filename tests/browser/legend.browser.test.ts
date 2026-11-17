@@ -291,9 +291,55 @@ describe("Legend", () => {
 				}
 			])
 		});
-		await expect.element(page.getByText("Smoke isn't available right now")).toBeVisible();
+		// Under the layer's heading, the line doesn't repeat the name (read once).
+		const row = page.getByRole("status");
+		await expect.element(row.getByRole("heading", { name: "Smoke" })).toBeVisible();
+		await expect.element(row.getByText("Isn't available right now", { exact: true })).toBeVisible();
+		expect(row.element().textContent!.split("Smoke").length - 1).toBe(1);
 		expect(page.getByRole("button").elements()).toHaveLength(0);
 		expect(document.querySelector(".mapsdk-legend")!.hasAttribute("hidden")).toBe(false);
+	});
+
+	it("an unavailable layer shows its name, the source's message, and the plugin's note", async () => {
+		// The user, 2026-11-17 (beta.20): DEFERRED "the legend status row ignores the unavailable
+		// reason". The source gives the words; the reason stays a code.
+		applyTheme("light");
+		const note = createRawSnippet(() => ({ render: () => `<p>3 notices have no place</p>` }));
+		render(Legend, {
+			map: fakeMap([
+				{
+					id: "notices",
+					label: "Spray notices",
+					legend: () => ({
+						pluginId: "notices",
+						status: {
+							state: "unavailable",
+							reason: "filter-gone",
+							message: "Spray notices can't be shown: a filter they use is no longer available."
+						},
+						note
+					})
+				},
+				{
+					id: "smoke",
+					label: "Smoke",
+					legend: () => ({ pluginId: "smoke", status: { state: "unavailable", reason: "scale" } })
+				}
+			])
+		});
+		const notices = page.getByRole("status").filter({ hasText: "filter they use" });
+		await expect.element(notices.getByRole("heading", { name: "Spray notices" })).toBeVisible();
+		await expect
+			.element(
+				notices.getByText("Spray notices can't be shown: a filter they use is no longer available.")
+			)
+			.toBeVisible();
+		expect(notices.element().textContent).not.toContain("isn't available right now");
+		await expect.element(notices.getByText("3 notices have no place")).toBeVisible();
+		const smoke = page.getByRole("status").filter({ hasText: "Isn't available right now" });
+		await expect.element(smoke.getByRole("heading", { name: "Smoke" })).toBeVisible();
+		const result = await axe.run(document.querySelector(".mapsdk-legend")!);
+		expect(result.violations).toEqual([]);
 	});
 
 	it("offers Try again on an error, which calls the status's retry", async () => {

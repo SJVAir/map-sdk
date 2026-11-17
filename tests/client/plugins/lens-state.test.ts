@@ -190,6 +190,69 @@ describe("createLensState", () => {
 		expect(state.held).toBe(true);
 	});
 
+	it("a held lens stays held when the card moves to its centre township", () => {
+		// The user, 2026-11-17 (0.1.0-beta.20): a section card's "In township" swaps in the
+		// township's card (MapContext.pin) and keeps the lens.
+		const { inputs, state } = lens();
+		inputs.parentHover = hover("parents", "T1");
+		step();
+		inputs.card = hover("lens", "T1-S2");
+		step();
+		expect(state.held).toBe(true);
+		inputs.card = hover("parents", "T1");
+		step();
+		expect(state.held).toBe(true);
+		inputs.parentHover = hover("parents", "T3");
+		step(1000);
+		expect(state.center).toBe("T1");
+		inputs.card = null;
+		step();
+		expect(state.held).toBe(false);
+		expect(state.center).toBe("T3");
+	});
+
+	it("the carried hold ends when the card moves on to another township", () => {
+		const { inputs, state } = lens();
+		inputs.parentHover = hover("parents", "T1");
+		step();
+		inputs.card = hover("lens", "T1-S2");
+		step();
+		inputs.card = hover("parents", "T1");
+		step();
+		expect(state.held).toBe(true);
+		inputs.card = hover("parents", "T2");
+		step();
+		expect(state.held).toBe(false);
+		inputs.parentHover = hover("parents", "T3");
+		step();
+		expect(state.center).toBe("T3");
+	});
+
+	it("a centre township's card that didn't come from a held card doesn't hold", () => {
+		const { inputs, state } = lens();
+		inputs.parentHover = hover("parents", "T1");
+		step();
+		inputs.card = hover("parents", "T1");
+		step();
+		expect(state.held).toBe(false);
+		inputs.parentHover = hover("parents", "T2");
+		step();
+		expect(state.center).toBe("T2");
+	});
+
+	it("list focus moving the held card to the centre township doesn't carry the hold", () => {
+		const { inputs, state } = lens();
+		inputs.parentHover = hover("parents", "T1");
+		step();
+		inputs.card = hover("lens", "T1-S2");
+		step();
+		expect(state.held).toBe(true);
+		inputs.focus = "T1";
+		inputs.card = hover("parents", "T1");
+		step();
+		expect(state.held).toBe(false);
+	});
+
 	it("a pinned lens is released when the pinned card closes or moves outside the block", () => {
 		const { inputs, state } = lens();
 		inputs.card = hover("parents", "T1");

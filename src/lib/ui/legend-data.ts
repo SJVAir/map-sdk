@@ -39,7 +39,7 @@ export type LegendEntry =
 			title: string;
 			symbols: Array<{ label: string; markup: string }>;
 	  }
-	| { kind: "status"; pluginId: string; layer: string; status: DataStatus };
+	| { kind: "status"; pluginId: string; layer: string; status: DataStatus; note?: Snippet };
 
 /** One legend section from a plugin's legend data; null for status-only data or no levels. */
 export function legendSection(data: LegendData, format: FormatProvider): LegendSection | null {

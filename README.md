@@ -145,8 +145,20 @@ same card, and Tab from the row reaches it. Esc closes the card of the map that 
 focus nowhere, it closes the page's most recently pinned card. One card shows at a time, and no hover card shows while
 one is pinned. Selection and `featureclick` are unchanged: a click still selects as before and
 also pins. `map.pinned` is the pinned feature (reactive), and `map.unpin()` closes it.
+`map.pin(pluginId, refKey)` pins a listed feature's card from your own code, such as a button on
+another card: it replaces the open card, and stays exactly where that card was when that point
+lies on the new feature's shape (a section's card swapped for its township's); otherwise it goes
+to the feature's point in view, as a click on the feature would place it. Pinning the feature
+already pinned changes nothing. It moves no camera and leaves the list focus,
+selection and `featureclick` alone, and returns `false`, changing nothing, while `card` is off,
+for a plugin not on the map or with `hoverable: false`, or for a feature its plugin doesn't list.
+If a click or key inside the card caused the swap (a button on the card), focus moves to the new
+card, which is labelled with the feature's name; Close and Esc still return it to where it was
+before the card. Only a `pin` made synchronously inside the card's click or key handler counts:
+one from elsewhere, or after an `await`, leaves focus where it is. A card kept in place goes to its
+feature's point in view once a pan takes that place out of view.
 `card={{ actions }}` also puts your buttons in a row at the card's foot: `actions` is a snippet
-given a `CardContext` (`pluginId`, `ref`, `refKey`, the listed `item` or `null`, reactive
+given a `CardContext` (`pluginId`, `ref`, `refKey`, the listed `item` (or a hover lens's drawn section's, through `itemFor`) or `null`, reactive
 `selectable` and `selected`, and `toggle()`, which is `map.togglePick` for that feature). Show
 Select/Remove only when `selectable` is true: a fire hotspot, a smoke plume, or a layer in mode
 `"none"` can't be selected, and `toggle()` then does nothing. Anything else goes in
@@ -300,13 +312,15 @@ the current block's children are drawn. Until a parent's children arrive it keep
   keyboard and touch path); hover then doesn't move it. `lens.release()`, Esc, or the pinned card
   closing or moving outside the block lets it go. A click or tap on a parent opens its card only.
   While a child's card, or a card on another plugin's feature inside the block (a notice), is
-  pinned, the lens holds where it is. Moving through the feature list
+  pinned, the lens holds where it is, and it stays held when that card is swapped for the centre
+  parent's (`map.pin`, below) for as long as that card is open. Moving through the feature list
   never releases a pinned lens, so keyboard users reach its rows.
 - **`lens.center`** and **`lens.pinned`** are reactive. The children are listed (never
-  selectable) only while the lens is pinned, and the lens's legend section shows only while
+  selectable) only while the lens is pinned, but a drawn child's tooltip and card show its
+  `tooltip` content either way, and the lens's legend section shows only while
   children are drawn; with the same `ScaleRef` as a zoomed-in sections plugin, they share one.
-- Options: `fillOpacity`, `outline`, `noFigure`, `tooltip`, `tooltipShowsName`, `legendUnits` and
-  `legendNote`, as on `shapesPlugin`. The centre parent gets a 2px `--foreground` outline over
+- Options: `fillOpacity`, `outline`, `noFigure`, `tooltip`, `tooltipShowsName`, `legendUnits`,
+  `legendNote` and `legendDisplay`, as on `shapesPlugin`. The centre parent gets a 2px `--foreground` outline over
   its children. It throws when `parents` isn't a choropleth `shapesPlugin`.
 
 ```ts
@@ -337,6 +351,19 @@ const sections = shapesPlugin({
 for (const plugin of [townships, lens, sections]) map.addPlugin(plugin);
 ```
 
+Under a hover lens the mouse always lands on a section, so a section's card can offer its
+township's card through `map.pin`, in place and with the lens held (`MapView`'s `card` actions):
+
+```svelte
+{#snippet actions(card: CardContext)}
+	{#if card.pluginId === "lens"}
+		<button type="button" onclick={() => map.pin("townships", townshipOfSection(card.refKey))}>
+			In township
+		</button>
+	{/if}
+{/snippet}
+```
+
 `hmsFirePlugin({ id?, source, hotspots?, layerLabel })` draws fires as flame icons sized and
 colored by FRP. With `hotspots`, it switches by itself while zooming, as sjvair.com's map does:
 `source` (the fire store's `groups`) below zoom 10 and `hotspots` from zoom 10. It stays one
@@ -348,7 +375,8 @@ more says "Average". A feature with a `count` (`FireFeatureProperties`, which th
 groups carry) is a group. Fire values are cut off at the display precision, not rounded, in the
 tooltip, the list and its accessible names, so 9.96 MW reads "9.9" beside "<10".
 
-`legendDisplay: "gradient" | "blocks"` on `pointsPlugin` sets how the legend draws a range scale
+`legendDisplay: "gradient" | "blocks"` on `pointsPlugin`, `shapesPlugin` and `shapesLens` sets
+how the legend draws a range scale
 (default a gradient; `hmsFirePlugin` uses `"blocks"`, labeled with the levels' own labels). A blocks
 legend (also every category scale, such as smoke) is one outlined bar of contiguous segments with
 each level's label under its segment; long labels wrap. `legendTitle: "layer" | "entry-type"` sets
@@ -598,7 +626,10 @@ A `DataSource` is `{ status, features, scale }`: a load status (`loading`, `read
 and level labels) or a full `Scale`. A value the scale doesn't cover (null, negative) draws neutral
 and reads "No level"; a level with an empty color draws neutral with its own label. While a
 source loads, fails, or is unavailable, the legend says so (a failure offers "Try again", which
-calls `status.retry()`). Values are shown with the metadata's display precision, except in the
+calls `status.retry()`). An unavailable status's `reason` is a code for your own logic; give it an
+already-translated `message` (`{ state: "unavailable", reason: "filter-gone", message }`) and the
+legend shows it under the layer's name in place of the generic "Isn't available right now", with
+the plugin's `legendNote` below. Values are shown with the metadata's display precision, except in the
 monitor, cluster, and collocation tooltips, which match monitor-map: the reading and a cluster's
 average are whole numbers, and a cluster's max and min are as reported. Fire values are cut off
 rather than rounded (see `truncateValues`). On a category scale, a value that is its level's code
@@ -684,7 +715,9 @@ ready and again after a basemap or theme change. For a plugin added to a ready m
 just after the current code finishes (a microtask), never inside the caller's code, so adding and
 removing plugins from an `$effect` is safe. Everything added through `ctx` is removed on teardown,
 and ids are namespaced per map. `features()` feeds the feature list, tooltip, and
-summary; `legend()` the legend. A plugin's `tooltip` content sits under the feature's name; set
+summary; `legend()` the legend. `itemFor(refKey)` gives the item for a feature the plugin draws
+but doesn't list (a hover lens's sections), so its tooltip and card still show its content and
+value. A plugin's `tooltip` content sits under the feature's name; set
 `tooltipShowsName` when the content shows the name itself (the monitor and collocation tooltips
 do), and the name header is left out.
 
@@ -935,6 +968,33 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.20
+
+- **New API: `MapContext.pin(pluginId, refKey)`** pins a listed feature's card from host code (a
+  section card's "In township"), replacing the open card: exactly in place when the open card's
+  point lies on the new feature's shape, else at the feature's point. No camera move, no list
+  focus, no selection change, no `featureclick`; `false` when refused; the same feature again
+  changes nothing. `pinned.inPlace` marks a card kept in place. Hosts that don't call it see no
+  change.
+- **`shapesLens`:** a drawn section's tooltip and pinned card show the lens's `tooltip` content
+  under a hover lens too (until beta.19, only the section's name and the card's actions showed
+  until the lens was pinned). The sections are still listed only while the lens is pinned. New
+  optional `MapPlugin.itemFor(refKey)` gives an unlisted drawn feature's item. With an item, a
+  hovered section's tooltip and a clicked section's card sit at the section's point in view, as
+  a listed shape's do, instead of at the pointer or the click.
+- **`shapesLens`:** a hover lens held by a section's or notice's card stays held when the card is
+  swapped for its centre township's, until that card closes or moves on. A township's card pinned
+  any other way still doesn't hold it.
+- **`legendDisplay`** on `shapesPlugin` and `shapesLens`, as on `pointsPlugin`: `"blocks"` draws
+  a range scale as labeled blocks (a gradient's tick labels run together with many classes).
+  Default unchanged. Plugins that share a legend section take the first one's display.
+- **The legend's unavailable row:** the layer's name as its heading, then the source's new
+  optional `message` (`DataStatus` `unavailable`), else "Isn't available right now" (new message
+  key `mapsdk_unavailable_line`, so the name is read once), then the plugin's `legendNote` (hidden
+  until beta.19). Every unavailable row gains the heading; an error row is unchanged.
+- **The card:** when a click or key inside the card swaps it, focus moves to the card itself (labelled with the new name, with a focus ring; focusable only then), so the swap is
+  announced; Close and Esc still hand focus back to where it was before the card.
 
 ### 0.1.0-beta.19
 

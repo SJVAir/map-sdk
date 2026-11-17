@@ -10,7 +10,7 @@ import type { GlMapLike } from "./gl.js";
 import { InteractionRouter, type Hovered, type OwnHover } from "./interactions.svelte.js";
 import type { ClickEvent, FeatureHit, FeatureListItem, MapPlugin } from "./plugin.js";
 import { PluginHost } from "./plugin-host.svelte.js";
-import { intersectsBounds, shapeAnchor } from "./shape-view.js";
+import { containsPoint, intersectsBounds, shapeAnchor } from "./shape-view.js";
 
 export interface CameraState {
 	center: [number, number];
@@ -224,6 +224,15 @@ export interface MapContext {
 	setPointerInCard(on: boolean): void;
 	/** Closes the pinned card. Does nothing when nothing is pinned. */
 	unpin(): void;
+	/**
+	 * Pins `pluginId`'s listed feature `refKey` from host code, such as a button on another card
+	 * (a section card's "In township"): the card shows in place of the open one, at the feature's
+	 * point in view (`anchorFor`), as a click on it would. Moves no camera and leaves the list
+	 * focus, selection and `featureclick` alone. A keyboard-focused list row's item still shows
+	 * first. Returns `false`, changing nothing, while `MapView`'s `card` is off, for a plugin not
+	 * on the map or with `hoverable: false`, or for a `refKey` its features don't list.
+	 */
+	pin(pluginId: string, refKey: string): boolean;
 	/** @internal For `MapView` only: turns pinning on or off. Off also unpins. */
 	setCardEnabled(on: boolean): void;
 	/**
@@ -484,6 +493,39 @@ class MapContextImpl implements MapContext {
 
 	unpin(): void {
 		if (untrack(() => this.#pinned) !== null) this.#pinned = null;
+	}
+
+	pin(pluginId: string, refKey: string): boolean {
+		if (this.#destroyed || !this.#cardEnabled) return false;
+		const found = untrack(() => this.#findItem(refKey, pluginId));
+		if (!found || found.plugin.hoverable === false) return false;
+		const { item } = found;
+		const hit = { pluginId, ref: item.ref, refKey: item.refKey, name: item.name };
+		// In place when the open card's point lies on the new feature's shape (a section's card
+		// swapped for its township's), else at the feature's own point, as a click would put it.
+		const open = untrack(() => this.#pinned);
+		if (open?.hit.pluginId === pluginId && open.hit.refKey === item.refKey) return true;
+		// A focused list row's card is the one drawn, at the anchor fixed when it was focused.
+		const focusedAt = untrack(() => (this.#focusedKey !== null ? this.#focusedAnchor : null));
+		const at = focusedAt ?? (open ? this.#drawnAt(open) : null);
+		if (at && item.geometry && containsPoint(item.geometry, at)) {
+			this.#pinned = { hit, lngLat: [at[0], at[1]], inPlace: true };
+		} else {
+			this.#pinned = { hit, lngLat: [...this.anchorFor(item)] as [number, number] };
+		}
+		return true;
+	}
+
+	/** Where `MapTooltip` draws a pinned card: its kept place, else its item's anchor. */
+	#drawnAt(pinned: Hovered): [number, number] {
+		if (pinned.inPlace) return pinned.lngLat;
+		const { pluginId, refKey } = pinned.hit;
+		const item = untrack(
+			() =>
+				this.#findItem(refKey, pluginId)?.item ??
+				this.plugins.find((p) => p.id === pluginId)?.itemFor?.(refKey)
+		);
+		return item ? this.anchorFor(item) : pinned.lngLat;
 	}
 
 	setCardEnabled(on: boolean): void {

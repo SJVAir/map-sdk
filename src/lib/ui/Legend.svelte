@@ -46,7 +46,8 @@
 					if ("status" in data) {
 						if (data.status.state === "ready") return [];
 						const layer = plugin.label ?? plugin.id;
-						return [{ kind: "status", pluginId: data.pluginId, layer, status: data.status }];
+						const { pluginId, status, note } = data;
+						return [{ kind: "status", pluginId, layer, status, ...(note && { note }) }];
 					}
 					if ("symbols" in data) {
 						if (data.symbols.length === 0) return [];
@@ -152,6 +153,13 @@
 				{#if status.state === "loading"}
 					<h3 class="text-sm">{entry.layer}</h3>
 					<p>{map.messages("mapsdk_loading")}</p>
+				{:else if status.state === "unavailable"}
+					<h3 class="text-sm">{entry.layer}</h3>
+					<!-- Under the layer's heading, so the generic line doesn't repeat the name. -->
+					<p>{status.message ?? map.messages("mapsdk_unavailable_line")}</p>
+					{#if entry.note}
+						<div class="mapsdk-legend-note text-xs">{@render entry.note()}</div>
+					{/if}
 				{:else}
 					<p>{map.messages("mapsdk_unavailable", { layer: entry.layer })}</p>
 					{#if status.state === "error"}

@@ -144,6 +144,31 @@ describe("README examples", () => {
 		expect(map.plugins.map((p) => p.id)).toEqual(["townships", "lens", "sections"]);
 		expect(lens.center).toBeNull();
 		expect(lens.pinned).toBe(false);
+		// A section card's "In township": refused here, since no MapView turned the card on.
+		const townshipOfSection = (refKey: string) => refKey.replace(/-\d+$/, "");
+		expect(map.pin("townships", townshipOfSection("T1-2"))).toBe(false);
+		// With the card on (MapView's `card` turns it on), a listed township pins.
+		const listed = createMap({ config: { maptilerKey: "" } });
+		listed.addPlugin({
+			id: "townships",
+			setup: () => () => {},
+			features: () => [
+				{
+					refKey: "T1",
+					ref: { kind: "feature", id: "T1" },
+					name: "Township T1",
+					value: null,
+					level: NO_LEVEL,
+					units: "",
+					lngLat: [-119.7, 36.7],
+					selectable: false
+				}
+			]
+		});
+		listed.setCardEnabled(true);
+		expect(listed.pin("townships", townshipOfSection("T1-2"))).toBe(true);
+		expect(listed.pinned?.hit.name).toBe("Township T1");
+		listed.destroy();
 		map.destroy();
 	});
 

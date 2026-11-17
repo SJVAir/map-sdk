@@ -1,9 +1,9 @@
-import { createRawSnippet } from "svelte";
-import { describe, expect, it, vi } from "vitest";
+import { createRawSnippet, tick } from "svelte";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
 import axe from "axe-core";
-import type { MapContext } from "../../src/lib/core/create-map.svelte.js";
+import { createMap, type MapContext } from "../../src/lib/core/create-map.svelte.js";
 import type { FeatureListItem, MapPlugin } from "../../src/lib/core/plugin.js";
 import { createDefaultFormat } from "../../src/lib/data/format.js";
 import { defaultMessages } from "../../src/lib/data/messages.js";
@@ -486,6 +486,20 @@ describe("MapTooltip card", () => {
 		await expect.element(page.getByRole("group", { name: "Site B" })).toBeVisible();
 	});
 
+	it("a click on the card's text doesn't focus the card", async () => {
+		// Review, 2026-11-17: a standing tabindex="-1" made a click on the card's text take focus
+		// (and an origin), a change for hosts that never call map.pin.
+		await render(MapTooltip, {
+			map: cardMap(sites(), { pinned: hit("a", "Site A") }),
+			project,
+			card: true
+		});
+		const card = page.getByRole("group", { name: "Site A" });
+		await card.getByText("Site A").click();
+		expect(document.activeElement).not.toBe(card.element());
+		expect(card.element().hasAttribute("tabindex")).toBe(false);
+	});
+
 	it("close button unpins and returns focus to where it came from", async () => {
 		const before = document.createElement("button");
 		before.textContent = "Before";
@@ -792,5 +806,149 @@ describe("MapTooltip card", () => {
 		});
 		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Site B 12.34 µg/m³ Good");
 		expect(document.querySelector("[role=group]")).toBeNull();
+	});
+});
+
+describe("MapTooltip card swap", () => {
+	const good = level("Good", "#00e400");
+	const sites = () => [item("a", "Site A", good), item("b", "Site B", good)];
+
+	/** A real map (so `pinned` is reactive) whose Site A card has a button that pins Site B. */
+	async function swapMap() {
+		const map = createMap({ config: { maptilerKey: "k" } });
+		const goToB = createRawSnippet(() => ({
+			render: () => `<button type="button">Go to Site B</button>`,
+			setup: (button) => {
+				const onClick = () => map.pin("points", "b");
+				button.addEventListener("click", onClick);
+				return () => button.removeEventListener("click", onClick);
+			}
+		}));
+		const plain = createRawSnippet(() => ({ render: () => `<p>Site B figures</p>` }));
+		const plugin: MapPlugin = {
+			id: "points",
+			setup: () => () => {},
+			features: sites,
+			tooltip: (it) => (it.refKey === "a" ? goToB : plain)
+		};
+		map.addPlugin(plugin);
+		map.setCardEnabled(true);
+		expect(map.pin("points", "a")).toBe(true);
+		const before = document.createElement("button");
+		before.textContent = "Before";
+		document.body.prepend(before);
+		await render(MapTooltip, { map, project, card: true });
+		await expect.element(page.getByRole("group", { name: "Site A" })).toBeVisible();
+		return { map, before };
+	}
+
+	afterEach(() => document.body.replaceChildren());
+
+	it("moves focus to the new card when its button swaps the card", async () => {
+		const { before } = await swapMap();
+		before.focus();
+		await userEvent.keyboard("{Tab}");
+		await expect.element(page.getByRole("button", { name: "Go to Site B" })).toHaveFocus();
+		await userEvent.keyboard("{Enter}");
+		const card = page.getByRole("group", { name: "Site B" });
+		await expect.element(card).toBeVisible();
+		await expect.element(card).toHaveFocus();
+		expect(card.element().getAttribute("tabindex")).toBe("-1");
+		const results = await axe.run(card.element());
+		expect(results.violations).toEqual([]);
+	});
+
+	it("Space on the card's button swaps it and moves focus too", async () => {
+		const { before } = await swapMap();
+		before.focus();
+		await userEvent.keyboard("{Tab}");
+		await userEvent.keyboard(" ");
+		await expect.element(page.getByRole("group", { name: "Site B" })).toHaveFocus();
+	});
+
+	it("Close after a swap returns focus to where it came from before the card", async () => {
+		const { before } = await swapMap();
+		before.focus();
+		await userEvent.keyboard("{Tab}");
+		await userEvent.keyboard("{Enter}");
+		await expect.element(page.getByRole("group", { name: "Site B" })).toHaveFocus();
+		await userEvent.keyboard("{Tab}");
+		await expect.element(page.getByRole("button", { name: "Close" })).toHaveFocus();
+		await userEvent.keyboard("{Enter}");
+		expect(document.activeElement).toBe(before);
+	});
+
+	it("a swap with focus outside the card leaves focus where it is", async () => {
+		const { map, before } = await swapMap();
+		before.focus();
+		map.pin("points", "b");
+		await expect.element(page.getByRole("group", { name: "Site B" })).toBeVisible();
+		await tick();
+		expect(document.activeElement).toBe(before);
+	});
+
+	it("a pin from host code, not from the card, leaves focus on the card's control", async () => {
+		const { map, before } = await swapMap();
+		before.focus();
+		await userEvent.keyboard("{Tab}{Tab}");
+		const close = page.getByRole("button", { name: "Close" });
+		await expect.element(close).toHaveFocus();
+		map.pin("points", "b");
+		await expect.element(page.getByRole("group", { name: "Site B" })).toBeVisible();
+		await new Promise((r) => setTimeout(r, 20));
+		await expect.element(close).toHaveFocus();
+	});
+
+	it("a card kept in place falls back to its feature's point once that place leaves the view", async () => {
+		// Review, 2026-11-17: a pan that took the kept point off-screen hid the card for good.
+		const map = createMap({ config: { maptilerKey: "k" } });
+		const place = item("p", "Place", good);
+		const area: FeatureListItem = {
+			...item("t", "Township T", good),
+			lngLat: [-118, 35],
+			geometry: {
+				type: "Polygon",
+				coordinates: [
+					[
+						[-121, 34],
+						[-117, 34],
+						[-117, 38],
+						[-121, 38],
+						[-121, 34]
+					]
+				]
+			}
+		};
+		map.addPlugin({ id: "points", setup: () => () => {}, features: () => [place, area] });
+		map.setCardEnabled(true);
+		map.pin("points", "p");
+		map.pin("points", "t");
+		expect(map.pinned?.inPlace).toBe(true);
+		const kept = map.pinned!.lngLat;
+		const at = (x: number) => (ll: [number, number]) =>
+			ll[0] === kept[0] && ll[1] === kept[1] ? { x, y: 100 } : { x: 200, y: 100 };
+		const { rerender } = await render(MapTooltip, {
+			map,
+			project: at(100),
+			width: 400,
+			height: 300,
+			card: true
+		});
+		const card = page.getByRole("group", { name: "Township T" });
+		await expect.element(card).toBeVisible();
+		await rerender({ project: at(-50) });
+		await expect.element(card).toBeVisible();
+	});
+
+	it("pinning the feature already pinned doesn't move focus", async () => {
+		const { map, before } = await swapMap();
+		before.focus();
+		await userEvent.keyboard("{Tab}{Tab}");
+		const close = page.getByRole("button", { name: "Close" });
+		await expect.element(close).toHaveFocus();
+		map.pin("points", "a");
+		await tick();
+		await new Promise((r) => setTimeout(r, 20));
+		await expect.element(close).toHaveFocus();
 	});
 });

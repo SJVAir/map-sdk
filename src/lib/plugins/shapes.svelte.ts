@@ -85,6 +85,11 @@ export interface ShapesOptions<P extends MapFeatureProperties> {
 	legendUnits?: string;
 	/** Host content at the foot of the plugin's legend section, below "No data". */
 	legendNote?: Snippet;
+	/**
+	 * How the legend shows a range scale: a gradient (default) or labeled blocks, as on
+	 * `pointsPlugin` (blocks read better with many classes).
+	 */
+	legendDisplay?: "gradient" | "blocks";
 }
 
 /** The check image is drawn at this multiple of its size and scaled down, for sharp HiDPI. */
@@ -214,7 +219,11 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 	const currentScale = (): Resolved | null => (choropleth ? scales.current() : NO_SCALE);
 	const legend = (): LegendData | null => {
 		if (!choropleth || !range.shown) return null;
-		const data = withHostLegend(scales.legend());
+		const hosted = withHostLegend(scales.legend());
+		const data =
+			hosted && "scale" in hosted && options.legendDisplay
+				? { ...hosted, display: options.legendDisplay }
+				: hosted;
 		if (!outlineNoFigure || !data || !("scale" in data)) return data;
 		const { scale } = data;
 		// Lines are never drawn as outlines, so they never add the "No data" row.

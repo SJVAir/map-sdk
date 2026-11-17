@@ -37,7 +37,13 @@ export type DataStatus =
 	| { state: "loading" }
 	| { state: "ready" }
 	| { state: "error"; error: unknown; retry(): void }
-	| { state: "unavailable"; reason: string };
+	| {
+			state: "unavailable";
+			/** A code for the host's own logic (map-sdk's own is "scale"); never shown. */
+			reason: string;
+			/** Already-translated text the legend shows for it; without one, a generic line. */
+			message?: string;
+	  };
 
 export interface DataSource<P extends MapFeatureProperties = MapFeatureProperties> {
 	readonly status: DataStatus;

@@ -109,8 +109,16 @@ export function createLensState(inputs: LensInputs, graceMs = 120) {
 				drop("center");
 			}
 			// A pinned card on a child, or on a feature inside the block (a notice), keeps a hover lens
-			// where it is while the card is open. A township's card doesn't.
-			held = center !== null && holdsLens(card);
+			// where it is while the card is open. A township's card doesn't, except that a held lens
+			// stays held when the card moves to its centre township (a section card's "In township",
+			// `MapContext.pin`) and while that card stays. List focus never carries it.
+			const carried =
+				held &&
+				!focused &&
+				card !== null &&
+				card.hit.pluginId === inputs.parentsId &&
+				card.hit.refKey === center;
+			held = center !== null && (holdsLens(card) || carried);
 			if (target === null || !suppressed.has(target)) suppressed.clear();
 			if (target !== null && suppressed.has(target)) return;
 			if (target !== null) {

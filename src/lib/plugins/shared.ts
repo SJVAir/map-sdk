@@ -26,8 +26,14 @@ export function hostLegend(
 	note: Snippet | undefined
 ): (data: LegendData | null) => LegendData | null {
 	if (!unitsLine && !note) return (data) => data;
-	return (data) =>
-		data && "scale" in data
-			? { ...data, ...(unitsLine && { unitsLine }), ...(note && { note }) }
-			: data;
+	return (data) => {
+		if (data && "scale" in data) {
+			return { ...data, ...(unitsLine && { unitsLine }), ...(note && { note }) };
+		}
+		// An unavailable layer keeps its note under the status line.
+		if (data && "status" in data && note && data.status.state === "unavailable") {
+			return { ...data, note };
+		}
+		return data;
+	};
 }

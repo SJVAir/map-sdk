@@ -21,7 +21,7 @@ import {
 	opacityExpression
 } from "../../../src/lib/plugins/style.js";
 import { createFakeGl, type FakeGl } from "../../fixtures/fake-gl.js";
-import { smokeScale } from "../../fixtures/scales.js";
+import { pm25Scale, smokeScale } from "../../fixtures/scales.js";
 import { TestSource } from "../../fixtures/sources.svelte.js";
 import { rootEffect } from "../../fixtures/effects.svelte.js";
 
@@ -849,6 +849,41 @@ describe("shapesPlugin legendUnits and legendNote", () => {
 		const data = plugin.legend!();
 		expect(data && "scale" in data && data.unitsLine).toBe("lbs per township");
 		expect(data && "scale" in data && data.note).toBe(note);
+	});
+
+	it("an unavailable source's status keeps the note (beta.20)", async () => {
+		const note = (() => {}) as unknown as import("svelte").Snippet;
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({ source, legendNote: note });
+		await settle();
+		source.status = { state: "unavailable", reason: "filter-gone", message: "Gone." };
+		flushSync();
+		const data = plugin.legend!();
+		expect(data && "status" in data && data.status).toEqual({
+			state: "unavailable",
+			reason: "filter-gone",
+			message: "Gone."
+		});
+		expect(data && "status" in data && data.note).toBe(note);
+	});
+});
+
+describe("shapesPlugin legendDisplay", () => {
+	// The user, 2026-11-17 (beta.20): pesticide use's 8 classes read as blocks, as pointsPlugin's can.
+	it("passes blocks to the legend, and leaves the default alone", async () => {
+		const blocks = await setup({
+			source: new TestSource<Props>({ features: POLYGONS, scale: pm25Scale }),
+			legendDisplay: "blocks"
+		});
+		await settle();
+		const data = blocks.plugin.legend!();
+		expect(data && "scale" in data && data.display).toBe("blocks");
+		const plain = await setup({
+			source: new TestSource<Props>({ features: POLYGONS, scale: pm25Scale })
+		});
+		await settle();
+		const other = plain.plugin.legend!();
+		expect(other && "scale" in other && "display" in other).toBe(false);
 	});
 });
 

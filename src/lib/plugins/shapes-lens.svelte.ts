@@ -29,6 +29,8 @@ export interface ShapesLensOptions<C extends MapFeatureProperties> {
 	tooltipShowsName?: boolean;
 	legendUnits?: string;
 	legendNote?: Snippet;
+	/** As on `shapesPlugin`: a gradient (default) or labeled blocks. */
+	legendDisplay?: "gradient" | "blocks";
 }
 
 export interface ShapesLens extends MapPlugin {
@@ -142,7 +144,8 @@ export function shapesLens<C extends MapFeatureProperties>(
 		tooltip: options.tooltip,
 		tooltipShowsName: options.tooltipShowsName,
 		legendUnits: options.legendUnits,
-		legendNote: options.legendNote
+		legendNote: options.legendNote,
+		legendDisplay: options.legendDisplay
 	});
 
 	function setup(ctx: PluginContext): () => void {
@@ -228,6 +231,9 @@ export function shapesLens<C extends MapFeatureProperties>(
 
 	const legend = (): LegendData | null => (filtered ? (inner.legend?.() ?? null) : null);
 	const features = (): FeatureListItem[] => (state.pinned ? (inner.features?.() ?? []) : []);
+	/** A drawn child's item, pinned or not: a hover lens's section card shows its content. */
+	const itemFor = (refKey: string): FeatureListItem | undefined =>
+		filtered ? inner.features?.().find((f) => f.refKey === refKey) : undefined;
 
 	const plugin: ShapesLens = {
 		id,
@@ -238,6 +244,7 @@ export function shapesLens<C extends MapFeatureProperties>(
 		setup,
 		legend,
 		features,
+		itemFor,
 		selectable: false,
 		summarizeEmpty: false,
 		get center() {
