@@ -994,6 +994,51 @@ describe("pinned card", () => {
 			expect(map.pinned?.lngLat).toEqual(map.anchorFor(listed()[1]));
 		});
 
+		it("keeps the card in place when the open card's point lies on the new feature's shape", async () => {
+			// The user, 2026-11-17: "In township" swaps the card exactly in place.
+			const square = (x: number, y: number, size: number): FeatureListItem => ({
+				...item(`${x}`),
+				refKey: `region:county:${x}`,
+				ref: { kind: "region", type: "county", code: `${x}` },
+				name: `Area ${x}`,
+				lngLat: [x + size / 4, y + size / 4],
+				geometry: {
+					type: "Polygon",
+					coordinates: [
+						[
+							[x, y],
+							[x + size, y],
+							[x + size, y + size],
+							[x, y + size],
+							[x, y]
+						]
+					]
+				}
+			});
+			const around = square(-120, 35, 2);
+			const far = square(-110, 30, 1);
+			const { map, gl } = await pinSetUp();
+			map.addPlugin({ ...points("areas", "region"), features: () => [around, far] });
+			gl.setRenderedFeatures([rendered(map, "monitors", "a")]);
+			click(gl);
+			expect(map.pin("areas", around.refKey)).toBe(true);
+			expect(map.pinned?.lngLat).toEqual([-119, 36]);
+			expect(map.pinned?.inPlace).toBe(true);
+			// From a card kept in place, the next one keeps that same point when it lies on it.
+			expect(map.pin("areas", far.refKey)).toBe(true);
+			expect(map.pinned?.lngLat).toEqual(map.anchorFor(far));
+			expect(map.pinned?.inPlace).toBeFalsy();
+		});
+
+		it("a point feature never keeps the open card's place", async () => {
+			const { map, gl } = await pinSetUp();
+			gl.setRenderedFeatures([rendered(map, "monitors", "a")]);
+			click(gl);
+			map.pin("monitors", "monitor:b");
+			expect(map.pinned?.lngLat).toEqual([-118, 35]);
+			expect(map.pinned?.inPlace).toBeFalsy();
+		});
+
 		it("refuses with the card off, an unknown plugin, hoverable: false, or an unlisted key", async () => {
 			const { map } = await pinSetUp();
 			map.addPlugin({ ...points("smoke"), hoverable: false, features: listed });

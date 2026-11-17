@@ -10,7 +10,7 @@ import type { GlMapLike } from "./gl.js";
 import { InteractionRouter, type Hovered, type OwnHover } from "./interactions.svelte.js";
 import type { ClickEvent, FeatureHit, FeatureListItem, MapPlugin } from "./plugin.js";
 import { PluginHost } from "./plugin-host.svelte.js";
-import { intersectsBounds, shapeAnchor } from "./shape-view.js";
+import { containsPoint, intersectsBounds, shapeAnchor } from "./shape-view.js";
 
 export interface CameraState {
 	center: [number, number];
@@ -500,11 +500,29 @@ class MapContextImpl implements MapContext {
 		const found = untrack(() => this.#findItem(refKey, pluginId));
 		if (!found || found.plugin.hoverable === false) return false;
 		const { item } = found;
-		this.#pinned = {
-			hit: { pluginId, ref: item.ref, refKey: item.refKey, name: item.name },
-			lngLat: [...this.anchorFor(item)] as [number, number]
-		};
+		const hit = { pluginId, ref: item.ref, refKey: item.refKey, name: item.name };
+		// In place when the open card's point lies on the new feature's shape (a section's card
+		// swapped for its township's), else at the feature's own point, as a click would put it.
+		const open = untrack(() => this.#pinned);
+		const at = open ? this.#drawnAt(open) : null;
+		if (at && item.geometry && containsPoint(item.geometry, at)) {
+			this.#pinned = { hit, lngLat: [at[0], at[1]], inPlace: true };
+		} else {
+			this.#pinned = { hit, lngLat: [...this.anchorFor(item)] as [number, number] };
+		}
 		return true;
+	}
+
+	/** Where `MapTooltip` draws a pinned card: its kept place, else its item's anchor. */
+	#drawnAt(pinned: Hovered): [number, number] {
+		if (pinned.inPlace) return pinned.lngLat;
+		const { pluginId, refKey } = pinned.hit;
+		const item = untrack(
+			() =>
+				this.#findItem(refKey, pluginId)?.item ??
+				this.plugins.find((p) => p.id === pluginId)?.itemFor?.(refKey)
+		);
+		return item ? this.anchorFor(item) : pinned.lngLat;
 	}
 
 	setCardEnabled(on: boolean): void {

@@ -93,6 +93,12 @@
 			const item = plugin.features?.().find((f) => f.refKey === key);
 			if (item) return { item, plugin };
 		}
+		// A drawn feature its plugin doesn't list (a hover lens's section): only for the shown hit.
+		if (hitPluginId !== null) {
+			const plugin = plugins.find((p) => p.id === hitPluginId);
+			const item = plugin?.itemFor?.(key);
+			if (plugin && item) return { item, plugin };
+		}
 		return null;
 	});
 
@@ -117,6 +123,8 @@
 		if (mode === "pointer" && !map.focusedKey && !pinned) return map.hovered?.lngLat ?? null;
 		// A focused feature that left the data has no item, so no tooltip.
 		if (map.focusedKey) return item ? (map.focusedAnchor ?? item.lngLat) : null;
+		// A card `map.pin` kept where the open card was.
+		if (pinned?.inPlace) return pinned.lngLat;
 		return hoverAnchor ?? item?.lngLat ?? shownHit?.lngLat ?? null;
 	});
 	const projected = $derived(anchor ? project(anchor) : null);

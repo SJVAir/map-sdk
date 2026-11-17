@@ -49,6 +49,11 @@ interface PointerEventLike {
 export interface Hovered {
 	hit: FeatureHit;
 	lngLat: [number, number];
+	/**
+	 * Set by `MapContext.pin` when the card stays where the open card was (that point lies on the
+	 * new feature's shape): the card is drawn at `lngLat`, not at the feature's own point.
+	 */
+	inPlace?: true;
 }
 
 /**

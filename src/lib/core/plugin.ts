@@ -280,4 +280,9 @@ export interface MapPlugin {
 	 * hit from `PluginContext.blocking`).
 	 */
 	hoverTooltip?(hit: FeatureHit): Snippet | undefined;
+	/**
+	 * The item for a feature this plugin draws but doesn't list (a hover lens's sections), so its
+	 * tooltip and card show its `tooltip` content and value. Not listed, never focused or selected.
+	 */
+	itemFor?(refKey: string): FeatureListItem | undefined;
 }

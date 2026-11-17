@@ -256,11 +256,20 @@ describe("shapesLens in a browser", () => {
 		await clickAt(at(2, 2, 3));
 		const section = page.getByRole("group", { name: "T2-2 S3" });
 		await expect.element(section).toBeVisible();
+		// The lens's tooltip body shows under a hover lens too (the user, 2026-11-17, beta.20).
+		await expect.element(section.getByRole("link", { name: "Open the section" })).toBeVisible();
 		const { lng, lat } = gl.getCenter();
+		const was = section.element().getBoundingClientRect();
 		await section.getByRole("button", { name: "In township" }).click();
 		const township = page.getByRole("group", { name: "T2-2" });
 		await expect.element(township).toBeVisible();
 		await expect.element(section).not.toBeInTheDocument();
+		// Exactly in place (the user, 2026-11-17): the same anchor, centred over the same point.
+		const now = township.element().getBoundingClientRect();
+		expect(Math.abs(now.left + now.width / 2 - (was.left + was.width / 2))).toBeLessThan(1);
+		expect(Math.min(Math.abs(now.bottom - was.bottom), Math.abs(now.top - was.top))).toBeLessThan(
+			1
+		);
 		expect(gl.getCenter().lng).toBe(lng);
 		expect(gl.getCenter().lat).toBe(lat);
 		// A township outside the block the card doesn't cover.
