@@ -133,7 +133,12 @@ export type LegendData =
 			 */
 			symbols: Array<{ label: string; markup: string }>;
 	  }
-	| { pluginId: string; status: DataStatus };
+	| {
+			pluginId: string;
+			status: DataStatus;
+			/** The plugin's `legendNote`, shown under an unavailable status. */
+			note?: Snippet;
+	  };
 
 export interface ClickEvent {
 	hits: FeatureHit[];

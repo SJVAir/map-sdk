@@ -850,6 +850,22 @@ describe("shapesPlugin legendUnits and legendNote", () => {
 		expect(data && "scale" in data && data.unitsLine).toBe("lbs per township");
 		expect(data && "scale" in data && data.note).toBe(note);
 	});
+
+	it("an unavailable source's status keeps the note (beta.20)", async () => {
+		const note = (() => {}) as unknown as import("svelte").Snippet;
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({ source, legendNote: note });
+		await settle();
+		source.status = { state: "unavailable", reason: "filter-gone", message: "Gone." };
+		flushSync();
+		const data = plugin.legend!();
+		expect(data && "status" in data && data.status).toEqual({
+			state: "unavailable",
+			reason: "filter-gone",
+			message: "Gone."
+		});
+		expect(data && "status" in data && data.note).toBe(note);
+	});
 });
 
 describe("shapesPlugin legendDisplay", () => {
