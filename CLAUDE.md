@@ -99,7 +99,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `icon.mutedColor`, `zoomRange`, `legendDisplay`, `legendTitle`, `detail` for features with no
   level, `truncateValues` to cut values off instead of rounding, `marksPlaces` for `drawnAt`,
   answers per point refreshed at the map's `idle`; `count` numbers circle markers and sums them in
-  clusters as `mapsdk:count`, in `countMarkerText` (`--background`)) and `shapesPlugin`
+  clusters as `mapsdk:count`; the number is black or white by the level's color
+  (`readableTextExpression`), the edge `countMarkerText` (`--background`)) and `shapesPlugin`
   (`zoomRange` from `zoom-range.svelte.ts`, shared with points; out of range it lists nothing and
   has no legend; `tooltip`; `lens-hooks.ts`'s symbol-keyed hooks for a lens: `shown`, `live`,
   `keys`, `geometryOf`, `setHidden` by the `lensHidden` feature state, the paint's case added only

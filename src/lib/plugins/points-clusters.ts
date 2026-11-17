@@ -1,4 +1,5 @@
 import type { ExpressionSpecification, FilterSpecification } from "@maptiler/sdk";
+import { readableColor } from "color2k";
 import type { Feature } from "geojson";
 import type { GlMapLike } from "../core/gl.js";
 import type { BlockingClick, FeatureHit, LayerSpecWithoutId } from "../core/plugin.js";
@@ -119,7 +120,8 @@ export function countClusterLayers({ sourceId, scale, theme }: ClusterLayerArgs)
 					"text-size": 12,
 					"text-allow-overlap": true
 				},
-				paint: { "text-color": theme.countMarkerText }
+				// Black or white by the bubble's color (WCAG 1.4.3); its edge stays --background.
+				paint: { "text-color": readableColor(scale.levels[0]?.color || theme.neutral) }
 			}
 		}
 	];
