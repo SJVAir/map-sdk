@@ -224,6 +224,15 @@ export interface MapContext {
 	setPointerInCard(on: boolean): void;
 	/** Closes the pinned card. Does nothing when nothing is pinned. */
 	unpin(): void;
+	/**
+	 * Pins `pluginId`'s listed feature `refKey`, as a card's own button would (a section card's
+	 * "In township"): at `options.anchor`, else where the open pinned card is (so it swaps in
+	 * place), else at `anchorFor(item)`. Moves no camera and leaves the list focus, selection and
+	 * `featureclick` alone. A keyboard-focused list row's item still shows first. Returns `false`,
+	 * changing nothing, while `MapView`'s `card` is off, for a plugin not on the map or with
+	 * `hoverable: false`, or for a `refKey` its features don't list.
+	 */
+	pin(pluginId: string, refKey: string, options?: { anchor?: [number, number] }): boolean;
 	/** @internal For `MapView` only: turns pinning on or off. Off also unpins. */
 	setCardEnabled(on: boolean): void;
 	/**
@@ -484,6 +493,19 @@ class MapContextImpl implements MapContext {
 
 	unpin(): void {
 		if (untrack(() => this.#pinned) !== null) this.#pinned = null;
+	}
+
+	pin(pluginId: string, refKey: string, options: { anchor?: [number, number] } = {}): boolean {
+		if (this.#destroyed || !this.#cardEnabled) return false;
+		const found = untrack(() => this.#findItem(refKey, pluginId));
+		if (!found || found.plugin.hoverable === false) return false;
+		const { item } = found;
+		const at = options.anchor ?? untrack(() => this.#pinned)?.lngLat ?? this.anchorFor(item);
+		this.#pinned = {
+			hit: { pluginId, ref: item.ref, refKey: item.refKey, name: item.name },
+			lngLat: [at[0], at[1]]
+		};
+		return true;
 	}
 
 	setCardEnabled(on: boolean): void {
