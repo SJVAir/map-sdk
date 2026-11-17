@@ -1,9 +1,9 @@
-import { createRawSnippet } from "svelte";
-import { describe, expect, it, vi } from "vitest";
+import { createRawSnippet, tick } from "svelte";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { page, userEvent } from "vitest/browser";
 import axe from "axe-core";
-import type { MapContext } from "../../src/lib/core/create-map.svelte.js";
+import { createMap, type MapContext } from "../../src/lib/core/create-map.svelte.js";
 import type { FeatureListItem, MapPlugin } from "../../src/lib/core/plugin.js";
 import { createDefaultFormat } from "../../src/lib/data/format.js";
 import { defaultMessages } from "../../src/lib/data/messages.js";
@@ -792,5 +792,88 @@ describe("MapTooltip card", () => {
 		});
 		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Site B 12.34 µg/m³ Good");
 		expect(document.querySelector("[role=group]")).toBeNull();
+	});
+});
+
+describe("MapTooltip card swap", () => {
+	const good = level("Good", "#00e400");
+	const sites = () => [item("a", "Site A", good), item("b", "Site B", good)];
+
+	/** A real map (so `pinned` is reactive) whose Site A card has a button that pins Site B. */
+	async function swapMap() {
+		const map = createMap({ config: { maptilerKey: "k" } });
+		const goToB = createRawSnippet(() => ({
+			render: () => `<button type="button">Go to Site B</button>`,
+			setup: (button) => {
+				const onClick = () => map.pin("points", "b");
+				button.addEventListener("click", onClick);
+				return () => button.removeEventListener("click", onClick);
+			}
+		}));
+		const plain = createRawSnippet(() => ({ render: () => `<p>Site B figures</p>` }));
+		const plugin: MapPlugin = {
+			id: "points",
+			setup: () => () => {},
+			features: sites,
+			tooltip: (it) => (it.refKey === "a" ? goToB : plain)
+		};
+		map.addPlugin(plugin);
+		map.setCardEnabled(true);
+		expect(map.pin("points", "a")).toBe(true);
+		const before = document.createElement("button");
+		before.textContent = "Before";
+		document.body.prepend(before);
+		await render(MapTooltip, { map, project, card: true });
+		await expect.element(page.getByRole("group", { name: "Site A" })).toBeVisible();
+		return { map, before };
+	}
+
+	afterEach(() => document.body.replaceChildren());
+
+	it("moves focus to the new card when its button swaps the card", async () => {
+		const { before } = await swapMap();
+		before.focus();
+		await userEvent.keyboard("{Tab}");
+		await expect.element(page.getByRole("button", { name: "Go to Site B" })).toHaveFocus();
+		await userEvent.keyboard("{Enter}");
+		const card = page.getByRole("group", { name: "Site B" });
+		await expect.element(card).toBeVisible();
+		await expect.element(card).toHaveFocus();
+		expect(card.element().getAttribute("tabindex")).toBe("-1");
+		const results = await axe.run(card.element());
+		expect(results.violations).toEqual([]);
+	});
+
+	it("Close after a swap returns focus to where it came from before the card", async () => {
+		const { before } = await swapMap();
+		before.focus();
+		await userEvent.keyboard("{Tab}");
+		await userEvent.keyboard("{Enter}");
+		await expect.element(page.getByRole("group", { name: "Site B" })).toHaveFocus();
+		await userEvent.keyboard("{Tab}");
+		await expect.element(page.getByRole("button", { name: "Close" })).toHaveFocus();
+		await userEvent.keyboard("{Enter}");
+		expect(document.activeElement).toBe(before);
+	});
+
+	it("a swap with focus outside the card leaves focus where it is", async () => {
+		const { map, before } = await swapMap();
+		before.focus();
+		map.pin("points", "b");
+		await expect.element(page.getByRole("group", { name: "Site B" })).toBeVisible();
+		await tick();
+		expect(document.activeElement).toBe(before);
+	});
+
+	it("pinning the feature already pinned doesn't move focus", async () => {
+		const { map, before } = await swapMap();
+		before.focus();
+		await userEvent.keyboard("{Tab}{Tab}");
+		const close = page.getByRole("button", { name: "Close" });
+		await expect.element(close).toHaveFocus();
+		map.pin("points", "a");
+		await tick();
+		await new Promise((r) => setTimeout(r, 20));
+		await expect.element(close).toHaveFocus();
 	});
 });

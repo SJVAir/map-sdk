@@ -5,6 +5,7 @@
 	import type { GlMapLike } from "../core/gl.js";
 	import type { FeatureListItem, MapPlugin } from "../core/plugin.js";
 	import TooltipItem from "./TooltipItem.svelte";
+	import "./controls.css";
 	import type { Snippet } from "svelte";
 	import type { CardContext } from "./card.js";
 	import { selectionKeys } from "../data/selection.js";
@@ -187,13 +188,16 @@
 	/** Where focus came from when it moved into the card, to return it on close. */
 	let origin: HTMLElement | null = null;
 
+	/** The card is taking focus itself after a swap: its origin stays. */
+	let refocusing = false;
+
 	function onfocusin(e: FocusEvent) {
 		const from = e.relatedTarget;
 		focusInside = true;
 		region = cardEl?.closest<HTMLElement>("[data-mapsdk-map]") ?? region;
 		// Focus from outside sets the origin afresh, even from nowhere, so an earlier card's
 		// origin is never reused.
-		if (!(from instanceof Node && cardEl?.contains(from))) {
+		if (!refocusing && !(from instanceof Node && cardEl?.contains(from))) {
 			origin = from instanceof HTMLElement ? from : null;
 		}
 	}
@@ -246,6 +250,29 @@
 		close();
 	}
 
+	// The pinned feature changed while focus was inside the card and the swap dropped it
+	// (`map.pin` from a card's own button, which the swap removes): focus goes to the card itself,
+	// which is labelled with the new name.
+	let lastPinned: string | null = null;
+	$effect(() => {
+		const id = pinned ? `${pinned.hit.pluginId}\n${pinned.hit.refKey}` : null;
+		const previous = lastPinned;
+		lastPinned = id;
+		if (id === null || previous === null || id === previous || !focusInside) return;
+		// Only when focus was dropped (the removed button had it), never taken from elsewhere.
+		const active = document.activeElement;
+		const el = cardEl;
+		if (!el || untrack(() => map.focusedKey) !== null || (active && active !== document.body)) {
+			return;
+		}
+		refocusing = true;
+		try {
+			el.focus();
+		} finally {
+			refocusing = false;
+		}
+	});
+
 	// A pinned hit with nothing to show (no name, listed item, or hover content) would be an
 	// invisible card that still hides the hover and takes Esc: unpin it.
 	$effect(() => {
@@ -280,8 +307,9 @@
 	<div
 		bind:this={cardEl}
 		{@attach handBackOnRemove}
-		class="mapsdk-tooltip mapsdk-card text-sm"
+		class="mapsdk-tooltip mapsdk-card mapsdk-focus-outline text-sm"
 		role="group"
+		tabindex="-1"
 		aria-label={name ?? undefined}
 		bind:offsetWidth={tipWidth}
 		bind:offsetHeight={tipHeight}
