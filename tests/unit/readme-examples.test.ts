@@ -144,6 +144,9 @@ describe("README examples", () => {
 		expect(map.plugins.map((p) => p.id)).toEqual(["townships", "lens", "sections"]);
 		expect(lens.center).toBeNull();
 		expect(lens.pinned).toBe(false);
+		// A section card's "In township": refused here, since no MapView turned the card on.
+		const townshipOfSection = (refKey: string) => refKey.replace(/-\d+$/, "");
+		expect(map.pin("townships", townshipOfSection("T1-2"))).toBe(false);
 		map.destroy();
 	});
 

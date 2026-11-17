@@ -145,6 +145,13 @@ same card, and Tab from the row reaches it. Esc closes the card of the map that 
 focus nowhere, it closes the page's most recently pinned card. One card shows at a time, and no hover card shows while
 one is pinned. Selection and `featureclick` are unchanged: a click still selects as before and
 also pins. `map.pinned` is the pinned feature (reactive), and `map.unpin()` closes it.
+`map.pin(pluginId, refKey, { anchor? })` pins a listed feature's card from your own code, such
+as a button on another card: in place of the open card (at its anchor; `anchor` overrides it;
+with no card open, at the feature's point in view). It moves no camera and leaves the list focus,
+selection and `featureclick` alone, and returns `false`, changing nothing, while `card` is off,
+for a plugin not on the map or with `hoverable: false`, or for a feature its plugin doesn't list.
+If focus was inside the card, it moves to the new card, which is labelled with the feature's
+name; Close and Esc still return it to where it was before the card.
 `card={{ actions }}` also puts your buttons in a row at the card's foot: `actions` is a snippet
 given a `CardContext` (`pluginId`, `ref`, `refKey`, the listed `item` or `null`, reactive
 `selectable` and `selected`, and `toggle()`, which is `map.togglePick` for that feature). Show
@@ -300,7 +307,8 @@ the current block's children are drawn. Until a parent's children arrive it keep
   keyboard and touch path); hover then doesn't move it. `lens.release()`, Esc, or the pinned card
   closing or moving outside the block lets it go. A click or tap on a parent opens its card only.
   While a child's card, or a card on another plugin's feature inside the block (a notice), is
-  pinned, the lens holds where it is. Moving through the feature list
+  pinned, the lens holds where it is, and it stays held when that card is swapped for the centre
+  parent's (`map.pin`, below) for as long as that card is open. Moving through the feature list
   never releases a pinned lens, so keyboard users reach its rows.
 - **`lens.center`** and **`lens.pinned`** are reactive. The children are listed (never
   selectable) only while the lens is pinned, and the lens's legend section shows only while
@@ -335,6 +343,19 @@ const sections = shapesPlugin({
 	zoomRange: { min: 11 }
 });
 for (const plugin of [townships, lens, sections]) map.addPlugin(plugin);
+```
+
+Under a hover lens the mouse always lands on a section, so a section's card can offer its
+township's card through `map.pin`, in place and with the lens held (`MapView`'s `card` actions):
+
+```svelte
+{#snippet actions(card: CardContext)}
+	{#if card.pluginId === "lens"}
+		<button type="button" onclick={() => map.pin("townships", townshipOfSection(card.refKey))}>
+			In township
+		</button>
+	{/if}
+{/snippet}
 ```
 
 `hmsFirePlugin({ id?, source, hotspots?, layerLabel })` draws fires as flame icons sized and
@@ -935,6 +956,19 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.20
+
+- **New API: `MapContext.pin(pluginId, refKey, { anchor? })`** pins a listed feature's card from
+  host code (a section card's "In township"), in place of the open card: no camera move, no list
+  focus, no selection change, no `featureclick`; `false` when refused. Hosts that don't call it
+  see no change.
+- **`shapesLens`:** a hover lens held by a section's or notice's card stays held when the card is
+  swapped for its centre township's, until that card closes or moves on. A township's card pinned
+  any other way still doesn't hold it.
+- **The card:** when the pinned feature changes while focus is inside the card, focus moves to
+  the card itself (`tabindex="-1"`, labelled with the new name, with a focus ring), so the swap is
+  announced; Close and Esc still hand focus back to where it was before the card.
 
 ### 0.1.0-beta.19
 
