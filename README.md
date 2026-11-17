@@ -145,9 +145,9 @@ same card, and Tab from the row reaches it. Esc closes the card of the map that 
 focus nowhere, it closes the page's most recently pinned card. One card shows at a time, and no hover card shows while
 one is pinned. Selection and `featureclick` are unchanged: a click still selects as before and
 also pins. `map.pinned` is the pinned feature (reactive), and `map.unpin()` closes it.
-`map.pin(pluginId, refKey, { anchor? })` pins a listed feature's card from your own code, such
-as a button on another card: in place of the open card (at its anchor; `anchor` overrides it;
-with no card open, at the feature's point in view). It moves no camera and leaves the list focus,
+`map.pin(pluginId, refKey)` pins a listed feature's card from your own code, such as a button on
+another card: it replaces the open card, at the feature's point in view, as a click on the
+feature would place it. It moves no camera and leaves the list focus,
 selection and `featureclick` alone, and returns `false`, changing nothing, while `card` is off,
 for a plugin not on the map or with `hoverable: false`, or for a feature its plugin doesn't list.
 If focus was inside the card, it moves to the new card, which is labelled with the feature's
@@ -959,15 +959,15 @@ local sjvair.com stack at `http://localhost:8000`.
 
 ### 0.1.0-beta.20
 
-- **New API: `MapContext.pin(pluginId, refKey, { anchor? })`** pins a listed feature's card from
-  host code (a section card's "In township"), in place of the open card: no camera move, no list
+- **New API: `MapContext.pin(pluginId, refKey)`** pins a listed feature's card from host code (a
+  section card's "In township"), replacing the open card, at the feature's point: no camera move, no list
   focus, no selection change, no `featureclick`; `false` when refused. Hosts that don't call it
   see no change.
 - **`shapesLens`:** a hover lens held by a section's or notice's card stays held when the card is
   swapped for its centre township's, until that card closes or moves on. A township's card pinned
   any other way still doesn't hold it.
 - **The card:** when the pinned feature changes while focus is inside the card, focus moves to
-  the card itself (`tabindex="-1"`, labelled with the new name, with a focus ring), so the swap is
+  the card itself (labelled with the new name, with a focus ring; focusable only then), so the swap is
   announced; Close and Esc still hand focus back to where it was before the card.
 
 ### 0.1.0-beta.19

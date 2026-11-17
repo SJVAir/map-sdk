@@ -225,14 +225,14 @@ export interface MapContext {
 	/** Closes the pinned card. Does nothing when nothing is pinned. */
 	unpin(): void;
 	/**
-	 * Pins `pluginId`'s listed feature `refKey`, as a card's own button would (a section card's
-	 * "In township"): at `options.anchor`, else where the open pinned card is (so it swaps in
-	 * place), else at `anchorFor(item)`. Moves no camera and leaves the list focus, selection and
-	 * `featureclick` alone. A keyboard-focused list row's item still shows first. Returns `false`,
-	 * changing nothing, while `MapView`'s `card` is off, for a plugin not on the map or with
-	 * `hoverable: false`, or for a `refKey` its features don't list.
+	 * Pins `pluginId`'s listed feature `refKey` from host code, such as a button on another card
+	 * (a section card's "In township"): the card shows in place of the open one, at the feature's
+	 * point in view (`anchorFor`), as a click on it would. Moves no camera and leaves the list
+	 * focus, selection and `featureclick` alone. A keyboard-focused list row's item still shows
+	 * first. Returns `false`, changing nothing, while `MapView`'s `card` is off, for a plugin not
+	 * on the map or with `hoverable: false`, or for a `refKey` its features don't list.
 	 */
-	pin(pluginId: string, refKey: string, options?: { anchor?: [number, number] }): boolean;
+	pin(pluginId: string, refKey: string): boolean;
 	/** @internal For `MapView` only: turns pinning on or off. Off also unpins. */
 	setCardEnabled(on: boolean): void;
 	/**
@@ -495,15 +495,14 @@ class MapContextImpl implements MapContext {
 		if (untrack(() => this.#pinned) !== null) this.#pinned = null;
 	}
 
-	pin(pluginId: string, refKey: string, options: { anchor?: [number, number] } = {}): boolean {
+	pin(pluginId: string, refKey: string): boolean {
 		if (this.#destroyed || !this.#cardEnabled) return false;
 		const found = untrack(() => this.#findItem(refKey, pluginId));
 		if (!found || found.plugin.hoverable === false) return false;
 		const { item } = found;
-		const at = options.anchor ?? untrack(() => this.#pinned)?.lngLat ?? this.anchorFor(item);
 		this.#pinned = {
 			hit: { pluginId, ref: item.ref, refKey: item.refKey, name: item.name },
-			lngLat: [at[0], at[1]]
+			lngLat: [...this.anchorFor(item)] as [number, number]
 		};
 		return true;
 	}

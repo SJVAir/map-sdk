@@ -91,3 +91,14 @@ row's unavailable reason (no legend change here), and the demo page's newer opt-
 Where in `MapTooltip` the focus move hooks in (keyed on the pinned hit's plugin and refKey,
 while `focusInside` or focus was just lost from the card); the test split across client and
 browser projects.
+
+## Changed after the final review (2026-11-17)
+
+- **No `anchor` option, and no inherited position.** `MapTooltip` draws a listed item's card at
+  the item's own point, so a stored anchor was never drawn, and an inherited one misled the
+  lens's `inBlock` test for other plugins' cards. `pin(pluginId, refKey)` now pins at
+  `anchorFor(item)`, where a click on the feature would put the card. The card is swapped in
+  place of the open one; it may move to the new feature's point.
+- **`tabindex="-1"` only for the refocus.** A standing one let a click on the card's text take
+  focus, a change for hosts that never call `pin`. The card is focused with
+  `mapsdk-focus-outline` (controls.css's ring for script-focused elements), not `mapsdk-focus`.

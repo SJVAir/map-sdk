@@ -486,6 +486,20 @@ describe("MapTooltip card", () => {
 		await expect.element(page.getByRole("group", { name: "Site B" })).toBeVisible();
 	});
 
+	it("a click on the card's text doesn't focus the card", async () => {
+		// Review, 2026-11-17: a standing tabindex="-1" made a click on the card's text take focus
+		// (and an origin), a change for hosts that never call map.pin.
+		await render(MapTooltip, {
+			map: cardMap(sites(), { pinned: hit("a", "Site A") }),
+			project,
+			card: true
+		});
+		const card = page.getByRole("group", { name: "Site A" });
+		await card.getByText("Site A").click();
+		expect(document.activeElement).not.toBe(card.element());
+		expect(card.element().hasAttribute("tabindex")).toBe(false);
+	});
+
 	it("close button unpins and returns focus to where it came from", async () => {
 		const before = document.createElement("button");
 		before.textContent = "Before";

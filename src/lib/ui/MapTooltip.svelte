@@ -208,6 +208,7 @@
 	let region: HTMLElement | null = null;
 
 	function onfocusout(e: FocusEvent) {
+		if (e.target === cardEl) cardEl?.removeAttribute("tabindex");
 		const to = e.relatedTarget;
 		if (to instanceof Node && cardEl?.contains(to)) return;
 		// Later, not now: removing the focused card fires focusout too, and its teardown (which
@@ -265,6 +266,9 @@
 		const el = cardEl;
 		if (!el || untrack(() => map.focusedKey) !== null || active === el) return;
 		if (active && active !== document.body && !el.contains(active)) return;
+		// Focusable only for this: a standing tabindex would let a click on the card's text take
+		// focus. Removed again when the card itself loses focus.
+		el.setAttribute("tabindex", "-1");
 		refocusing = true;
 		try {
 			el.focus();
@@ -309,7 +313,6 @@
 		{@attach handBackOnRemove}
 		class="mapsdk-tooltip mapsdk-card mapsdk-focus-outline text-sm"
 		role="group"
-		tabindex="-1"
 		aria-label={name ?? undefined}
 		bind:offsetWidth={tipWidth}
 		bind:offsetHeight={tipHeight}

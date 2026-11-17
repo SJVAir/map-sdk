@@ -963,7 +963,7 @@ describe("pinned card", () => {
 			return { map, gl };
 		}
 
-		it("pins a listed feature at the open card's anchor, with no move or featureclick", async () => {
+		it("pins a listed feature at its own anchor, with no move or featureclick", async () => {
 			const { map, gl } = await pinSetUp();
 			gl.setRenderedFeatures([rendered(map, "monitors", "a")]);
 			click(gl);
@@ -979,21 +979,19 @@ describe("pinned card", () => {
 				refKey: "monitor:b",
 				name: "Site b"
 			});
-			expect(map.pinned?.lngLat).toEqual([-119, 36]);
+			// Where MapTooltip draws a listed item's card, never the open card's point (review,
+			// 2026-11-17: an inherited point drew nowhere and misled the lens's inBlock).
+			expect(map.pinned?.lngLat).toEqual([-118, 35]);
 			expect(gl.moves.length).toBe(moves);
 			expect(featureclick).not.toHaveBeenCalled();
 			expect(map.getSelection("monitors")).toEqual(selection);
 			expect(map.focusedKey).toBeNull();
 		});
 
-		it("with no card open uses anchorFor(item); options.anchor wins over both", async () => {
+		it("with no card open pins at anchorFor(item)", async () => {
 			const { map } = await pinSetUp();
 			expect(map.pin("monitors", "monitor:b")).toBe(true);
 			expect(map.pinned?.lngLat).toEqual(map.anchorFor(listed()[1]));
-			expect(map.pinned?.lngLat).toEqual([-118, 35]);
-			expect(map.pin("monitors", "monitor:a", { anchor: [-117, 34] })).toBe(true);
-			expect(map.pinned?.hit.refKey).toBe("monitor:a");
-			expect(map.pinned?.lngLat).toEqual([-117, 34]);
 		});
 
 		it("refuses with the card off, an unknown plugin, hoverable: false, or an unlisted key", async () => {

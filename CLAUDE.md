@@ -63,8 +63,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 - **Core** (`src/lib/core/`): `createMap()` returns a `MapContext` (`create-map.svelte.ts`):
   reactive camera, bounds, basemap, plugin list, selection per plugin, `featureclick`, `featuresAt`,
   `pinned`/`unpin()` (the card pinned by a click, a tap, or list focus while `MapView`'s `card` is on;
-  `pin(pluginId, refKey, { anchor? })` pins one from host code in place of the open card, no pan;
-  `MapTooltip` moves focus inside the card to the card on a swap),
+  `pin(pluginId, refKey)` pins one from host code in place of the open card, at its own point, no
+  pan; `MapTooltip` moves focus inside the card to the card on a swap, `tabindex` only for that),
   `pickWith`/`canSelect` plugin options with `togglePick` and `notice` (a refused pick's message),
   `featureForElement`, camera moves (`easeTo`/`flyTo`/`fitBounds`), `ready`, `gl`,
   `projection`/`space`/`telemetry` config (`telemetry: false` turns MapTiler's page-wide telemetry
