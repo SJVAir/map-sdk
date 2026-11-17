@@ -55,10 +55,14 @@ pin(pluginId: string, refKey: string, options?: { anchor?: [number, number] }): 
 - A lens pinned with `shapesLens.pin(refKey)`: unchanged. A card on a parent in the block, as the
   swap gives, already keeps it.
 - A hover lens: today a card on a child (section) or on another plugin's feature inside the
-  block (a notice) holds it; a parent's (township's) card doesn't. New: **a card on the lens's
-  centre parent holds it too.** Hosts that don't call `pin` can't reach that state: under a hover
-  lens a click on the centre parent lands on a child, and list focus uses `focusedKey`. Closing
-  the card, Esc, or a card outside the block let go as now.
+  block (a notice) holds it; a parent's (township's) card doesn't. New: **a held lens stays held
+  when the card moves to its centre parent**, and for as long as that card stays. It is a
+  carry-over, not a new way to start a hold: a centre parent's card pinned any other way (list
+  focus, a tap with no lens) still doesn't hold, so hosts that don't call `pin` see no change.
+  A card moved by list focus (`focusedKey` set) never carries the hold. Closing the card, Esc,
+  or a card on another parent or outside the block let go as now. (Refined while planning: a
+  plain "a centre parent's card holds" rule changed the list-focus case, which the existing test
+  "a pinned card on a parent doesn't pin; on a drawn child it holds" pins.)
 
 ### Focus and accessibility
 
