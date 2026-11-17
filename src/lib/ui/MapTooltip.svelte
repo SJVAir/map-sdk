@@ -250,21 +250,21 @@
 		close();
 	}
 
-	// The pinned feature changed while focus was inside the card and the swap dropped it
-	// (`map.pin` from a card's own button, which the swap removes): focus goes to the card itself,
-	// which is labelled with the new name.
+	// The pinned feature changed while focus was inside the card (`map.pin` from a card's own
+	// button): focus goes to the card itself, which is labelled with the new name, so the change
+	// is announced.
 	let lastPinned: string | null = null;
 	$effect(() => {
 		const id = pinned ? `${pinned.hit.pluginId}\n${pinned.hit.refKey}` : null;
 		const previous = lastPinned;
 		lastPinned = id;
 		if (id === null || previous === null || id === previous || !focusInside) return;
-		// Only when focus was dropped (the removed button had it), never taken from elsewhere.
+		// Only from inside the card (on a control the swap kept, such as a card action) or from
+		// nowhere (the removed button had it), never from elsewhere.
 		const active = document.activeElement;
 		const el = cardEl;
-		if (!el || untrack(() => map.focusedKey) !== null || (active && active !== document.body)) {
-			return;
-		}
+		if (!el || untrack(() => map.focusedKey) !== null || active === el) return;
+		if (active && active !== document.body && !el.contains(active)) return;
 		refocusing = true;
 		try {
 			el.focus();
