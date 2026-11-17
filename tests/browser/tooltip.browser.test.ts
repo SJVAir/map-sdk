@@ -879,6 +879,18 @@ describe("MapTooltip card swap", () => {
 		expect(document.activeElement).toBe(before);
 	});
 
+	it("a pin from host code, not from the card, leaves focus on the card's control", async () => {
+		const { map, before } = await swapMap();
+		before.focus();
+		await userEvent.keyboard("{Tab}{Tab}");
+		const close = page.getByRole("button", { name: "Close" });
+		await expect.element(close).toHaveFocus();
+		map.pin("points", "b");
+		await expect.element(page.getByRole("group", { name: "Site B" })).toBeVisible();
+		await new Promise((r) => setTimeout(r, 20));
+		await expect.element(close).toHaveFocus();
+	});
+
 	it("pinning the feature already pinned doesn't move focus", async () => {
 		const { map, before } = await swapMap();
 		before.focus();

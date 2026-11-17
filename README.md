@@ -146,12 +146,15 @@ focus nowhere, it closes the page's most recently pinned card. One card shows at
 one is pinned. Selection and `featureclick` are unchanged: a click still selects as before and
 also pins. `map.pinned` is the pinned feature (reactive), and `map.unpin()` closes it.
 `map.pin(pluginId, refKey)` pins a listed feature's card from your own code, such as a button on
-another card: it replaces the open card, at the feature's point in view, as a click on the
-feature would place it. It moves no camera and leaves the list focus,
+another card: it replaces the open card, and stays exactly where that card was when that point
+lies on the new feature's shape (a section's card swapped for its township's); otherwise it goes
+to the feature's point in view, as a click on the feature would place it. Pinning the feature
+already pinned changes nothing. It moves no camera and leaves the list focus,
 selection and `featureclick` alone, and returns `false`, changing nothing, while `card` is off,
 for a plugin not on the map or with `hoverable: false`, or for a feature its plugin doesn't list.
-If focus was inside the card, it moves to the new card, which is labelled with the feature's
-name; Close and Esc still return it to where it was before the card.
+If a click or key inside the card caused the swap (a button on the card), focus moves to the new
+card, which is labelled with the feature's name; Close and Esc still return it to where it was
+before the card. A `pin` from elsewhere leaves focus where it is.
 `card={{ actions }}` also puts your buttons in a row at the card's foot: `actions` is a snippet
 given a `CardContext` (`pluginId`, `ref`, `refKey`, the listed `item` or `null`, reactive
 `selectable` and `selected`, and `toggle()`, which is `map.togglePick` for that feature). Show
@@ -311,7 +314,8 @@ the current block's children are drawn. Until a parent's children arrive it keep
   parent's (`map.pin`, below) for as long as that card is open. Moving through the feature list
   never releases a pinned lens, so keyboard users reach its rows.
 - **`lens.center`** and **`lens.pinned`** are reactive. The children are listed (never
-  selectable) only while the lens is pinned, and the lens's legend section shows only while
+  selectable) only while the lens is pinned, but a drawn child's tooltip and card show its
+  `tooltip` content either way, and the lens's legend section shows only while
   children are drawn; with the same `ScaleRef` as a zoomed-in sections plugin, they share one.
 - Options: `fillOpacity`, `outline`, `noFigure`, `tooltip`, `tooltipShowsName`, `legendUnits` and
   `legendNote`, as on `shapesPlugin`. The centre parent gets a 2px `--foreground` outline over
@@ -705,7 +709,9 @@ ready and again after a basemap or theme change. For a plugin added to a ready m
 just after the current code finishes (a microtask), never inside the caller's code, so adding and
 removing plugins from an `$effect` is safe. Everything added through `ctx` is removed on teardown,
 and ids are namespaced per map. `features()` feeds the feature list, tooltip, and
-summary; `legend()` the legend. A plugin's `tooltip` content sits under the feature's name; set
+summary; `legend()` the legend. `itemFor(refKey)` gives the item for a feature the plugin draws
+but doesn't list (a hover lens's sections), so its tooltip and card still show its content and
+value. A plugin's `tooltip` content sits under the feature's name; set
 `tooltipShowsName` when the content shows the name itself (the monitor and collocation tooltips
 do), and the name header is left out.
 
@@ -960,14 +966,19 @@ local sjvair.com stack at `http://localhost:8000`.
 ### 0.1.0-beta.20
 
 - **New API: `MapContext.pin(pluginId, refKey)`** pins a listed feature's card from host code (a
-  section card's "In township"), replacing the open card, at the feature's point: no camera move, no list
-  focus, no selection change, no `featureclick`; `false` when refused. Hosts that don't call it
-  see no change.
+  section card's "In township"), replacing the open card: exactly in place when the open card's
+  point lies on the new feature's shape, else at the feature's point. No camera move, no list
+  focus, no selection change, no `featureclick`; `false` when refused; the same feature again
+  changes nothing. `pinned.inPlace` marks a card kept in place. Hosts that don't call it see no
+  change.
+- **`shapesLens`:** a drawn section's tooltip and pinned card show the lens's `tooltip` content
+  under a hover lens too (until beta.19, only the section's name and the card's actions showed
+  until the lens was pinned). The sections are still listed only while the lens is pinned. New
+  optional `MapPlugin.itemFor(refKey)` gives an unlisted drawn feature's item.
 - **`shapesLens`:** a hover lens held by a section's or notice's card stays held when the card is
   swapped for its centre township's, until that card closes or moves on. A township's card pinned
   any other way still doesn't hold it.
-- **The card:** when the pinned feature changes while focus is inside the card, focus moves to
-  the card itself (labelled with the new name, with a focus ring; focusable only then), so the swap is
+- **The card:** when a click or key inside the card swaps it, focus moves to the card itself (labelled with the new name, with a focus ring; focusable only then), so the swap is
   announced; Close and Esc still hand focus back to where it was before the card.
 
 ### 0.1.0-beta.19

@@ -63,8 +63,9 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 - **Core** (`src/lib/core/`): `createMap()` returns a `MapContext` (`create-map.svelte.ts`):
   reactive camera, bounds, basemap, plugin list, selection per plugin, `featureclick`, `featuresAt`,
   `pinned`/`unpin()` (the card pinned by a click, a tap, or list focus while `MapView`'s `card` is on;
-  `pin(pluginId, refKey)` pins one from host code in place of the open card, at its own point, no
-  pan; `MapTooltip` moves focus inside the card to the card on a swap, `tabindex` only for that),
+  `pin(pluginId, refKey)` pins one from host code in place of the open card, kept exactly there
+  (`inPlace`) when that point lies on the new shape, else at its own point, no pan; `MapTooltip`
+  moves focus to the card on a swap a click or key inside the card caused, `tabindex` only then),
   `pickWith`/`canSelect` plugin options with `togglePick` and `notice` (a refused pick's message),
   `featureForElement`, camera moves (`easeTo`/`flyTo`/`fitBounds`), `ready`, `gl`,
   `projection`/`space`/`telemetry` config (`telemetry: false` turns MapTiler's page-wide telemetry
@@ -110,7 +111,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   parents, an inner `shapesPlugin` over the block's children, the centre outline, a scoped Esc;
   rules in `lens-state.svelte.ts`, no GL: Explorer hover with a 120 ms grace, `pin`/`release`,
   a click opens a card only, touch hover ignored; a section or notice card's hold carries over
-  when the card is swapped for the centre parent's; children listed only while pinned). Both take
+  when the card is swapped for the centre parent's; children listed only while pinned, but
+  `itemFor` gives a drawn child's item to the tooltip and card either way). Both take
   `legendUnits`/`legendNote` (`shared.ts`'s `hostLegend`). `shapesPlugin` also has
   fill/`outline`/check overlay, `hoverable`, `noFigure: "outline"` for a no-level feature's
   unfilled `--foreground` edge, a `no-figure` line layer under `outline: "none"`, and `noFigure` on

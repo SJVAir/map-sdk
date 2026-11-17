@@ -102,3 +102,18 @@ browser projects.
 - **`tabindex="-1"` only for the refocus.** A standing one let a click on the card's text take
   focus, a change for hosts that never call `pin`. The card is focused with
   `mapsdk-focus-outline` (controls.css's ring for script-focused elements), not `mapsdk-focus`.
+
+## The user's decisions after the review (2026-11-17)
+
+- **Exactly in place.** `pin` keeps the card at the open card's drawn point (`pinned.inPlace`,
+  which `MapTooltip` draws at `lngLat`) when that point lies on the new feature's shape
+  (`containsPoint`); otherwise it pins at `anchorFor(item)`. So a section's card swapped for its
+  township's doesn't move, and a card for a feature elsewhere never claims the old spot (the
+  lens's `inBlock` test reads a truthful point). This replaces the first change above.
+- **A hover lens's section card shows its body.** New optional `MapPlugin.itemFor(refKey)`: the
+  item for a drawn but unlisted feature. `shapesLens` gives its drawn children's items, so their
+  tooltip and card show the `tooltip` content under a hover lens too (beta.17–19 showed only the
+  name and actions). The list is unchanged.
+- **The review's minors, fixed.** Focus moves to the card only for a swap a click or key inside
+  the card caused (not a `pin` from host code elsewhere); pinning the feature already pinned is a
+  no-op; the README examples test covers a successful `pin`.

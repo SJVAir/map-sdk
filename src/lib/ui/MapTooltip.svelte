@@ -198,6 +198,16 @@
 
 	/** The card is taking focus itself after a swap: its origin stays. */
 	let refocusing = false;
+	/**
+	 * A click or key inside the card is being handled (until the next task): a swap it causes is
+	 * the person's, so focus follows it. A pin from host code elsewhere leaves focus alone.
+	 */
+	let acting = false;
+	function onAct() {
+		if (acting) return;
+		acting = true;
+		setTimeout(() => (acting = false));
+	}
 
 	function onfocusin(e: FocusEvent) {
 		const from = e.relatedTarget;
@@ -267,7 +277,7 @@
 		const id = pinned ? `${pinned.hit.pluginId}\n${pinned.hit.refKey}` : null;
 		const previous = lastPinned;
 		lastPinned = id;
-		if (id === null || previous === null || id === previous || !focusInside) return;
+		if (id === null || previous === null || id === previous || !focusInside || !acting) return;
 		// Only from inside the card (on a control the swap kept, such as a card action) or from
 		// nowhere (the removed button had it), never from elsewhere.
 		const active = document.activeElement;
@@ -329,6 +339,8 @@
 		{onfocusin}
 		{onfocusout}
 		{onkeydown}
+		onclickcapture={onAct}
+		onkeydowncapture={onAct}
 		onpointerenter={() => map.setPointerInCard?.(true)}
 		onpointerleave={() => map.setPointerInCard?.(false)}
 		{@attach pointerOutOnRemove}

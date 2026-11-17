@@ -1061,6 +1061,14 @@ describe("pinned card", () => {
 			expect(map.pinned?.hit.refKey).toBe("monitor:b");
 		});
 
+		it("pinning the feature already pinned changes nothing", async () => {
+			const { map } = await pinSetUp();
+			map.pin("monitors", "monitor:a");
+			const before = map.pinned;
+			expect(map.pin("monitors", "monitor:a")).toBe(true);
+			expect(map.pinned).toBe(before);
+		});
+
 		it("refuses after destroy", async () => {
 			const { map } = await pinSetUp();
 			map.destroy();

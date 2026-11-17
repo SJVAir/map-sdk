@@ -504,6 +504,7 @@ class MapContextImpl implements MapContext {
 		// In place when the open card's point lies on the new feature's shape (a section's card
 		// swapped for its township's), else at the feature's own point, as a click would put it.
 		const open = untrack(() => this.#pinned);
+		if (open?.hit.pluginId === pluginId && open.hit.refKey === item.refKey) return true;
 		const at = open ? this.#drawnAt(open) : null;
 		if (at && item.geometry && containsPoint(item.geometry, at)) {
 			this.#pinned = { hit, lngLat: [at[0], at[1]], inPlace: true };
