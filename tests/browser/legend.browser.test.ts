@@ -291,7 +291,11 @@ describe("Legend", () => {
 				}
 			])
 		});
-		await expect.element(page.getByText("Smoke isn't available right now")).toBeVisible();
+		// Under the layer's heading, the line doesn't repeat the name (read once).
+		const row = page.getByRole("status");
+		await expect.element(row.getByRole("heading", { name: "Smoke" })).toBeVisible();
+		await expect.element(row.getByText("Isn't available right now", { exact: true })).toBeVisible();
+		expect(row.element().textContent!.split("Smoke").length - 1).toBe(1);
 		expect(page.getByRole("button").elements()).toHaveLength(0);
 		expect(document.querySelector(".mapsdk-legend")!.hasAttribute("hidden")).toBe(false);
 	});
@@ -332,7 +336,7 @@ describe("Legend", () => {
 			.toBeVisible();
 		expect(notices.element().textContent).not.toContain("isn't available right now");
 		await expect.element(notices.getByText("3 notices have no place")).toBeVisible();
-		const smoke = page.getByRole("status").filter({ hasText: "Smoke isn't available" });
+		const smoke = page.getByRole("status").filter({ hasText: "Isn't available right now" });
 		await expect.element(smoke.getByRole("heading", { name: "Smoke" })).toBeVisible();
 		const result = await axe.run(document.querySelector(".mapsdk-legend")!);
 		expect(result.violations).toEqual([]);

@@ -155,7 +155,8 @@
 					<p>{map.messages("mapsdk_loading")}</p>
 				{:else if status.state === "unavailable"}
 					<h3 class="text-sm">{entry.layer}</h3>
-					<p>{status.message ?? map.messages("mapsdk_unavailable", { layer: entry.layer })}</p>
+					<!-- Under the layer's heading, so the generic line doesn't repeat the name. -->
+					<p>{status.message ?? map.messages("mapsdk_unavailable_line")}</p>
 					{#if entry.note}
 						<div class="mapsdk-legend-note text-xs">{@render entry.note()}</div>
 					{/if}

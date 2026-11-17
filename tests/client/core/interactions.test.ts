@@ -1030,6 +1030,46 @@ describe("pinned card", () => {
 			expect(map.pinned?.inPlace).toBeFalsy();
 		});
 
+		it("while a list row is focused, keeps the place the focused card is drawn at", async () => {
+			// Review, 2026-11-17: MapTooltip draws a focused row's card at focusedAnchor, fixed at
+			// focus time; after a pan, anchorFor(item) is another point.
+			const rect = (
+				id: string,
+				w: number,
+				e: number,
+				label: [number, number]
+			): FeatureListItem => ({
+				...item(id),
+				refKey: `region:county:${id}`,
+				ref: { kind: "region", type: "county", code: id },
+				name: `Area ${id}`,
+				lngLat: label,
+				geometry: {
+					type: "Polygon",
+					coordinates: [
+						[
+							[w, 36],
+							[e, 36],
+							[e, 37],
+							[w, 37],
+							[w, 36]
+						]
+					]
+				}
+			});
+			const row = rect("a", -120, -119, [-119.5, 36.5]);
+			const around = rect("b", -119.8, -119.4, [-119.6, 36.5]);
+			const { map, gl } = await pinSetUp();
+			map.addPlugin({ ...points("areas", "region"), features: () => [row, around] });
+			map.focusFeature(row.refKey, "areas");
+			expect(map.focusedAnchor).toEqual([-119.5, 36.5]);
+			gl.easeTo({ center: [-116.5, 36.7] });
+			expect(map.anchorFor(row)).not.toEqual([-119.5, 36.5]);
+			expect(map.pin("areas", around.refKey)).toBe(true);
+			expect(map.pinned?.inPlace).toBe(true);
+			expect(map.pinned?.lngLat).toEqual([-119.5, 36.5]);
+		});
+
 		it("a point feature never keeps the open card's place", async () => {
 			const { map, gl } = await pinSetUp();
 			gl.setRenderedFeatures([rendered(map, "monitors", "a")]);

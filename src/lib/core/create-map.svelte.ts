@@ -505,7 +505,9 @@ class MapContextImpl implements MapContext {
 		// swapped for its township's), else at the feature's own point, as a click would put it.
 		const open = untrack(() => this.#pinned);
 		if (open?.hit.pluginId === pluginId && open.hit.refKey === item.refKey) return true;
-		const at = open ? this.#drawnAt(open) : null;
+		// A focused list row's card is the one drawn, at the anchor fixed when it was focused.
+		const focusedAt = untrack(() => (this.#focusedKey !== null ? this.#focusedAnchor : null));
+		const at = focusedAt ?? (open ? this.#drawnAt(open) : null);
 		if (at && item.geometry && containsPoint(item.geometry, at)) {
 			this.#pinned = { hit, lngLat: [at[0], at[1]], inPlace: true };
 		} else {

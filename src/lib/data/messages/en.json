@@ -32,6 +32,7 @@
 	"mapsdk_zoom_out": "Zoom out",
 	"mapsdk_map_label": "Map. Use arrow keys to pan, plus and minus to zoom.",
 	"mapsdk_unavailable": "{layer} isn't available right now",
+	"mapsdk_unavailable_line": "Isn't available right now",
 	"mapsdk_loading": "Loading",
 	"mapsdk_error_retry": "Try again",
 	"mapsdk_legend_label": "Legend",
