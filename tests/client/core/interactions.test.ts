@@ -1024,7 +1024,7 @@ describe("pinned card", () => {
 			expect(map.pin("areas", around.refKey)).toBe(true);
 			expect(map.pinned?.lngLat).toEqual([-119, 36]);
 			expect(map.pinned?.inPlace).toBe(true);
-			// From a card kept in place, the next one keeps that same point when it lies on it.
+			// From a card kept in place, a feature whose shape doesn't hold that point goes to its own.
 			expect(map.pin("areas", far.refKey)).toBe(true);
 			expect(map.pinned?.lngLat).toEqual(map.anchorFor(far));
 			expect(map.pinned?.inPlace).toBeFalsy();

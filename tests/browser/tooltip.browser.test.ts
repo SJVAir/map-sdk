@@ -858,6 +858,14 @@ describe("MapTooltip card swap", () => {
 		expect(results.violations).toEqual([]);
 	});
 
+	it("Space on the card's button swaps it and moves focus too", async () => {
+		const { before } = await swapMap();
+		before.focus();
+		await userEvent.keyboard("{Tab}");
+		await userEvent.keyboard(" ");
+		await expect.element(page.getByRole("group", { name: "Site B" })).toHaveFocus();
+	});
+
 	it("Close after a swap returns focus to where it came from before the card", async () => {
 		const { before } = await swapMap();
 		before.focus();
@@ -889,6 +897,47 @@ describe("MapTooltip card swap", () => {
 		await expect.element(page.getByRole("group", { name: "Site B" })).toBeVisible();
 		await new Promise((r) => setTimeout(r, 20));
 		await expect.element(close).toHaveFocus();
+	});
+
+	it("a card kept in place falls back to its feature's point once that place leaves the view", async () => {
+		// Review, 2026-11-17: a pan that took the kept point off-screen hid the card for good.
+		const map = createMap({ config: { maptilerKey: "k" } });
+		const place = item("p", "Place", good);
+		const area: FeatureListItem = {
+			...item("t", "Township T", good),
+			lngLat: [-118, 35],
+			geometry: {
+				type: "Polygon",
+				coordinates: [
+					[
+						[-121, 34],
+						[-117, 34],
+						[-117, 38],
+						[-121, 38],
+						[-121, 34]
+					]
+				]
+			}
+		};
+		map.addPlugin({ id: "points", setup: () => () => {}, features: () => [place, area] });
+		map.setCardEnabled(true);
+		map.pin("points", "p");
+		map.pin("points", "t");
+		expect(map.pinned?.inPlace).toBe(true);
+		const kept = map.pinned!.lngLat;
+		const at = (x: number) => (ll: [number, number]) =>
+			ll[0] === kept[0] && ll[1] === kept[1] ? { x, y: 100 } : { x: 200, y: 100 };
+		const { rerender } = await render(MapTooltip, {
+			map,
+			project: at(100),
+			width: 400,
+			height: 300,
+			card: true
+		});
+		const card = page.getByRole("group", { name: "Township T" });
+		await expect.element(card).toBeVisible();
+		await rerender({ project: at(-50) });
+		await expect.element(card).toBeVisible();
 	});
 
 	it("pinning the feature already pinned doesn't move focus", async () => {

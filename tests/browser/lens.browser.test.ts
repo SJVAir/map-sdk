@@ -301,6 +301,16 @@ describe("shapesLens in a browser", () => {
 		await vi.waitFor(() => expect(lens.center).toBe(parentKey(free[0], free[1])));
 	});
 
+	it("hovering a section under a hover lens shows its tooltip body", async () => {
+		const { lens, pointAt } = await lensMap();
+		await pointAt(at(2, 2));
+		await vi.waitFor(() => expect(lens.center).toBe(parentKey(2, 2)));
+		await pointAt(at(2, 2, 1));
+		await vi.waitFor(() =>
+			expect(document.querySelector(".mapsdk-tooltip")?.textContent).toContain("Section figures")
+		);
+	});
+
 	it("keyboard: the township button moves focus into the township's card and keeps a pinned lens", async () => {
 		const { lens, clickAt } = await lensMap(false, true);
 		await clickAt(at(2, 2));

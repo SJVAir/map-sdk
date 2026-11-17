@@ -154,9 +154,11 @@ selection and `featureclick` alone, and returns `false`, changing nothing, while
 for a plugin not on the map or with `hoverable: false`, or for a feature its plugin doesn't list.
 If a click or key inside the card caused the swap (a button on the card), focus moves to the new
 card, which is labelled with the feature's name; Close and Esc still return it to where it was
-before the card. A `pin` from elsewhere leaves focus where it is.
+before the card. Only a `pin` made synchronously inside the card's click or key handler counts:
+one from elsewhere, or after an `await`, leaves focus where it is. A card kept in place goes to its
+feature's point in view once a pan takes that place out of view.
 `card={{ actions }}` also puts your buttons in a row at the card's foot: `actions` is a snippet
-given a `CardContext` (`pluginId`, `ref`, `refKey`, the listed `item` or `null`, reactive
+given a `CardContext` (`pluginId`, `ref`, `refKey`, the listed `item` (or a hover lens's drawn section's, through `itemFor`) or `null`, reactive
 `selectable` and `selected`, and `toggle()`, which is `map.togglePick` for that feature). Show
 Select/Remove only when `selectable` is true: a fire hotspot, a smoke plume, or a layer in mode
 `"none"` can't be selected, and `toggle()` then does nothing. Anything else goes in
@@ -317,8 +319,8 @@ the current block's children are drawn. Until a parent's children arrive it keep
   selectable) only while the lens is pinned, but a drawn child's tooltip and card show its
   `tooltip` content either way, and the lens's legend section shows only while
   children are drawn; with the same `ScaleRef` as a zoomed-in sections plugin, they share one.
-- Options: `fillOpacity`, `outline`, `noFigure`, `tooltip`, `tooltipShowsName`, `legendUnits` and
-  `legendNote`, as on `shapesPlugin`. The centre parent gets a 2px `--foreground` outline over
+- Options: `fillOpacity`, `outline`, `noFigure`, `tooltip`, `tooltipShowsName`, `legendUnits`,
+  `legendNote` and `legendDisplay`, as on `shapesPlugin`. The centre parent gets a 2px `--foreground` outline over
   its children. It throws when `parents` isn't a choropleth `shapesPlugin`.
 
 ```ts
@@ -978,7 +980,9 @@ local sjvair.com stack at `http://localhost:8000`.
 - **`shapesLens`:** a drawn section's tooltip and pinned card show the lens's `tooltip` content
   under a hover lens too (until beta.19, only the section's name and the card's actions showed
   until the lens was pinned). The sections are still listed only while the lens is pinned. New
-  optional `MapPlugin.itemFor(refKey)` gives an unlisted drawn feature's item.
+  optional `MapPlugin.itemFor(refKey)` gives an unlisted drawn feature's item. With an item, a
+  hovered section's tooltip and a clicked section's card sit at the section's point in view, as
+  a listed shape's do, instead of at the pointer or the click.
 - **`shapesLens`:** a hover lens held by a section's or notice's card stays held when the card is
   swapped for its centre township's, until that card closes or moves on. A township's card pinned
   any other way still doesn't hold it.

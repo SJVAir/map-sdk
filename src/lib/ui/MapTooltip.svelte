@@ -123,8 +123,17 @@
 		if (mode === "pointer" && !map.focusedKey && !pinned) return map.hovered?.lngLat ?? null;
 		// A focused feature that left the data has no item, so no tooltip.
 		if (map.focusedKey) return item ? (map.focusedAnchor ?? item.lngLat) : null;
-		// A card `map.pin` kept where the open card was.
-		if (pinned?.inPlace) return pinned.lngLat;
+		// A card `map.pin` kept where the open card was, while that place is in view; after a pan
+		// takes it out, the card goes to its feature's point in view, as a clicked one does.
+		if (pinned?.inPlace) {
+			const p = project(pinned.lngLat);
+			const inView =
+				p !== null &&
+				(width === undefined ||
+					height === undefined ||
+					(p.x >= 0 && p.y >= 0 && p.x <= width && p.y <= height));
+			if (inView) return pinned.lngLat;
+		}
 		return hoverAnchor ?? item?.lngLat ?? shownHit?.lngLat ?? null;
 	});
 	const projected = $derived(anchor ? project(anchor) : null);
