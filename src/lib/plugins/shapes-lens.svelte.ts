@@ -29,6 +29,8 @@ export interface ShapesLensOptions<C extends MapFeatureProperties> {
 	tooltipShowsName?: boolean;
 	legendUnits?: string;
 	legendNote?: Snippet;
+	/** As on `shapesPlugin`: a gradient (default) or labeled blocks. */
+	legendDisplay?: "gradient" | "blocks";
 }
 
 export interface ShapesLens extends MapPlugin {
@@ -142,7 +144,8 @@ export function shapesLens<C extends MapFeatureProperties>(
 		tooltip: options.tooltip,
 		tooltipShowsName: options.tooltipShowsName,
 		legendUnits: options.legendUnits,
-		legendNote: options.legendNote
+		legendNote: options.legendNote,
+		legendDisplay: options.legendDisplay
 	});
 
 	function setup(ctx: PluginContext): () => void {

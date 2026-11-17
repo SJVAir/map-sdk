@@ -42,6 +42,7 @@ async function setUp(
 		parentOf?: (p: Props) => string | null;
 		deep?: boolean;
 		meta?: MetadataProvider;
+		legendDisplay?: "gradient" | "blocks";
 	} = {}
 ) {
 	const grid = lensGrid();
@@ -68,7 +69,8 @@ async function setUp(
 		parentOf: opts.parentOf ?? grid.parentOf,
 		layerLabel: "Sections",
 		tooltip: opts.tooltip,
-		legendUnits: "lbs per section"
+		legendUnits: "lbs per section",
+		legendDisplay: opts.legendDisplay
 	});
 	map.addPlugin(parents);
 	map.addPlugin(lens);
@@ -170,6 +172,14 @@ describe("shapesLens", () => {
 		const items = lens.features!();
 		expect(items).toHaveLength(36);
 		expect(items.every((i) => i.selectable === false)).toBe(true);
+	});
+
+	it("passes legendDisplay to its legend", async () => {
+		const { lens } = await setUp({ legendDisplay: "blocks" });
+		lens.pin(parentKey(2, 2));
+		await settle();
+		const data = lens.legend!();
+		expect(data && "scale" in data && data.display).toBe("blocks");
 	});
 
 	it("legends only while children are drawn, and shares a section with sections on the same ScaleRef", async () => {
