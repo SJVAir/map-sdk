@@ -37,6 +37,8 @@ export interface GlMapLike {
 		properties: Record<string, unknown>;
 		geometry: Geometry;
 	}>;
+	/** The source's data and the tiles in view have loaded (MapLibre's `isSourceLoaded`). */
+	isSourceLoaded(id: string): boolean;
 	isStyleLoaded(): boolean | void;
 	setStyle(style: unknown, options?: { diff?: boolean }): void;
 	/* eslint-disable @typescript-eslint/no-explicit-any -- MapLibre's event payloads vary by type */

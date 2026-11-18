@@ -321,3 +321,95 @@ describe("shapesLens", () => {
 		expect(hiddenParents(gl, map)).toEqual([parentKey(2, 2)]);
 	});
 });
+
+describe("shapesLens hides its parents once the children have loaded", () => {
+	const lensSource = (map: MapContext) => `${map.uid}:lens:shapes`;
+	const blockOf = (grid: ReturnType<typeof lensGrid>, key: string) => grid.block(key).sort();
+
+	async function held() {
+		const set = await setUp();
+		set.lens.pin(parentKey(2, 2));
+		await settle();
+		set.gl.holdData = true;
+		return set;
+	}
+
+	it("keeps the old hidden set until the children's tiles load, then applies it whole", async () => {
+		const { map, gl, lens, grid } = await held();
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 2)));
+		lens.pin(parentKey(2, 3));
+		await settle();
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 2)));
+		gl.finishData(lensSource(map));
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 3)));
+	});
+
+	it("a metadata or content event doesn't apply it, though it says the source is loaded", async () => {
+		const { map, gl, lens, grid } = await held();
+		lens.pin(parentKey(2, 3));
+		await settle();
+		for (const sourceDataType of ["metadata", "content"]) {
+			gl.emit("sourcedata", { sourceId: lensSource(map), isSourceLoaded: true, sourceDataType });
+		}
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 2)));
+	});
+
+	it("a second recentre before the load applies only the latest", async () => {
+		const { map, gl, lens, grid } = await held();
+		lens.pin(parentKey(2, 3));
+		await settle();
+		lens.pin(parentKey(3, 3));
+		await settle();
+		gl.emit("sourcedata", { sourceId: lensSource(map), isSourceLoaded: false, tile: {} });
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 2)));
+		gl.finishData(lensSource(map));
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(3, 3)));
+	});
+
+	it("an error on the children's source applies the pending set", async () => {
+		const { map, gl, lens, grid } = await held();
+		lens.pin(parentKey(2, 3));
+		await settle();
+		gl.failData(lensSource(map));
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 3)));
+	});
+
+	it("an event for another source doesn't apply it", async () => {
+		const { map, gl, lens, grid } = await held();
+		lens.pin(parentKey(2, 3));
+		await settle();
+		gl.emit("sourcedata", {
+			sourceId: `${map.uid}:parents:shapes`,
+			isSourceLoaded: true,
+			tile: {}
+		});
+		gl.emit("error", { sourceId: `${map.uid}:parents:shapes`, error: new Error("other") });
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 2)));
+	});
+
+	it("a change that brings no new children applies at once", async () => {
+		const { map, gl, grid, parentsSource } = await held();
+		parentsSource.features = {
+			...grid.parents,
+			features: grid.parents.features.filter((f) => f.properties.refKey !== parentKey(1, 1))
+		};
+		await settle();
+		expect(hiddenParents(gl, map)).toEqual(
+			blockOf(grid, parentKey(2, 2)).filter((k) => k !== parentKey(1, 1))
+		);
+	});
+
+	it("teardown with a load pending clears the hidden set and ignores later loads", async () => {
+		const { map, gl, lens } = await held();
+		lens.pin(parentKey(2, 3));
+		await settle();
+		const source = lensSource(map);
+		map.removePlugin("lens");
+		await settle();
+		expect(hiddenParents(gl, map)).toEqual([]);
+		gl.emit("sourcedata", { sourceId: source, isSourceLoaded: true, tile: {} });
+		gl.emit("error", { sourceId: source, error: new Error("late") });
+		await settle();
+		expect(hiddenParents(gl, map)).toEqual([]);
+	});
+});
