@@ -109,6 +109,9 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `keys`, `geometryOf`, `setHidden` by the `lensHidden` feature state, the paint's case added only
   once a lens hides something) and `shapesLens` (`shapes-lens.svelte.ts`: its own plugin after the
   parents, an inner `shapesPlugin` over the block's children, the centre outline, a scoped Esc;
+  the parents' hidden set applies whole once the children's source has loaded (a `sourcedata`
+  tile or `idle` event with `isSourceLoaded`, never `metadata`/`content`; an `error` or the map's
+  `idle` applies it; at once when nothing loads or the children have no layers), so no frame shows a parent clear or under the old children;
   rules in `lens-state.svelte.ts`, no GL: Explorer hover with a 120 ms grace, `pin`/`release`,
   a click opens a card only, touch hover ignored; a section or notice card's hold carries over
   when the card is swapped for the centre parent's; children listed only while pinned, but

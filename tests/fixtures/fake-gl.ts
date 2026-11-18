@@ -12,6 +12,15 @@ export interface FakeGl extends GlMapLike {
 	 * loaded (adding sources and layers works), as MapLibre's does right after `style.load`.
 	 */
 	tilesLoading: boolean;
+	/**
+	 * While true, a `setData` leaves its source loading (`isSourceLoaded` false) until
+	 * `finishData` or `failData`, as MapLibre's worker and tile reload do. Off by default.
+	 */
+	holdData: boolean;
+	/** Ends a held load: the source is loaded, and a tile `sourcedata` event is emitted. */
+	finishData(id: string): void;
+	/** Ends a held load with an `error` event for the source. */
+	failData(id: string): void;
 	/** Specs as added; a `setData` through `getSource(id)` replaces the spec's `data`. */
 	readonly sources: Map<string, SourceSpecification>;
 	/** In draw order. */
@@ -44,6 +53,7 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 	const images = new Map<string, HTMLImageElement | ImageData>();
 	const featureStates = new Map<string, Record<string, unknown>>();
 	const listeners: FakeGl["listeners"] = [];
+	const loading = new Set<string>();
 	const calls: string[] = [];
 	const moves: FakeGl["moves"] = [];
 	let rendered: Rendered[] = [];
@@ -66,6 +76,7 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 	const gl: FakeGl = {
 		styleLoaded: opts.styleLoaded ?? false,
 		tilesLoading: false,
+		holdData: false,
 		sources,
 		layers,
 		images,
@@ -98,6 +109,7 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 					const spec = sources.get(id);
 					if (!spec) throw new Error(`fake-gl: setData on removed source ${id}`);
 					sources.set(id, { ...spec, data } as SourceSpecification);
+					if (gl.holdData) loading.add(id);
 				}
 			};
 		},
@@ -179,6 +191,11 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 			log("queryRenderedFeatures");
 			const only = options?.layers;
 			return only ? rendered.filter((f) => only.includes(f.layer.id)) : [...rendered];
+		},
+		isSourceLoaded(id) {
+			log("isSourceLoaded", id);
+			if (!sources.has(id)) throw new Error(`fake-gl: no source ${id}`);
+			return !loading.has(id);
 		},
 		isStyleLoaded() {
 			log("isStyleLoaded");
@@ -277,6 +294,14 @@ export function createFakeGl(opts: { styleLoaded?: boolean } = {}): FakeGl {
 			for (const l of [...listeners]) {
 				if (l.type === type && l.layerId === layerId) l.listener(e);
 			}
+		},
+		finishData(id) {
+			loading.delete(id);
+			gl.emit("sourcedata", { sourceId: id, isSourceLoaded: true, tile: {} });
+		},
+		failData(id) {
+			loading.delete(id);
+			gl.emit("error", { sourceId: id, error: new Error("fake-gl: load failed") });
 		},
 		fireStyleLoad() {
 			gl.styleLoaded = true;

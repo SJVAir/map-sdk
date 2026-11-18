@@ -969,6 +969,17 @@ local sjvair.com stack at `http://localhost:8000`.
 
 ## Changes
 
+### 0.1.0-beta.21
+
+- **`shapesLens`:** recentring no longer flashes the newly covered townships clear for a frame
+  or two, and the townships the lens leaves (all of them on release) no longer show through the
+  old sections for those frames. The lens hides and shows its townships together, once its
+  sections' tiles have loaded; a recentre during a load applies only the latest, and a failed
+  load applies it as before. Hosts see no other change. When the view spans several tiles that
+  finish in different frames, a township can still show through its new sections, as a tint,
+  for one frame.
+- **`GlMapLike.isSourceLoaded(id)`**, as MapLibre's `Map` has it (for hosts that wrap the GL map).
+
 ### 0.1.0-beta.20
 
 - **New API: `MapContext.pin(pluginId, refKey)`** pins a listed feature's card from host code (a

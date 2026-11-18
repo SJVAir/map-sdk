@@ -351,3 +351,92 @@ describe("shapesLens in a browser", () => {
 });
 
 export type { MapContext };
+
+describe("shapesLens frames in a browser", () => {
+	// A 5×5 grid in the middle of one z9 tile (85, 199), with the whole 600×400 view inside it:
+	// MapLibre swaps a source's tiles one at a time, so a view across tiles could mix two states.
+	const TILE_CENTRE: [number, number] = [-119.8828125, 36.8796206];
+	const CELL = 0.035;
+	const origin: [number, number] = [TILE_CENTRE[0] - 2.5 * CELL, TILE_CENTRE[1] - 2.5 * CELL];
+	const middle = (row: number, col: number): [number, number] => [
+		origin[0] + (col + 0.5) * CELL,
+		origin[1] + (row + 0.5) * CELL
+	];
+
+	it("recentring never shows a township clear, or under its sections, for a frame", async () => {
+		const grid = lensGrid({ origin, size: CELL });
+		const map = createMap({
+			config: {
+				maptilerKey: "test-key",
+				basemaps: { styles: [{ id: "a", style }], defaultId: "a" },
+				initialView: { center: TILE_CENTRE, zoom: 9.9, bearing: 0, pitch: 0 }
+			}
+		});
+		const parents = shapesPlugin<Props>({
+			id: "parents",
+			source: staticSource(grid.parents, pm25Scale),
+			layerLabel: "Townships",
+			mode: "choropleth"
+		});
+		const lens = shapesLens<Props>({
+			id: "lens",
+			parents,
+			source: staticSource(grid.children, pm25Scale),
+			block: grid.block,
+			parentOf: grid.parentOf,
+			layerLabel: "Sections"
+		});
+		map.addPlugin(parents);
+		map.addPlugin(lens);
+		const attached: GlMapLike[] = [];
+		const attach = map.attach.bind(map);
+		vi.spyOn(map, "attach").mockImplementation((gl) => {
+			attached.push(gl);
+			attach(gl);
+		});
+		render(MapView, { map, class: "lens-map", label: "Frames map" });
+		await vi.waitFor(() => expect(map.ready).toBe(true), { timeout: 5000 });
+		const gl = attached[0] as GlMapLike & {
+			getFeatureState(target: { source: string; id: string }): Record<string, unknown>;
+		};
+		const parentsSource = `${map.uid}:parents:shapes`;
+		const lensLayer = `${map.uid}:lens:`;
+		const mismatched: string[] = [];
+		let frames = 0;
+		let recording = false;
+		gl.on("render", () => {
+			frames++;
+			if (!recording) return;
+			for (let row = 0; row < 5; row++) {
+				for (let col = 0; col < 5; col++) {
+					const key = parentKey(row, col);
+					const hidden = !!gl.getFeatureState({ source: parentsSource, id: key }).lensHidden;
+					const { x, y } = gl.project(middle(row, col));
+					const covered = gl
+						.queryRenderedFeatures([x, y])
+						.some((f) => f.layer.id.startsWith(lensLayer));
+					if (hidden !== covered) {
+						mismatched.push(`frame ${frames}: ${key} ${hidden ? "clear" : "under"}`);
+					}
+				}
+			}
+		});
+		const wait = () => settle(400);
+		lens.pin(parentKey(2, 2));
+		await wait();
+		recording = true;
+		for (const [row, col] of [
+			[2, 3],
+			[1, 3],
+			[2, 2],
+			[3, 1]
+		]) {
+			lens.pin(parentKey(row, col));
+			await wait();
+		}
+		lens.release();
+		await wait();
+		expect(frames).toBeGreaterThan(10);
+		expect(mismatched).toEqual([]);
+	});
+});
