@@ -183,7 +183,8 @@ export function shapesLens<C extends MapFeatureProperties>(
 			if (!ctxRef || (ctx.gl.getSource(childSource) && !ctx.gl.isSourceLoaded(childSource))) return;
 			apply();
 		};
-		// MapLibre's `metadata` and `content` events already say loaded, before the tiles reload.
+		// Only a loaded tile (or the source's first `idle`) counts: `metadata` comes before the
+		// tiles reload, and either can say loaded while the children have no layers, and so no tiles.
 		const onData = (e: {
 			sourceId?: string;
 			isSourceLoaded?: boolean;
@@ -193,20 +194,26 @@ export function shapesLens<C extends MapFeatureProperties>(
 			if (e.sourceId !== childSource || !e.isSourceLoaded) return;
 			if (e.tile || e.sourceDataType === "idle") apply();
 		};
-		// A failed load mustn't leave the parents as they were: apply as if it had drawn.
+		// A failed load mustn't leave the parents as they were: apply as if it had drawn. (A failed
+		// tile applies the set while others may still reload, a frame early there at worst.)
 		const onError = (e: { sourceId?: string }) => {
 			if (e.sourceId === childSource) apply();
 		};
 		ctx.gl.on("sourcedata", onData);
 		ctx.gl.on("error", onError);
+		// The backstop: at the map's idle every source has loaded and drawn, events or not (the
+		// last reloading tile panned out of view, say).
+		ctx.gl.on("idle", apply);
 		ctx.effect(() => {
+			const ready = innerReady();
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt whole, never mutated
 			const parents = new Set(
-				innerReady() ? [...childParents.values()].filter((key) => hooks.keys.has(key)) : []
+				ready ? [...childParents.values()].filter((key) => hooks.keys.has(key)) : []
 			);
 			pending = parents;
 			// After the flush, so the children's `setData` in it counts whatever the effect order.
-			queueMicrotask(applyIfLoaded);
+			// Without the children's layers nothing of theirs draws, so there's nothing to wait for.
+			queueMicrotask(ready ? applyIfLoaded : apply);
 		});
 
 		// The centre parent's outline over the children, while any are drawn. It's re-added on top
@@ -256,6 +263,7 @@ export function shapesLens<C extends MapFeatureProperties>(
 			stopState();
 			ctx.gl.off("sourcedata", onData);
 			ctx.gl.off("error", onError);
+			ctx.gl.off("idle", apply);
 			pending = null;
 			teardownInner();
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt whole, never mutated

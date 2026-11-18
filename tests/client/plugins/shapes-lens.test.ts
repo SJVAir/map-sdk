@@ -399,6 +399,34 @@ describe("shapesLens hides its parents once the children have loaded", () => {
 		);
 	});
 
+	it("the children's scale going unavailable with a load pending shows the parents at once", async () => {
+		const BROKEN: ScaleRef = { dataset: "pesticides", entryType: "broken" };
+		const meta = {
+			scale: vi.fn((ref: ScaleRef) =>
+				ref.entryType === BROKEN.entryType
+					? Promise.reject(new Error("no scale"))
+					: Promise.resolve(pm25Scale)
+			),
+			entryType: vi.fn(() => Promise.resolve("unavailable"))
+		} as unknown as MetadataProvider;
+		const { map, gl, lens, childSource } = await setUp({ meta });
+		lens.pin(parentKey(2, 2));
+		await settle();
+		gl.holdData = true;
+		childSource.scale = BROKEN;
+		await settle();
+		await settle();
+		expect(hiddenParents(gl, map)).toEqual([]);
+	});
+
+	it("the map's idle applies a pending set", async () => {
+		const { map, gl, lens, grid } = await held();
+		lens.pin(parentKey(2, 3));
+		await settle();
+		gl.emit("idle");
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 3)));
+	});
+
 	it("teardown with a load pending clears the hidden set and ignores later loads", async () => {
 		const { map, gl, lens } = await held();
 		lens.pin(parentKey(2, 3));
@@ -409,6 +437,7 @@ describe("shapesLens hides its parents once the children have loaded", () => {
 		expect(hiddenParents(gl, map)).toEqual([]);
 		gl.emit("sourcedata", { sourceId: source, isSourceLoaded: true, tile: {} });
 		gl.emit("error", { sourceId: source, error: new Error("late") });
+		gl.emit("idle");
 		await settle();
 		expect(hiddenParents(gl, map)).toEqual([]);
 	});

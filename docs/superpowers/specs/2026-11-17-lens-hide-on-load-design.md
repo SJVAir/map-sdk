@@ -21,9 +21,9 @@ A browser repro read every rendered frame across a recentre. It checked each tow
 - On a dashboard-like grid (9×9 townships of 36 sections, zoom 10, 1200×800), `main` has 20
   mismatched frames over 10 recentres.
 
-A spike also showed that MapLibre's map-level `sourcedata` events for `metadata` and `content`
-already report `isSourceLoaded: true`. They fire before the tiles are marked for reload, so they
-can't be used.
+A spike also showed that MapLibre's map-level `metadata` event already reports
+`isSourceLoaded: true`, because it fires before the tiles are marked for reload. `content` can
+report the same when the source has no layers. So only tile and `idle` events count.
 
 ## Change
 
@@ -41,6 +41,11 @@ removals together, once the inner sections' source has loaded the data it was la
 - **An `error` event for the inner source** applies the pending set at once (today's behaviour), so
   a failed load can't leave townships stuck. While a slow load is pending, the old townships stay
   hidden under the old sections, which still draw, so the map stays consistent.
+- **The map's `idle` event** applies the pending set as a backstop: every source has loaded and
+  drawn by then. That covers a load that ends without a tile event, such as the last reloading
+  tile panned out of view. When the children's layers are gone (their scale is unresolved or
+  unavailable), MapLibre stops using the source and sends no tile events. Nothing of theirs
+  draws then, so the set applies at once. (Added after the final review.)
 - Teardown (restyle, removal) clears the hidden set at once, drops anything pending, and removes
   the listeners, as it does today.
 
