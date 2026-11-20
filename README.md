@@ -265,7 +265,8 @@ Two more options, on `shapesPlugin` and passed through by `regionsPlugin`, both 
 `noFigureLabel` (already-translated text) replaces "No data" for the whole layer under
 `noFigure: "outline"`, in every place above, legend row included; `detail(props)` gives a
 no-figure feature its reason, beside the label in the row's accessible name and under the
-tooltip's and pinned card's chip. The visible list row shows the label alone. Both are trimmed,
+tooltip's and pinned card's chip, given only to a drawn no-figure outline (not while the scale is
+loading or unavailable). The visible list row shows the label alone. Both are trimmed,
 and empty means unset; `noFigureLabel` is ignored under `"neutral"`, where `detail` stands in for
 "No level" as on `pointsPlugin`. A shared legend section takes its first member's
 `noFigureLabel` that is set. `regionsPlugin` passes `legendUnits` and `legendNote` through too.
@@ -370,7 +371,8 @@ the current block's children are drawn. Until a parent's children arrive it keep
   children are drawn; with the same `ScaleRef` as a zoomed-in sections plugin, they share one.
 - Options: `fillOpacity`, `outline`, `noFigure`, `noFigureLabel`, `detail`, `tooltip`,
   `tooltipShowsName`, `legendUnits`, `legendNote` and `legendDisplay`, as on `shapesPlugin`. The
-  centre parent gets a 2px `--foreground` outline over its children. It throws when `parents` isn't a choropleth `shapesPlugin`.
+  centre parent gets a 2px `--foreground` outline over its children. It throws when `parents`
+  isn't a choropleth `shapesPlugin`.
 
 ```ts
 const townships = shapesPlugin({
@@ -1037,7 +1039,9 @@ local sjvair.com stack at `http://localhost:8000`.
 - **New message key `mapsdk_list_row_level_detail`** (`"{name}, {level}, {detail}"`, a no-figure
   row's accessible name with its reason). A host that types its messages as
   `Record<MessageKey, …>` adds it when it moves to this beta; nothing else changes for a host that
-  sets none of the new options.
+  sets none of the new options. A host's own plugin that sets both `noFigure` and `detail` on a
+  `FeatureListItem` now gets the detail in the row's accessible name and under the tooltip's chip
+  (until beta.21, `noFigure` hid it).
 
 ### 0.1.0-beta.21
 

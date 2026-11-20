@@ -130,16 +130,17 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   readers a `mapsdk_reading_pause` before each line under the value), `collocationSitesPlugin`, `regionsPlugin`,
   `calHeatScorePlugin`, `forecastZonesPlugin` (`regionsPlugin` passes `noFigure`/`fillOpacity`/
   `outline`/`noFigureLabel`/`detail`/`legendUnits`/`legendNote` through), `hmsSmokePlugin`,
-  `hmsFirePlugin` (groups, then hotspots from zoom 10), `focusAreaPlugin` (`focus-area.svelte.ts`: an area's slate outline and
-  white wash outside it, from `focus-geometry.ts`'s `worldMask`; or a point's ring and canvas label,
-  listed as one `noReading` row (left out while `ctx.coveredAt` its point) and clickable, never
-  selectable; `set()` changes it in place), `schoolsPlugin` (`schools.svelte.ts`: the host's raw
-  `getPesticideLocations` features, a `types` allow-list, `school-icons.ts`'s school-house badges
-  with Lucide's `school`/`baby` paths (ISC) and school-house count bubbles, `SchoolTooltip` and
-  `SchoolClusterTooltip`, a `symbols` legend with one row per badge, labels from
-  `locationTypeLabel`, never selectable, `marksPlaces`), and `groupFires`, with the monitor, cluster (its "within a X mi² area"
-  line from `cluster-area.ts`'s convex hull), collocation (`CollocationTooltip`), and fire
-  (`FireTooltip`, the reading box) tooltips. Smoke takes no hover. Presets never fetch.
+  `hmsFirePlugin` (groups, then hotspots from zoom 10), `focusAreaPlugin` (`focus-area.svelte.ts`:
+  an area's slate outline and white wash outside it, from `focus-geometry.ts`'s `worldMask`; or a
+  point's ring and canvas label, listed as one `noReading` row (left out while `ctx.coveredAt` its
+  point) and clickable, never selectable; `set()` changes it in place), `schoolsPlugin`
+  (`schools.svelte.ts`: the host's raw `getPesticideLocations` features, a `types` allow-list,
+  `school-icons.ts`'s school-house badges with Lucide's `school`/`baby` paths (ISC) and
+  school-house count bubbles, `SchoolTooltip` and `SchoolClusterTooltip`, a `symbols` legend with
+  one row per badge, labels from `locationTypeLabel`, never selectable, `marksPlaces`), and
+  `groupFires`, with the monitor, cluster (its "within a X mi² area" line from `cluster-area.ts`'s
+  convex hull), collocation (`CollocationTooltip`), and fire (`FireTooltip`, the reading box)
+  tooltips. Smoke takes no hover. Presets never fetch.
 - **Options** (`src/lib/options/`): `OptionsToolbar` (monitor-map 5.0's toolbar, shared): plain
   declarations (`types.ts`: `OptionGroup`, `OptionRow`, `OptionValues`), pure value logic
   (`values.ts`: select-all, reset, one change per action), `menus.svelte.ts` (per-toolbar open

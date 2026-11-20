@@ -71,8 +71,9 @@ export interface ShapesOptions<P extends MapFeatureProperties> {
 	/**
 	 * A short, already-translated text for a feature with no level, as `pointsPlugin`'s: under
 	 * `noFigure: "outline"` the reason beside the no-figure label (the row's accessible name and
-	 * under the tooltip's chip, not the visible row), else in place of "No level". Trimmed; empty
-	 * or undefined means none. Ignored for a feature with a level.
+	 * under the tooltip's chip, not the visible row), given only to a drawn no-figure outline (not
+	 * while the scale loads or is unavailable, nor to a line); else in place of "No level".
+	 * Trimmed; empty or undefined means none. Ignored for a feature with a level.
 	 */
 	detail?(props: P): string | undefined;
 	/**
@@ -272,8 +273,11 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 			const { lngLat, bbox } = measure(feature);
 			if (!lngLat) continue;
 			const level = scale ? levelFor(props.value, scale) : NO_LEVEL;
-			const detail = level === NO_LEVEL ? options.detail?.(props)?.trim() : undefined;
 			const noFigure = outlineNoFigure && scale !== null && drawnAsNoFigure(feature, scale);
+			// Under outline, the reason goes only with a drawn no-figure outline (never in the
+			// visible row while the scale is loading or unavailable).
+			const wantsDetail = level === NO_LEVEL && (noFigure || !outlineNoFigure);
+			const detail = wantsDetail ? options.detail?.(props)?.trim() : undefined;
 			items.push({
 				refKey: props.refKey,
 				ref,

@@ -932,6 +932,19 @@ describe("shapesPlugin detail and noFigureLabel", () => {
 		expect("noFigureLabel" in plugin.legend!()!).toBe(false);
 	});
 
+	it("gives no reason under outline while the scale is loading or unavailable", async () => {
+		const pending = new Promise<Scale>(() => {});
+		for (const meta of [pending, "unavailable"] as const) {
+			const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
+			const { plugin } = await setup(
+				{ source, noFigure: "outline", noFigureLabel: "Not enough data", detail: why },
+				meta
+			);
+			await settle();
+			expect(plugin.features!().some((i) => "detail" in i)).toBe(false);
+		}
+	});
+
 	it("a null scale flags and labels every polygon, with no legend", async () => {
 		const source = new TestSource<Props>({ features: POLYGONS, scale: null });
 		const { plugin } = await setup({
