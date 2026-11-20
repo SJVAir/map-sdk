@@ -19,6 +19,48 @@
 					"p75": 14,
 					"station_count": 12,
 					"mean": 8.2
+				},
+				{
+					"timestamp": "2026-11-03T00:00:00-08:00",
+					"entry_type": "pm25",
+					"resolution": "day",
+					"count": 100,
+					"expected_count": 100,
+					"minimum": 1,
+					"maximum": 40,
+					"stddev": 4,
+					"p25": 6,
+					"p75": 14,
+					"station_count": 12,
+					"mean": 8.2
+				},
+				{
+					"timestamp": "2026-11-04T00:00:00-08:00",
+					"entry_type": "pm25",
+					"resolution": "day",
+					"count": 100,
+					"expected_count": 100,
+					"minimum": 1,
+					"maximum": 40,
+					"stddev": 4,
+					"p25": 6,
+					"p75": 14,
+					"station_count": 12,
+					"mean": 8.2
+				},
+				{
+					"timestamp": "2026-11-05T00:00:00-08:00",
+					"entry_type": "pm25",
+					"resolution": "day",
+					"count": 100,
+					"expected_count": 100,
+					"minimum": 1,
+					"maximum": 40,
+					"stddev": 4,
+					"p25": 6,
+					"p75": 14,
+					"station_count": 12,
+					"mean": 8.2
 				}
 			]
 		},

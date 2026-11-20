@@ -85,6 +85,12 @@ const daysIn = (range: DateRange) =>
 	Math.round((Date.parse(range.end) - Date.parse(range.start)) / 86_400_000) + 1;
 
 /**
+ * The demo's rule for a region's range figure: the average of its daily figures, only when at
+ * least half the range's days have one (the server's monthly rule asks for 75%).
+ */
+const enoughDays = (days: number, expected: number) => days > 0 && days * 2 >= expected;
+
+/**
  * Why a region has no figure, as the dashboard's region fills say it (demo text, not a message
  * key): how many of the range's days had a daily figure.
  */
@@ -133,8 +139,9 @@ const loaders: Record<SourceKind, Loader> = {
 				const code = f.properties.external_id;
 				if (!code) return [];
 				const days = figures.get(f.id) ?? [];
-				const value = average(days);
-				const reason = value === null ? noFigureReason(days.length, expected) : null;
+				const enough = enoughDays(days.length, expected);
+				const value = enough ? average(days) : null;
+				const reason = enough ? null : noFigureReason(days.length, expected);
 				return [
 					regionFeature(f as Feature<Geometry>, "county", code, f.properties.name, value, {
 						reason

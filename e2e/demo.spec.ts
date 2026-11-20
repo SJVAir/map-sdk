@@ -501,6 +501,14 @@ test("a no-figure county reads Not enough data with its reason", async ({ page }
 	await expect(
 		panel.locator(".mapsdk-legend").getByText("µg/m³ · Average of the range's daily means")
 	).toBeVisible();
+	// Kings has 1 of the default range's 7 days, under the demo's half; Fresno has 4.
+	await expect(
+		list.getByRole("option", {
+			name: "Kings County, Not enough data, Only 1 of 7 days had a figure",
+			exact: true
+		})
+	).toBeVisible();
+	await expect(list.getByRole("option", { name: /^Fresno County, 8\.2 / })).toBeVisible();
 });
 
 test("the monitor-map setup map doesn't pin on click", async ({ page }) => {

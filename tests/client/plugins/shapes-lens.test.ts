@@ -43,6 +43,9 @@ async function setUp(
 		deep?: boolean;
 		meta?: MetadataProvider;
 		legendDisplay?: "gradient" | "blocks";
+		noFigure?: "neutral" | "outline";
+		noFigureLabel?: string;
+		detail?: (p: Props) => string | undefined;
 	} = {}
 ) {
 	const grid = lensGrid();
@@ -70,7 +73,10 @@ async function setUp(
 		layerLabel: "Sections",
 		tooltip: opts.tooltip,
 		legendUnits: "lbs per section",
-		legendDisplay: opts.legendDisplay
+		legendDisplay: opts.legendDisplay,
+		noFigure: opts.noFigure,
+		noFigureLabel: opts.noFigureLabel,
+		detail: opts.detail
 	});
 	map.addPlugin(parents);
 	map.addPlugin(lens);
@@ -172,6 +178,26 @@ describe("shapesLens", () => {
 		const items = lens.features!();
 		expect(items).toHaveLength(36);
 		expect(items.every((i) => i.selectable === false)).toBe(true);
+	});
+
+	it("passes noFigureLabel and detail to its children", async () => {
+		// Each parent's first section has no reading, so no figure.
+		const children = lensGrid({ value: (_key, n) => (n === 0 ? null : n) }).children;
+		const { lens } = await setUp({
+			children,
+			noFigure: "outline",
+			noFigureLabel: "Not enough data",
+			detail: (p) => (p.value === null ? `why ${p.name}` : undefined)
+		});
+		lens.pin(parentKey(2, 2));
+		await settle();
+		const item = lens.features!().find((i) => i.name === "T2-2 S0")!;
+		expect(item).toMatchObject({
+			noFigure: true,
+			noFigureLabel: "Not enough data",
+			detail: "why T2-2 S0"
+		});
+		expect(lens.legend!()).toMatchObject({ noFigure: true, noFigureLabel: "Not enough data" });
 	});
 
 	it("passes legendDisplay to its legend", async () => {

@@ -317,9 +317,10 @@ the snippet is the shape's tooltip and pinned card body (`props` are its source 
 (`MapView`'s `card`) its links and buttons work; `card.actions` still adds the host's buttons.
 
 `legendUnits` (already-translated text) and `legendNote` (a `Snippet`) on `shapesPlugin` and
-`pointsPlugin` (and `monitorsPlugin` and `regionsPlugin`, which pass them through) add a unit line under the legend section's title ("lbs per township"), in place of
-the "(units)" after it, and host content at the section's foot, below "No data". A shared section
-takes its first member's that is set. Without them the section is as before.
+`pointsPlugin` (and `monitorsPlugin` and `regionsPlugin`, which pass them through) add a unit
+line under the legend section's title ("lbs per township"), in place of the "(units)" after it,
+and host content at the section's foot, below "No data". A shared section takes its first
+member's that is set. Without them the section is as before.
 
 `count: { property }` on `pointsPlugin` puts a number on each circle marker (e.g. notices per
 section): a count of 1 is a plain dot, 2 or more a larger circle with the number in it, in
@@ -367,9 +368,9 @@ the current block's children are drawn. Until a parent's children arrive it keep
   selectable) only while the lens is pinned, but a drawn child's tooltip and card show its
   `tooltip` content either way, and the lens's legend section shows only while
   children are drawn; with the same `ScaleRef` as a zoomed-in sections plugin, they share one.
-- Options: `fillOpacity`, `outline`, `noFigure`, `tooltip`, `tooltipShowsName`, `legendUnits`,
-  `legendNote` and `legendDisplay`, as on `shapesPlugin`. The centre parent gets a 2px `--foreground` outline over
-  its children. It throws when `parents` isn't a choropleth `shapesPlugin`.
+- Options: `fillOpacity`, `outline`, `noFigure`, `noFigureLabel`, `detail`, `tooltip`,
+  `tooltipShowsName`, `legendUnits`, `legendNote` and `legendDisplay`, as on `shapesPlugin`. The
+  centre parent gets a 2px `--foreground` outline over its children. It throws when `parents` isn't a choropleth `shapesPlugin`.
 
 ```ts
 const townships = shapesPlugin({
@@ -1029,7 +1030,8 @@ local sjvair.com stack at `http://localhost:8000`.
 - **New API: a no-figure region's label and reason.** `shapesPlugin` and `regionsPlugin` take
   `noFigureLabel` (in place of "No data" for the layer, under `noFigure: "outline"`) and
   `detail(props)` (the reason, in the row's accessible name and under the tooltip's and card's
-  chip). `regionsPlugin` also passes `legendUnits` and `legendNote` through. New optional
+  chip). `regionsPlugin` also passes `legendUnits` and `legendNote` through, and `shapesLens`
+  passes `noFigureLabel` and `detail` to its children. New optional
   fields: `FeatureListItem.noFigureLabel` and `LegendData`'s `noFigureLabel`; `levelText` gives a
   no-figure item's `detail` beside its label.
 - **New message key `mapsdk_list_row_level_detail`** (`"{name}, {level}, {detail}"`, a no-figure

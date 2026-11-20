@@ -25,6 +25,10 @@ export interface ShapesLensOptions<C extends MapFeatureProperties> {
 	fillOpacity?: number;
 	outline?: "theme" | "level" | "none";
 	noFigure?: "neutral" | "outline";
+	/** As on `shapesPlugin`: the children's text in place of "No data" (outline only). */
+	noFigureLabel?: string;
+	/** As on `shapesPlugin`: a child's reason for having no figure, or its text for no level. */
+	detail?(props: C): string | undefined;
 	tooltip?(item: FeatureListItem, props: C, env: ShapesTooltipEnv): Snippet | undefined;
 	tooltipShowsName?: boolean;
 	legendUnits?: string;
@@ -141,6 +145,8 @@ export function shapesLens<C extends MapFeatureProperties>(
 		fillOpacity: options.fillOpacity,
 		outline: options.outline,
 		noFigure: options.noFigure,
+		noFigureLabel: options.noFigureLabel,
+		detail: options.detail,
 		tooltip: options.tooltip,
 		tooltipShowsName: options.tooltipShowsName,
 		legendUnits: options.legendUnits,

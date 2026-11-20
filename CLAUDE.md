@@ -107,8 +107,9 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   (`zoomRange` from `zoom-range.svelte.ts`, shared with points; out of range it lists nothing and
   has no legend; `tooltip`; `noFigureLabel` (the layer's text for "No data", outline only) and
   `detail(props)` (a no-figure feature's reason beside it, or in place of "No level");
-  `lens-hooks.ts`'s symbol-keyed hooks for a lens: `shown`, `live`, `keys`, `geometryOf`, `setHidden` by the `lensHidden` feature state, the paint's case added only
-  once a lens hides something) and `shapesLens` (`shapes-lens.svelte.ts`: its own plugin after the
+  `lens-hooks.ts`'s symbol-keyed hooks for a lens: `shown`, `live`, `keys`, `geometryOf`,
+  `setHidden` by the `lensHidden` feature state, the paint's case added only once a lens hides
+  something) and `shapesLens` (`shapes-lens.svelte.ts`: its own plugin after the
   parents, an inner `shapesPlugin` over the block's children, the centre outline, a scoped Esc;
   the parents' hidden set applies whole once the children's source has loaded (a `sourcedata`
   tile or `idle` event with `isSourceLoaded`, never `metadata`/`content`; an `error` or the map's
@@ -118,7 +119,7 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   when the card is swapped for the centre parent's; children listed only while pinned, but
   `itemFor` gives a drawn child's item to the tooltip and card either way). Both take
   `legendUnits`/`legendNote` (`shared.ts`'s `hostLegend`, which keeps the note on an unavailable
-  status) and `legendDisplay`. `shapesPlugin` also has
+  status), `legendDisplay`, `noFigureLabel` and `detail`. `shapesPlugin` also has
   fill/`outline`/check overlay, `hoverable`, `noFigure: "outline"` for a no-level feature's
   unfilled `--foreground` edge, a `no-figure` line layer under `outline: "none"`, and `noFigure` on
   those polygons' items, by the legend's rule. Plus shared style expressions, scale resolution,
@@ -128,8 +129,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   the legend; the reading box gives screen
   readers a `mapsdk_reading_pause` before each line under the value), `collocationSitesPlugin`, `regionsPlugin`,
   `calHeatScorePlugin`, `forecastZonesPlugin` (`regionsPlugin` passes `noFigure`/`fillOpacity`/
-  `outline`/`noFigureLabel`/`detail`/`legendUnits`/`legendNote` through), `hmsSmokePlugin`, `hmsFirePlugin` (groups, then
-  hotspots from zoom 10), `focusAreaPlugin` (`focus-area.svelte.ts`: an area's slate outline and
+  `outline`/`noFigureLabel`/`detail`/`legendUnits`/`legendNote` through), `hmsSmokePlugin`,
+  `hmsFirePlugin` (groups, then hotspots from zoom 10), `focusAreaPlugin` (`focus-area.svelte.ts`: an area's slate outline and
   white wash outside it, from `focus-geometry.ts`'s `worldMask`; or a point's ring and canvas label,
   listed as one `noReading` row (left out while `ctx.coveredAt` its point) and clickable, never
   selectable; `set()` changes it in place), `schoolsPlugin` (`schools.svelte.ts`: the host's raw

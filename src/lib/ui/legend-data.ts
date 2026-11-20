@@ -80,7 +80,7 @@ export function legendSection(data: LegendData, format: FormatProvider): LegendS
 		...(data.scaleLabel && { scaleLabel: data.scaleLabel }),
 		...(scale.label && { scaleName: scale.label }),
 		noFigure: data.noFigure === true,
-		...(data.noFigureLabel && { noFigureLabel: data.noFigureLabel }),
+		...(data.noFigureLabel?.trim() && { noFigureLabel: data.noFigureLabel.trim() }),
 		...(data.unitsLine && { unitsLine: data.unitsLine }),
 		...(data.note && { note: data.note })
 	};

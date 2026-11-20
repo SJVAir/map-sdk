@@ -7,8 +7,8 @@ const list = new Intl.ListFormat("en-US", { type: "unit" });
 
 /**
  * One line describing the listed features: the layer, then how many are at each level, in the
- * scale's order, zero counts left out, then no-figure outlines (by `noFigureLabel`, else "No data"), then items with no
- * level to show. With no scale, or nothing counted, just the count and layer.
+ * scale's order, zero counts left out, then no-figure outlines (by `noFigureLabel`, else
+ * "No data"), then items with no level to show. With no scale, or nothing counted, just the count and layer.
  */
 export function summaryText(
 	layerLabel: string,
