@@ -63,6 +63,19 @@ export interface ShapesOptions<P extends MapFeatureProperties> {
 	 */
 	noFigure?: "neutral" | "outline";
 	/**
+	 * Already-translated text in place of "No data" for this layer's no-figure features (e.g.
+	 * "Not enough data"): the legend's row, the list row, its accessible name, the tooltip's chip
+	 * and the view summary. Only under `noFigure: "outline"`; trimmed, and empty means unset.
+	 */
+	noFigureLabel?: string;
+	/**
+	 * A short, already-translated text for a feature with no level, as `pointsPlugin`'s: under
+	 * `noFigure: "outline"` the reason beside the no-figure label (the row's accessible name and
+	 * under the tooltip's chip, not the visible row), else in place of "No level". Trimmed; empty
+	 * or undefined means none. Ignored for a feature with a level.
+	 */
+	detail?(props: P): string | undefined;
+	/**
 	 * False: hovering a shape shows no tooltip and doesn't hide what is beneath it
 	 * (`MapPlugin.hoverable`); list focus still shows it. Default true.
 	 */
@@ -192,6 +205,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 	const outlineNoFigure = choropleth && options.noFigure === "outline";
 	const range = zoomRanged(options.zoomRange);
 	const withHostLegend = hostLegend(options.legendUnits, options.legendNote);
+	const noFigureLabel = (outlineNoFigure && options.noFigureLabel?.trim()) || undefined;
 
 	// A lens over these shapes (see `lens-hooks.ts`). Plugin-level, so it outlives restyles.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced whole, never mutated
@@ -228,7 +242,7 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 		const { scale } = data;
 		// Lines are never drawn as outlines, so they never add the "No data" row.
 		const some = source.features?.features.some((f) => drawnAsNoFigure(f, scale));
-		return some ? { ...data, noFigure: true } : data;
+		return some ? { ...data, noFigure: true, ...(noFigureLabel && { noFigureLabel }) } : data;
 	};
 
 	// Each feature's label point and bbox, measured once per feature object (once per data load):
@@ -257,19 +271,23 @@ export function shapesPlugin<P extends MapFeatureProperties>(options: ShapesOpti
 			if (!ref) continue;
 			const { lngLat, bbox } = measure(feature);
 			if (!lngLat) continue;
+			const level = scale ? levelFor(props.value, scale) : NO_LEVEL;
+			const detail = level === NO_LEVEL ? options.detail?.(props)?.trim() : undefined;
+			const noFigure = outlineNoFigure && scale !== null && drawnAsNoFigure(feature, scale);
 			items.push({
 				refKey: props.refKey,
 				ref,
 				name: props.name,
 				value: props.value,
-				level: scale ? levelFor(props.value, scale) : NO_LEVEL,
+				level,
 				units: scale?.units ?? "",
 				precision,
 				lngLat,
 				geometry: feature.geometry,
 				...(bbox && { bbox }),
 				selectable: selectable && selectionId(ref) !== null,
-				...(outlineNoFigure && scale && drawnAsNoFigure(feature, scale) && { noFigure: true })
+				...(detail && { detail }),
+				...(noFigure && { noFigure: true, ...(noFigureLabel && { noFigureLabel }) })
 			});
 		}
 		return items;

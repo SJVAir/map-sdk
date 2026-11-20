@@ -92,8 +92,9 @@ const sameRef = (a: ScaleRef, b: ScaleRef) =>
 /**
  * One section per shared scale reference, at its first member's place; the others close up. A
  * shared section is titled with the first member's `scaleLabel` that is set (else the scale's
- * own label, else the first title), and has the "No data" row when any member does (with the first member's `noFigureLabel` that is set). A section that shares with none, and
- * status and symbol entries, are kept as they are.
+ * own label, else the first title), and has the "No data" row when any member does, labeled with
+ * the first member's `noFigureLabel` that is set. A section that shares with none, and status
+ * and symbol entries, are kept as they are.
  */
 export function shareSections(entries: LegendEntry[]): LegendEntry[] {
 	const groups: LegendSection[][] = [];

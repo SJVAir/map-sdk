@@ -1,3 +1,4 @@
+import type { Snippet } from "svelte";
 import type { MapPlugin } from "../core/plugin.js";
 import type { DataSource, MapFeatureProperties } from "../data/types.js";
 import { shapesPlugin, type ShapesOptions } from "../plugins/shapes.svelte.js";
@@ -20,6 +21,21 @@ export interface RegionsPluginOptions {
 	fillOpacity?: number;
 	/** The regions' edge: `"theme"` (default), `"level"` or `"none"`. See `shapesPlugin`. */
 	outline?: ShapesOptions<MapFeatureProperties>["outline"];
+	/**
+	 * Already-translated text in place of "No data" for the regions with no figure (e.g. "Not
+	 * enough data"), legend row included. Only under `noFigure: "outline"`. See `shapesPlugin`.
+	 */
+	noFigureLabel?: string;
+	/**
+	 * Why a region has no figure (e.g. "Only 3 of 30 days had a figure"), already translated:
+	 * beside the no-figure label in the row's accessible name and under the tooltip's chip. See
+	 * `shapesPlugin`.
+	 */
+	detail?(props: MapFeatureProperties): string | undefined;
+	/** Already-translated unit line under the legend section's title. See `shapesPlugin`. */
+	legendUnits?: string;
+	/** Host content at the foot of the legend section. See `shapesPlugin`. */
+	legendNote?: Snippet;
 }
 
 /**
@@ -43,6 +59,10 @@ export function regionsPlugin(options: RegionsPluginOptions): MapPlugin {
 		selectable: options.selectable ?? true,
 		noFigure: options.noFigure,
 		fillOpacity: options.fillOpacity,
-		outline: options.outline
+		outline: options.outline,
+		noFigureLabel: options.noFigureLabel,
+		detail: options.detail,
+		legendUnits: options.legendUnits,
+		legendNote: options.legendNote
 	});
 }
