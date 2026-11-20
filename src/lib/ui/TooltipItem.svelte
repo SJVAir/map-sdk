@@ -19,7 +19,8 @@
 
 	// A level with an empty color shows its label on the neutral chip.
 	const level = $derived(item.level !== NO_LEVEL ? item.level : null);
-	// The level's label, else the item's detail (plain text, no chip), else "No level".
+	// The level's label, else the item's detail (plain text, no chip), else "No level". A
+	// no-figure item's detail goes under its chip.
 	const levelPlace = $derived(levelText(item, messages));
 	const chipColors = $derived.by(() => {
 		const chip = levelChip(level?.color);
@@ -42,6 +43,9 @@
 			<span class="mapsdk-tooltip-chip text-xs" class:neutral={!chipColors} style={chipColors}>
 				{levelPlace.text}
 			</span>
+			{#if levelPlace.detail}
+				<span class="mapsdk-tooltip-detail text-xs">{levelPlace.detail}</span>
+			{/if}
 		{/if}
 	</div>
 {/if}

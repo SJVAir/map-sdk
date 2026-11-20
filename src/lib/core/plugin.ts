@@ -80,15 +80,22 @@ export interface FeatureListItem {
 	/**
 	 * A short text about a feature with no level (e.g. "Level 2 charger"), shown where its level
 	 * would be: in the feature list, its row's accessible name, and the generic tooltip. Ignored
-	 * when the item has a level.
+	 * when the item has a level. On a `noFigure` item it is the reason beside the "No data" label
+	 * instead: in the row's accessible name (when the item has no value) and under the generic
+	 * tooltip's chip, not in the visible row.
 	 */
 	detail?: string;
 	/**
 	 * Drawn as a no-figure outline (`shapesPlugin`'s `noFigure: "outline"`): where "No level" would
 	 * be, its list row, the row's accessible name, the generic tooltip and the view summary read the
-	 * Legend's "No data". Ignored when the item has a level; wins over `detail`. Default false.
+	 * Legend's "No data" (or `noFigureLabel`). Ignored when the item has a level. Default false.
 	 */
 	noFigure?: boolean;
+	/**
+	 * Already-translated text in place of "No data" on a `noFigure` item (e.g. "Not enough data"),
+	 * as the Legend's row reads it. Ignored without `noFigure` or when the item has a level.
+	 */
+	noFigureLabel?: string;
 	/**
 	 * A place with no reading (a focus point): its row, accessible name, and tooltip show its name
 	 * alone, with no value, level, or "No level". Default false.
