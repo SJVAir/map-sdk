@@ -663,6 +663,40 @@ describe("shared sections", () => {
 		expect(page.getByText("No data").elements()).toHaveLength(0);
 	});
 
+	it("a shared PM2.5 section shows the monitors' units line for both layers, regions first", async () => {
+		applyTheme("light");
+		const map = fakeMap([
+			{
+				id: "regions",
+				legend: () => ({
+					pluginId: "regions",
+					title: "Counties",
+					units: "µg/m³",
+					scale: pm25Scale,
+					scaleRef: PM25,
+					noFigure: true
+				})
+			},
+			{
+				id: "monitors",
+				legend: () => ({
+					pluginId: "monitors",
+					title: "PM2.5",
+					units: "µg/m³",
+					scale: pm25Scale,
+					scaleRef: PM25,
+					scaleLabel: "PM2.5",
+					unitsLine: "µg/m³ · Average of daily means"
+				})
+			}
+		]);
+		render(Legend, { map });
+		await expect.element(page.getByText("µg/m³ · Average of daily means")).toBeVisible();
+		expect(page.getByText("µg/m³ · Average of daily means").elements()).toHaveLength(1);
+		expect(document.querySelectorAll(".mapsdk-legend-section")).toHaveLength(1);
+		await expect.element(page.getByText("No data")).toBeVisible();
+	});
+
 	it("has no axe violations with a shared section and its row", async () => {
 		applyTheme("light");
 		render(Legend, { map: sharedMap(true) });
