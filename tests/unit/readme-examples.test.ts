@@ -214,6 +214,46 @@ describe("README examples", () => {
 		map.destroy();
 	});
 
+	it("a no-figure region's label and reason", () => {
+		const regions: FeatureCollection<
+			Point,
+			{ refKey: string; name: string; value: number | null }
+		> = { type: "FeatureCollection", features: [] };
+		const map = createMap({ config: { maptilerKey: "k" } });
+		const source = staticSource(regions, { dataset: "air-quality", entryType: "pm25" });
+		map.addPlugin(
+			regionsPlugin({
+				source,
+				layerLabel: "Counties",
+				noFigure: "outline",
+				noFigureLabel: "Not enough data",
+				detail: (props) => (props.value === null ? "Only 3 of 30 days had a figure" : undefined)
+			})
+		);
+		expect(map.plugins[0].id).toBe("regions");
+		const row: Pick<FeatureListItem, "noFigure" | "noFigureLabel"> = {
+			noFigure: true,
+			noFigureLabel: "Not enough data"
+		};
+		expect(row.noFigureLabel).toBe("Not enough data");
+		map.destroy();
+	});
+
+	it("the figure's name in the monitors legend", () => {
+		const monitors = createMonitorsStore();
+		const map = createMap({ config: { maptilerKey: "k" } });
+		map.addPlugin(
+			monitorsPlugin({
+				source: monitors.dataSource,
+				layerLabel: "Monitors",
+				figureLabel: "Average of daily highest 1-hour averages",
+				legendUnits: "ppb · Average of daily highest 1-hour averages"
+			})
+		);
+		expect(map.plugins[0].id).toBe("monitors");
+		map.destroy();
+	});
+
 	it("a shapes layer that takes no hover", () => {
 		const plumes: FeatureCollection<Point, { refKey: string; name: string; value: string }> = {
 			type: "FeatureCollection",

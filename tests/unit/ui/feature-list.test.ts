@@ -154,6 +154,45 @@ describe("rowLabel", () => {
 		);
 	});
 
+	it("names a no-value noFigure item with its label and detail", () => {
+		const region = {
+			value: null,
+			level: NO_LEVEL,
+			noFigure: true,
+			noFigureLabel: "Not enough data",
+			detail: "Only 3 of 30 days had a figure"
+		} as const;
+		expect(rowLabel(item("1", "Fresno", region), defaultMessages, format)).toBe(
+			"Fresno, Not enough data, Only 3 of 30 days had a figure"
+		);
+	});
+
+	it("uses the label alone without a detail", () => {
+		const region = {
+			value: null,
+			level: NO_LEVEL,
+			noFigure: true,
+			noFigureLabel: "Not enough data"
+		} as const;
+		expect(rowLabel(item("1", "Fresno", region), defaultMessages, format)).toBe(
+			"Fresno, Not enough data"
+		);
+	});
+
+	it("keeps a valued noFigure item's name without the detail", () => {
+		const region = {
+			value: 5,
+			precision: 0,
+			level: NO_LEVEL,
+			noFigure: true,
+			noFigureLabel: "Not enough data",
+			detail: "x"
+		} as const;
+		expect(rowLabel(item("1", "Fresno", region), defaultMessages, format)).toBe(
+			"Fresno, 5 µg/m³, Not enough data"
+		);
+	});
+
 	it("keeps no reading for a no-value item without noFigure", () => {
 		const region = { value: null, level: NO_LEVEL } as const;
 		expect(rowLabel(item("1", "Fresno", region), defaultMessages, format)).toBe(
@@ -284,11 +323,50 @@ describe("levelText", () => {
 		});
 	});
 
-	it("gives noFigure's No data over a detail", () => {
+	it("gives noFigure's No data over a detail, carrying the detail beside it", () => {
 		const both = { level: NO_LEVEL, noFigure: true, detail: "x" } as const;
 		expect(levelText(item("1", "A", both), defaultMessages)).toEqual({
 			kind: "none",
+			text: "No data",
+			detail: "x"
+		});
+	});
+
+	it("reads a noFigure item's noFigureLabel in place of No data", () => {
+		const region = { level: NO_LEVEL, noFigure: true, noFigureLabel: "Not enough data" } as const;
+		expect(levelText(item("1", "A", region), defaultMessages)).toEqual({
+			kind: "none",
+			text: "Not enough data"
+		});
+	});
+
+	it("carries a noFigure item's detail beside its label", () => {
+		const region = {
+			level: NO_LEVEL,
+			noFigure: true,
+			noFigureLabel: "Not enough data",
+			detail: "Only 3 of 30 days had a figure"
+		} as const;
+		expect(levelText(item("1", "A", region), defaultMessages)).toEqual({
+			kind: "none",
+			text: "Not enough data",
+			detail: "Only 3 of 30 days had a figure"
+		});
+	});
+
+	it("treats a blank noFigureLabel and detail as unset", () => {
+		const region = { level: NO_LEVEL, noFigure: true, noFigureLabel: "  ", detail: " " } as const;
+		expect(levelText(item("1", "A", region), defaultMessages)).toEqual({
+			kind: "none",
 			text: "No data"
+		});
+	});
+
+	it("ignores noFigureLabel without noFigure", () => {
+		const region = { level: NO_LEVEL, noFigureLabel: "X" } as const;
+		expect(levelText(item("1", "A", region), defaultMessages)).toEqual({
+			kind: "none",
+			text: "No level"
 		});
 	});
 

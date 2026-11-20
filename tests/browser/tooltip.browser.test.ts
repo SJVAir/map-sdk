@@ -160,6 +160,25 @@ describe("MapTooltip", () => {
 		expect(result.violations).toEqual([]);
 	});
 
+	it("shows a noFigure item's label chip with its detail under it, with no axe violations", async () => {
+		const region = {
+			...item("a", "Gray", NO_LEVEL),
+			value: null,
+			noFigure: true,
+			noFigureLabel: "Not enough data",
+			detail: "Only 3 of 30 days had a figure"
+		};
+		const map = fakeMap([region], { focusedKey: "a" });
+		render(MapTooltip, { map, project });
+		await expect.element(page.getByText("Not enough data")).toBeVisible();
+		await expect.element(page.getByText("Only 3 of 30 days had a figure")).toBeVisible();
+		const chip = page.getByText("Not enough data").element();
+		const reason = page.getByText("Only 3 of 30 days had a figure").element();
+		expect(chip.compareDocumentPosition(reason) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+		const result = await axe.run(page.getByRole("tooltip").element());
+		expect(result.violations).toEqual([]);
+	});
+
 	it("shows No level for NO_LEVEL", async () => {
 		const map = fakeMap([item("a", "Gray", NO_LEVEL)], { focusedKey: "a" });
 		render(MapTooltip, { map, project });

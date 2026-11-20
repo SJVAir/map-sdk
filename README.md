@@ -222,6 +222,23 @@ map.addPlugin(
 );
 ```
 
+`figureLabel` never reaches the legend. To name the figure there, pass `legendUnits` (and
+`legendNote`) to `monitorsPlugin`, as on `pointsPlugin` (below): the line under the section's
+title, in place of "(µg/m³)". Unset, the section is as before. With no scale (a `null` source
+scale) there is no section, so neither shows. A section shared with a region fill on the same
+pollutant shows the line once, for both:
+
+```ts
+map.addPlugin(
+	monitorsPlugin({
+		source: monitors.dataSource,
+		layerLabel: "Monitors",
+		figureLabel: "Average of daily highest 1-hour averages",
+		legendUnits: "ppb · Average of daily highest 1-hour averages"
+	})
+);
+```
+
 `outline` on `shapesPlugin` is `"theme"` (default, a 1px `--foreground` edge), `"level"` (the edge
 in each level's color at the fill's opacity; choropleth only), or `"none"` (no outline layer).
 `hmsSmokePlugin` uses `"level"`. `hoverable: false` on `shapesPlugin` sets the plugin's
@@ -242,6 +259,38 @@ line and "No level". `regionsPlugin` passes `noFigure`,
 
 ```ts
 map.addPlugin(regionsPlugin({ source, layerLabel: "Counties", noFigure: "outline" }));
+```
+
+Two more options, on `shapesPlugin` and passed through by `regionsPlugin`, both unset by default:
+`noFigureLabel` (already-translated text) replaces "No data" for the whole layer under
+`noFigure: "outline"`, in every place above, legend row included; `detail(props)` gives a
+no-figure feature its reason, beside the label in the row's accessible name and under the
+tooltip's and pinned card's chip, given only to a drawn no-figure outline (not while the scale is
+loading or unavailable). The visible list row shows the label alone. Both are trimmed,
+and empty means unset; `noFigureLabel` is ignored under `"neutral"`, where `detail` stands in for
+"No level" as on `pointsPlugin`. A shared legend section takes its first member's
+`noFigureLabel` that is set. `regionsPlugin` passes `legendUnits` and `legendNote` through too.
+
+| Where                | Unset           | `noFigureLabel`         | and `detail`                                            |
+| -------------------- | --------------- | ----------------------- | ------------------------------------------------------- |
+| Legend row, list row | No data         | Not enough data         | Not enough data                                         |
+| Accessible name      | Fresno, No data | Fresno, Not enough data | Fresno, Not enough data, Only 3 of 30 days had a figure |
+| Tooltip and card     | "No data" chip  | "Not enough data" chip  | the chip, the reason under it                           |
+| View summary         | 3 No data       | 3 Not enough data       | 3 Not enough data                                       |
+
+A no-figure feature with a value keeps "Fresno, 5 µg/m³, Not enough data" as its accessible name;
+its reason shows in the tooltip and card.
+
+```ts
+map.addPlugin(
+	regionsPlugin({
+		source,
+		layerLabel: "Counties",
+		noFigure: "outline",
+		noFigureLabel: "Not enough data",
+		detail: (props) => (props.value === null ? "Only 3 of 30 days had a figure" : undefined)
+	})
+);
 ```
 
 ```ts
@@ -269,9 +318,10 @@ the snippet is the shape's tooltip and pinned card body (`props` are its source 
 (`MapView`'s `card`) its links and buttons work; `card.actions` still adds the host's buttons.
 
 `legendUnits` (already-translated text) and `legendNote` (a `Snippet`) on `shapesPlugin` and
-`pointsPlugin` add a unit line under the legend section's title ("lbs per township"), in place of
-the "(units)" after it, and host content at the section's foot, below "No data". A shared section
-takes its first member's that is set. Without them the section is as before.
+`pointsPlugin` (and `monitorsPlugin` and `regionsPlugin`, which pass them through) add a unit
+line under the legend section's title ("lbs per township"), in place of the "(units)" after it,
+and host content at the section's foot, below "No data". A shared section takes its first
+member's that is set. Without them the section is as before.
 
 `count: { property }` on `pointsPlugin` puts a number on each circle marker (e.g. notices per
 section): a count of 1 is a plain dot, 2 or more a larger circle with the number in it, in
@@ -319,9 +369,10 @@ the current block's children are drawn. Until a parent's children arrive it keep
   selectable) only while the lens is pinned, but a drawn child's tooltip and card show its
   `tooltip` content either way, and the lens's legend section shows only while
   children are drawn; with the same `ScaleRef` as a zoomed-in sections plugin, they share one.
-- Options: `fillOpacity`, `outline`, `noFigure`, `tooltip`, `tooltipShowsName`, `legendUnits`,
-  `legendNote` and `legendDisplay`, as on `shapesPlugin`. The centre parent gets a 2px `--foreground` outline over
-  its children. It throws when `parents` isn't a choropleth `shapesPlugin`.
+- Options: `fillOpacity`, `outline`, `noFigure`, `noFigureLabel`, `detail`, `tooltip`,
+  `tooltipShowsName`, `legendUnits`, `legendNote` and `legendDisplay`, as on `shapesPlugin`. The
+  centre parent gets a 2px `--foreground` outline over its children. It throws when `parents`
+  isn't a choropleth `shapesPlugin`.
 
 ```ts
 const townships = shapesPlugin({
@@ -407,7 +458,8 @@ charger") shown where "No level" would be: in the feature list (plain text, no s
 accessible name ("Fresno Station, Level 2 charger"), and the tooltip. A feature with a level
 always shows its level. A plugin of your own sets the same `detail` on its `FeatureListItem`s.
 `noFigure: true` on a `FeatureListItem` (set by `shapesPlugin` under `noFigure: "outline"`) reads
-"No data" there instead, ahead of a `detail`; a level still wins.
+"No data" there instead (or the item's `noFigureLabel`), with its `detail` beside it in the
+accessible name and the tooltip; a level still wins.
 
 `truncateValues: true` on `pointsPlugin` cuts values off at the display precision instead of
 rounding them (`truncate` on each `FeatureListItem`), in the list, its accessible names, and the
@@ -968,6 +1020,28 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.22
+
+- **Built on `@sjvair/sdk` `5.0.0-beta.15`** (dev pin). `NO_SCALE` lists its two new `Scale` keys,
+  `period_statistic` and `period_statistic_label`, as `null`. The peer range is unchanged
+  (`^5.0.0-beta.2`).
+- **New API: `monitorsPlugin`'s `legendUnits` and `legendNote`**, as on `pointsPlugin`: a line
+  under the legend section's title (e.g. the figure's name) and host content at its foot.
+  `figureLabel` still never shows in the legend.
+- **New API: a no-figure region's label and reason.** `shapesPlugin` and `regionsPlugin` take
+  `noFigureLabel` (in place of "No data" for the layer, under `noFigure: "outline"`) and
+  `detail(props)` (the reason, in the row's accessible name and under the tooltip's and card's
+  chip). `regionsPlugin` also passes `legendUnits` and `legendNote` through, and `shapesLens`
+  passes `noFigureLabel` and `detail` to its children. New optional
+  fields: `FeatureListItem.noFigureLabel` and `LegendData`'s `noFigureLabel`; `levelText` gives a
+  no-figure item's `detail` beside its label.
+- **New message key `mapsdk_list_row_level_detail`** (`"{name}, {level}, {detail}"`, a no-figure
+  row's accessible name with its reason). A host that types its messages as
+  `Record<MessageKey, …>` adds it when it moves to this beta; nothing else changes for a host that
+  sets none of the new options. A host's own plugin that sets both `noFigure` and `detail` on a
+  `FeatureListItem` now gets the detail in the row's accessible name and under the tooltip's chip
+  (until beta.21, `noFigure` hid it).
 
 ### 0.1.0-beta.21
 

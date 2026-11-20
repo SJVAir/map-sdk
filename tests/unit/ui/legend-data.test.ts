@@ -168,6 +168,39 @@ describe("shareSections", () => {
 		).toEqual([false]);
 	});
 
+	it("carries noFigureLabel onto the section", () => {
+		const [entry] = shareSections([
+			scaleEntry({ pluginId: "regions", noFigure: true, noFigureLabel: "Not enough data" })
+		]);
+		expect(entry.kind === "scale" && entry.section.noFigureLabel).toBe("Not enough data");
+	});
+
+	it("treats a blank noFigureLabel as unset, alone and shared", () => {
+		const [alone] = shareSections([
+			scaleEntry({ pluginId: "regions", noFigure: true, noFigureLabel: "  " })
+		]);
+		expect(alone.kind === "scale" && "noFigureLabel" in alone.section).toBe(false);
+		const [shared] = shareSections([
+			scaleEntry({ pluginId: "a", scaleRef: PM25, noFigure: true, noFigureLabel: " " }),
+			scaleEntry({ pluginId: "b", scaleRef: PM25, noFigureLabel: " Not enough data " })
+		]);
+		expect(shared.kind === "scale" && shared.section.noFigureLabel).toBe("Not enough data");
+	});
+
+	it("a shared section takes the first noFigureLabel that is set", () => {
+		const [entry] = shareSections([
+			scaleEntry({ pluginId: "monitors", title: "PM2.5", scaleRef: PM25 }),
+			scaleEntry({
+				pluginId: "regions",
+				title: "Counties",
+				scaleRef: PM25,
+				noFigure: true,
+				noFigureLabel: "Not enough data"
+			})
+		]);
+		expect(entry.kind === "scale" && entry.section.noFigureLabel).toBe("Not enough data");
+	});
+
 	it("a loading member doesn't drop the shared section", () => {
 		const loading: LegendEntry = {
 			kind: "status",

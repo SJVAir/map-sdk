@@ -118,7 +118,10 @@ describe("monitorShape", () => {
 
 describe("monitorsPlugin legend title", () => {
 	const REF = { dataset: "air-quality", entryType: "pm25" };
-	async function titled(entryType: () => Promise<unknown>) {
+	async function titled(
+		entryType: () => Promise<unknown>,
+		extra: Partial<Parameters<typeof monitorsPlugin>[0]> = {}
+	) {
 		const metadata = {
 			scale: () => Promise.resolve(pm25Scale),
 			entryType: vi.fn(entryType)
@@ -128,7 +131,7 @@ describe("monitorsPlugin legend title", () => {
 			scale: REF
 		});
 		const map = createMap({ config: { maptilerKey: "test-key" }, metadata });
-		const plugin = monitorsPlugin({ source, layerLabel: "Air monitors" });
+		const plugin = monitorsPlugin({ source, layerLabel: "Air monitors", ...extra });
 		map.addPlugin(plugin);
 		map.attach(createFakeGl({ styleLoaded: true }));
 		await tick();
@@ -146,6 +149,38 @@ describe("monitorsPlugin legend title", () => {
 		await settle();
 		expect(plugin.legend!()).toMatchObject({ title: "PM2.5" });
 		expect(plugin.label).toBe("Air monitors");
+	});
+
+	const pm25 = () => Promise.resolve({ label: "PM2.5", units: "µg/m³", precision: 1 });
+
+	it("carries legendUnits and legendNote", async () => {
+		const note = (() => {}) as unknown as import("svelte").Snippet;
+		const plugin = await titled(pm25, {
+			legendUnits: "µg/m³ · Average of daily means",
+			legendNote: note
+		});
+		await settle();
+		expect(plugin.legend!()).toMatchObject({
+			unitsLine: "µg/m³ · Average of daily means",
+			note
+		});
+	});
+
+	it("leaves them out when unset", async () => {
+		const plugin = await titled(pm25);
+		await settle();
+		const data = plugin.legend!()!;
+		expect("scale" in data).toBe(true);
+		expect("unitsLine" in data || "note" in data).toBe(false);
+	});
+
+	it("keeps figureLabel out of the legend", async () => {
+		const plugin = await titled(pm25, { figureLabel: "24-hour average" });
+		await settle();
+		const data = plugin.legend!()!;
+		expect("scale" in data).toBe(true);
+		expect("unitsLine" in data || "note" in data).toBe(false);
+		expect(JSON.stringify(data)).not.toContain("24-hour average");
 	});
 
 	it("falls back to layerLabel when the metadata has none", async () => {

@@ -480,6 +480,25 @@ describe("FeatureList", () => {
 		expect(style.outlineColor).toBe("rgb(20, 30, 40)");
 	});
 
+	it("shows a noFigure row's label, not its detail, and names both", async () => {
+		const region = item("9", "Fresno", {
+			value: null,
+			level: NO_LEVEL,
+			noFigure: true,
+			noFigureLabel: "Not enough data",
+			detail: "Only 3 of 30 days had a figure"
+		});
+		const { map } = newMap("single", [region, ...SITES]);
+		render(FeatureList, { map });
+		const name = "Fresno, Not enough data, Only 3 of 30 days had a figure";
+		await expect.element(page.getByRole("option", { name, exact: true })).toBeInTheDocument();
+		expect(option("Fresno").textContent).toContain("Not enough data");
+		expect(option("Fresno").textContent).not.toContain("Only 3 of 30 days");
+		await focusList();
+		const result = await axe.run(document.querySelector(".mapsdk-list")!);
+		expect(result.violations).toEqual([]);
+	});
+
 	it("keeps the neutral filled swatch for a no-level row without noFigure", async () => {
 		withTokens();
 		const region = item("9", "Fresno", { value: null, level: NO_LEVEL });

@@ -482,6 +482,35 @@ test("pinned card, keyboard: a list row shows it; Tab reaches it; Escape returns
 	await expect(list).toBeFocused();
 });
 
+test("a no-figure county reads Not enough data with its reason", async ({ page }) => {
+	await page.getByRole("checkbox", { name: /^Region fill/ }).check();
+	const panel = page.getByRole("region", { name: "Date-range sources" });
+	// Madera's fixture has no daily summaries, so it has no figure for the range.
+	const list = await openList(leftMap(page));
+	const row = list.getByRole("option", {
+		name: "Madera County, Not enough data, No day in the range had a figure",
+		exact: true
+	});
+	await expect(row).toHaveText(/Not enough data/);
+	await expect(row).not.toHaveText(/No day in the range/);
+	await row.click();
+	const tooltip = leftMap(page).getByRole("tooltip");
+	await expect(tooltip).toContainText("Not enough data");
+	await expect(tooltip).toContainText("No day in the range had a figure");
+	await expect(panel.locator(".mapsdk-legend").getByText("Not enough data")).toBeVisible();
+	await expect(
+		panel.locator(".mapsdk-legend").getByText("µg/m³ · Average of the range's daily means")
+	).toBeVisible();
+	// Kings has 1 of the default range's 7 days, under the demo's half; Fresno has 4.
+	await expect(
+		list.getByRole("option", {
+			name: "Kings County, Not enough data, Only 1 of 7 days had a figure",
+			exact: true
+		})
+	).toBeVisible();
+	await expect(list.getByRole("option", { name: /^Fresno County, 8\.2 / })).toBeVisible();
+});
+
 test("the monitor-map setup map doesn't pin on click", async ({ page }) => {
 	await zoomTo(page, "today", ALPHA_LNGLAT);
 	await clickMonitor(page, "today", ALPHA_LNGLAT);

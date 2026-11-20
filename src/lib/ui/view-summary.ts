@@ -7,8 +7,9 @@ const list = new Intl.ListFormat("en-US", { type: "unit" });
 
 /**
  * One line describing the listed features: the layer, then how many are at each level, in the
- * scale's order, zero counts left out, then no-figure outlines ("No data"), then items with no
- * level to show. With no scale, or nothing counted, just the count and layer.
+ * scale's order, zero counts left out, then no-figure outlines (by `noFigureLabel`, else
+ * "No data"), then items with no level to show. With no scale, or nothing counted, just the
+ * count and layer.
  */
 export function summaryText(
 	layerLabel: string,
@@ -19,14 +20,17 @@ export function summaryText(
 	const plain = () => messages("mapsdk_summary", { count: items.length, layer: layerLabel });
 	if (!scale || items.length === 0) return plain();
 	const counts = new Map<string, number>();
-	let noFigure = 0;
+	// No-figure outlines by their label, in first-seen order.
+	const noFigure = new Map<string, number>();
+	const noData = messages("mapsdk_legend_no_figure");
 	let none = 0;
 	for (const item of items) {
 		const level = shownLevel(item);
 		if (level && scale.levels.some((l) => l.key === level.key)) {
 			counts.set(level.key, (counts.get(level.key) ?? 0) + 1);
 		} else if (!level && item.noFigure) {
-			noFigure++;
+			const label = item.noFigureLabel?.trim() || noData;
+			noFigure.set(label, (noFigure.get(label) ?? 0) + 1);
 		} else {
 			none++;
 		}
@@ -35,13 +39,8 @@ export function summaryText(
 		const count = counts.get(level.key);
 		return count ? [messages("mapsdk_summary_level", { count, level: level.label })] : [];
 	});
-	if (noFigure > 0) {
-		parts.push(
-			messages("mapsdk_summary_level", {
-				count: noFigure,
-				level: messages("mapsdk_legend_no_figure")
-			})
-		);
+	for (const [label, count] of noFigure) {
+		parts.push(messages("mapsdk_summary_level", { count, level: label }));
 	}
 	if (none > 0) {
 		parts.push(

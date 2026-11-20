@@ -57,6 +57,14 @@ export interface MonitorsPluginOptions {
 	 * as before. For the list, pass it as `MapView`'s `featureList={{ note }}`.
 	 */
 	figureLabel?: string;
+	/**
+	 * Already-translated unit line under the legend section's title, in place of "(units)" (e.g.
+	 * the figure's name: "µg/m³ · Average of daily highest 1-hour averages"). `figureLabel` never
+	 * reaches the legend; pass its text here to name the figure there. Unset: "(units)", as before.
+	 */
+	legendUnits?: string;
+	/** Host content at the foot of the plugin's legend section. */
+	legendNote?: Snippet;
 }
 
 export type MonitorShape = "circle" | "square" | "triangle";
@@ -274,6 +282,8 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 		source: options.source,
 		layerLabel: options.layerLabel,
 		legendTitle: "entry-type",
+		legendUnits: options.legendUnits,
+		legendNote: options.legendNote,
 		selectable: options.selectable ?? true,
 		selectedStyle: options.selectedStyle,
 		detail: options.detail,

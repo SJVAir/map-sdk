@@ -581,7 +581,7 @@ describe("symbol legends with equal labels", () => {
 
 describe("shared sections", () => {
 	const PM25 = { dataset: "air-quality", entryType: "pm25" };
-	const sharedMap = (noFigure: boolean) =>
+	const sharedMap = (noFigure: boolean, noFigureLabel?: string) =>
 		fakeMap([
 			{
 				id: "regions",
@@ -591,7 +591,8 @@ describe("shared sections", () => {
 					units: "µg/m³",
 					scale: pm25Scale,
 					scaleRef: PM25,
-					...(noFigure && { noFigure: true })
+					...(noFigure && { noFigure: true }),
+					...(noFigureLabel && { noFigureLabel })
 				})
 			},
 			{
@@ -647,10 +648,53 @@ describe("shared sections", () => {
 		expect(style.borderTopWidth).toBe("2px");
 	});
 
+	it("labels the no-figure row with the section's noFigureLabel", async () => {
+		applyTheme("light");
+		render(Legend, { map: sharedMap(true, "Not enough data") });
+		await expect.element(page.getByText("Not enough data")).toBeVisible();
+		expect(page.getByText("No data").elements()).toHaveLength(0);
+		const result = await axe.run(document.querySelector(".mapsdk-legend")!);
+		expect(result.violations).toEqual([]);
+	});
+
 	it("shows no row without noFigure", async () => {
 		render(Legend, { map: sharedMap(false) });
 		await expect.element(page.getByRole("heading", { name: "PM2.5 (µg/m³)" })).toBeVisible();
 		expect(page.getByText("No data").elements()).toHaveLength(0);
+	});
+
+	it("a shared PM2.5 section shows the monitors' units line for both layers, regions first", async () => {
+		applyTheme("light");
+		const map = fakeMap([
+			{
+				id: "regions",
+				legend: () => ({
+					pluginId: "regions",
+					title: "Counties",
+					units: "µg/m³",
+					scale: pm25Scale,
+					scaleRef: PM25,
+					noFigure: true
+				})
+			},
+			{
+				id: "monitors",
+				legend: () => ({
+					pluginId: "monitors",
+					title: "PM2.5",
+					units: "µg/m³",
+					scale: pm25Scale,
+					scaleRef: PM25,
+					scaleLabel: "PM2.5",
+					unitsLine: "µg/m³ · Average of daily means"
+				})
+			}
+		]);
+		render(Legend, { map });
+		await expect.element(page.getByText("µg/m³ · Average of daily means")).toBeVisible();
+		expect(page.getByText("µg/m³ · Average of daily means").elements()).toHaveLength(1);
+		expect(document.querySelectorAll(".mapsdk-legend-section")).toHaveLength(1);
+		await expect.element(page.getByText("No data")).toBeVisible();
 	});
 
 	it("has no axe violations with a shared section and its row", async () => {

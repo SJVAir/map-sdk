@@ -53,6 +53,21 @@ describe("summaryText", () => {
 		);
 	});
 
+	it("counts noFigure items under their noFigureLabel", () => {
+		const outlined = many(2, NO_LEVEL, 5).map((i) => ({
+			...i,
+			noFigure: true,
+			noFigureLabel: "Not enough data"
+		}));
+		const text = summaryText(
+			"Counties",
+			[...many(1, good), ...outlined],
+			pm25Scale,
+			defaultMessages
+		);
+		expect(text).toBe("Counties: 1 Good, 2 Not enough data");
+	});
+
 	it("counts a noFigure item with a level under its level", () => {
 		const items = many(2, good).map((i) => ({ ...i, noFigure: true }));
 		expect(summaryText("Counties", items, pm25Scale, defaultMessages)).toBe("Counties: 2 Good");

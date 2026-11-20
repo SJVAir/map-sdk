@@ -179,6 +179,31 @@ describe("regionsPlugin shape options", () => {
 		]);
 	});
 
+	it("passes detail, noFigureLabel, legendUnits and legendNote to the shapes", async () => {
+		const note = (() => {}) as unknown as import("svelte").Snippet;
+		const source = new TestSource<Props>({ features: ZIP, scale: heatScale });
+		const plugin = regionsPlugin({
+			source,
+			layerLabel: "Counties",
+			noFigure: "outline",
+			noFigureLabel: "Not enough data",
+			detail: () => "x",
+			legendUnits: "µg/m³ · monthly",
+			legendNote: note
+		});
+		await attach(plugin);
+		const outlined = plugin.features!().filter((i) => i.noFigure);
+		expect(outlined.length).toBeGreaterThan(0);
+		for (const i of outlined)
+			expect(i).toMatchObject({ noFigureLabel: "Not enough data", detail: "x" });
+		expect(plugin.legend!()).toMatchObject({
+			unitsLine: "µg/m³ · monthly",
+			note,
+			noFigure: true,
+			noFigureLabel: "Not enough data"
+		});
+	});
+
 	it("keeps today's paint with nothing set", async () => {
 		const source = new TestSource<Props>({ features: ZIP, scale: heatScale });
 		const { fill, ids } = await attach(regionsPlugin({ source, layerLabel: "Counties" }));

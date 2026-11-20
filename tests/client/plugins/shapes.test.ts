@@ -868,6 +868,99 @@ describe("shapesPlugin legendUnits and legendNote", () => {
 	});
 });
 
+describe("shapesPlugin detail and noFigureLabel", () => {
+	type Item = { name: string; noFigure?: boolean; noFigureLabel?: string; detail?: string };
+	const items = (plugin: { features?: () => Item[] }) =>
+		Object.fromEntries(
+			plugin.features!().map((i) => [
+				i.name,
+				{ noFigure: i.noFigure, noFigureLabel: i.noFigureLabel, detail: i.detail }
+			])
+		);
+	const why = (p: Props) => `why ${p.name}`;
+
+	it("puts the label and detail on outlined no-figure items", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({
+			source,
+			noFigure: "outline",
+			noFigureLabel: "Not enough data",
+			detail: why
+		});
+		expect(items(plugin)).toEqual({
+			Alpha: { noFigure: true, noFigureLabel: "Not enough data", detail: "why Alpha" },
+			Bravo: { noFigure: undefined, noFigureLabel: undefined, detail: undefined }
+		});
+	});
+
+	it("the legend's no-figure row carries the label", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({
+			source,
+			noFigure: "outline",
+			noFigureLabel: "Not enough data"
+		});
+		expect(plugin.legend!()).toMatchObject({ noFigure: true, noFigureLabel: "Not enough data" });
+	});
+
+	it("ignores noFigureLabel under neutral, but still gives the detail", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({
+			source,
+			noFigure: "neutral",
+			noFigureLabel: "Not enough data",
+			detail: why
+		});
+		expect(items(plugin)).toEqual({
+			Alpha: { noFigure: undefined, noFigureLabel: undefined, detail: "why Alpha" },
+			Bravo: { noFigure: undefined, noFigureLabel: undefined, detail: undefined }
+		});
+		expect("noFigureLabel" in plugin.legend!()!).toBe(false);
+	});
+
+	it("trims, and a blank label or detail is unset", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: smokeScale });
+		const { plugin } = await setup({
+			source,
+			noFigure: "outline",
+			noFigureLabel: " ",
+			detail: () => "  "
+		});
+		const alpha = plugin.features!().find((i) => i.name === "Alpha")!;
+		expect("noFigureLabel" in alpha).toBe(false);
+		expect("detail" in alpha).toBe(false);
+		expect("noFigureLabel" in plugin.legend!()!).toBe(false);
+	});
+
+	it("gives no reason under outline while the scale is loading or unavailable", async () => {
+		const pending = new Promise<Scale>(() => {});
+		for (const meta of [pending, "unavailable"] as const) {
+			const source = new TestSource<Props>({ features: POLYGONS, scale: SMOKE_REF });
+			const { plugin } = await setup(
+				{ source, noFigure: "outline", noFigureLabel: "Not enough data", detail: why },
+				meta
+			);
+			await settle();
+			expect(plugin.features!().some((i) => "detail" in i)).toBe(false);
+		}
+	});
+
+	it("a null scale flags and labels every polygon, with no legend", async () => {
+		const source = new TestSource<Props>({ features: POLYGONS, scale: null });
+		const { plugin } = await setup({
+			source,
+			noFigure: "outline",
+			noFigureLabel: "Not enough data",
+			detail: why
+		});
+		expect(items(plugin)).toEqual({
+			Alpha: { noFigure: true, noFigureLabel: "Not enough data", detail: "why Alpha" },
+			Bravo: { noFigure: true, noFigureLabel: "Not enough data", detail: "why Bravo" }
+		});
+		expect(plugin.legend!()).toBeNull();
+	});
+});
+
 describe("shapesPlugin legendDisplay", () => {
 	// The user, 2026-11-17 (beta.20): pesticide use's 8 classes read as blocks, as pointsPlugin's can.
 	it("passes blocks to the legend, and leaves the default alone", async () => {
