@@ -85,6 +85,8 @@ function lbsScale(id: string, breaks: number[]): Scale {
 		averaging_hours: null,
 		daily_statistic: null,
 		daily_statistic_label: null,
+		period_statistic: null,
+		period_statistic_label: null,
 		levels: breaks.map((b, i) => level(`l${i}`, labels[i], colors[i], b, breaks[i + 1] ?? null))
 	};
 }
@@ -228,6 +230,8 @@ export const NOTICE_SCALE: Scale = {
 	averaging_hours: null,
 	daily_statistic: null,
 	daily_statistic_label: null,
+	period_statistic: null,
+	period_statistic_label: null,
 	levels: [
 		{ ...level("notice", "Notice of intent", "#d35400", 0, null), value: "notice", min: null }
 	]

@@ -32,6 +32,8 @@ export const pm25Scale: Scale = {
 	averaging_hours: null,
 	daily_statistic: null,
 	daily_statistic_label: null,
+	period_statistic: null,
+	period_statistic_label: null,
 	levels: [
 		range("good", "Good", "#00e400", 0, 9.1, 0),
 		range(
@@ -113,6 +115,8 @@ export const smokeScale: Scale = {
 	averaging_hours: null,
 	daily_statistic: null,
 	daily_statistic_label: null,
+	period_statistic: null,
+	period_statistic_label: null,
 	levels: [
 		category("light", "Light", "#bfc8c3", "light", 0.2, 1),
 		category("medium", "Medium", "#757b78", "medium", 0.3, 2),
@@ -129,6 +133,8 @@ export const fireScale: Scale = {
 	averaging_hours: null,
 	daily_statistic: null,
 	daily_statistic_label: null,
+	period_statistic: null,
+	period_statistic_label: null,
 	levels: [
 		range("sm", "<10", "#FFD700", 0, 10, null),
 		range("md", "10–49", "#FF8C00", 10, 50, null),
@@ -147,6 +153,8 @@ export const heatScale: Scale = {
 	averaging_hours: null,
 	daily_statistic: null,
 	daily_statistic_label: null,
+	period_statistic: null,
+	period_statistic_label: null,
 	levels: [
 		{
 			key: "low",
@@ -227,5 +235,7 @@ export const burnScale: Scale = {
 	averaging_hours: null,
 	daily_statistic: null,
 	daily_statistic_label: null,
+	period_statistic: null,
+	period_statistic_label: null,
 	levels: [category("discouraged", "Burning Discouraged", "", "discouraged", null, null)]
 };
