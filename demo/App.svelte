@@ -113,14 +113,28 @@
 					source: source as DataSource<MonitorFeatureProperties>,
 					layerLabel: "Monitors",
 					id: "monitors",
-					selectable: true
+					selectable: true,
+					// The figure's name in the legend, as the dashboard's monthly Maps do.
+					legendUnits: "µg/m³ · Average of the range's daily means"
 				})
 		},
 		{
 			kind: "regions",
 			label: "Region fill",
 			selectable: true,
-			plugin: (source) => regionsPlugin({ source, layerLabel: "Counties", id: "regions" })
+			plugin: (source) =>
+				regionsPlugin({
+					source,
+					layerLabel: "Counties",
+					id: "regions",
+					// A county with no figure for the range: an outline, its label and why.
+					noFigure: "outline",
+					noFigureLabel: "Not enough data",
+					detail: (p) => {
+						const { reason } = p as { reason?: unknown };
+						return typeof reason === "string" ? reason : undefined;
+					}
+				})
 		},
 		{
 			kind: "calheatscore",

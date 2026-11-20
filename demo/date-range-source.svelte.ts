@@ -69,10 +69,29 @@ function regionFeature(
 	type: string,
 	code: string,
 	name: string,
-	value: number | null
+	value: number | null,
+	extra: Record<string, unknown> = {}
 ): Feature<Geometry, MapFeatureProperties> {
 	const refKey = encodeRef({ kind: "region", type, code });
-	return { type: "Feature", geometry: shape.geometry, properties: { refKey, name, value } };
+	return {
+		type: "Feature",
+		geometry: shape.geometry,
+		properties: { ...extra, refKey, name, value }
+	};
+}
+
+/** The days in an inclusive `YYYY-MM-DD` range. */
+const daysIn = (range: DateRange) =>
+	Math.round((Date.parse(range.end) - Date.parse(range.start)) / 86_400_000) + 1;
+
+/**
+ * Why a region has no figure, as the dashboard's region fills say it (demo text, not a message
+ * key): how many of the range's days had a daily figure.
+ */
+function noFigureReason(days: number, expected: number): string {
+	return days === 0
+		? "No day in the range had a figure"
+		: `Only ${days} of ${expected} days had a figure`;
 }
 
 const loaders: Record<SourceKind, Loader> = {
@@ -105,13 +124,22 @@ const loaders: Record<SourceKind, Loader> = {
 		const summaries = ids.length
 			? await getRegionSummariesBulkDaily({ entryType, ...range, region: ids }, { signal })
 			: [];
-		const means = new Map(summaries.map((r) => [r.id, average(r.summaries.map((s) => s.mean))]));
+		const figures = new Map(
+			summaries.map((r) => [r.id, r.summaries.flatMap((s) => (s.mean === null ? [] : [s.mean]))])
+		);
+		const expected = daysIn(range);
 		return collection(
 			shapes.features.flatMap((f) => {
 				const code = f.properties.external_id;
 				if (!code) return [];
-				const value = means.get(f.id) ?? null;
-				return [regionFeature(f as Feature<Geometry>, "county", code, f.properties.name, value)];
+				const days = figures.get(f.id) ?? [];
+				const value = average(days);
+				const reason = value === null ? noFigureReason(days.length, expected) : null;
+				return [
+					regionFeature(f as Feature<Geometry>, "county", code, f.properties.name, value, {
+						reason
+					})
+				];
 			})
 		);
 	},
