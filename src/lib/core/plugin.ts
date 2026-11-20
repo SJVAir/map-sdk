@@ -123,6 +123,8 @@ export type LegendData =
 			scaleLabel?: string;
 			/** The plugin draws at least one feature with no figure as an outline (`noFigure`). */
 			noFigure?: boolean;
+			/** Already-translated text of the `noFigure` row in place of "No data". */
+			noFigureLabel?: string;
 			/**
 			 * Already-translated unit line under the section's title (e.g. "lbs per township"), in
 			 * place of `units` after the title.

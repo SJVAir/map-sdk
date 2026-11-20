@@ -127,7 +127,7 @@
 				{#if section.noFigure}
 					<p class="mapsdk-legend-nofigure text-sm">
 						<span class="mapsdk-legend-nofigure-swatch" aria-hidden="true"></span>
-						<span>{map.messages("mapsdk_legend_no_figure")}</span>
+						<span>{section.noFigureLabel ?? map.messages("mapsdk_legend_no_figure")}</span>
 					</p>
 				{/if}
 				{#if section.note}

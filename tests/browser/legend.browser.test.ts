@@ -581,7 +581,7 @@ describe("symbol legends with equal labels", () => {
 
 describe("shared sections", () => {
 	const PM25 = { dataset: "air-quality", entryType: "pm25" };
-	const sharedMap = (noFigure: boolean) =>
+	const sharedMap = (noFigure: boolean, noFigureLabel?: string) =>
 		fakeMap([
 			{
 				id: "regions",
@@ -591,7 +591,8 @@ describe("shared sections", () => {
 					units: "µg/m³",
 					scale: pm25Scale,
 					scaleRef: PM25,
-					...(noFigure && { noFigure: true })
+					...(noFigure && { noFigure: true }),
+					...(noFigureLabel && { noFigureLabel })
 				})
 			},
 			{
@@ -645,6 +646,15 @@ describe("shared sections", () => {
 		const style = getComputedStyle(swatch);
 		expect(style.borderTopColor).toBe("rgb(10, 120, 30)");
 		expect(style.borderTopWidth).toBe("2px");
+	});
+
+	it("labels the no-figure row with the section's noFigureLabel", async () => {
+		applyTheme("light");
+		render(Legend, { map: sharedMap(true, "Not enough data") });
+		await expect.element(page.getByText("Not enough data")).toBeVisible();
+		expect(page.getByText("No data").elements()).toHaveLength(0);
+		const result = await axe.run(document.querySelector(".mapsdk-legend")!);
+		expect(result.violations).toEqual([]);
 	});
 
 	it("shows no row without noFigure", async () => {

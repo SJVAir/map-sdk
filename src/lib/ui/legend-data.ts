@@ -25,6 +25,8 @@ export interface LegendSection {
 	scaleName?: string;
 	/** Ends with a "No data" row: a member draws features with no figure as outlines. */
 	noFigure: boolean;
+	/** The no-figure row's text in place of "No data". */
+	noFigureLabel?: string;
 	/** A unit line under the title, in place of `units` after it. */
 	unitsLine?: string;
 	/** Host content at the section's foot, below "No data". */
@@ -78,6 +80,7 @@ export function legendSection(data: LegendData, format: FormatProvider): LegendS
 		...(data.scaleLabel && { scaleLabel: data.scaleLabel }),
 		...(scale.label && { scaleName: scale.label }),
 		noFigure: data.noFigure === true,
+		...(data.noFigureLabel && { noFigureLabel: data.noFigureLabel }),
 		...(data.unitsLine && { unitsLine: data.unitsLine }),
 		...(data.note && { note: data.note })
 	};
@@ -89,7 +92,7 @@ const sameRef = (a: ScaleRef, b: ScaleRef) =>
 /**
  * One section per shared scale reference, at its first member's place; the others close up. A
  * shared section is titled with the first member's `scaleLabel` that is set (else the scale's
- * own label, else the first title), and has the "No data" row when any member does. A section that shares with none, and
+ * own label, else the first title), and has the "No data" row when any member does (with the first member's `noFigureLabel` that is set). A section that shares with none, and
  * status and symbol entries, are kept as they are.
  */
 export function shareSections(entries: LegendEntry[]): LegendEntry[] {
@@ -113,6 +116,7 @@ export function shareSections(entries: LegendEntry[]): LegendEntry[] {
 		// The scale's own label stands in until the metadata's arrives, so the title doesn't flip.
 		const title = item.find((s) => s.scaleLabel)?.scaleLabel ?? (first.scaleName || first.title);
 		const noFigure = item.some((s) => s.noFigure);
+		const noFigureLabel = item.find((s) => s.noFigureLabel)?.noFigureLabel;
 		const unitsLine = item.find((s) => s.unitsLine)?.unitsLine;
 		const note = item.find((s) => s.note)?.note;
 		return {
@@ -121,6 +125,7 @@ export function shareSections(entries: LegendEntry[]): LegendEntry[] {
 				...first,
 				title,
 				noFigure,
+				...(noFigureLabel && { noFigureLabel }),
 				...(unitsLine && { unitsLine }),
 				...(note && { note })
 			}
