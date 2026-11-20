@@ -105,8 +105,9 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   clusters as `mapsdk:count`; the number is black or white by the level's color
   (`readableTextExpression`), the edge `countMarkerText` (`--background`)) and `shapesPlugin`
   (`zoomRange` from `zoom-range.svelte.ts`, shared with points; out of range it lists nothing and
-  has no legend; `tooltip`; `lens-hooks.ts`'s symbol-keyed hooks for a lens: `shown`, `live`,
-  `keys`, `geometryOf`, `setHidden` by the `lensHidden` feature state, the paint's case added only
+  has no legend; `tooltip`; `noFigureLabel` (the layer's text for "No data", outline only) and
+  `detail(props)` (a no-figure feature's reason beside it, or in place of "No level");
+  `lens-hooks.ts`'s symbol-keyed hooks for a lens: `shown`, `live`, `keys`, `geometryOf`, `setHidden` by the `lensHidden` feature state, the paint's case added only
   once a lens hides something) and `shapesLens` (`shapes-lens.svelte.ts`: its own plugin after the
   parents, an inner `shapesPlugin` over the block's children, the centre outline, a scoped Esc;
   the parents' hidden set applies whole once the children's source has loaded (a `sourcedata`
@@ -122,11 +123,12 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   unfilled `--foreground` edge, a `no-figure` line layer under `outline: "none"`, and `noFigure` on
   those polygons' items, by the legend's rule. Plus shared style expressions, scale resolution,
   and the exported marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
-- **Presets** (`src/lib/presets/`): `monitorsPlugin` (`detail` passes through; `figureLabel`
-  replaces the tooltip's interval note and names a cluster's figure; the reading box gives screen
+- **Presets** (`src/lib/presets/`): `monitorsPlugin` (`detail`, `legendUnits` and `legendNote` pass
+  through; `figureLabel` replaces the tooltip's interval note and names a cluster's figure, never
+  the legend; the reading box gives screen
   readers a `mapsdk_reading_pause` before each line under the value), `collocationSitesPlugin`, `regionsPlugin`,
   `calHeatScorePlugin`, `forecastZonesPlugin` (`regionsPlugin` passes `noFigure`/`fillOpacity`/
-  `outline` through), `hmsSmokePlugin`, `hmsFirePlugin` (groups, then
+  `outline`/`noFigureLabel`/`detail`/`legendUnits`/`legendNote` through), `hmsSmokePlugin`, `hmsFirePlugin` (groups, then
   hotspots from zoom 10), `focusAreaPlugin` (`focus-area.svelte.ts`: an area's slate outline and
   white wash outside it, from `focus-geometry.ts`'s `worldMask`; or a point's ring and canvas label,
   listed as one `noReading` row (left out while `ctx.coveredAt` its point) and clickable, never
@@ -169,12 +171,14 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `note` snippet sits at the foot, a shared section taking the first set; blocks legends are one labeled bar; `symbols`
   legends a row per symbol; `legend-data.ts`'s `shareSections` makes one section per equal
   `ScaleRef`, from `LegendData`'s `scaleRef`/`scaleLabel`, which the scale resolver sets, and a
-  "No data" row from `noFigure`), FeatureList,
+  "No data" row from `noFigure`, reading the first `noFigureLabel` set), FeatureList,
   MapTooltip, SelectionBar, ViewSummary, and MapControls (zoom buttons only; basemap switching is
   `MapContext`, credits are the engine's). `controls.css` holds the focus ring and motion classes.
   A `FeatureListItem` with `noReading` (the focus point) shows its name alone everywhere.
-  One with `noFigure` (no level) reads "No data" (`mapsdk_legend_no_figure`) in `levelText`,
-  `rowLabel` and `summaryText`, with an unfilled list swatch.
+  One with `noFigure` (no level) reads "No data" (`mapsdk_legend_no_figure`), or its
+  `noFigureLabel`, in `levelText`, `rowLabel` and `summaryText`, with an unfilled list swatch; its
+  `detail` is the reason beside it (`levelText`'s `detail`: the accessible name with
+  `mapsdk_list_row_level_detail`, and under `TooltipItem`'s chip).
   `feature-list.ts`'s `shownValue` is the one place a row's or tooltip's value text is made; it
   hides a category reading's code, since the level label already says it.
 - **Entries**: `.` (everything, reaches the map engine), `./data` and `./stores` (must not reach
