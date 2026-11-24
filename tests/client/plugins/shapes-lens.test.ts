@@ -513,3 +513,68 @@ describe("shapesLens childrenLoaded", () => {
 		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 2)));
 	});
 });
+
+describe("shapesLens shows a leaving parent at its first reloaded tile", () => {
+	const lensSource = (map: MapContext) => `${map.uid}:lens:shapes`;
+	const blockOf = (grid: ReturnType<typeof lensGrid>, key: string) => grid.block(key).sort();
+	/** The zoom-10 tile at a point: about 0.35° across, so inside one 1° grid parent. */
+	const tileAt = (lng: number, lat: number) => {
+		const z = 10;
+		const n = 2 ** z;
+		const phi = (lat * Math.PI) / 180;
+		const x = Math.floor(((lng + 180) / 360) * n);
+		const y = Math.floor(((1 - Math.log(Math.tan(phi) + 1 / Math.cos(phi)) / Math.PI) / 2) * n);
+		return { tileID: { canonical: { z, x, y } } };
+	};
+	const tileEvent = (map: MapContext, tile: unknown) => ({
+		sourceId: lensSource(map),
+		isSourceLoaded: false,
+		tile
+	});
+
+	/** Pinned on (2,2) and loaded; then recentred on (2,3) with the new children's load held. */
+	async function recentred() {
+		const set = await setUp();
+		set.lens.pin(parentKey(2, 2));
+		await settle();
+		set.gl.holdData = true;
+		set.lens.pin(parentKey(2, 3));
+		await settle();
+		return set;
+	}
+
+	it("a leaving parent shows at the first tile of the new children that overlaps it", async () => {
+		const { map, gl, grid } = await recentred();
+		// T2-1 spans lng 1–2, lat 2–3: it leaves the block.
+		gl.emit("sourcedata", tileEvent(map, tileAt(1.5, 2.5)));
+		const hidden = hiddenParents(gl, map);
+		expect(hidden).not.toContain(parentKey(2, 1));
+		expect(hidden).toContain(parentKey(1, 1));
+		expect(hidden).toContain(parentKey(3, 1));
+		// The arriving column waits for the whole load.
+		expect(hidden).not.toContain(parentKey(2, 4));
+		gl.finishData(lensSource(map));
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 3)));
+	});
+
+	it("a tile that overlaps no leaving parent shows none", async () => {
+		const { map, gl, grid } = await recentred();
+		gl.emit("sourcedata", tileEvent(map, tileAt(100.5, 40.5)));
+		gl.emit("sourcedata", tileEvent(map, tileAt(2.5, 2.5)));
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 2)));
+	});
+
+	it("a parent pending show that the next recentre hides again stays hidden", async () => {
+		const { map, gl, lens, grid } = await recentred();
+		lens.pin(parentKey(2, 2));
+		await settle();
+		gl.emit("sourcedata", tileEvent(map, tileAt(1.5, 2.5)));
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 2)));
+	});
+
+	it("a tile with no tile id shows nothing early", async () => {
+		const { map, gl, grid } = await recentred();
+		gl.emit("sourcedata", tileEvent(map, {}));
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 2)));
+	});
+});

@@ -2,12 +2,13 @@ import type { Snippet } from "svelte";
 import { untrack } from "svelte";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import type { FeatureListItem, LegendData, MapPlugin, PluginContext } from "../core/plugin.js";
-import { containsPoint } from "../core/shape-view.js";
+import { containsPoint, geometryBbox } from "../core/shape-view.js";
 import type { DataSource, MapFeatureProperties } from "../data/types.js";
 import { lensParentOf } from "./lens-hooks.js";
 import { createLensState } from "./lens-state.svelte.js";
 import { shapesPlugin, type ShapesTooltipEnv } from "./shapes.svelte.js";
 import { themeColors } from "./style.js";
+import { tileBounds } from "./tile-bounds.js";
 
 export interface ShapesLensOptions<C extends MapFeatureProperties> {
 	id: string;
@@ -185,9 +186,16 @@ export function shapesLens<C extends MapFeatureProperties>(
 		// a parent would show clear for a frame, and shown before, under the old children.
 		const childSource = ctx.id("shapes");
 		let pending: ReadonlySet<string> | null = null;
+		/** What the parents were last given. */
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced whole, never mutated
+		let applied: ReadonlySet<string> = new Set();
+		const setHidden = (keys: ReadonlySet<string>) => {
+			applied = keys;
+			hooks.setHidden(keys);
+		};
 		const apply = () => {
 			if (!pending || !ctxRef) return;
-			hooks.setHidden(pending);
+			setHidden(pending);
 			pending = null;
 		};
 		/** Applies now unless the children's source is loading (a `setData` this flush made). */
@@ -195,16 +203,35 @@ export function shapesLens<C extends MapFeatureProperties>(
 			if (!ctxRef || (ctx.gl.getSource(childSource) && !ctx.gl.isSourceLoaded(childSource))) return;
 			apply();
 		};
-		// Only a loaded tile (or the source's first `idle`) counts: `metadata` comes before the
-		// tiles reload, and either can say loaded while the children have no layers, and so no tiles.
+		// A parent leaving the set shows on the frame its children go: the first reloaded tile that
+		// overlaps it, not the whole load, which can come frames later (MapLibre swaps a source's
+		// tiles one at a time). One across two tiles may tint for a frame in the slower one.
+		const showUnder = (tile: unknown) => {
+			const bounds = tileBounds(tile);
+			if (!pending || !bounds) return;
+			const [west, south, east, north] = bounds;
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt whole, never mutated
+			const kept = new Set<string>();
+			for (const key of applied) {
+				const geometry = pending.has(key) ? null : hooks.geometryOf(key);
+				const box = geometry ? geometryBbox(geometry) : null;
+				const under = !!box && box[0] < east && box[2] > west && box[1] < north && box[3] > south;
+				if (!under) kept.add(key);
+			}
+			if (kept.size < applied.size) setHidden(kept);
+		};
+		// Only a loaded tile (or the source's first `idle`) applies the set: `metadata` comes before
+		// the tiles reload, and either can say loaded while the children have no layers, and so no
+		// tiles. Hiding waits for the whole load, so no arriving parent shows clear.
 		const onData = (e: {
 			sourceId?: string;
 			isSourceLoaded?: boolean;
 			tile?: unknown;
 			sourceDataType?: string;
 		}) => {
-			if (e.sourceId !== childSource || !e.isSourceLoaded) return;
-			if (e.tile || e.sourceDataType === "idle") apply();
+			if (e.sourceId !== childSource) return;
+			if (e.tile) showUnder(e.tile);
+			if (e.isSourceLoaded && (e.tile || e.sourceDataType === "idle")) apply();
 		};
 		// A failed load mustn't leave the parents as they were: apply as if it had drawn. (A failed
 		// tile applies the set while others may still reload, a frame early there at worst.)
