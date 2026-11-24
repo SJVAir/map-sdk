@@ -19,6 +19,12 @@ export interface ShapesLensOptions<C extends MapFeatureProperties> {
 	block(refKey: string): string[];
 	/** A child's parent refKey (for recentring and for which parents to hide). */
 	parentOf(props: C): string | null;
+	/**
+	 * Whether the source holds every child of this parent. A parent hides under its children only
+	 * once it says so, so one with just a few children loaded (a host's cached edge sections) never
+	 * shows clear around them. Read reactively. Default: always.
+	 */
+	childrenLoaded?(parentKey: string): boolean;
 	/** Already-translated name of the children, for the list, summary and legend. */
 	layerLabel: string;
 	/** Fill opacity where a level sets none. Default 0.6. */
@@ -214,7 +220,11 @@ export function shapesLens<C extends MapFeatureProperties>(
 			const ready = innerReady();
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt whole, never mutated
 			const parents = new Set(
-				ready ? [...childParents.values()].filter((key) => hooks.keys.has(key)) : []
+				ready
+					? [...childParents.values()].filter(
+							(key) => hooks.keys.has(key) && (options.childrenLoaded?.(key) ?? true)
+						)
+					: []
 			);
 			pending = parents;
 			// After the flush, so the children's `setData` in it counts whatever the effect order.

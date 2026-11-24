@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { SvelteSet } from "svelte/reactivity";
 import { flushSync, tick, type Snippet } from "svelte";
 import type { FeatureCollection, Geometry } from "geojson";
 import type { GeoJSONSourceSpecification } from "@maptiler/sdk";
@@ -46,6 +47,7 @@ async function setUp(
 		noFigure?: "neutral" | "outline";
 		noFigureLabel?: string;
 		detail?: (p: Props) => string | undefined;
+		childrenLoaded?: (parentKey: string) => boolean;
 	} = {}
 ) {
 	const grid = lensGrid();
@@ -76,7 +78,8 @@ async function setUp(
 		legendDisplay: opts.legendDisplay,
 		noFigure: opts.noFigure,
 		noFigureLabel: opts.noFigureLabel,
-		detail: opts.detail
+		detail: opts.detail,
+		childrenLoaded: opts.childrenLoaded
 	});
 	map.addPlugin(parents);
 	map.addPlugin(lens);
@@ -466,5 +469,47 @@ describe("shapesLens hides its parents once the children have loaded", () => {
 		gl.emit("idle");
 		await settle();
 		expect(hiddenParents(gl, map)).toEqual([]);
+	});
+});
+
+describe("shapesLens childrenLoaded", () => {
+	const lensSource = (map: MapContext) => `${map.uid}:lens:shapes`;
+	const blockOf = (grid: ReturnType<typeof lensGrid>, key: string) => grid.block(key).sort();
+	const PARTIAL = parentKey(1, 1);
+
+	/** Pinned on (2,2) with the host holding all of the block but PARTIAL's children. */
+	async function partly() {
+		const block = lensGrid().block(parentKey(2, 2));
+		const loaded = new SvelteSet(block.filter((k) => k !== PARTIAL));
+		const set = await setUp({ childrenLoaded: (key) => loaded.has(key) });
+		set.lens.pin(parentKey(2, 2));
+		await settle();
+		return { ...set, loaded };
+	}
+
+	it("a parent its host hasn't fully loaded stays shown under its drawn children", async () => {
+		const { map, gl, grid } = await partly();
+		expect(lensData(gl, map).some((k) => k.startsWith("feature:T1-1-"))).toBe(true);
+		expect(hiddenParents(gl, map)).toEqual(
+			blockOf(grid, parentKey(2, 2)).filter((k) => k !== PARTIAL)
+		);
+	});
+
+	it("it hides once childrenLoaded says so, after the children's next load", async () => {
+		const { map, gl, grid, loaded, childSource } = await partly();
+		gl.holdData = true;
+		loaded.add(PARTIAL);
+		childSource.features = { ...grid.children, features: [...grid.children.features] };
+		await settle();
+		expect(hiddenParents(gl, map)).not.toContain(PARTIAL);
+		gl.finishData(lensSource(map));
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 2)));
+	});
+
+	it("childrenLoaded turning true with no new children data hides at once", async () => {
+		const { map, gl, grid, loaded } = await partly();
+		loaded.add(PARTIAL);
+		await settle();
+		expect(hiddenParents(gl, map)).toEqual(blockOf(grid, parentKey(2, 2)));
 	});
 });
