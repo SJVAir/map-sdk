@@ -111,9 +111,12 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `setHidden` by the `lensHidden` feature state, the paint's case added only once a lens hides
   something) and `shapesLens` (`shapes-lens.svelte.ts`: its own plugin after the
   parents, an inner `shapesPlugin` over the block's children, the centre outline, a scoped Esc;
-  the parents' hidden set applies whole once the children's source has loaded (a `sourcedata`
-  tile or `idle` event with `isSourceLoaded`, never `metadata`/`content`; an `error` or the map's
-  `idle` applies it; at once when nothing loads or the children have no layers), so no frame shows a parent clear or under the old children;
+  a parent hides only where a child is drawn and the host's `childrenLoaded(key)` (default true)
+  says it holds all of them; the parents' hidden set applies whole once the children's source has
+  loaded (a `sourcedata` tile or `idle` event with `isSourceLoaded`, never `metadata`/`content`;
+  an `error` or the map's `idle` applies it; at once when nothing loads or the children have no
+  layers), but a parent leaving the set shows at the first reloaded tile overlapping it
+  (`tile-bounds.ts`), so no frame shows a parent clear;
   rules in `lens-state.svelte.ts`, no GL: Explorer hover with a 120 ms grace, `pin`/`release`,
   a click opens a card only, touch hover ignored; a section or notice card's hold carries over
   when the card is swapped for the centre parent's; children listed only while pinned, but
@@ -144,9 +147,12 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 - **Options** (`src/lib/options/`): `OptionsToolbar` (monitor-map 5.0's toolbar, shared): plain
   declarations (`types.ts`: `OptionGroup`, `OptionRow`, `OptionValues`), pure value logic
   (`values.ts`: select-all, reset, one change per action), `menus.svelte.ts` (per-toolbar open
-  state), `OptionsMenu` (a trigger and its dropdown, or a narrow-panel section), the recursive
-  `OptionRows` (group rows and checkbox rows with children draw the chevron), `Glyph` (inline Lucide chevron/sliders/x, ISC + Feather MIT), and
-  `toolbar-context.ts`. On the narrow bar the `search` slot fills the rest
+  state), `OptionsMenu` (a trigger and its dropdown, or a narrow-panel section; a press that
+  starts inside it never closes it on focusout, so a host's focusable ancestor taking focus from a
+  label press doesn't), the recursive `OptionRows` (group rows and checkbox rows with children draw
+  the chevron; a child's checkbox is centred under the parent's icon, or at its label without one;
+  the guide line is an inset shadow), `Glyph` (inline Lucide chevron/sliders/x, ISC + Feather
+  MIT), and `toolbar-context.ts`. On the narrow bar the `search` slot fills the rest
   of the bar (a definite width; its empty part passes the pointer). Wide vs narrow comes from `MapView`'s `MapLayout` context
   (`view/map-layout.ts`, 48rem of the map's box); without one it's wide. The host owns the values;
   setting them never fires `onchange`; read-only is `aria-disabled`. Presets: `presets.ts`
