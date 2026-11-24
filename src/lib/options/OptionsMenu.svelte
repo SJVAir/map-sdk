@@ -49,8 +49,10 @@
 
 	// A press inside this menu on a part that takes no focus (a row's label text, padding) moves
 	// focus to the nearest focusable ancestor, which a host may have (`<main tabindex="-1">`).
-	// That isn't leaving the menu: note the press, so focusout ignores it. Cleared once the press
-	// has ended and its click has run.
+	// That isn't leaving the menu: note the press, so focusout ignores it. Cleared once the press's
+	// click has run (a touch tap moves focus after pointerup, so pointerup is too early), when the
+	// press is cancelled, and on any key, so a press whose release never comes can't keep Tab from
+	// closing the menu.
 	let pressing = false;
 	$effect(() => {
 		let timer: ReturnType<typeof setTimeout> | undefined;
@@ -58,12 +60,18 @@
 			clearTimeout(timer);
 			timer = setTimeout(() => (pressing = false), 0);
 		};
-		document.addEventListener("pointerup", release, true);
+		const releaseNow = () => {
+			clearTimeout(timer);
+			pressing = false;
+		};
+		document.addEventListener("click", release, true);
 		document.addEventListener("pointercancel", release, true);
+		document.addEventListener("keydown", releaseNow, true);
 		return () => {
 			clearTimeout(timer);
-			document.removeEventListener("pointerup", release, true);
+			document.removeEventListener("click", release, true);
 			document.removeEventListener("pointercancel", release, true);
+			document.removeEventListener("keydown", releaseNow, true);
 		};
 	});
 

@@ -617,6 +617,16 @@ describe("OptionsToolbar child rows line up with their parent", () => {
 			);
 		});
 
+		it(`${layout}: the guide line is a border, so a hovered row's background doesn't cover it`, async () => {
+			await open(layout);
+			// The test page sets no --border: the line still takes its 1px, so the alignment holds.
+			for (const parent of ["Reference-grade", "EV Chargers", "Level 2"]) {
+				const style = getComputedStyle(childrenOf(parent));
+				expect(style.borderLeftWidth).toBe("1px");
+				expect(style.borderLeftStyle).toBe("solid");
+			}
+		});
+
 		it(`${layout}: the guide line stays under the parent's checkbox`, async () => {
 			await open(layout);
 			for (const parent of ["Reference-grade", "EV Chargers", "Level 2"]) {

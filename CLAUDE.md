@@ -151,8 +151,9 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   starts inside it never closes it on focusout, so a host's focusable ancestor taking focus from a
   label press doesn't), the recursive `OptionRows` (group rows and checkbox rows with children draw
   the chevron; a child's checkbox is centred under the parent's icon, or at its label without one;
-  the guide line is an inset shadow), `Glyph` (inline Lucide chevron/sliders/x, ISC + Feather
-  MIT), and `toolbar-context.ts`. On the narrow bar the `search` slot fills the rest
+  the guide line is a border that is transparent without `--border`), `Glyph` (inline Lucide
+  chevron/sliders/x, ISC + Feather MIT), and `toolbar-context.ts`. On the narrow bar the `search`
+  slot fills the rest
   of the bar (a definite width; its empty part passes the pointer). Wide vs narrow comes from `MapView`'s `MapLayout` context
   (`view/map-layout.ts`, 48rem of the map's box); without one it's wide. The host owns the values;
   setting them never fires `onchange`; read-only is `aria-disabled`. Presets: `presets.ts`

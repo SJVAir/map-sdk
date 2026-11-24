@@ -80,11 +80,13 @@ centres at the icon's centre).
 
 - Today: row padding 0.75rem, checkbox 1rem, gap 0.5rem, icon 1.25rem; children block indented
   1.25rem with a 1px left border.
-- The guide line becomes an inset 1px shadow (it takes no room, so the alignment holds whether
-  or not a host defines `--border`). The children block of a row with an icon gets child-row left
+- The guide line stays a 1px left border but always takes its width (`var(--border, transparent)`,
+  the block's margin 1px less), so the alignment holds whether or not a host defines `--border`.
+  (A first try drew it as an inset shadow; a hovered child row's background covered it.) The
+  children block of a row with an icon gets child-row left
   padding of `1.125rem` (checkbox centre = icon centre); of a row without an icon, `1rem`
   (checkbox left = label left). Applies to both `checkbox`-with-children and `group` rows. A
-  nested block's margin is its parent row's padding plus half a checkbox (`1.625rem` / `1.5rem`).
+  nested block's margin is its parent row's padding plus half a checkbox, less the line's 1px.
 - Radio help text indents (`mapsdk-option-help`) are untouched.
 
 ### Lens (`src/lib/plugins/shapes-lens.svelte.ts`)

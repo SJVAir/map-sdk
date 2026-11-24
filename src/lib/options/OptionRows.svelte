@@ -252,11 +252,12 @@
 	}
 
 	/* The guide line sits under the parent's checkbox centre. A child's checkbox is centred under
-	   the parent's icon, or starts at its label when it has none. The line is a shadow, so it takes
-	   no room and the alignment holds with or without it. */
+	   the parent's icon, or starts at its label when it has none. The line is a border outside the
+	   rows (a hovered row's background never covers it) that always takes its 1px, transparent
+	   without a --border, so the alignment holds either way. */
 	.mapsdk-option-children {
-		margin-left: 1.25rem;
-		box-shadow: inset 1px 0 var(--border);
+		margin-left: calc(1.25rem - 1px);
+		border-left: 1px solid var(--border, transparent);
 	}
 
 	.mapsdk-option-children > :global(.mapsdk-option-row) {
@@ -269,11 +270,11 @@
 
 	/* A nested block: its parent row's padding plus half a checkbox. */
 	.mapsdk-option-children > :global(.mapsdk-option-children) {
-		margin-left: 1.5rem;
+		margin-left: calc(1.5rem - 1px);
 	}
 
 	.mapsdk-option-children[data-under-icon] > :global(.mapsdk-option-children) {
-		margin-left: 1.625rem;
+		margin-left: calc(1.625rem - 1px);
 	}
 
 	.mapsdk-option-heading {

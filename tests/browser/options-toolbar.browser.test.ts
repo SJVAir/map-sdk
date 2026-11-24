@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
-import { page, userEvent } from "vitest/browser";
+import { cdp, page, userEvent } from "vitest/browser";
 import axe from "axe-core";
 import { createMap, type MapContext } from "../../src/lib/core/create-map.svelte.js";
 import type { OptionGroup } from "../../src/lib/options/types.js";
@@ -712,6 +712,43 @@ describe.each(["-1", "0"] as const)(
 		it("Tab past the last row still closes", async () => {
 			await setupIn();
 			await trigger("Monitors").click();
+			const boxes = panelOf("Monitors").querySelectorAll<HTMLInputElement>("input");
+			boxes[boxes.length - 1].focus();
+			await userEvent.tab();
+			expect(expanded("Monitors")).toBe("false");
+		});
+
+		/** A real touch tap (Chrome fires pointerup before the mousedown that moves focus). */
+		async function tap(label: string) {
+			const el = page.getByText(label, { exact: true }).element();
+			const r = el.getBoundingClientRect();
+			const frame = (window.frameElement as HTMLElement | null)?.getBoundingClientRect();
+			const x = (frame?.left ?? 0) + r.left + r.width / 2;
+			const y = (frame?.top ?? 0) + r.top + r.height / 2;
+			const send = cdp().send.bind(cdp()) as (m: string, p: unknown) => Promise<unknown>;
+			await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+			await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+			await new Promise((r) => setTimeout(r, 100));
+		}
+
+		it("two touch taps on a label toggle twice and keep the dropdown open", async () => {
+			const state = await setupIn();
+			await trigger("Monitors").click();
+			await parkPointer();
+			await tap("Inactive");
+			expect(expanded("Monitors")).toBe("true");
+			expect(state.values.inactive).toBe(true);
+			await tap("Inactive");
+			expect(expanded("Monitors")).toBe("true");
+			expect(state.values.inactive).toBe(false);
+		});
+
+		it("a press whose release never comes doesn't stop Tab from closing it", async () => {
+			await setupIn();
+			await trigger("Monitors").click();
+			await parkPointer();
+			const label = page.getByText("Inactive", { exact: true }).element();
+			label.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
 			const boxes = panelOf("Monitors").querySelectorAll<HTMLInputElement>("input");
 			boxes[boxes.length - 1].focus();
 			await userEvent.tab();

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SvelteSet } from "svelte/reactivity";
 import type { ComponentProps } from "svelte";
 import {
 	circle,
@@ -114,7 +115,7 @@ describe("README examples", () => {
 		const lensSource = staticSource(empty, { dataset: "pesticides", entryType: "section" });
 		const sectionSource = staticSource(empty, { dataset: "pesticides", entryType: "section" });
 		const neighbourhood = (refKey: string) => [refKey];
-		const loadedBlocks = new Set<string>();
+		const loadedBlocks = new SvelteSet<string>();
 		const townshipOf = (props: { refKey: string }) => props.refKey.replace(/-\d+$/, "");
 		const map = createMap({ config: { maptilerKey: "" } });
 		const townships = shapesPlugin({
@@ -131,7 +132,8 @@ describe("README examples", () => {
 			source: lensSource,
 			block: (refKey) => neighbourhood(refKey),
 			parentOf: (props) => townshipOf(props),
-			// The host's loaded blocks: a township is complete once a block that holds it has loaded.
+			// The host's loaded blocks (a SvelteSet, so the lens sees each one added): a township is
+			// complete once a block that holds it has loaded.
 			childrenLoaded: (key) =>
 				[...loadedBlocks].some((centre) => neighbourhood(centre).includes(key)),
 			layerLabel: "Sections",
