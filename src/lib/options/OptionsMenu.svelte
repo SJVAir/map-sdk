@@ -47,13 +47,34 @@
 				: trigger.right - width < box.left + EDGE && trigger.left + width <= box.right - EDGE;
 	});
 
+	// A press inside this menu on a part that takes no focus (a row's label text, padding) moves
+	// focus to the nearest focusable ancestor, which a host may have (`<main tabindex="-1">`).
+	// That isn't leaving the menu: note the press, so focusout ignores it. Cleared once the press
+	// has ended and its click has run.
+	let pressing = false;
+	$effect(() => {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const release = () => {
+			clearTimeout(timer);
+			timer = setTimeout(() => (pressing = false), 0);
+		};
+		document.addEventListener("pointerup", release, true);
+		document.addEventListener("pointercancel", release, true);
+		return () => {
+			clearTimeout(timer);
+			document.removeEventListener("pointerup", release, true);
+			document.removeEventListener("pointercancel", release, true);
+		};
+	});
+
 	function onfocusout(e: FocusEvent) {
 		if (!ctx.wide) return;
 		const next = e.relatedTarget;
 		const root = e.currentTarget as HTMLElement;
 		if (next instanceof Node) {
-			// Focus moving on past this dropdown (tabbing out of its last row) closes it.
-			if (!root.contains(next)) ctx.menus.close(group.id);
+			// Focus moving on past this dropdown (tabbing out of its last row) closes it; a press
+			// inside it doesn't.
+			if (!root.contains(next) && !pressing) ctx.menus.close(group.id);
 			return;
 		}
 		// No destination: a click on something that takes no focus (the outside-click handler
@@ -100,6 +121,7 @@
 	onpointerleave={(e) => {
 		if (e.pointerType === "mouse") ctx.menus.unhover(group.id);
 	}}
+	onpointerdowncapture={() => (pressing = true)}
 	{onfocusout}
 >
 	<button
