@@ -291,5 +291,6 @@ through `GlMapLike`.
       `summary-b23-*.txt` with `summary-b22-*`: `beforeLoad`/`notInData` (arriving) and
       `leavingEarly` (leaving) should drop to 0, `tint` and `regress` stay 0 or near. Report both
       results to the user and to the coordinator.
-- [ ] **Step 6:** Fresh whole-branch review on the most capable model (superpowers:requesting-code-review),
+- [ ] **Step 6:** Fresh whole-branch review on the most capable model
+      (superpowers:requesting-code-review),
       then fix its findings, minors included, each with targeted tests.
