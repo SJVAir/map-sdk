@@ -353,6 +353,12 @@ where their children are drawn. `block(refKey)` names the parents of a centre's 
 included), `parentOf(props)` a child's parent refKey, and `source` holds the children: the host
 fills it for `lens.center` (map-sdk never fetches), and may keep other blocks in it, since only
 the current block's children are drawn. Until a parent's children arrive it keeps its fill.
+A host that keeps other blocks may already hold a few of a parent's children (edge sections a
+neighbouring block's query also returned): `childrenLoaded(parentKey)` says whether it holds all
+of them, and a parent hides only once it says so (by default, as soon as one child is drawn).
+The lens reads it reactively, so it must read reactive state (a `SvelteSet`, `$state`): a plain
+`Set` is asked again only when the children change, and a block marked loaded after its data
+arrived would never hide its townships.
 
 - **Hover:** the lens centres on the parent under the pointer, recentres as soon as the pointer is
   over a neighbour's child, and drops 120 ms after the pointer leaves both. A marker of another
@@ -389,6 +395,9 @@ const lens = shapesLens({
 	source: lensSource,
 	block: (refKey) => neighbourhood(refKey),
 	parentOf: (props) => townshipOf(props),
+	// The host's loaded blocks (a SvelteSet, so the lens sees each one added): a township is
+	// complete once a block that holds it has loaded.
+	childrenLoaded: (key) => [...loadedBlocks].some((centre) => neighbourhood(centre).includes(key)),
 	layerLabel: "Sections",
 	legendUnits: "lbs per section"
 });
@@ -1020,6 +1029,25 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.23
+
+- **Options dropdowns stay open on a press inside them.** With the map inside a focusable element
+  (`<main tabindex="-1">`, a focusable dashboard tile), a press on a row's label text moved focus
+  to that element and closed the wide dropdown before the click landed. A press that starts inside
+  a dropdown no longer closes it; Tab past its last row, Esc and a click outside still do.
+- **Options child rows line up with their parent:** a child's checkbox is centred under the parent
+  row's icon, or starts at its label when it has none (about 5px and 4px further right than
+  before). The guide line under the parent's checkbox always takes its 1px (transparent when a
+  host sets no `--border`), so the alignment is the same on every host.
+- **New API: `shapesLens`'s `childrenLoaded(parentKey)`.** A parent hides under its children only
+  once it says the source holds all of them, so a township with just a few cached edge sections
+  drawn no longer shows clear around them on a block's first visit. Without it, nothing changes.
+- **`shapesLens`:** a township the lens leaves shows again on the frame its sections go (the first
+  reloaded tile over it), not a frame or more later when the whole new set of sections has loaded.
+  A township across two tiles can show a tint for one frame in the slower one. Hiding still waits
+  for the whole load.
+- No new message keys; nothing removed.
 
 ### 0.1.0-beta.22
 

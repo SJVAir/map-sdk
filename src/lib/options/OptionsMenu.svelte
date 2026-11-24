@@ -47,13 +47,42 @@
 				: trigger.right - width < box.left + EDGE && trigger.left + width <= box.right - EDGE;
 	});
 
+	// A press inside this menu on a part that takes no focus (a row's label text, padding) moves
+	// focus to the nearest focusable ancestor, which a host may have (`<main tabindex="-1">`).
+	// That isn't leaving the menu: note the press, so focusout ignores it. Cleared once the press's
+	// click has run (a touch tap moves focus after pointerup, so pointerup is too early), when the
+	// press is cancelled, and on any key, so a press whose release never comes can't keep Tab from
+	// closing the menu.
+	let pressing = false;
+	$effect(() => {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const release = () => {
+			clearTimeout(timer);
+			timer = setTimeout(() => (pressing = false), 0);
+		};
+		const releaseNow = () => {
+			clearTimeout(timer);
+			pressing = false;
+		};
+		document.addEventListener("click", release, true);
+		document.addEventListener("pointercancel", release, true);
+		document.addEventListener("keydown", releaseNow, true);
+		return () => {
+			clearTimeout(timer);
+			document.removeEventListener("click", release, true);
+			document.removeEventListener("pointercancel", release, true);
+			document.removeEventListener("keydown", releaseNow, true);
+		};
+	});
+
 	function onfocusout(e: FocusEvent) {
 		if (!ctx.wide) return;
 		const next = e.relatedTarget;
 		const root = e.currentTarget as HTMLElement;
 		if (next instanceof Node) {
-			// Focus moving on past this dropdown (tabbing out of its last row) closes it.
-			if (!root.contains(next)) ctx.menus.close(group.id);
+			// Focus moving on past this dropdown (tabbing out of its last row) closes it; a press
+			// inside it doesn't.
+			if (!root.contains(next) && !pressing) ctx.menus.close(group.id);
 			return;
 		}
 		// No destination: a click on something that takes no focus (the outside-click handler
@@ -100,6 +129,7 @@
 	onpointerleave={(e) => {
 		if (e.pointerType === "mouse") ctx.menus.unhover(group.id);
 	}}
+	onpointerdowncapture={() => (pressing = true)}
 	{onfocusout}
 >
 	<button

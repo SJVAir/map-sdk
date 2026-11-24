@@ -536,3 +536,104 @@ describe("layoutRoot", () => {
 		}
 	});
 });
+
+describe("OptionsToolbar child rows line up with their parent", () => {
+	const dot = {
+		svg: '<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>'
+	};
+	const aligned = (): OptionGroup[] => [
+		{
+			id: "monitors",
+			label: "Monitors",
+			rows: [
+				{
+					kind: "group",
+					id: "ref",
+					label: "Reference-grade",
+					icon: dot,
+					children: [
+						{ kind: "checkbox", id: "airnow", label: "AirNow" },
+						{ kind: "checkbox", id: "bam", label: "BAM 1022" }
+					]
+				},
+				{
+					kind: "checkbox",
+					id: "ev",
+					label: "EV Chargers",
+					children: [
+						{
+							kind: "checkbox",
+							id: "ev2",
+							label: "Level 2",
+							children: [{ kind: "checkbox", id: "ev2fast", label: "Fast" }]
+						}
+					]
+				}
+			]
+		}
+	];
+
+	async function open(layout: "wide" | "narrow") {
+		const state = new ToolbarState({
+			groups: aligned(),
+			values: { airnow: true, bam: true, ev: true, ev2: true, ev2fast: false }
+		});
+		const props = layout === "narrow" ? { class: "narrow-map" } : {};
+		await render(MapViewWithToolbar, { map: newMap(), state, ...props } as never);
+		await settle();
+		if (layout === "narrow") {
+			await page.getByRole("button", { name: "Open map options" }).click();
+			await slid();
+		}
+		await trigger("Monitors").click();
+	}
+
+	const rowOf = (label: string) =>
+		page.getByText(label, { exact: true }).element().closest("label")!;
+	const box = (el: Element) => el.getBoundingClientRect();
+	const centreX = (el: Element) => box(el).left + box(el).width / 2;
+	const input = (label: string) => rowOf(label).querySelector("input")!;
+	const icon = (label: string) => rowOf(label).querySelector(".mapsdk-option-icon")!;
+	const text = (label: string) => rowOf(label).querySelector(".mapsdk-option-label")!;
+	const childrenOf = (label: string) => rowOf(label).nextElementSibling!;
+
+	for (const layout of ["wide", "narrow"] as const) {
+		it(`${layout}: a child's checkbox is centred under the parent's icon`, async () => {
+			await open(layout);
+			for (const child of ["AirNow", "BAM 1022"]) {
+				expect(
+					Math.abs(centreX(input(child)) - centreX(icon("Reference-grade")))
+				).toBeLessThanOrEqual(0.5);
+			}
+		});
+
+		it(`${layout}: under a parent with no icon, a child's checkbox starts at the parent's label`, async () => {
+			await open(layout);
+			expect(
+				Math.abs(box(input("Level 2")).left - box(text("EV Chargers")).left)
+			).toBeLessThanOrEqual(0.5);
+			expect(Math.abs(box(input("Fast")).left - box(text("Level 2")).left)).toBeLessThanOrEqual(
+				0.5
+			);
+		});
+
+		it(`${layout}: the guide line is a border, so a hovered row's background doesn't cover it`, async () => {
+			await open(layout);
+			// The test page sets no --border: the line still takes its 1px, so the alignment holds.
+			for (const parent of ["Reference-grade", "EV Chargers", "Level 2"]) {
+				const style = getComputedStyle(childrenOf(parent));
+				expect(style.borderLeftWidth).toBe("1px");
+				expect(style.borderLeftStyle).toBe("solid");
+			}
+		});
+
+		it(`${layout}: the guide line stays under the parent's checkbox`, async () => {
+			await open(layout);
+			for (const parent of ["Reference-grade", "EV Chargers", "Level 2"]) {
+				expect(Math.abs(box(childrenOf(parent)).left - centreX(input(parent)))).toBeLessThanOrEqual(
+					1
+				);
+			}
+		});
+	}
+});

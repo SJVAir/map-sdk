@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
-import { page, userEvent } from "vitest/browser";
+import { cdp, page, userEvent } from "vitest/browser";
 import axe from "axe-core";
 import { createMap, type MapContext } from "../../src/lib/core/create-map.svelte.js";
 import type { OptionGroup } from "../../src/lib/options/types.js";
@@ -624,3 +624,150 @@ describe("OptionsToolbar, final review fixes", () => {
 		expect(page.getByRole("radiogroup", { name: "PM2.5" }).query()).not.toBeNull();
 	});
 });
+
+describe.each(["-1", "0"] as const)(
+	"OptionsToolbar, wide, inside a focusable ancestor (tabindex %s)",
+	(focusable) => {
+		const withMode = (): OptionGroup[] => [
+			...groups(),
+			{
+				id: "mode",
+				label: "Mode",
+				rows: [
+					{
+						kind: "radio",
+						id: "mode",
+						choices: [
+							{ value: "a", label: "Alpha" },
+							{ value: "b", label: "Beta" }
+						]
+					}
+				]
+			}
+		];
+
+		async function setupIn() {
+			const state = new ToolbarState({ groups: withMode(), values: { ...values(), mode: "a" } });
+			await render(OptionsToolbarHost, { map: newMap(), state, focusable });
+			return state;
+		}
+
+		/** A press on a row's label text, not its box: the part that takes no focus. */
+		const press = (label: string) => page.getByText(label, { exact: true }).click();
+
+		const cases: Array<{
+			name: string;
+			menu: string;
+			labels: [string, string];
+			read: (s: ToolbarState) => unknown;
+			after: [unknown, unknown];
+		}> = [
+			{
+				name: "a checkbox",
+				menu: "Monitors",
+				labels: ["Inactive", "Inactive"],
+				read: (s) => s.values.inactive,
+				after: [true, false]
+			},
+			{
+				name: "a select-all group",
+				menu: "Monitors",
+				labels: ["Low-cost sensors", "Low-cost sensors"],
+				read: (s) => s.values["type:airgradient"],
+				after: [true, false]
+			},
+			{
+				name: "a checkbox with children",
+				menu: "Layers",
+				labels: ["EV Chargers", "EV Chargers"],
+				read: (s) => s.values.ev,
+				after: [true, false]
+			},
+			{
+				name: "a radio",
+				menu: "Mode",
+				labels: ["Beta", "Alpha"],
+				read: (s) => s.values.mode,
+				after: ["b", "a"]
+			}
+		];
+
+		for (const c of cases) {
+			for (const opened of ["click", "hover"] as const) {
+				it(`${c.name}: two label presses toggle twice and keep a ${opened}-opened dropdown open`, async () => {
+					const state = await setupIn();
+					if (opened === "click") await trigger(c.menu).click();
+					else await trigger(c.menu).hover();
+					expect(expanded(c.menu)).toBe("true");
+					await press(c.labels[0]);
+					expect(expanded(c.menu)).toBe("true");
+					expect(c.read(state)).toBe(c.after[0]);
+					await press(c.labels[1]);
+					expect(expanded(c.menu)).toBe("true");
+					expect(c.read(state)).toBe(c.after[1]);
+				});
+			}
+		}
+
+		it("Tab past the last row still closes", async () => {
+			await setupIn();
+			await trigger("Monitors").click();
+			const boxes = panelOf("Monitors").querySelectorAll<HTMLInputElement>("input");
+			boxes[boxes.length - 1].focus();
+			await userEvent.tab();
+			expect(expanded("Monitors")).toBe("false");
+		});
+
+		/** A real touch tap (Chrome fires pointerup before the mousedown that moves focus). */
+		async function tap(label: string) {
+			const el = page.getByText(label, { exact: true }).element();
+			const r = el.getBoundingClientRect();
+			const frame = (window.frameElement as HTMLElement | null)?.getBoundingClientRect();
+			const x = (frame?.left ?? 0) + r.left + r.width / 2;
+			const y = (frame?.top ?? 0) + r.top + r.height / 2;
+			const send = cdp().send.bind(cdp()) as (m: string, p: unknown) => Promise<unknown>;
+			await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+			await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+			await new Promise((r) => setTimeout(r, 100));
+		}
+
+		it("two touch taps on a label toggle twice and keep the dropdown open", async () => {
+			const state = await setupIn();
+			await trigger("Monitors").click();
+			await parkPointer();
+			await tap("Inactive");
+			expect(expanded("Monitors")).toBe("true");
+			expect(state.values.inactive).toBe(true);
+			await tap("Inactive");
+			expect(expanded("Monitors")).toBe("true");
+			expect(state.values.inactive).toBe(false);
+		});
+
+		it("a press whose release never comes doesn't stop Tab from closing it", async () => {
+			await setupIn();
+			await trigger("Monitors").click();
+			await parkPointer();
+			const label = page.getByText("Inactive", { exact: true }).element();
+			label.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
+			const boxes = panelOf("Monitors").querySelectorAll<HTMLInputElement>("input");
+			boxes[boxes.length - 1].focus();
+			await userEvent.tab();
+			expect(expanded("Monitors")).toBe("false");
+		});
+
+		it("a press released outside still lets Tab close it", async () => {
+			await setupIn();
+			await trigger("Monitors").click();
+			await parkPointer();
+			const label = page.getByText("Inactive", { exact: true }).element();
+			label.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: "mouse" }));
+			const outside = page.getByTestId("outside").element();
+			outside.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerType: "mouse" }));
+			await new Promise((r) => setTimeout(r, 20));
+			const boxes = panelOf("Monitors").querySelectorAll<HTMLInputElement>("input");
+			boxes[boxes.length - 1].focus();
+			await userEvent.tab();
+			expect(expanded("Monitors")).toBe("false");
+		});
+	}
+);
