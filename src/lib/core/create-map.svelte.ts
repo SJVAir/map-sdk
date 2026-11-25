@@ -154,7 +154,8 @@ export interface MapContext {
 	readonly cooperativeGestures: boolean;
 	/**
 	 * Turns cooperative gestures on or off (see `MapConfig.cooperativeGestures`): at once on the
-	 * attached map, and on any map attached later. Off, a plain scroll zooms and one finger pans.
+	 * attached map (turning off within 0.1 s of a blocked gesture waits out that 0.1 s), and on any
+	 * map attached later. Off, a plain scroll zooms and one finger pans.
 	 */
 	setCooperativeGestures(on: boolean): void;
 	/**
@@ -385,6 +386,12 @@ class MapContextImpl implements MapContext {
 	#gesturesTimer: ReturnType<typeof setTimeout> | undefined;
 	#onGestureBlocked = () => {
 		this.#gestureBlockedAt = performance.now();
+		// The engine schedules its hint timer after the event's listeners have run: stamp again
+		// then, so a slow listener doesn't let a turn-off beat that timer.
+		queueMicrotask(() => {
+			this.#gestureBlockedAt = performance.now();
+			if (this.#gesturesTimer !== undefined && this.#gl) this.#applyGestures(this.#gl);
+		});
 	};
 	#focusedKey = $state<string | null>(null);
 	#focusedPluginId = $state<string | null>(null);
@@ -844,9 +851,8 @@ class MapContextImpl implements MapContext {
 		if (on) return handler.enable();
 		const wait = this.#gestureBlockedAt + HINT_HIDE_MS - performance.now();
 		if (wait > 0) {
-			this.#gesturesTimer = setTimeout(() => {
-				if (this.#gl === gl) this.#applyGestures(gl);
-			}, wait);
+			// `detach` clears it, so `gl` is still attached when it runs.
+			this.#gesturesTimer = setTimeout(() => this.#applyGestures(gl), wait);
 			return;
 		}
 		handler.disable();
@@ -882,7 +888,6 @@ class MapContextImpl implements MapContext {
 		this.#gl.off("cooperativegestureprevented", this.#onGestureBlocked);
 		clearTimeout(this.#gesturesTimer);
 		this.#gesturesTimer = undefined;
-		this.#gestureBlockedAt = -Infinity;
 		this.#focusEasing = false;
 		this.unpin();
 		this.clearNotice();

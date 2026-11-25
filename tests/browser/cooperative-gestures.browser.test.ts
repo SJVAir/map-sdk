@@ -129,8 +129,8 @@ describe("cooperative gestures", () => {
 		};
 		window.addEventListener("error", onError);
 		try {
+			// The engine blocks the wheel and starts its 100 ms hint timer during the dispatch.
 			sendWheel(gl);
-			await wait(60);
 			map.setCooperativeGestures(false);
 			await wait(300);
 			expect(errors).toEqual([]);

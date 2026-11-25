@@ -1068,7 +1068,8 @@ local sjvair.com stack at `http://localhost:8000`.
 ### 0.1.0-beta.26
 
 - **Cooperative gestures can change while the map runs.** `map.setCooperativeGestures(on)`
-  turns them on or off at once on the attached map, and is kept for a map attached later (a call
+  turns them on or off at once on the attached map (turning off within 0.1 s of a blocked gesture
+  waits out that 0.1 s), and is kept for a map attached later (a call
   before `MapView` creates its map applies to it). `map.cooperativeGestures` is the current
   setting, reactive, starting from `config.cooperativeGestures`, which stays the starting value.
   Off, a plain scroll zooms and one finger pans. A host that never calls it sees no change.

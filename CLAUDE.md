@@ -71,7 +71,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `cooperativeGestures`/`setCooperativeGestures(on)` (reactive; `config.cooperativeGestures` is
   the starting value; applied untracked, at once to the attached map and on `attach`, through
   `GlMapLike`'s optional engine handler; turning off waits 120 ms past the last
-  `cooperativegestureprevented`, as the engine's hint timer reads the element `disable()` deletes),
+  `cooperativegestureprevented` (stamped again in a microtask, after its listeners), as the
+  engine's hint timer reads the element `disable()` deletes),
   `featureForElement`, camera moves (`easeTo`/`flyTo`/`fitBounds`), `ready`, `gl`,
   `projection`/`space`/`telemetry` config (`telemetry: false` turns MapTiler's page-wide telemetry
   off before the GL map is made; sessions stay on, as MapTiler bills by them), and the `maptilerMap()` escape hatch (for markers
