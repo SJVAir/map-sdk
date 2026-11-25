@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy, tick, untrack, type Snippet } from "svelte";
+	import { isTouchClick } from "../core/click-pointer.js";
 	import type { Bounds, MapContext } from "../core/create-map.svelte.js";
 	import type { FeatureListItem } from "../core/plugin.js";
 	import { selectionKeys } from "../data/selection.js";
@@ -53,7 +54,7 @@
 	let menuSentTimer: ReturnType<typeof setTimeout> | undefined;
 	// Focus from a pointer: the click picks the row, so focusing doesn't activate the first one.
 	let pointerFocus = false;
-	/** The last pointerdown's type, for a click sent as a plain MouseEvent (Safari before 17). */
+	/** The last pointerdown's type, for `isTouchClick`; cleared on each row click and on cancel. */
 	let downPointerType: string | null = null;
 	// While the listbox has focus it filters by the bounds from when focus arrived: each key press
 	// pans the map, and re-filtering on that pan's moveend would reshuffle the rows under the user.
@@ -268,10 +269,10 @@
 	}
 
 	function onrowclick(e: MouseEvent, index: number) {
-		const pointerType = (e as PointerEvent).pointerType || downPointerType;
+		const touch = isTouchClick((e as Partial<PointerEvent>).pointerType, downPointerType);
 		downPointerType = null;
 		activate(index);
-		pick(rows[index], e.shiftKey || e.metaKey || e.ctrlKey, pointerType === "touch");
+		pick(rows[index], e.shiftKey || e.metaKey || e.ctrlKey, touch);
 	}
 
 	onDestroy(() => {
@@ -334,8 +335,9 @@
 			{oncontextmenu}
 			onpointerdown={(e) => {
 				pointerFocus = true;
-				downPointerType = e.pointerType;
+				downPointerType = e.pointerType || null;
 			}}
+			onpointercancel={() => (downPointerType = null)}
 		>
 			{#each windowRows as row, i (row.key)}
 				{@const index = range.start + i}

@@ -136,4 +136,44 @@ describe("featureclick's touch", () => {
 		await userEvent.keyboard("{Enter}");
 		await vi.waitFor(() => expect(seen).toEqual([true, false, false]));
 	});
+
+	it("reads a list row's press, not its click: iOS, Safari before 17, synthetic, cancelled", async () => {
+		const map = createMap({ config: { maptilerKey: "test-key" } });
+		const item: FeatureListItem = {
+			refKey: "monitor:1",
+			ref: { kind: "monitor", id: "1" },
+			name: "Arvin",
+			value: 5,
+			level: pm25Scale.levels[0],
+			units: "µg/m³",
+			lngLat: [-119.5, 36.5],
+			selectable: true
+		};
+		map.addPlugin({ id: "monitors", setup: () => () => {}, features: () => [item] });
+		const seen: boolean[] = [];
+		map.on("featureclick", (e) => seen.push(e.touch));
+		render(FeatureList, { map });
+		const row = page.getByRole("option", { name: /Arvin/ });
+		await expect.element(row).toBeVisible();
+		const el = row.element();
+		const down = (type: string) =>
+			el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: type }));
+		const pointerClick = (type: string) =>
+			el.dispatchEvent(new PointerEvent("click", { bubbles: true, pointerType: type }));
+
+		// iOS Safari since 18.2: a tap's click says "mouse".
+		down("touch");
+		pointerClick("mouse");
+		// Safari before 17: the click is a plain MouseEvent.
+		down("touch");
+		el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		// A synthetic click after a touch press that never clicked.
+		down("touch");
+		pointerClick("");
+		// A touch press the browser cancelled (a scroll), then a click with no pointer type.
+		down("touch");
+		el.dispatchEvent(new PointerEvent("pointercancel", { bubbles: true, pointerType: "touch" }));
+		el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		expect(seen).toEqual([true, true, false, false]);
+	});
 });

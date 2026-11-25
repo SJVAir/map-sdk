@@ -193,12 +193,37 @@ describe("picking", () => {
 		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["2"] });
 	});
 
-	it("lets the click's own pointerType win over the recorded one", async () => {
+	it("lets a touch pointerdown win over a click that says mouse (iOS Safari since 18.2)", async () => {
 		const { map, gl } = await setUp("multiple", ["1"]);
+		const seen: boolean[] = [];
+		map.on("featureclick", (e) => seen.push(e.touch));
 		gl.setRenderedFeatures([rendered(map, "monitors", "2")]);
 		gl.canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
 		click(gl, { pointerType: "mouse" });
+		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["1", "2"] });
+		expect(seen).toEqual([true]);
+	});
+
+	it("never takes a synthetic click (empty pointerType) for a tap", async () => {
+		const { map, gl } = await setUp("multiple", ["1"]);
+		const seen: boolean[] = [];
+		map.on("featureclick", (e) => seen.push(e.touch));
+		gl.setRenderedFeatures([rendered(map, "monitors", "2")]);
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
+		click(gl, { pointerType: "" });
 		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["2"] });
+		expect(seen).toEqual([false]);
+	});
+
+	it("forgets a touch press the browser cancelled", async () => {
+		const { map, gl } = await setUp("none");
+		const seen: boolean[] = [];
+		map.on("featureclick", (e) => seen.push(e.touch));
+		gl.setRenderedFeatures([rendered(map, "monitors", "2")]);
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
+		gl.canvas.dispatchEvent(new Event("pointercancel"));
+		click(gl, {});
+		expect(seen).toEqual([false]);
 	});
 
 	it("stops recording pointerdown after detach", async () => {

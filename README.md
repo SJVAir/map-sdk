@@ -1037,8 +1037,13 @@ local sjvair.com stack at `http://localhost:8000`.
 
 - **New API: `featureclick`'s `touch`.** `true` when the feature was tapped on a touch screen,
   `false` for a mouse or pen click. A pick in the feature list gives `true` only when the row was
-  tapped; a mouse click on a row, Enter or Space gives `false`. Hosts that don't read it see no
-  change.
+  tapped; a mouse click on a row, Enter or Space gives `false`. It reads the press
+  (`pointerdown`), not the click, which iOS Safari reports as a mouse; a synthetic click
+  (`element.click()`, assistive technology) is never a tap. Handlers that don't read it see no
+  change; a test fake that builds these events itself needs `touch`.
+- **Taps on iPhone toggle again in `multiple` mode.** iOS Safari since 18.2 reports a tap's click
+  as a mouse click, so a tap replaced the selection there instead of adding to it as on other touch
+  screens. The press's own type now decides, for the selection as for `featureclick`.
 - **`MapContext.pickFromList`** (internal, for `FeatureList`) takes an optional fourth argument,
   `touch` (default `false`). A hand-written fake of `MapContext` still type-checks without it.
 - No new message keys; nothing removed.

@@ -87,7 +87,9 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   resolve; never a toolbar change). `plugin-host.svelte.ts` runs plugins' `setup` when the style is ready and tears them down on
   detach or restyle (draw order = registry order); `interactions.svelte.ts` routes clicks, hovers
   (and the pointer cursor), and blocking layers (cluster bubbles); a `hoverable: false` plugin's
-  features are left out of the hover as if not drawn, but still clicked; `basemap.svelte.ts`
+  features are left out of the hover as if not drawn, but still clicked; a click is a tap by its
+  press's `pointerdown`, not its own type (`click-pointer.ts`'s `isTouchClick`, shared with
+  `FeatureList`; iOS Safari's tap clicks say "mouse"); `basemap.svelte.ts`
   switches and falls back between styles. Nothing is module-global: two maps on a page never share
   state, and every source/layer id is namespaced `${mapUid}:${pluginId}:${local}`.
 - **Data** (`src/lib/data/`, entry `./data`): types (`DataSource`, `FeatureRef`,

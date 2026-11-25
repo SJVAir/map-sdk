@@ -1,4 +1,5 @@
 import { SvelteMap } from "svelte/reactivity";
+import { isTouchClick } from "./click-pointer.js";
 import type { GlMapLike } from "./gl.js";
 import type { BlockingClick, ClickEvent, FeatureHit } from "./plugin.js";
 
@@ -86,8 +87,8 @@ export class InteractionRouter {
 	#gl: GlMapLike | null = null;
 	#canvas: HTMLCanvasElement | null = null;
 	/**
-	 * The `pointerType` of the latest `pointerdown` on the canvas, for clicks whose original event
-	 * has none (Safari before 17 dispatches `click` as a `MouseEvent`). Cleared after each click.
+	 * The `pointerType` of the latest `pointerdown` on the canvas, for `isTouchClick`. Cleared after
+	 * each click and on `pointercancel`.
 	 */
 	#lastPointerType: string | null = null;
 	#hovered = $state.raw<Hovered | null>(null);
@@ -209,6 +210,7 @@ export class InteractionRouter {
 		gl.on("boxzoomcancel", this.#onBoxZoomCancel);
 		this.#canvas = gl.getCanvas();
 		this.#canvas.addEventListener("pointerdown", this.#onPointerDown);
+		this.#canvas.addEventListener("pointercancel", this.#onPointerCancel);
 		this.#pointerRoot = this.#canvas.parentElement ?? this.#canvas;
 		this.#pointerRoot.addEventListener("pointerdown", this.#onPointerType);
 		this.#pointerRoot.addEventListener("pointermove", this.#onPointerType);
@@ -225,6 +227,7 @@ export class InteractionRouter {
 		gl.off("boxzoomcancel", this.#onBoxZoomCancel);
 		this.#boxDrawn = false;
 		this.#canvas?.removeEventListener("pointerdown", this.#onPointerDown);
+		this.#canvas?.removeEventListener("pointercancel", this.#onPointerCancel);
 		this.#pointerRoot?.removeEventListener("pointerdown", this.#onPointerType);
 		this.#pointerRoot?.removeEventListener("pointermove", this.#onPointerType);
 		this.#pointerRoot = null;
@@ -356,6 +359,10 @@ export class InteractionRouter {
 		this.#lastPointerType = (e as PointerEvent).pointerType || null;
 	};
 
+	#onPointerCancel = () => {
+		this.#lastPointerType = null;
+	};
+
 	#onPointerType = (e: Event) => {
 		this.#movePointerType = (e as PointerEvent).pointerType || null;
 	};
@@ -430,9 +437,8 @@ export class InteractionRouter {
 			return;
 		}
 		const o = e.originalEvent;
-		const pointerType = o?.pointerType || recorded;
 		const modifier = Boolean(o?.shiftKey || o?.metaKey || o?.ctrlKey);
-		const touch = pointerType === "touch";
+		const touch = isTouchClick(o?.pointerType, recorded);
 		const event: ClickEvent = {
 			hits,
 			additive: modifier || touch,
