@@ -571,7 +571,8 @@ The badges' glyphs are Lucide's `school` and `baby` icons (lucide.dev, ISC licen
 
 `OptionsToolbar` is monitor-map 5.0's toolbar, shared: the same groups (Pollutant, Monitors,
 Layers, Overlays, Settings), rows, words, and sizes. Pass it as `MapView`'s `toolbar` snippet:
-it sits top-left, the List button stacks below it, and the map's box gets
+it sits top-left and runs to 0.5rem short of the zoom controls at top-right (1rem from the edge
+with `controls: "none"`), the List button stacks below it, and the map's box gets
 `--mapsdk-toolbar-height` (px from the map's top to the toolbar's bottom) for your own overlays.
 A map at least 48rem wide (the map's box, or the `layoutRoot` you pass; never the window) shows
 a row of joined dropdown buttons; a narrower one shows one options button that opens a "Map
@@ -1041,6 +1042,20 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.25
+
+- **The options toolbar's bar is wider and its triggers narrower**, so monitor-map's row and a
+  search button fit one row of a 683px map (a 1024px page with its side panel open); before, the
+  search button wrapped onto a second row.
+  - The bar's right edge stops 0.5rem short of the zoom controls at top-right, measured (map-sdk's
+    zoom buttons or, with `controls: "engine"`, the engine's), instead of a fixed 4rem from the
+    map's edge: about 8px more room with map-sdk's buttons. `controls: "none"` keeps 1rem.
+  - Each dropdown trigger has 0.625rem of side padding instead of 0.75rem, 4px narrower; an
+    icon-only trigger is a 40×40px square. Height (40px), type, colours and contrast are
+    unchanged, so every trigger stays a full target. Every host's toolbar (data-dashboard's Map
+    widget too) is that much tighter.
+- No new API or message keys; nothing removed.
 
 ### 0.1.0-beta.24
 

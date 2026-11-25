@@ -98,7 +98,13 @@ function groups(): OptionGroup[] {
 }
 
 async function setup(
-	props: { class?: string; featureList?: unknown; withToolbar?: boolean; searchWidth?: string } = {}
+	props: {
+		class?: string;
+		featureList?: unknown;
+		withToolbar?: boolean;
+		searchWidth?: string;
+		controls?: "mapsdk" | "engine" | "none";
+	} = {}
 ) {
 	const state = new ToolbarState({ groups: groups(), values: { pollutant: "pm25" } });
 	const map = newMap();
@@ -123,6 +129,30 @@ describe("OptionsToolbar in MapView", () => {
 		await setup({ class: "narrow-map" });
 		await expect.element(page.getByRole("button", { name: "Open map options" })).toBeVisible();
 		expect(trigger("Monitors").query()).toBeNull();
+	});
+
+	it("the bar stops 0.5rem short of the controls at top-right, or 1rem from the edge without", async () => {
+		const barRight = () =>
+			document.querySelector("[data-mapsdk-toolbar-bar]")!.getBoundingClientRect().right;
+		await setup();
+		const zoom = document.querySelector(".mapsdk-zoom")!.getBoundingClientRect();
+		await vi.waitFor(() => expect(barRight()).toBe(zoom.left - 8));
+
+		document.body.replaceChildren();
+		const engine = await setup({ controls: "engine" });
+		// The SDK adds its controls once the style loads; the bar follows.
+		const corner = () =>
+			engine.root().querySelector(".maplibregl-ctrl-top-right")!.getBoundingClientRect();
+		await vi.waitFor(() => expect(corner().width).toBeGreaterThan(0), { timeout: 5000 });
+		await vi.waitFor(() => expect(barRight()).toBe(corner().left - 8));
+
+		document.body.replaceChildren();
+		await setup({ controls: "none" });
+		await vi.waitFor(() =>
+			expect(barRight()).toBe(
+				document.querySelector(".mapsdk-map")!.getBoundingClientRect().right - 16
+			)
+		);
 	});
 
 	it("the narrow panel: a titled panel over the map, sections, a close button", async () => {
@@ -419,6 +449,52 @@ describe("layoutRoot", () => {
 		const { mapBox } = await inRoot();
 		expect(mapBox().getBoundingClientRect().width).toBe(683);
 		expect(isWide()).toBe(true);
+	});
+
+	/**
+	 * Monitor-map's toolbar: two clusters of icon-and-label triggers and the icon-only Settings,
+	 * with a 40px search button. Each label is pinned to its width in monitor-map (its triggers
+	 * measured 119/135/121/136/44px there), so the row is the app's whatever this browser's font.
+	 */
+	async function appToolbar() {
+		const icon = { svg: "<svg viewBox='0 0 16 16'><circle cx='8' cy='8' r='6'/></svg>" };
+		const rows = many(1);
+		const app: OptionGroup[] = [
+			{ id: "pollutant", label: "PM2.5", icon, cluster: "monitors", rows },
+			{ id: "monitors", label: "Monitors", icon, cluster: "monitors", rows },
+			{ id: "layers", label: "Layers", icon, cluster: "options", rows },
+			{ id: "overlays", label: "Overlays", icon, cluster: "options", align: "end", rows },
+			{ id: "settings", label: "Settings", icon, cluster: "options", iconOnly: true, rows }
+		];
+		const state = new ToolbarState({ groups: app, values: {} });
+		await render(MapViewInRoot, { map: newMap(), state, searchButton: true } as never);
+		await settle();
+		await settle();
+		const labels = [43, 59, 45, 60];
+		const triggers = [...document.querySelectorAll<HTMLElement>(".mapsdk-options-trigger")];
+		triggers.slice(0, 4).forEach((t, i) => {
+			const label = t.querySelector<HTMLElement>(":scope > span:nth-of-type(2)")!;
+			label.style.cssText = `display: inline-block; width: ${labels[i]}px; flex: none`;
+		});
+		await settle();
+		const search = document.querySelector<HTMLElement>("[data-test-search]")!;
+		return { triggers, search };
+	}
+
+	it("monitor-map's row and its search button fit one row of a 683px map", async () => {
+		const { triggers, search } = await appToolbar();
+		expect(isWide()).toBe(true);
+		expect(search.getBoundingClientRect().top).toBe(triggers[0].getBoundingClientRect().top);
+		// With room to spare, so a slightly wider label or font doesn't wrap it.
+		const bar = document.querySelector("[data-mapsdk-toolbar-bar]")!.getBoundingClientRect();
+		expect(bar.right - search.getBoundingClientRect().right).toBeGreaterThanOrEqual(8);
+		// Every trigger stays a full target (WCAG 2.5.8's 24×24 and then some); icon-only is square.
+		for (const t of triggers) {
+			const r = t.getBoundingClientRect();
+			expect(r.height).toBe(40);
+			expect(r.width).toBeGreaterThanOrEqual(40);
+		}
+		expect(triggers[4].getBoundingClientRect().width).toBe(40);
 	});
 
 	it("without it, the same 683px map goes narrow, as before", async () => {

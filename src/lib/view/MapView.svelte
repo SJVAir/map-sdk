@@ -318,6 +318,43 @@
 		};
 	});
 
+	// How far the top-right controls column (map-sdk's zoom buttons, or the engine's corner) reaches
+	// in from the map's right edge, so the toolbar's bar stops 0.5rem short of it rather than a
+	// fixed 4rem: null until measured, 0 with none drawn. Measured, as the column's size is the
+	// engine's or the theme's.
+	let controlsReach = $state<number | null>(null);
+	$effect(() => {
+		void projector;
+		const kind = controls;
+		if (!toolbar || kind === "none") return;
+		const column = () =>
+			kind === "mapsdk"
+				? root.querySelector(".mapsdk-zoom")
+				: glContainer.querySelector(".maplibregl-ctrl-top-right");
+		const measure = () => {
+			const r = column()?.getBoundingClientRect();
+			controlsReach =
+				r && r.width > 0 ? Math.max(0, root.getBoundingClientRect().right - r.left) : 0;
+		};
+		// The bar's inset moves only the bar, never the map or the column: no ResizeObserver loop.
+		const observer = new ResizeObserver(measure);
+		observer.observe(root);
+		const el = column();
+		if (el) observer.observe(el);
+		measure();
+		return () => {
+			observer.disconnect();
+			controlsReach = null;
+		};
+	});
+	const toolbarRight = $derived(
+		controlsReach === null
+			? undefined
+			: controlsReach > 0
+				? `calc(${controlsReach}px + 0.5rem)`
+				: "1rem"
+	);
+
 	// While the narrow options panel covers the map, the map's other pieces leave the Tab order.
 	$effect(() => {
 		const on = covered && !!toolbar;
@@ -414,7 +451,13 @@
 	<div class="mapsdk-gl" bind:this={glContainer}></div>
 	{#if toolbar}
 		<!-- Before the list in the Tab order, as it is on screen; above it in the stacking. -->
-		<div class="mapsdk-toolbar-slot" data-controls={controls}>{@render toolbar()}</div>
+		<div
+			class="mapsdk-toolbar-slot"
+			data-controls={controls}
+			style:--mapsdk-toolbar-right={toolbarRight}
+		>
+			{@render toolbar()}
+		</div>
 	{/if}
 	{#if list && sides}
 		<div
@@ -543,7 +586,8 @@
 	}
 
 	/* Covers the map (so the narrow panel can fill it) and lets the pointer through; the toolbar's
-	   bar sits top-left, short of the zoom controls at top-right. Above the list (2) and card (3). */
+	   bar sits top-left, 0.5rem short of the controls at top-right (measured; 4rem until then).
+	   Above the list (2) and card (3). */
 	.mapsdk-toolbar-slot {
 		position: absolute;
 		inset: 0;
@@ -555,7 +599,7 @@
 		position: absolute;
 		top: 1rem;
 		left: 1rem;
-		right: 4rem;
+		right: var(--mapsdk-toolbar-right, 4rem);
 	}
 
 	.mapsdk-toolbar-slot[data-controls="none"] :global([data-mapsdk-toolbar-bar]) {
