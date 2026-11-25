@@ -57,10 +57,14 @@ function newMap(cooperativeGestures: boolean) {
 	});
 }
 
-/** A plain wheel (no Ctrl/⌘) over the map's middle; resolves with the zoom once it has settled. */
-async function wheel(gl: GlMapLike): Promise<number> {
+const frame = () => new Promise((r) => requestAnimationFrame(r));
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** A wheel over the map's middle: plain, or with Ctrl/⌘ (the bypass key). */
+function sendWheel(gl: GlMapLike, bypass = false) {
 	const canvas = gl.getCanvas();
 	const rect = canvas.getBoundingClientRect();
+	const mac = navigator.userAgent.includes("Mac");
 	canvas.dispatchEvent(
 		new WheelEvent("wheel", {
 			bubbles: true,
@@ -68,12 +72,27 @@ async function wheel(gl: GlMapLike): Promise<number> {
 			deltaY: -200,
 			deltaMode: WheelEvent.DOM_DELTA_PIXEL,
 			clientX: rect.left + rect.width / 2,
-			clientY: rect.top + rect.height / 2
+			clientY: rect.top + rect.height / 2,
+			ctrlKey: bypass && !mac,
+			metaKey: bypass && mac
 		})
 	);
-	// MapLibre eases the wheel's zoom over a few hundred milliseconds.
-	await new Promise((r) => setTimeout(r, 600));
-	return gl.getZoom();
+}
+
+/** Sends a wheel and resolves with the zoom once MapLibre's ease has stopped. */
+async function wheel(gl: GlMapLike, bypass = false): Promise<number> {
+	sendWheel(gl, bypass);
+	// MapLibre decides the wheel's type after 40 ms and eases for 200 ms after that.
+	await wait(300);
+	let last = NaN;
+	let still = 0;
+	while (still < 5) {
+		await frame();
+		const zoom = gl.getZoom();
+		still = zoom === last ? still + 1 : 0;
+		last = zoom;
+	}
+	return last;
 }
 
 const overlay = () => document.querySelector(".maplibregl-cooperative-gesture-screen");
@@ -93,6 +112,33 @@ describe("cooperative gestures", () => {
 		const zoom = gl.getZoom();
 		expect(overlay()).not.toBeNull();
 		expect(await wheel(gl)).toBe(zoom);
+	});
+
+	it("a Ctrl/⌘ wheel still zooms while on", async () => {
+		const gl = await mount(newMap(true));
+		expect(await wheel(gl, true)).toBeGreaterThan(7);
+	});
+
+	it("switching off right after a blocked wheel raises no error", async () => {
+		const map = newMap(true);
+		const gl = await mount(map);
+		const errors: unknown[] = [];
+		const onError = (e: ErrorEvent) => {
+			errors.push(e.error ?? e.message);
+			e.preventDefault();
+		};
+		window.addEventListener("error", onError);
+		try {
+			sendWheel(gl);
+			await wait(60);
+			map.setCooperativeGestures(false);
+			await wait(300);
+			expect(errors).toEqual([]);
+			expect(overlay()).toBeNull();
+			expect(await wheel(gl)).toBeGreaterThan(7);
+		} finally {
+			window.removeEventListener("error", onError);
+		}
 	});
 
 	it("creates the map with a setting changed before it was created", async () => {

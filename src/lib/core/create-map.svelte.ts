@@ -357,6 +357,9 @@ function sameSelection(a: SpatialSelection | null, b: SpatialSelection | null): 
 const inRect = (p: [number, number], b: Bounds) =>
 	p[0] >= b.west && p[0] <= b.east && p[1] >= b.south && p[1] <= b.north;
 
+/** The engine's hint hides this long after a blocked gesture, plus a margin. */
+const HINT_HIDE_MS = 120;
+
 function prefersReducedMotion(): boolean {
 	return globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
@@ -376,7 +379,13 @@ class MapContextImpl implements MapContext {
 	/** `markReady` came while plugin setups were queued; the queued run sets `ready`. */
 	#readyRequested = false;
 	#glState = $state.raw<GlMapLike | null>(null);
-	#cooperativeGestures = $state(false);
+	#cooperativeGestures: boolean;
+	/** When the engine last blocked a gesture, from `performance.now()`. */
+	#gestureBlockedAt = -Infinity;
+	#gesturesTimer: ReturnType<typeof setTimeout> | undefined;
+	#onGestureBlocked = () => {
+		this.#gestureBlockedAt = performance.now();
+	};
 	#focusedKey = $state<string | null>(null);
 	#focusedPluginId = $state<string | null>(null);
 	#focusedAnchor = $state.raw<[number, number] | null>(null);
@@ -407,7 +416,7 @@ class MapContextImpl implements MapContext {
 			initialView,
 			cooperativeGestures: options.config.cooperativeGestures ?? false
 		};
-		this.#cooperativeGestures = this.config.cooperativeGestures ?? false;
+		this.#cooperativeGestures = $state(this.config.cooperativeGestures ?? false);
 		this.metadata = options.metadata ?? createDefaultMetadata();
 		this.messages = options.messages ?? defaultMessages;
 		this.format = options.format ?? createDefaultFormat();
@@ -815,15 +824,32 @@ class MapContextImpl implements MapContext {
 	}
 
 	setCooperativeGestures(on: boolean): void {
+		if (this.#destroyed) return;
 		this.#cooperativeGestures = on;
-		if (this.#gl) this.#applyGestures(this.#gl);
+		// Untracked: an effect that calls this mustn't depend on the setting it writes.
+		if (this.#gl) untrack(() => this.#applyGestures(this.#gl!));
 	}
 
+	/**
+	 * Brings the engine's handler to the setting. A blocked gesture shows the engine's hint and
+	 * hides it 100 ms later through the hint's element, which `disable()` deletes (the timer then
+	 * throws), so turning off waits until 100 ms have passed since the last blocked gesture.
+	 */
 	#applyGestures(gl: GlMapLike): void {
+		clearTimeout(this.#gesturesTimer);
+		this.#gesturesTimer = undefined;
 		const handler = gl.cooperativeGestures;
-		if (!handler || handler.isEnabled() === this.#cooperativeGestures) return;
-		if (this.#cooperativeGestures) handler.enable();
-		else handler.disable();
+		const on = this.#cooperativeGestures;
+		if (!handler || handler.isEnabled() === on) return;
+		if (on) return handler.enable();
+		const wait = this.#gestureBlockedAt + HINT_HIDE_MS - performance.now();
+		if (wait > 0) {
+			this.#gesturesTimer = setTimeout(() => {
+				if (this.#gl === gl) this.#applyGestures(gl);
+			}, wait);
+			return;
+		}
+		handler.disable();
 	}
 
 	attach(gl: GlMapLike): void {
@@ -832,7 +858,8 @@ class MapContextImpl implements MapContext {
 		if (this.#gl) this.detach();
 		this.#gl = gl;
 		this.#glState = gl;
-		this.#applyGestures(gl);
+		gl.on("cooperativegestureprevented", this.#onGestureBlocked);
+		untrack(() => this.#applyGestures(gl));
 		this.#host.attach(gl);
 		this.#router.attach(gl);
 		gl.on("moveend", this.#onMoveEnd);
@@ -852,6 +879,10 @@ class MapContextImpl implements MapContext {
 	detach(): void {
 		if (!this.#gl) return;
 		this.#gl.off("moveend", this.#onMoveEnd);
+		this.#gl.off("cooperativegestureprevented", this.#onGestureBlocked);
+		clearTimeout(this.#gesturesTimer);
+		this.#gesturesTimer = undefined;
+		this.#gestureBlockedAt = -Infinity;
 		this.#focusEasing = false;
 		this.unpin();
 		this.clearNotice();

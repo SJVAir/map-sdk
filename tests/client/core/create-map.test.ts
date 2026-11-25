@@ -856,6 +856,32 @@ describe("setCooperativeGestures", () => {
 		expect(second.cooperativeGestures.isEnabled()).toBe(false);
 	});
 
+	it("doesn't make an effect that sets it depend on the setting", async () => {
+		const map = createMap({ config });
+		const gl = glWithGestures(false);
+		map.attach(gl);
+		let runs = 0;
+		stops.push(
+			rootEffect(() => {
+				runs++;
+				map.setCooperativeGestures(true);
+			})
+		);
+		await tick();
+		map.setCooperativeGestures(false);
+		await tick();
+		expect(runs).toBe(1);
+		expect(map.cooperativeGestures).toBe(false);
+		expect(gl.cooperativeGestures.isEnabled()).toBe(false);
+	});
+
+	it("ignores calls after destroy", () => {
+		const map = createMap({ config: { ...config, cooperativeGestures: true } });
+		map.destroy();
+		map.setCooperativeGestures(false);
+		expect(map.cooperativeGestures).toBe(true);
+	});
+
 	it("leaves a map without the handler alone", () => {
 		const map = createMap({ config });
 		map.attach(createFakeGl({ styleLoaded: true }));

@@ -966,13 +966,17 @@ map.easeTo({ center: monitor.lngLat, minZoom: 12 });
 ### Cooperative gestures
 
 With cooperative gestures on, a plain scroll over the map scrolls the page and Ctrl + scroll (⌘ +
-scroll on a Mac) zooms; on touch, one finger scrolls the page and two fingers pan the map. A plain
-scroll shows the engine's "Use Ctrl + scroll to zoom the map" hint. `config.cooperativeGestures`
-(default `false`) is the starting value, and `map.setCooperativeGestures(on)` changes it while the
-map runs: at once on the attached map, and on any map attached later, so a call made before
-`MapView` creates its map is kept. `map.cooperativeGestures` is the current setting, reactive;
-`config.cooperativeGestures` stays the starting value. Off, a plain scroll zooms and one finger
-pans, and the hint goes away at once, even mid-gesture.
+scroll on a Mac) zooms; on touch, one finger scrolls the page and two fingers pan the map. A blocked
+gesture briefly shows the engine's hint (how to zoom, or to pan with two fingers).
+`config.cooperativeGestures` (default `false`) is the starting value, and
+`map.setCooperativeGestures(on)` changes it while the map runs: at once on the attached map, and
+on any map attached later, so a call made before `MapView` creates its map is kept. Calling it from
+an effect doesn't make the effect depend on the setting. Off, a plain scroll zooms and one finger
+pans. Turning off within 0.1 s of a blocked gesture (a trackpad's scroll momentum) waits out that
+0.1 s, while the engine hides its hint. `map.cooperativeGestures` is the setting asked for,
+reactive; `config.cooperativeGestures` stays the starting value. It is not the engine's live state:
+a MapLibre `FullscreenControl` added through `maptilerMap()` turns gestures off in fullscreen on its
+own.
 
 ```ts
 const map = createMap({ config: { maptilerKey, cooperativeGestures: true } });
@@ -1067,8 +1071,7 @@ local sjvair.com stack at `http://localhost:8000`.
   turns them on or off at once on the attached map, and is kept for a map attached later (a call
   before `MapView` creates its map applies to it). `map.cooperativeGestures` is the current
   setting, reactive, starting from `config.cooperativeGestures`, which stays the starting value.
-  Off, a plain scroll zooms and one finger pans; the engine's "Use Ctrl + scroll" hint goes away at
-  once. A host that never calls it sees no change.
+  Off, a plain scroll zooms and one finger pans. A host that never calls it sees no change.
 - **`MapContext` has two new members**, `cooperativeGestures` and `setCooperativeGestures`: a
   hand-written fake of `MapContext` needs them to type-check. `GlMapLike` gains an optional
   `cooperativeGestures` (the engine's handler), so fakes of it are unaffected.
