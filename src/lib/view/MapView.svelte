@@ -201,7 +201,13 @@
 			nearExtent = extent(`${s.vertical}-${s.horizontal}`);
 			farExtent = extent(s.far);
 		};
-		const observer = new ResizeObserver(measure);
+		// Measured a frame later: the engine's corners sit as deep as the list panel, so moving the
+		// panel inside the callback is a ResizeObserver loop.
+		let frame = 0;
+		const observer = new ResizeObserver(() => {
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(measure);
+		});
 		observer.observe(root);
 		const corners = [`${s.vertical}-${s.horizontal}`, s.far].map((c) =>
 			glContainer.querySelector(`.maplibregl-ctrl-${c}`)
@@ -210,7 +216,10 @@
 			if (el) observer.observe(el);
 		}
 		measure();
-		return () => observer.disconnect();
+		return () => {
+			cancelAnimationFrame(frame);
+			observer.disconnect();
+		};
 	});
 
 	const inset = (reach: number) => (reach > 0 ? `calc(${reach}px + 0.5rem)` : undefined);

@@ -229,6 +229,28 @@ describe("featureList position", () => {
 		);
 	});
 
+	it("the engine's controls loading or hiding raise no ResizeObserver loop error", async () => {
+		const errors: string[] = [];
+		const onerror = (e: ErrorEvent) => errors.push(e.message);
+		window.addEventListener("error", onerror);
+		try {
+			probe.count = 30;
+			await show({ position: "bottom-right" }, "engine");
+			const panel = await openList();
+			await vi.waitFor(() =>
+				expect(rectOf(panel).top).toBeGreaterThanOrEqual(cornerEdge("top-right"))
+			);
+			const corner = document.querySelector<HTMLElement>(".maplibregl-ctrl-top-right")!;
+			for (const display of ["none", ""]) {
+				corner.style.display = display;
+				await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+			}
+		} finally {
+			window.removeEventListener("error", onerror);
+		}
+		expect(errors.filter((m) => /ResizeObserver/.test(m))).toEqual([]);
+	});
+
 	it("follows the credits as they change size", async () => {
 		probe.count = 30;
 		await show({ position: "top-right" }, "engine");

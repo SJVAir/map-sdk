@@ -1058,6 +1058,10 @@ local sjvair.com stack at `http://localhost:8000`.
     icon-only trigger is a 40×40px square. Height (40px), type, colours and contrast are
     unchanged, so every trigger stays a full target. Every host's toolbar (data-dashboard's Map
     widget too) is that much tighter. The narrow panel's section headers keep 0.75rem.
+- **No more "ResizeObserver loop" errors with the engine's controls.** With `controls: "engine"`
+  and the feature list on, the list panel's measuring raised one on each page load and whenever
+  the engine's controls changed size; a page's `window.onerror` and error trackers saw it. The
+  panel now measures a frame later, as the toolbar does.
 - No new API or message keys; nothing removed.
 
 ### 0.1.0-beta.24
