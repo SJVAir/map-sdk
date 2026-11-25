@@ -3,7 +3,7 @@ import { render } from "vitest-browser-svelte";
 import { cdp, page, userEvent } from "vitest/browser";
 import axe from "axe-core";
 import { config as maptilerConfig } from "@maptiler/sdk";
-import { createMap } from "../../src/lib/index.js";
+import { createMap, maptilerMap } from "../../src/lib/index.js";
 import type { MapContext } from "../../src/lib/core/create-map.svelte.js";
 import type { OptionGroup, OptionRow } from "../../src/lib/options/types.js";
 import MapViewWithToolbar from "../fixtures/MapViewWithToolbar.svelte";
@@ -98,7 +98,13 @@ function groups(): OptionGroup[] {
 }
 
 async function setup(
-	props: { class?: string; featureList?: unknown; withToolbar?: boolean; searchWidth?: string } = {}
+	props: {
+		class?: string;
+		featureList?: unknown;
+		withToolbar?: boolean;
+		searchWidth?: string;
+		controls?: "mapsdk" | "engine" | "none";
+	} = {}
 ) {
 	const state = new ToolbarState({ groups: groups(), values: { pollutant: "pm25" } });
 	const map = newMap();
@@ -125,6 +131,63 @@ describe("OptionsToolbar in MapView", () => {
 		expect(trigger("Monitors").query()).toBeNull();
 	});
 
+	it("the bar stops 0.5rem short of the top-right controls, or 1rem without", async () => {
+		const barRight = () =>
+			document.querySelector("[data-mapsdk-toolbar-bar]")!.getBoundingClientRect().right;
+		await setup();
+		const zoom = document.querySelector(".mapsdk-zoom")!.getBoundingClientRect();
+		await vi.waitFor(() => expect(barRight()).toBeCloseTo(zoom.left - 8, 1));
+
+		document.body.replaceChildren();
+		const engine = await setup({ controls: "engine" });
+		// The SDK adds its controls once the style loads; the bar follows.
+		const corner = () =>
+			engine.root().querySelector(".maplibregl-ctrl-top-right")!.getBoundingClientRect();
+		await vi.waitFor(() => expect(corner().width).toBeGreaterThan(0), { timeout: 5000 });
+		await vi.waitFor(() => expect(barRight()).toBeCloseTo(corner().left - 8, 1));
+
+		document.body.replaceChildren();
+		await setup({ controls: "none" });
+		await vi.waitFor(() =>
+			expect(barRight()).toBeCloseTo(
+				document.querySelector(".mapsdk-map")!.getBoundingClientRect().right - 16,
+				1
+			)
+		);
+	});
+
+	it("with the engine's controls, the bar keeps 4rem until they're drawn, not 1rem", async () => {
+		// A style that never loads (fetch is offline here): the engine never adds its controls.
+		const map = createMap({
+			config: {
+				maptilerKey: "test-key",
+				basemaps: {
+					styles: [{ id: "a", style: "https://tiles.invalid/style.json" }],
+					defaultId: "a"
+				}
+			}
+		});
+		const state = new ToolbarState({ groups: groups(), values: { pollutant: "pm25" } });
+		await render(MapViewWithToolbar, { map, state, controls: "engine" } as never);
+		await settle();
+		await new Promise((r) => setTimeout(r, 300));
+		const box = document.querySelector(".mapsdk-map")!.getBoundingClientRect();
+		const bar = document.querySelector("[data-mapsdk-toolbar-bar]")!.getBoundingClientRect();
+		expect(bar.right).toBeCloseTo(box.right - 64, 1);
+	});
+
+	it("stops short of a host's control in the engine corner, beside the zoom", async () => {
+		const { map } = await setup();
+		await vi.waitFor(() => expect(maptilerMap(map)).toBeTruthy());
+		const wide = document.createElement("div");
+		wide.className = "maplibregl-ctrl";
+		wide.style.cssText = "width: 120px; height: 30px";
+		maptilerMap(map)!.addControl({ onAdd: () => wide, onRemove: () => wide.remove() }, "top-right");
+		const bar = () =>
+			document.querySelector("[data-mapsdk-toolbar-bar]")!.getBoundingClientRect().right;
+		await vi.waitFor(() => expect(bar()).toBeCloseTo(wide.getBoundingClientRect().left - 8, 1));
+	});
+
 	it("the narrow panel: a titled panel over the map, sections, a close button", async () => {
 		const { state, root } = await setup({ class: "narrow-map" });
 		const open = page.getByRole("button", { name: "Open map options" });
@@ -142,6 +205,8 @@ describe("OptionsToolbar in MapView", () => {
 			map.width,
 			map.height
 		]);
+		// Its section headers keep 0.75rem of side padding (the wide row's triggers have 0.625rem).
+		expect(getComputedStyle(trigger("Layers").element()).paddingLeft).toBe("12px");
 		// Several sections at once; picking a radio keeps its section open.
 		await trigger("PM2.5").click();
 		await trigger("Layers").click();
@@ -379,6 +444,27 @@ describe("OptionsToolbar narrow panel, final review fixes", () => {
 });
 
 describe("OptionsToolbar measuring", () => {
+	it("the engine controls loading or hiding raise no ResizeObserver loop error", async () => {
+		const errors: string[] = [];
+		const onerror = (e: ErrorEvent) => errors.push(e.message);
+		window.addEventListener("error", onerror);
+		try {
+			const { root } = await setup({ controls: "engine" });
+			const corner = () => root().querySelector<HTMLElement>(".maplibregl-ctrl-top-right")!;
+			await vi.waitFor(() => expect(corner().getBoundingClientRect().width).toBeGreaterThan(0), {
+				timeout: 5000
+			});
+			for (const display of ["none", ""]) {
+				corner().style.display = display;
+				await settle();
+				await settle();
+			}
+		} finally {
+			window.removeEventListener("error", onerror);
+		}
+		expect(errors.filter((m) => /ResizeObserver/.test(m))).toEqual([]);
+	});
+
 	it("crossing to narrow and back raises no ResizeObserver loop error", async () => {
 		const errors: string[] = [];
 		const onerror = (e: ErrorEvent) => errors.push(e.message);
@@ -419,6 +505,60 @@ describe("layoutRoot", () => {
 		const { mapBox } = await inRoot();
 		expect(mapBox().getBoundingClientRect().width).toBe(683);
 		expect(isWide()).toBe(true);
+	});
+
+	/**
+	 * Monitor-map's toolbar: two clusters of icon-and-label triggers and the icon-only Settings,
+	 * with a 40px search button. Each label is pinned to its width in monitor-map (its triggers
+	 * measured 119/135/121/136/44px there), so the row is the app's whatever this browser's font.
+	 * With map-sdk's zoom buttons, which reach further in than monitor-map's engine controls: the
+	 * tighter case.
+	 */
+	async function appToolbar() {
+		const icon = { svg: "<svg viewBox='0 0 16 16'><circle cx='8' cy='8' r='6'/></svg>" };
+		const rows = many(1);
+		const app: OptionGroup[] = [
+			{ id: "pollutant", label: "PM2.5", icon, cluster: "monitors", rows },
+			{ id: "monitors", label: "Monitors", icon, cluster: "monitors", rows },
+			{ id: "layers", label: "Layers", icon, cluster: "options", rows },
+			{ id: "overlays", label: "Overlays", icon, cluster: "options", align: "end", rows },
+			{ id: "settings", label: "Settings", icon, cluster: "options", iconOnly: true, rows }
+		];
+		const state = new ToolbarState({ groups: app, values: {} });
+		await render(MapViewInRoot, { map: newMap(), state, searchButton: true } as never);
+		await settle();
+		await settle();
+		const labels = [43, 59, 45, 60];
+		// The app's borders (each cluster's 1px edge and divider) take their room here too.
+		const shell = document.querySelector<HTMLElement>(".layout-root")!;
+		shell.style.setProperty("--border", "#e5e5e5");
+		shell.style.setProperty("--card-border", "#d4d4d4");
+		const triggers = [...document.querySelectorAll<HTMLElement>(".mapsdk-options-trigger")];
+		triggers.slice(0, 4).forEach((t, i) => {
+			const label = t.querySelector<HTMLElement>(":scope > span:nth-of-type(2)")!;
+			label.style.cssText = `display: inline-block; width: ${labels[i]}px; flex: none`;
+		});
+		await settle();
+		const search = document.querySelector<HTMLElement>("[data-test-search]")!;
+		return { triggers, search };
+	}
+
+	it("monitor-map's row and its search button fit one row of a 683px map", async () => {
+		const { triggers, search } = await appToolbar();
+		expect(isWide()).toBe(true);
+		// On the first row: level with the first cluster (its trigger sits inside a 1px border).
+		const cluster = triggers[0].closest(".mapsdk-options-cluster")!;
+		expect(search.getBoundingClientRect().top).toBe(cluster.getBoundingClientRect().top);
+		// With room to spare, so a slightly wider label or font doesn't wrap it.
+		const bar = document.querySelector("[data-mapsdk-toolbar-bar]")!.getBoundingClientRect();
+		expect(bar.right - search.getBoundingClientRect().right).toBeGreaterThanOrEqual(8);
+		// Every trigger stays a full target (WCAG 2.5.8's 24×24 and then some); icon-only is square.
+		for (const t of triggers) {
+			const r = t.getBoundingClientRect();
+			expect(r.height).toBe(40);
+			expect(r.width).toBeGreaterThanOrEqual(40);
+		}
+		expect(triggers[4].getBoundingClientRect().width).toBe(40);
 	});
 
 	it("without it, the same 683px map goes narrow, as before", async () => {

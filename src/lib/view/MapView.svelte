@@ -201,7 +201,13 @@
 			nearExtent = extent(`${s.vertical}-${s.horizontal}`);
 			farExtent = extent(s.far);
 		};
-		const observer = new ResizeObserver(measure);
+		// Measured a frame later: the engine's corners sit as deep as the list panel, so moving the
+		// panel inside the callback is a ResizeObserver loop.
+		let frame = 0;
+		const observer = new ResizeObserver(() => {
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(measure);
+		});
 		observer.observe(root);
 		const corners = [`${s.vertical}-${s.horizontal}`, s.far].map((c) =>
 			glContainer.querySelector(`.maplibregl-ctrl-${c}`)
@@ -210,7 +216,10 @@
 			if (el) observer.observe(el);
 		}
 		measure();
-		return () => observer.disconnect();
+		return () => {
+			cancelAnimationFrame(frame);
+			observer.disconnect();
+		};
 	});
 
 	const inset = (reach: number) => (reach > 0 ? `calc(${reach}px + 0.5rem)` : undefined);
@@ -318,6 +327,53 @@
 		};
 	});
 
+	// How far the top-right controls column (map-sdk's zoom buttons, and the engine's corner, which
+	// holds its controls or a host's own) reaches in from the map's right edge, so the toolbar's bar
+	// stops 0.5rem short of it rather than a fixed 4rem. null until measured (the 4rem fallback),
+	// 0 with nothing there (1rem, as with `controls: "none"`; with map-sdk's buttons, a host that
+	// hides them gets that too). Measured, as the column's size is the engine's or the theme's.
+	let controlsReach = $state<number | null>(null);
+	$effect(() => {
+		void projector;
+		const kind = controls;
+		if (!toolbar || kind === "none") return;
+		const corner = () => glContainer.querySelector(".maplibregl-ctrl-top-right");
+		const zoom = () => (kind === "mapsdk" ? root.querySelector(".mapsdk-zoom") : null);
+		const measure = () => {
+			const right = root.getBoundingClientRect().right;
+			let reach = 0;
+			for (const el of [zoom(), corner()]) {
+				const r = el?.getBoundingClientRect();
+				if (r && r.width > 0) reach = Math.max(reach, right - r.left);
+			}
+			// The engine adds its controls on the map's `load` (after fetching the tiles' metadata):
+			// until then, or while a host hides them, its corner is empty, and 4rem stands.
+			controlsReach = reach === 0 && kind === "engine" ? null : reach;
+		};
+		// Measured a frame later: the engine's corner sits as deep as the bar, so changing the bar
+		// inside the callback is a ResizeObserver loop.
+		let frame = 0;
+		const observer = new ResizeObserver(() => {
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(measure);
+		});
+		observer.observe(root);
+		for (const el of [zoom(), corner()]) if (el) observer.observe(el);
+		measure();
+		return () => {
+			cancelAnimationFrame(frame);
+			observer.disconnect();
+			controlsReach = null;
+		};
+	});
+	const toolbarRight = $derived(
+		controlsReach === null
+			? undefined
+			: controlsReach > 0
+				? `calc(${controlsReach}px + 0.5rem)`
+				: "1rem"
+	);
+
 	// While the narrow options panel covers the map, the map's other pieces leave the Tab order.
 	$effect(() => {
 		const on = covered && !!toolbar;
@@ -414,7 +470,13 @@
 	<div class="mapsdk-gl" bind:this={glContainer}></div>
 	{#if toolbar}
 		<!-- Before the list in the Tab order, as it is on screen; above it in the stacking. -->
-		<div class="mapsdk-toolbar-slot" data-controls={controls}>{@render toolbar()}</div>
+		<div
+			class="mapsdk-toolbar-slot"
+			data-controls={controls}
+			style:--mapsdk-toolbar-right={toolbarRight}
+		>
+			{@render toolbar()}
+		</div>
 	{/if}
 	{#if list && sides}
 		<div
@@ -543,7 +605,8 @@
 	}
 
 	/* Covers the map (so the narrow panel can fill it) and lets the pointer through; the toolbar's
-	   bar sits top-left, short of the zoom controls at top-right. Above the list (2) and card (3). */
+	   bar sits top-left, 0.5rem short of the controls at top-right (measured; 4rem until then).
+	   Above the list (2) and card (3). */
 	.mapsdk-toolbar-slot {
 		position: absolute;
 		inset: 0;
@@ -555,7 +618,7 @@
 		position: absolute;
 		top: 1rem;
 		left: 1rem;
-		right: 4rem;
+		right: var(--mapsdk-toolbar-right, 4rem);
 	}
 
 	.mapsdk-toolbar-slot[data-controls="none"] :global([data-mapsdk-toolbar-bar]) {

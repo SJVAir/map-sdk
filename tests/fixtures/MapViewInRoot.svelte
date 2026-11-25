@@ -13,7 +13,8 @@
 		altRoot = false,
 		altShown = true,
 		altClass = "root-600",
-		secondMap
+		secondMap,
+		searchButton = false
 	}: {
 		map: MapContext;
 		state: ToolbarState;
@@ -25,12 +26,23 @@
 		altClass?: string;
 		/** A second map in the same root, with no layoutRoot. */
 		secondMap?: MapContext;
+		/** A 40px search button in the search slot, as monitor-map's. */
+		searchButton?: boolean;
 	} = $props();
 
 	let shell = $state<HTMLDivElement>();
 	let alt = $state<HTMLDivElement>();
 	const layoutRoot = $derived(useRoot ? ((altRoot ? alt : shell) ?? null) : null);
 </script>
+
+{#snippet search()}
+	<button
+		type="button"
+		aria-label="Search"
+		data-test-search
+		style="box-sizing: border-box; width: 2.5rem; height: 2.5rem"
+	></button>
+{/snippet}
 
 {#snippet toolbar()}
 	{#if options.shown}
@@ -40,6 +52,7 @@
 			defaults={options.defaults}
 			readonly={options.readonly}
 			onchange={options.onchange}
+			search={searchButton ? search : undefined}
 		/>
 	{/if}
 {/snippet}

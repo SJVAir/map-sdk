@@ -169,7 +169,9 @@
 		height: 2.5rem;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0 0.75rem;
+		/* 0.625rem: monitor-map's row and a search button fit a 683px map (a 1024px page with its
+		   panel open); an icon-only trigger is 2.5rem square. */
+		padding: 0 0.625rem;
 		border: 0;
 		background: transparent;
 		color: inherit;

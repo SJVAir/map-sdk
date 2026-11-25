@@ -11,7 +11,8 @@
 		class: className = "wide-map",
 		featureList = true,
 		withToolbar = true,
-		searchWidth
+		searchWidth,
+		controls
 	}: {
 		map: MapContext;
 		state: ToolbarState;
@@ -20,6 +21,7 @@
 		withToolbar?: boolean;
 		/** Renders a search field of this CSS width (capped at 22.5rem) in the search slot. */
 		searchWidth?: string;
+		controls?: "mapsdk" | "engine" | "none";
 	} = $props();
 </script>
 
@@ -45,4 +47,10 @@
 	{/if}
 {/snippet}
 
-<MapView {map} class={className} {featureList} toolbar={withToolbar ? toolbar : undefined} />
+<MapView
+	{map}
+	class={className}
+	{featureList}
+	{controls}
+	toolbar={withToolbar ? toolbar : undefined}
+/>

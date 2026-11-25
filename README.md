@@ -571,7 +571,8 @@ The badges' glyphs are Lucide's `school` and `baby` icons (lucide.dev, ISC licen
 
 `OptionsToolbar` is monitor-map 5.0's toolbar, shared: the same groups (Pollutant, Monitors,
 Layers, Overlays, Settings), rows, words, and sizes. Pass it as `MapView`'s `toolbar` snippet:
-it sits top-left, the List button stacks below it, and the map's box gets
+it sits top-left and runs to 0.5rem short of the controls at top-right (1rem from the edge with
+`controls: "none"`), the List button stacks below it, and the map's box gets
 `--mapsdk-toolbar-height` (px from the map's top to the toolbar's bottom) for your own overlays.
 A map at least 48rem wide (the map's box, or the `layoutRoot` you pass; never the window) shows
 a row of joined dropdown buttons; a narrower one shows one options button that opens a "Map
@@ -1041,6 +1042,27 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.25
+
+- **The options toolbar's bar is wider and its triggers narrower**, so monitor-map's row and a
+  search button fit one row of a 683px map (a 1024px page with its side panel open); before, the
+  search button wrapped onto a second row.
+  - The bar's right edge stops 0.5rem short of the controls at top-right, measured (map-sdk's
+    zoom buttons, the engine's with `controls: "engine"`, and any control a host adds to that
+    corner), instead of a fixed 4rem from the map's edge: about 6px more room with map-sdk's
+    buttons, about 13px with the engine's. With the engine's, it keeps 4rem until they're drawn
+    (on the map's `load`), and while a host hides them. With map-sdk's buttons hidden, or
+    `controls: "none"`, it's 1rem; under `"none"` a host's own top-right control isn't measured.
+  - Each dropdown trigger has 0.625rem of side padding instead of 0.75rem, 4px narrower; an
+    icon-only trigger is a 40×40px square. Height (40px), type, colours and contrast are
+    unchanged, so every trigger stays a full target. Every host's toolbar (data-dashboard's Map
+    widget too) is that much tighter. The narrow panel's section headers keep 0.75rem.
+- **No more "ResizeObserver loop" errors with the engine's controls.** With `controls: "engine"`
+  and the feature list on, the list panel's measuring raised one on each page load and whenever
+  the engine's controls changed size; a page's `window.onerror` and error trackers saw it. The
+  panel now measures a frame later, as the toolbar does.
+- No new API or message keys; nothing removed.
 
 ### 0.1.0-beta.24
 
