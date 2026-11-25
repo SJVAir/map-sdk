@@ -278,7 +278,11 @@ export function createGlMap(
 	ctx: MapContext,
 	engineControls = false
 ): GlMapLike {
-	const { camera, style } = untrack(() => ({ camera: ctx.camera, style: styleOf(ctx) }));
+	const { camera, style, cooperativeGestures } = untrack(() => ({
+		camera: ctx.camera,
+		style: styleOf(ctx),
+		cooperativeGestures: ctx.cooperativeGestures
+	}));
 	// Before the map exists, so its telemetry timer finds it off. Sessions stay on: MapTiler
 	// bills SDK maps by session, and without one every tile request counts on its own.
 	if (ctx.config.telemetry === false) maptilerConfig.telemetry = false;
@@ -292,7 +296,7 @@ export function createGlMap(
 		// The key goes on each request, not on the SDK's global config (the `apiKey` option
 		// sets that global).
 		transformRequest: maptilerKeyTransform(ctx.config.maptilerKey),
-		cooperativeGestures: ctx.config.cooperativeGestures ?? false,
+		cooperativeGestures,
 		keyboard: true,
 		// The engine's attribution control (and MapTiler's logo, when the key's plan requires it),
 		// at its automatic size: full on wide maps, collapsed on narrow ones. The SDK's default is

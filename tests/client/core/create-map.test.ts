@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushSync, tick } from "svelte";
 import { SvelteMap } from "svelte/reactivity";
 import { createMap, type MapContext } from "../../../src/lib/core/create-map.svelte.js";
@@ -804,5 +804,172 @@ describe("selection mode and focus", () => {
 		}
 		expect(ease.mock.calls[0][0]).toEqual({ center: [-118.5, 35.25], duration: 0 });
 		expect(ease.mock.calls[1][0]).toEqual({ center: [-118.5, 35.25] });
+	});
+});
+
+describe("setCooperativeGestures", () => {
+	/** The fake map with MapLibre's handler: `enable`, `disable`, `isEnabled`. */
+	function glWithGestures(on: boolean) {
+		const gl = createFakeGl({ styleLoaded: true });
+		let enabled = on;
+		const cooperativeGestures = {
+			enable: vi.fn(() => (enabled = true)),
+			disable: vi.fn(() => (enabled = false)),
+			isEnabled: () => enabled
+		};
+		return Object.assign(gl, { cooperativeGestures });
+	}
+
+	it("starts from config.cooperativeGestures and is reactive", async () => {
+		const map = createMap({ config: { ...config, cooperativeGestures: true } });
+		expect(map.cooperativeGestures).toBe(true);
+		const seen: boolean[] = [];
+		stops.push(rootEffect(() => void seen.push(map.cooperativeGestures)));
+		await tick();
+		map.setCooperativeGestures(false);
+		await tick();
+		expect(seen).toEqual([true, false]);
+		expect(map.config.cooperativeGestures).toBe(true);
+	});
+
+	it("switches the attached map's handler at once", () => {
+		const map = createMap({ config: { ...config, cooperativeGestures: true } });
+		const gl = glWithGestures(true);
+		map.attach(gl);
+		map.setCooperativeGestures(false);
+		expect(gl.cooperativeGestures.isEnabled()).toBe(false);
+		map.setCooperativeGestures(true);
+		expect(gl.cooperativeGestures.isEnabled()).toBe(true);
+	});
+
+	it("remembers a call made before a map is attached, and across a new map", () => {
+		const map = createMap({ config });
+		map.setCooperativeGestures(true);
+		const first = glWithGestures(false);
+		map.attach(first);
+		expect(first.cooperativeGestures.isEnabled()).toBe(true);
+		map.detach();
+		map.setCooperativeGestures(false);
+		expect(first.cooperativeGestures.disable).not.toHaveBeenCalled();
+		const second = glWithGestures(true);
+		map.attach(second);
+		expect(second.cooperativeGestures.isEnabled()).toBe(false);
+	});
+
+	it("doesn't make an effect that sets it depend on the setting", async () => {
+		const map = createMap({ config });
+		const gl = glWithGestures(false);
+		map.attach(gl);
+		let runs = 0;
+		stops.push(
+			rootEffect(() => {
+				runs++;
+				map.setCooperativeGestures(true);
+			})
+		);
+		await tick();
+		map.setCooperativeGestures(false);
+		await tick();
+		expect(runs).toBe(1);
+		expect(map.cooperativeGestures).toBe(false);
+		expect(gl.cooperativeGestures.isEnabled()).toBe(false);
+	});
+
+	it("ignores calls after destroy", () => {
+		const map = createMap({ config: { ...config, cooperativeGestures: true } });
+		map.destroy();
+		map.setCooperativeGestures(false);
+		expect(map.cooperativeGestures).toBe(true);
+	});
+
+	describe("turning off after a blocked gesture", () => {
+		// The engine hides its hint 100 ms after a blocked gesture, through the element that
+		// `disable()` deletes, so turning off waits 120 ms past the last one.
+		beforeEach(() => vi.useFakeTimers());
+		afterEach(() => vi.useRealTimers());
+
+		function blockedThenOff() {
+			const map = createMap({ config: { ...config, cooperativeGestures: true } });
+			const gl = glWithGestures(true);
+			map.attach(gl);
+			gl.emit("cooperativegestureprevented");
+			return { map, gl };
+		}
+
+		it("waits 120 ms past the blocked gesture", async () => {
+			const { map, gl } = blockedThenOff();
+			await Promise.resolve();
+			map.setCooperativeGestures(false);
+			expect(map.cooperativeGestures).toBe(false);
+			vi.advanceTimersByTime(119);
+			expect(gl.cooperativeGestures.disable).not.toHaveBeenCalled();
+			vi.advanceTimersByTime(1);
+			expect(gl.cooperativeGestures.isEnabled()).toBe(false);
+		});
+
+		it("counts from after the event's other listeners", async () => {
+			const map = createMap({ config: { ...config, cooperativeGestures: true } });
+			const gl = glWithGestures(true);
+			map.attach(gl);
+			// A host's slow listener runs before the engine schedules its hint timer.
+			gl.on("cooperativegestureprevented", () => vi.advanceTimersByTime(40));
+			gl.emit("cooperativegestureprevented");
+			await Promise.resolve();
+			map.setCooperativeGestures(false);
+			vi.advanceTimersByTime(119);
+			expect(gl.cooperativeGestures.disable).not.toHaveBeenCalled();
+			vi.advanceTimersByTime(1);
+			expect(gl.cooperativeGestures.isEnabled()).toBe(false);
+		});
+
+		it("moves a pending turn-off when the event's listeners turn it off and run long", async () => {
+			const map = createMap({ config: { ...config, cooperativeGestures: true } });
+			const gl = glWithGestures(true);
+			map.attach(gl);
+			gl.on("cooperativegestureprevented", () => {
+				map.setCooperativeGestures(false);
+				vi.advanceTimersByTime(40);
+			});
+			gl.emit("cooperativegestureprevented");
+			await Promise.resolve();
+			vi.advanceTimersByTime(119);
+			expect(gl.cooperativeGestures.disable).not.toHaveBeenCalled();
+			vi.advanceTimersByTime(1);
+			expect(gl.cooperativeGestures.isEnabled()).toBe(false);
+		});
+
+		it("cancels when turned back on in time", () => {
+			const { map, gl } = blockedThenOff();
+			map.setCooperativeGestures(false);
+			map.setCooperativeGestures(true);
+			vi.advanceTimersByTime(200);
+			expect(gl.cooperativeGestures.disable).not.toHaveBeenCalled();
+			expect(gl.cooperativeGestures.isEnabled()).toBe(true);
+		});
+
+		it("leaves a detached map alone", () => {
+			const { map, gl } = blockedThenOff();
+			map.setCooperativeGestures(false);
+			map.detach();
+			vi.advanceTimersByTime(200);
+			expect(gl.cooperativeGestures.disable).not.toHaveBeenCalled();
+		});
+
+		it("still waits when the same map is attached again", () => {
+			const { map, gl } = blockedThenOff();
+			map.detach();
+			map.setCooperativeGestures(false);
+			map.attach(gl);
+			expect(gl.cooperativeGestures.disable).not.toHaveBeenCalled();
+			vi.advanceTimersByTime(120);
+			expect(gl.cooperativeGestures.isEnabled()).toBe(false);
+		});
+	});
+
+	it("leaves a map without the handler alone", () => {
+		const map = createMap({ config });
+		map.attach(createFakeGl({ styleLoaded: true }));
+		expect(() => map.setCooperativeGestures(true)).not.toThrow();
+		expect(map.cooperativeGestures).toBe(true);
 	});
 });

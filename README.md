@@ -165,7 +165,8 @@ Select/Remove only when `selectable` is true: a fire hotspot, a smoke plume, or 
 the `overlays` snippet, where `getMapContext()` returns the map. `config.basemaps` replaces the
 default MapTiler basemaps (build on `defaultBasemaps()`, which `createMap` uses: today's
 sjvair.com setup is `defaultBasemaps({ keepPoiLabels: true })`); `config.initialView` and
-`config.cooperativeGestures` set the camera and gesture handling. `config.projection` (`"mercator"`
+`config.cooperativeGestures` set the camera and gesture handling (see "Cooperative gestures"
+under Camera). `config.projection` (`"mercator"`
 by default, or `"globe"`) and `config.space` (`false` by default, or `{ preset: "milkyway" }` for a
 space background behind the globe) are passed to MapTiler only when set. `config.telemetry: false`
 turns off MapTiler's telemetry (a usage report of the SDK version, API key, and session id, sent
@@ -962,6 +963,27 @@ map.flyTo({ center: [-119.7, 36.7], zoom: 16 });
 map.easeTo({ center: monitor.lngLat, minZoom: 12 });
 ```
 
+### Cooperative gestures
+
+With cooperative gestures on, a plain scroll over the map scrolls the page and Ctrl + scroll (⌘ +
+scroll on a Mac) zooms; on touch, one finger scrolls the page and two fingers pan the map. A blocked
+gesture briefly shows the engine's hint (how to zoom, or to pan with two fingers).
+`config.cooperativeGestures` (default `false`) is the starting value, and
+`map.setCooperativeGestures(on)` changes it while the map runs: at once on the attached map, and
+on any map attached later, so a call made before `MapView` creates its map is kept. Calling it from
+an effect doesn't make the effect depend on the setting. Off, a plain scroll zooms and one finger
+pans. Turning off within 0.1 s of a blocked gesture (a trackpad's scroll momentum) waits out that
+0.1 s, while the engine hides its hint. `map.cooperativeGestures` is the setting asked for,
+reactive; `config.cooperativeGestures` stays the starting value. It is not the engine's live state:
+a MapLibre `FullscreenControl` added through `maptilerMap()` turns gestures off in fullscreen on its
+own.
+
+```ts
+const map = createMap({ config: { maptilerKey, cooperativeGestures: true } });
+// A fullscreen view zooms with a plain scroll; back in the page, Ctrl + scroll again.
+$effect(() => map.setCooperativeGestures(!fullscreen));
+```
+
 ## Ready, and reaching the GL map
 
 `map.ready` is reactive: true once the attached map's style has loaded, the map has gone idle
@@ -1042,6 +1064,19 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.26
+
+- **Cooperative gestures can change while the map runs.** `map.setCooperativeGestures(on)`
+  turns them on or off at once on the attached map (turning off within 0.1 s of a blocked gesture
+  waits out that 0.1 s), and is kept for a map attached later (a call
+  before `MapView` creates its map applies to it). `map.cooperativeGestures` is the current
+  setting, reactive, starting from `config.cooperativeGestures`, which stays the starting value.
+  Off, a plain scroll zooms and one finger pans. A host that never calls it sees no change.
+- **`MapContext` has two new members**, `cooperativeGestures` and `setCooperativeGestures`: a
+  hand-written fake of `MapContext` needs them to type-check. `GlMapLike` gains an optional
+  `cooperativeGestures` (the engine's handler), so fakes of it are unaffected.
+- No new message keys; nothing removed.
 
 ### 0.1.0-beta.25
 

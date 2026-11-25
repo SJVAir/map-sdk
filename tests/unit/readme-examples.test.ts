@@ -88,6 +88,15 @@ describe("README examples", () => {
 		map.destroy();
 	});
 
+	it("cooperative gestures: a starting value, then switched while the map runs", () => {
+		const map = createMap({ config: { maptilerKey: "", cooperativeGestures: true } });
+		const fullscreen = true;
+		map.setCooperativeGestures(!fullscreen);
+		expect(map.cooperativeGestures).toBe(false);
+		expect(map.config.cooperativeGestures).toBe(true);
+		map.destroy();
+	});
+
 	it("maptilerMap is null while detached", () => {
 		const map = createMap({ config: { maptilerKey: "your-maptiler-key" } });
 		expect(map.ready).toBe(false);
