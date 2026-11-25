@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushSync } from "svelte";
 import { createLensState } from "../../../src/lib/plugins/lens-state.svelte.js";
-import { FakeLensInputs, hover } from "../../fixtures/lens-inputs.svelte.js";
+import { cardOn, FakeLensInputs, hover } from "../../fixtures/lens-inputs.svelte.js";
 
 let stops: Array<() => void> = [];
 beforeEach(() => vi.useFakeTimers());
@@ -152,13 +152,13 @@ describe("createLensState", () => {
 		const { inputs, state } = lens();
 		inputs.parentHover = hover("parents", "T1");
 		step();
-		inputs.card = hover("parents", "T1");
+		inputs.card = cardOn("parents", "T1");
 		step();
 		expect(state.pinned).toBe(false);
 		inputs.parentHover = hover("parents", "T2");
 		step();
 		expect(state.center).toBe("T2");
-		inputs.card = hover("lens", "T2-S3");
+		inputs.card = cardOn("lens", "T2-S3");
 		step();
 		expect(state.held).toBe(true);
 		inputs.parentHover = hover("parents", "T3");
@@ -175,17 +175,17 @@ describe("createLensState", () => {
 		const { inputs, state } = lens();
 		inputs.parentHover = hover("parents", "T1");
 		step();
-		inputs.card = hover("notices", "feature:n1", false, [1, 1]);
+		inputs.card = cardOn("notices", "feature:n1", [1, 1]);
 		step();
 		expect(state.held).toBe(true);
 		inputs.parentHover = hover("parents", "T3");
 		step(1000);
 		expect(state.center).toBe("T1");
-		inputs.card = hover("notices", "feature:n2", false, [50, 1]);
+		inputs.card = cardOn("notices", "feature:n2", [50, 1]);
 		step();
 		expect(state.held).toBe(false);
 		expect(state.center).toBe("T3");
-		inputs.card = hover("lens", "T3-S2");
+		inputs.card = cardOn("lens", "T3-S2");
 		step();
 		expect(state.held).toBe(true);
 	});
@@ -196,10 +196,10 @@ describe("createLensState", () => {
 		const { inputs, state } = lens();
 		inputs.parentHover = hover("parents", "T1");
 		step();
-		inputs.card = hover("lens", "T1-S2");
+		inputs.card = cardOn("lens", "T1-S2");
 		step();
 		expect(state.held).toBe(true);
-		inputs.card = hover("parents", "T1");
+		inputs.card = cardOn("parents", "T1");
 		step();
 		expect(state.held).toBe(true);
 		inputs.parentHover = hover("parents", "T3");
@@ -215,12 +215,12 @@ describe("createLensState", () => {
 		const { inputs, state } = lens();
 		inputs.parentHover = hover("parents", "T1");
 		step();
-		inputs.card = hover("lens", "T1-S2");
+		inputs.card = cardOn("lens", "T1-S2");
 		step();
-		inputs.card = hover("parents", "T1");
+		inputs.card = cardOn("parents", "T1");
 		step();
 		expect(state.held).toBe(true);
-		inputs.card = hover("parents", "T2");
+		inputs.card = cardOn("parents", "T2");
 		step();
 		expect(state.held).toBe(false);
 		inputs.parentHover = hover("parents", "T3");
@@ -232,7 +232,7 @@ describe("createLensState", () => {
 		const { inputs, state } = lens();
 		inputs.parentHover = hover("parents", "T1");
 		step();
-		inputs.card = hover("parents", "T1");
+		inputs.card = cardOn("parents", "T1");
 		step();
 		expect(state.held).toBe(false);
 		inputs.parentHover = hover("parents", "T2");
@@ -244,21 +244,21 @@ describe("createLensState", () => {
 		const { inputs, state } = lens();
 		inputs.parentHover = hover("parents", "T1");
 		step();
-		inputs.card = hover("lens", "T1-S2");
+		inputs.card = cardOn("lens", "T1-S2");
 		step();
 		expect(state.held).toBe(true);
 		inputs.focus = "T1";
-		inputs.card = hover("parents", "T1");
+		inputs.card = cardOn("parents", "T1");
 		step();
 		expect(state.held).toBe(false);
 	});
 
 	it("a pinned lens is released when the pinned card closes or moves outside the block", () => {
 		const { inputs, state } = lens();
-		inputs.card = hover("parents", "T1");
+		inputs.card = cardOn("parents", "T1");
 		state.pin("T1");
 		step();
-		inputs.card = hover("lens", "T1-S2");
+		inputs.card = cardOn("lens", "T1-S2");
 		step();
 		expect(state.pinned).toBe(true);
 		inputs.card = null;
@@ -266,10 +266,10 @@ describe("createLensState", () => {
 		expect(state.pinned).toBe(false);
 		expect(state.center).toBeNull();
 
-		inputs.card = hover("parents", "T1");
+		inputs.card = cardOn("parents", "T1");
 		state.pin("T1");
 		step();
-		inputs.card = hover("monitors", "monitor:9", false, [80, 0]);
+		inputs.card = cardOn("monitors", "monitor:9", [80, 0]);
 		step();
 		expect(state.pinned).toBe(false);
 	});
@@ -353,7 +353,7 @@ describe("createLensState", () => {
 
 	it("pin while a card outside the block is pinned stays pinned through later moves", () => {
 		const { inputs, state } = lens();
-		inputs.card = hover("monitors", "monitor:9", false, [80, 0]);
+		inputs.card = cardOn("monitors", "monitor:9", [80, 0]);
 		step();
 		state.pin("T1");
 		step();
@@ -385,13 +385,13 @@ describe("createLensState", () => {
 
 	it("a lens released by its card moving to another township follows the hover at once", () => {
 		const { inputs, state } = lens();
-		inputs.card = hover("parents", "T1");
+		inputs.card = cardOn("parents", "T1");
 		state.pin("T1");
 		step();
 		inputs.parentHover = hover("parents", "T3");
 		step();
 		// The person picks a township outside the block (blockX: inside is x < 10).
-		inputs.card = hover("parents", "T3", false, [50, 0]);
+		inputs.card = cardOn("parents", "T3", [50, 0]);
 		step();
 		expect(state.pinned).toBe(false);
 		expect(state.center).toBe("T3");
@@ -409,24 +409,24 @@ describe("createLensState", () => {
 
 	it("list focus moving the card outside the block keeps a pinned lens; a click there releases it", () => {
 		const { inputs, state } = lens();
-		inputs.card = hover("parents", "T1");
+		inputs.card = cardOn("parents", "T1");
 		inputs.focus = "T1";
 		state.pin("T1");
 		step();
 		// Arrowing down the list: the next row is a township outside the block.
 		inputs.focus = "T3";
-		inputs.card = hover("parents", "T3", false, [50, 0]);
+		inputs.card = cardOn("parents", "T3", [50, 0]);
 		step();
 		expect(state.pinned).toBe(true);
 		inputs.focus = "monitor:9";
-		inputs.card = hover("monitors", "monitor:9", false, [80, 0]);
+		inputs.card = cardOn("monitors", "monitor:9", [80, 0]);
 		step();
 		expect(state.pinned).toBe(true);
 		// Leaving the list, then a click on a feature outside the block.
 		inputs.focus = null;
 		step();
 		expect(state.pinned).toBe(true);
-		inputs.card = hover("monitors", "monitor:8", false, [90, 0]);
+		inputs.card = cardOn("monitors", "monitor:8", [90, 0]);
 		step();
 		expect(state.pinned).toBe(false);
 	});

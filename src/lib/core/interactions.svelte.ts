@@ -64,17 +64,17 @@ export interface Hovered {
 	inPlace?: true;
 	/**
 	 * The hover came from touch: a tap's emulated mouse move (the latest `pointerdown` or
-	 * `pointermove` was a touch, or the move is at a touch press's point just after it). On
-	 * `hovered`, set (to `true`) only then; `OwnHover` always has it.
+	 * `pointermove` was a touch, or the move is at a touch press's point just after it). Set only
+	 * then.
 	 */
-	touch?: boolean;
+	touch?: true;
 }
 
 /**
  * A plugin's own topmost hit under the pointer (`InteractionRouter.hoverOf`). `lngLat` is where
  * the pointer entered the feature, not where it is now.
  */
-export interface OwnHover extends Hovered {
+export interface OwnHover extends Omit<Hovered, "touch"> {
 	/** The move came from touch (the browser's emulated mouse events after a tap). */
 	touch: boolean;
 }
