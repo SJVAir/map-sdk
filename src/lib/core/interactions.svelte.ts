@@ -1,4 +1,5 @@
 import { SvelteMap } from "svelte/reactivity";
+import { isTouchClick } from "./click-pointer.js";
 import type { GlMapLike } from "./gl.js";
 import type { BlockingClick, ClickEvent, FeatureHit } from "./plugin.js";
 
@@ -43,8 +44,15 @@ interface PointerEventLike {
 		ctrlKey?: boolean;
 		/** Set when the browser dispatches the click as a `PointerEvent`. */
 		pointerType?: string;
+		clientX?: number;
+		clientY?: number;
 	};
 }
+
+/** How long after a touch press a mouse move at its point counts as that tap's emulated move. */
+const TAP_MOVE_MS = 1000;
+/** How far (CSS px) a tap's emulated mouse move may land from the touch press. */
+const TAP_MOVE_SLOP = 4;
 
 export interface Hovered {
 	hit: FeatureHit;
@@ -54,13 +62,19 @@ export interface Hovered {
 	 * new feature's shape): the card is drawn at `lngLat`, not at the feature's own point.
 	 */
 	inPlace?: true;
+	/**
+	 * The hover came from touch: a tap's emulated mouse move (the latest `pointerdown` or
+	 * `pointermove` was a touch, or the move is at a touch press's point just after it). Set only
+	 * then.
+	 */
+	touch?: true;
 }
 
 /**
  * A plugin's own topmost hit under the pointer (`InteractionRouter.hoverOf`). `lngLat` is where
  * the pointer entered the feature, not where it is now.
  */
-export interface OwnHover extends Hovered {
+export interface OwnHover extends Omit<Hovered, "touch"> {
 	/** The move came from touch (the browser's emulated mouse events after a tap). */
 	touch: boolean;
 }
@@ -86,18 +100,24 @@ export class InteractionRouter {
 	#gl: GlMapLike | null = null;
 	#canvas: HTMLCanvasElement | null = null;
 	/**
-	 * The `pointerType` of the latest `pointerdown` on the canvas, for clicks whose original event
-	 * has none (Safari before 17 dispatches `click` as a `MouseEvent`). Cleared after each click.
+	 * The `pointerType` of the latest `pointerdown` in the canvas's container, for `isTouchClick`.
+	 * Cleared after each click and on `pointercancel`.
 	 */
 	#lastPointerType: string | null = null;
 	#hovered = $state.raw<Hovered | null>(null);
 	/** Each plugin's own topmost hit under the pointer; written only when it changes. */
 	#own = new SvelteMap<string, OwnHover>();
 	/**
-	 * The `pointerType` of the latest `pointerdown` or `pointermove` on the canvas, for marking
-	 * hover from touch. Unlike `#lastPointerType`, a click doesn't clear it.
+	 * The `pointerType` of the latest `pointerdown` or `pointermove` in the canvas's container, for
+	 * marking hover from touch. Unlike `#lastPointerType`, a click doesn't clear it.
 	 */
 	#movePointerType: string | null = null;
+	/**
+	 * Where and when the latest touch `pointerdown` or `pointerup` was. A mouse move at that point
+	 * soon after is the tap's emulated move even if a "mouse" `pointermove` came between (iOS
+	 * Safari has sent those around a tap).
+	 */
+	#touchPress: { x: number; y: number; at: number } | null = null;
 	/** Plugins whose own hover someone watches (`watchHover`), with how many watchers. */
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, not reactive
 	#watched = new Map<string, number>();
@@ -208,10 +228,14 @@ export class InteractionRouter {
 		gl.on("boxzoomstart", this.#onBoxZoomStart);
 		gl.on("boxzoomcancel", this.#onBoxZoomCancel);
 		this.#canvas = gl.getCanvas();
-		this.#canvas.addEventListener("pointerdown", this.#onPointerDown);
 		this.#pointerRoot = this.#canvas.parentElement ?? this.#canvas;
+		// The canvas's container, not the canvas: MapLibre fires a map click for a press on anything
+		// in it (a host's Marker over a feature, too).
+		this.#pointerRoot.addEventListener("pointerdown", this.#onPointerDown);
+		this.#pointerRoot.addEventListener("pointercancel", this.#onPointerCancel);
 		this.#pointerRoot.addEventListener("pointerdown", this.#onPointerType);
 		this.#pointerRoot.addEventListener("pointermove", this.#onPointerType);
+		this.#pointerRoot.addEventListener("pointerup", this.#onPointerType);
 	}
 
 	/** Stops listening and clears `hovered`. */
@@ -224,10 +248,13 @@ export class InteractionRouter {
 		gl.off("boxzoomstart", this.#onBoxZoomStart);
 		gl.off("boxzoomcancel", this.#onBoxZoomCancel);
 		this.#boxDrawn = false;
-		this.#canvas?.removeEventListener("pointerdown", this.#onPointerDown);
+		this.#pointerRoot?.removeEventListener("pointerdown", this.#onPointerDown);
+		this.#pointerRoot?.removeEventListener("pointercancel", this.#onPointerCancel);
 		this.#pointerRoot?.removeEventListener("pointerdown", this.#onPointerType);
 		this.#pointerRoot?.removeEventListener("pointermove", this.#onPointerType);
+		this.#pointerRoot?.removeEventListener("pointerup", this.#onPointerType);
 		this.#pointerRoot = null;
+		this.#touchPress = null;
 		this.#setPointer(false);
 		this.#canvas = null;
 		this.#lastPointerType = null;
@@ -356,9 +383,30 @@ export class InteractionRouter {
 		this.#lastPointerType = (e as PointerEvent).pointerType || null;
 	};
 
-	#onPointerType = (e: Event) => {
-		this.#movePointerType = (e as PointerEvent).pointerType || null;
+	#onPointerCancel = () => {
+		this.#lastPointerType = null;
 	};
+
+	#onPointerType = (e: Event) => {
+		const p = e as PointerEvent;
+		if (p.pointerType === "touch" && (e.type === "pointerdown" || e.type === "pointerup")) {
+			this.#touchPress = { x: p.clientX, y: p.clientY, at: performance.now() };
+		}
+		// A pointerup only marks the press; the type comes from downs and moves.
+		if (e.type !== "pointerup") this.#movePointerType = p.pointerType || null;
+	};
+
+	/** Whether a mouse move is a tap's emulated one. */
+	#moveIsTouch(o: PointerEventLike["originalEvent"]): boolean {
+		if (this.#movePointerType === "touch") return true;
+		const press = this.#touchPress;
+		if (!press || typeof o?.clientX !== "number" || typeof o.clientY !== "number") return false;
+		return (
+			performance.now() - press.at <= TAP_MOVE_MS &&
+			Math.abs(o.clientX - press.x) <= TAP_MOVE_SLOP &&
+			Math.abs(o.clientY - press.y) <= TAP_MOVE_SLOP
+		);
+	}
 
 	/**
 	 * The layers under `point` a move needs, topmost first, and which registration owns each:
@@ -384,9 +432,9 @@ export class InteractionRouter {
 	#updateOwn(
 		features: ReturnType<GlMapLike["queryRenderedFeatures"]>,
 		byLayer: Map<string, Registration>,
-		lngLat: [number, number]
+		lngLat: [number, number],
+		touch: boolean
 	): void {
-		const touch = this.#movePointerType === "touch";
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- a local for one move
 		const next = new Map<string, OwnHover>();
 		for (const feature of features) {
@@ -430,9 +478,8 @@ export class InteractionRouter {
 			return;
 		}
 		const o = e.originalEvent;
-		const pointerType = o?.pointerType || recorded;
 		const modifier = Boolean(o?.shiftKey || o?.metaKey || o?.ctrlKey);
-		const touch = pointerType === "touch";
+		const touch = isTouchClick(o?.pointerType, recorded);
 		const event: ClickEvent = {
 			hits,
 			additive: modifier || touch,
@@ -513,10 +560,12 @@ export class InteractionRouter {
 	#onMove = (e: PointerEventLike) => {
 		const point: [number, number] = [e.point.x, e.point.y];
 		const { features, byLayer } = this.#queryAll(point);
-		this.#updateOwn(features, byLayer, [e.lngLat.lng, e.lngLat.lat]);
+		const touch = this.#moveIsTouch(e.originalEvent);
+		this.#updateOwn(features, byLayer, [e.lngLat.lng, e.lngLat.lat], touch);
 		const found = this.#lookup(point, true, features);
 		const hit = found.blocked ? (found.hover ?? found.blocker) : found.hover;
-		this.#hovered = hit ? { hit, lngLat: [e.lngLat.lng, e.lngLat.lat] } : null;
+		const lngLat: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+		this.#hovered = hit ? (touch ? { hit, lngLat, touch } : { hit, lngLat }) : null;
 		this.#setPointer(found.blocked || hit !== null);
 	};
 

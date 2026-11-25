@@ -61,7 +61,8 @@ air-quality data on the MapTiler SDK. The demo page in `demo/` is the dev server
 not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 
 - **Core** (`src/lib/core/`): `createMap()` returns a `MapContext` (`create-map.svelte.ts`):
-  reactive camera, bounds, basemap, plugin list, selection per plugin, `featureclick`, `featuresAt`,
+  reactive camera, bounds, basemap, plugin list, selection per plugin, `featureclick` (`touch`: a
+  tap, or a tapped list row, `pickFromList`'s optional fourth argument), `featuresAt`,
   `pinned`/`unpin()` (the card pinned by a click, a tap, or list focus while `MapView`'s `card` is on;
   `pin(pluginId, refKey)` pins one from host code in place of the open card, kept exactly there
   (`inPlace`) when that point lies on the new shape, else at its own point, no pan; `MapTooltip`
@@ -72,7 +73,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   off before the GL map is made; sessions stay on, as MapTiler bills by them), and the `maptilerMap()` escape hatch (for markers
   and popups only).
   It has no GL map of its own; `MapView` attaches one. `plugin.ts` defines `MapPlugin`
-  (`hoverPriority`, `tooltipShowsName`, `hoverable`, `properties` for `featureclick`, `drawnAt`)
+  (`hoverPriority`, `tooltipShowsName`, `hoverable`, `tooltipOnTouch` (false: `MapTooltip` skips
+  a hover whose `touch` is set, a tap's emulated move), `properties` for `featureclick`, `drawnAt`)
   and `PluginContext` (`addCustomLayer`, `coveredAt`: another plugin draws a marker exactly there;
   `hoverOf(pluginId)`: that plugin's own topmost feature under the pointer even beneath another's,
   with `touch`, from the router's `watchHover` so unwatched plugins cost moves nothing; `pinned`,
@@ -86,7 +88,9 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   resolve; never a toolbar change). `plugin-host.svelte.ts` runs plugins' `setup` when the style is ready and tears them down on
   detach or restyle (draw order = registry order); `interactions.svelte.ts` routes clicks, hovers
   (and the pointer cursor), and blocking layers (cluster bubbles); a `hoverable: false` plugin's
-  features are left out of the hover as if not drawn, but still clicked; `basemap.svelte.ts`
+  features are left out of the hover as if not drawn, but still clicked; a click is a tap by its
+  press's `pointerdown`, not its own type (`click-pointer.ts`'s `isTouchClick`, shared with
+  `FeatureList`; iOS Safari's tap clicks say "mouse"); `basemap.svelte.ts`
   switches and falls back between styles. Nothing is module-global: two maps on a page never share
   state, and every source/layer id is namespaced `${mapUid}:${pluginId}:${local}`.
 - **Data** (`src/lib/data/`, entry `./data`): types (`DataSource`, `FeatureRef`,
@@ -101,11 +105,12 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 - **Plugins** (`src/lib/plugins/`): the general `pointsPlugin` (icons, clusters; `selectedStyle`,
   `icon.mutedColor`, `zoomRange`, `legendDisplay`, `legendTitle`, `detail` for features with no
   level, `truncateValues` to cut values off instead of rounding, `marksPlaces` for `drawnAt`,
-  answers per point refreshed at the map's `idle`; `count` numbers circle markers and sums them in
-  clusters as `mapsdk:count`; the number is black or white by the level's color
-  (`readableTextExpression`), the edge `countMarkerText` (`--background`)) and `shapesPlugin`
-  (`zoomRange` from `zoom-range.svelte.ts`, shared with points; out of range it lists nothing and
-  has no legend; `tooltip`; `noFigureLabel` (the layer's text for "No data", outline only) and
+  answers per point refreshed at the map's `idle`; `tooltipOnTouch`; `count` numbers circle
+  markers and sums them in clusters as `mapsdk:count`; the number is black or white by the
+  level's color (`readableTextExpression`), the edge `countMarkerText` (`--background`)) and
+  `shapesPlugin` (`zoomRange` from `zoom-range.svelte.ts`, shared with points; out of range it
+  lists nothing and has no legend; `tooltip`; `noFigureLabel` (the layer's text for "No data",
+  outline only) and
   `detail(props)` (a no-figure feature's reason beside it, or in place of "No level");
   `lens-hooks.ts`'s symbol-keyed hooks for a lens: `shown`, `live`, `keys`, `geometryOf`,
   `setHidden` by the `lensHidden` feature state, the paint's case added only once a lens hides
@@ -127,9 +132,9 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   unfilled `--foreground` edge, a `no-figure` line layer under `outline: "none"`, and `noFigure` on
   those polygons' items, by the legend's rule. Plus shared style expressions, scale resolution,
   and the exported marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
-- **Presets** (`src/lib/presets/`): `monitorsPlugin` (`detail`, `legendUnits` and `legendNote` pass
-  through; `figureLabel` replaces the tooltip's interval note and names a cluster's figure, never
-  the legend; the reading box gives screen
+- **Presets** (`src/lib/presets/`): `monitorsPlugin` (`detail`, `legendUnits`, `legendNote` and
+  `tooltipOnTouch` pass through; `figureLabel` replaces the tooltip's interval note and names a
+  cluster's figure, never the legend; the reading box gives screen
   readers a `mapsdk_reading_pause` before each line under the value), `collocationSitesPlugin`, `regionsPlugin`,
   `calHeatScorePlugin`, `forecastZonesPlugin` (`regionsPlugin` passes `noFigure`/`fillOpacity`/
   `outline`/`noFigureLabel`/`detail`/`legendUnits`/`legendNote` through), `hmsSmokePlugin`,

@@ -65,6 +65,11 @@ export interface MonitorsPluginOptions {
 	legendUnits?: string;
 	/** Host content at the foot of the plugin's legend section. */
 	legendNote?: Snippet;
+	/**
+	 * False: a touch tap on a monitor or a cluster leaves no hover tooltip
+	 * (`MapPlugin.tooltipOnTouch`). A mouse hover still shows one. Default true.
+	 */
+	tooltipOnTouch?: boolean;
 }
 
 export type MonitorShape = "circle" | "square" | "triangle";
@@ -284,6 +289,7 @@ export function monitorsPlugin(options: MonitorsPluginOptions): MapPlugin {
 		legendTitle: "entry-type",
 		legendUnits: options.legendUnits,
 		legendNote: options.legendNote,
+		tooltipOnTouch: options.tooltipOnTouch,
 		selectable: options.selectable ?? true,
 		selectedStyle: options.selectedStyle,
 		detail: options.detail,

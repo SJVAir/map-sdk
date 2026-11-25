@@ -393,13 +393,16 @@ describe("README examples", () => {
 		const store = createMonitorsStore();
 		const plugin: MapPlugin = monitorsPlugin({
 			source: store.dataSource,
-			layerLabel: "Monitors"
+			layerLabel: "Monitors",
+			tooltipOnTouch: false
 		});
+		expect(plugin.tooltipOnTouch).toBe(false);
 		map.addPlugin(plugin);
 		map.setSelection("monitors", { kind: "monitors", ids: ["abc"] });
 		const off = map.on(
 			"featureclick",
-			({ pluginId, ref }: { pluginId: string; ref: FeatureRef }) => void [pluginId, ref]
+			({ pluginId, ref, touch }: { pluginId: string; ref: FeatureRef; touch: boolean }) =>
+				void [pluginId, ref, touch]
 		);
 		const onContextMenu = (event: MouseEvent) => {
 			const hits = map.featuresAt({ x: event.offsetX, y: event.offsetY });

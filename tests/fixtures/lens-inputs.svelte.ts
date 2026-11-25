@@ -15,6 +15,16 @@ export function hover(
 	};
 }
 
+/** A pinned card on `refKey` of `pluginId` (a card is never a touch hover). */
+export function cardOn(
+	pluginId: string,
+	refKey: string,
+	lngLat: [number, number] = [0, 0]
+): Hovered {
+	const { hit } = hover(pluginId, refKey);
+	return { hit, lngLat };
+}
+
 /** Settable lens inputs: parents "parents", children "lens"; a child's parent is its key minus "-Sn". */
 export class FakeLensInputs implements LensInputs {
 	readonly parentsId = "parents";

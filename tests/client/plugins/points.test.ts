@@ -113,6 +113,14 @@ describe("pointsPlugin", () => {
 		).toBeUndefined();
 	});
 
+	it("passes tooltipOnTouch: false on, and leaves it unset otherwise", () => {
+		const source = new TestSource<Props>({ scale: pm25Scale });
+		const base = { id: "p", source, layerLabel: "m", circle: { radius: 5 } };
+		expect(pointsPlugin({ ...base, tooltipOnTouch: false }).tooltipOnTouch).toBe(false);
+		expect("tooltipOnTouch" in pointsPlugin(base)).toBe(false);
+		expect("tooltipOnTouch" in pointsPlugin({ ...base, tooltipOnTouch: true })).toBe(false);
+	});
+
 	it("adds no layers and reports the status while the scale is unavailable", async () => {
 		const source = new TestSource<Props>({ features: points(ROWS), scale: PM25_REF });
 		const scale = Promise.withResolvers<"unavailable">();

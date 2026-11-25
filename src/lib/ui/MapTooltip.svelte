@@ -50,6 +50,15 @@
 		actions
 	}: Props = $props();
 
+	// A touch hover on a plugin that opted out (`tooltipOnTouch: false`) shows nothing: a phone has
+	// no pointer to move off it.
+	const hovered = $derived.by(() => {
+		const h = map.hovered;
+		if (!h?.touch) return h;
+		const plugin = map.plugins.find((p) => p.id === h.hit.pluginId);
+		return plugin?.tooltipOnTouch === false ? null : h;
+	});
+
 	// Ignored without the card, so a host's map never pins.
 	const pinned = $derived(card ? map.pinned : null);
 
@@ -65,7 +74,7 @@
 	});
 	$effect(() => {
 		// A new hovered object comes with every pointer move over a hit.
-		if (map.hovered) zoomHidden = false;
+		if (hovered) zoomHidden = false;
 	});
 
 	let tipWidth = $state(0);
@@ -74,7 +83,7 @@
 
 	// The keyboard-focused list item wins, then the pinned card, then the pointer (which shows
 	// nothing while a card is pinned).
-	const shownHit = $derived(map.focusedKey ? null : (pinned ?? map.hovered));
+	const shownHit = $derived(map.focusedKey ? null : (pinned ?? hovered));
 	const key = $derived(map.focusedKey ?? shownHit?.hit.refKey ?? null);
 	// Primitives, so moving the pointer within one feature doesn't recompute the content.
 	const hitPluginId = $derived(shownHit?.hit.pluginId ?? null);
@@ -120,7 +129,7 @@
 		return untrack(() => (item?.geometry ? map.anchorFor(item) : null));
 	});
 	const anchor = $derived.by((): [number, number] | null => {
-		if (mode === "pointer" && !map.focusedKey && !pinned) return map.hovered?.lngLat ?? null;
+		if (mode === "pointer" && !map.focusedKey && !pinned) return hovered?.lngLat ?? null;
 		// A focused feature that left the data has no item, so no tooltip.
 		if (map.focusedKey) return item ? (map.focusedAnchor ?? item.lngLat) : null;
 		// A card `map.pin` kept where the open card was, while that place is in view; after a pan

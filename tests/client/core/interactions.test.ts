@@ -85,7 +85,8 @@ describe("picking", () => {
 		expect(handler).toHaveBeenCalledExactlyOnceWith({
 			pluginId: "monitors",
 			ref: { kind: "monitor", id: "7" },
-			lngLat: [-119, 36]
+			lngLat: [-119, 36],
+			touch: false
 		});
 		expect(map.getSelection("monitors")).toBeNull();
 	});
@@ -107,7 +108,8 @@ describe("picking", () => {
 			pluginId: "monitors",
 			ref: { kind: "monitor", id: "7" },
 			lngLat: [-119, 36],
-			properties: { refKey: "monitor:7", external_id: "X7" }
+			properties: { refKey: "monitor:7", external_id: "X7" },
+			touch: false
 		});
 		expect(lookup).toHaveBeenCalledWith("monitor:7");
 	});
@@ -122,6 +124,30 @@ describe("picking", () => {
 		gl.setRenderedFeatures([rendered(map, "monitors", "7")]);
 		click(gl);
 		expect(seen).toEqual([{ kind: "monitor", id: "7" }]);
+	});
+
+	it("says whether featureclick was a touch tap", async () => {
+		const { map, gl } = await setUp("none");
+		const seen: boolean[] = [];
+		map.on("featureclick", (e) => seen.push(e.touch));
+		gl.setRenderedFeatures([rendered(map, "monitors", "7")]);
+		click(gl, { pointerType: "mouse" });
+		click(gl, { pointerType: "touch" });
+		click(gl, { pointerType: "pen" });
+		click(gl, {});
+		expect(seen).toEqual([false, true, false, false]);
+	});
+
+	it("reports a MouseEvent click after a touch pointerdown as a touch featureclick", async () => {
+		// Safari before 17 dispatches click as a MouseEvent, with no pointerType.
+		const { map, gl } = await setUp("none");
+		const seen: boolean[] = [];
+		map.on("featureclick", (e) => seen.push(e.touch));
+		gl.setRenderedFeatures([rendered(map, "monitors", "7")]);
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
+		click(gl, {});
+		click(gl, {});
+		expect(seen).toEqual([true, false]);
 	});
 
 	it("replaces the selection on a plain click", async () => {
@@ -167,12 +193,37 @@ describe("picking", () => {
 		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["2"] });
 	});
 
-	it("lets the click's own pointerType win over the recorded one", async () => {
+	it("lets a touch pointerdown win over a click that says mouse (iOS Safari since 18.2)", async () => {
 		const { map, gl } = await setUp("multiple", ["1"]);
+		const seen: boolean[] = [];
+		map.on("featureclick", (e) => seen.push(e.touch));
 		gl.setRenderedFeatures([rendered(map, "monitors", "2")]);
 		gl.canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
 		click(gl, { pointerType: "mouse" });
+		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["1", "2"] });
+		expect(seen).toEqual([true]);
+	});
+
+	it("never takes a synthetic click (empty pointerType) for a tap", async () => {
+		const { map, gl } = await setUp("multiple", ["1"]);
+		const seen: boolean[] = [];
+		map.on("featureclick", (e) => seen.push(e.touch));
+		gl.setRenderedFeatures([rendered(map, "monitors", "2")]);
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
+		click(gl, { pointerType: "" });
 		expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["2"] });
+		expect(seen).toEqual([false]);
+	});
+
+	it("forgets a touch press the browser cancelled", async () => {
+		const { map, gl } = await setUp("none");
+		const seen: boolean[] = [];
+		map.on("featureclick", (e) => seen.push(e.touch));
+		gl.setRenderedFeatures([rendered(map, "monitors", "2")]);
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
+		gl.canvas.dispatchEvent(new Event("pointercancel"));
+		click(gl, {});
+		expect(seen).toEqual([false]);
 	});
 
 	it("stops recording pointerdown after detach", async () => {
@@ -381,6 +432,52 @@ describe("hover", () => {
 		expect(seen).toEqual([null, "monitor:3", null]);
 	});
 
+	it("marks a hover from touch (a tap's emulated mousemove), and only that one", async () => {
+		const { map, gl } = await setUp("none");
+		gl.setRenderedFeatures([rendered(map, "monitors", "3")]);
+		const move = () =>
+			gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
+		move();
+		expect(map.hovered?.touch).toBe(true);
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointermove"), { pointerType: "mouse" }));
+		move();
+		expect(map.hovered).not.toHaveProperty("touch");
+	});
+
+	it("keeps a tap's move as touch past a stray mouse pointermove at its point (iOS)", async () => {
+		const { map, gl } = await setUp("none");
+		gl.setRenderedFeatures([rendered(map, "monitors", "3")]);
+		const pointer = (type: string, pointerType: string, x: number, y: number) =>
+			gl.canvas.dispatchEvent(
+				Object.assign(new Event(type), { pointerType, clientX: x, clientY: y })
+			);
+		const move = (x: number, y: number) =>
+			gl.emit("mousemove", {
+				point: { x: 1, y: 2 },
+				lngLat: { lng: -119.5, lat: 36.5 },
+				originalEvent: { clientX: x, clientY: y }
+			});
+		map.hoverOf("monitors"); // Watched from the first ask.
+		const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+		try {
+			pointer("pointerdown", "touch", 40, 50);
+			pointer("pointerup", "touch", 40, 50);
+			pointer("pointermove", "mouse", 40, 50);
+			move(40, 50);
+			expect(map.hovered?.touch).toBe(true);
+			expect(map.hoverOf("monitors")?.touch).toBe(true);
+			// A real mouse elsewhere, or at the tap's point once the tap is long past, is a mouse.
+			move(140, 50);
+			expect(map.hovered).not.toHaveProperty("touch");
+			now.mockReturnValue(2500);
+			move(40, 50);
+			expect(map.hovered).not.toHaveProperty("touch");
+		} finally {
+			now.mockRestore();
+		}
+	});
+
 	it("clears hovered on mousemove off every registered layer", async () => {
 		const { map, gl } = await setUp("none");
 		gl.setRenderedFeatures([rendered(map, "monitors", "3")]);
@@ -481,7 +578,8 @@ describe("blocking layers", () => {
 		expect(handler).toHaveBeenCalledWith({
 			pluginId: "regions",
 			ref: { kind: "region", type: "county", code: "019" },
-			lngLat: [-119, 36]
+			lngLat: [-119, 36],
+			touch: false
 		});
 		expect(bubbleClicks).toEqual([]);
 	});

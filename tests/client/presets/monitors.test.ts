@@ -166,6 +166,11 @@ describe("monitorsPlugin legend title", () => {
 		});
 	});
 
+	it("passes tooltipOnTouch through", async () => {
+		expect((await titled(pm25, { tooltipOnTouch: false })).tooltipOnTouch).toBe(false);
+		expect("tooltipOnTouch" in (await titled(pm25))).toBe(false);
+	});
+
 	it("leaves them out when unset", async () => {
 		const plugin = await titled(pm25);
 		await settle();
@@ -369,7 +374,8 @@ describe("monitorsPlugin", () => {
 		expect(handler).toHaveBeenCalledWith({
 			pluginId: "monitors",
 			ref: { kind: "monitor", id: "4" },
-			lngLat: [-119.5, 36.5]
+			lngLat: [-119.5, 36.5],
+			touch: false
 		});
 		expect(expansionZoom).not.toHaveBeenCalled();
 		expect(gl.calls).not.toContain("easeTo");

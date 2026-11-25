@@ -65,8 +65,8 @@ export interface PluginOptions {
 	selection?: SpatialSelection | null;
 	onselectionchange?(sel: SpatialSelection | null): void;
 	/**
-	 * `"click"` (default): today's rules (a click selects; Shift/⌘/Ctrl or a tap adds in
-	 * `"multiple"` mode). `"modifier"`: a plain click or tap only pins the card (use it with
+	 * `"click"` (default): today's rules (a click selects; Shift/⌘/Ctrl or a tap, on the map or a
+	 * list row, adds in `"multiple"` mode). `"modifier"`: a plain click or tap only pins the card (use it with
 	 * `MapView`'s `card`), and Shift/⌘/Ctrl-click, or the list's Space or Shift+Enter, toggles the
 	 * feature in the selection without opening or closing the card.
 	 */
@@ -93,6 +93,14 @@ export type FeatureClickHandler = (e: {
 	 * and `external_id`); absent when the plugin gives none.
 	 */
 	properties?: Readonly<Record<string, unknown>>;
+	/**
+	 * `true` when the click was a touch tap: the press's `pointerdown` was a touch, whatever the
+	 * click itself says (iOS Safari reports a tap's click as `"mouse"`). A click with no pointer
+	 * (`pointerType: ""`, as Chrome and Firefox send for `element.click()` and keyboard activation)
+	 * is `false`. For a pick in the feature list, `true` only when the row was tapped; a mouse
+	 * click on a row or a key (Enter, Space) gives `false`.
+	 */
+	touch: boolean;
 }) => void;
 
 /** Where a camera move ends up. `zoom` wins over `minZoom`. */
@@ -167,8 +175,10 @@ export interface MapContext {
 	 * `featureclick`, then applies the same selection rules (`additive` adds or toggles in
 	 * `multiple` mode), calling `onselectionchange` if the selection changes. An item that isn't
 	 * selectable is still clicked but not selected. Does nothing for a refKey the plugin doesn't list.
+	 * `touch` (default `false`): the row was tapped. It's the `featureclick`'s, and in `multiple`
+	 * mode it adds or toggles, as a map tap does (never a modifier pick).
 	 */
-	pickFromList(pluginId: string, refKey: string, additive: boolean): void;
+	pickFromList(pluginId: string, refKey: string, additive: boolean, touch?: boolean): void;
 	/**
 	 * Internal, for the selection bar: the user clears a plugin's selection. Calls the plugin's
 	 * `onselectionchange(null)` when it had a selection; does nothing otherwise.
@@ -585,7 +595,7 @@ class MapContextImpl implements MapContext {
 		return this.#selections.get(pluginId)?.mode ?? "none";
 	}
 
-	pickFromList(pluginId: string, refKey: string, additive: boolean): void {
+	pickFromList(pluginId: string, refKey: string, additive: boolean, touch = false): void {
 		if (this.#destroyed) return;
 		const found = untrack(() => this.#findItem(refKey, pluginId));
 		if (!found) return;
@@ -596,8 +606,12 @@ class MapContextImpl implements MapContext {
 			untrack(() => this.#focusedKey) === refKey &&
 			(untrack(() => this.#focusedPluginId) ?? pluginId) === pluginId;
 		const anchor = (focused && untrack(() => this.#focusedAnchor)) || this.anchorFor(item);
-		this.#emitClick(pluginId, item.ref, anchor, refKey);
-		if (item.selectable) this.#applyPick(pluginId, item.ref, { additive, modifier: additive });
+		this.#emitClick(pluginId, item.ref, anchor, refKey, touch);
+		// A tapped row adds in `multiple` mode, as a map tap does (a phone has no Shift), but isn't a
+		// modifier pick: under `pickWith: "modifier"` it only opens the card.
+		if (item.selectable) {
+			this.#applyPick(pluginId, item.ref, { additive: additive || touch, modifier: additive });
+		}
 	}
 
 	clearSelection(pluginId: string): void {
@@ -857,7 +871,7 @@ class MapContextImpl implements MapContext {
 		if (e.boxZoom && untrack(() => this.#selections.get(pluginId)?.pickWith) !== "modifier") {
 			return;
 		}
-		this.#emitClick(pluginId, ref, e.lngLat, hit.refKey);
+		this.#emitClick(pluginId, ref, e.lngLat, hit.refKey, e.touch);
 		this.#applyPick(pluginId, ref, { additive: e.additive, modifier: e.modifier });
 		if (!this.#cardEnabled || this.#destroyed) return;
 		// A modifier pick only marks: the card (pinned or not) stays as it is.
@@ -870,12 +884,18 @@ class MapContextImpl implements MapContext {
 		else this.#pinned = { hit, lngLat: e.lngLat };
 	}
 
-	#emitClick(pluginId: string, ref: FeatureRef, lngLat: [number, number], refKey: string): void {
+	#emitClick(
+		pluginId: string,
+		ref: FeatureRef,
+		lngLat: [number, number],
+		refKey: string,
+		touch: boolean
+	): void {
 		const plugin = untrack(() => this.plugins).find((p) => p.id === pluginId);
 		const properties = untrack(() => plugin?.properties?.(refKey));
 		for (const handler of [...this.#featureClickHandlers]) {
 			// Each handler gets its own event, as before properties existed.
-			const event = { pluginId, ref: { ...ref }, lngLat: [...lngLat] as [number, number] };
+			const event = { pluginId, ref: { ...ref }, lngLat: [...lngLat] as [number, number], touch };
 			try {
 				handler(properties ? { ...event, properties: { ...properties } } : event);
 			} catch (error) {
