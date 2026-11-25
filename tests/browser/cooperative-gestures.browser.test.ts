@@ -1,9 +1,11 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
+import { cdp } from "vitest/browser";
 import { config as maptilerConfig } from "@maptiler/sdk";
 import { MapView, createMap } from "../../src/lib/index.js";
 import type { GlMapLike } from "../../src/lib/core/gl.js";
 import type { MapContext } from "../../src/lib/core/create-map.svelte.js";
+import { parkPointer } from "./park-pointer.js";
 
 vi.mock("esm-env", () => ({ BROWSER: true, DEV: true, NODE: false }));
 
@@ -26,8 +28,10 @@ beforeAll(() => {
 	});
 });
 
-afterEach(() => {
+afterEach(async () => {
 	document.body.replaceChildren();
+	// Desktop Chrome moves its real mouse after a CDP touch.
+	await parkPointer();
 });
 
 afterAll(() => {
@@ -95,6 +99,38 @@ async function wheel(gl: GlMapLike, bypass = false): Promise<number> {
 	return last;
 }
 
+/**
+ * A real one-finger drag of 80px across the map, then resolves with the map's centre once any
+ * glide (inertia) has stopped.
+ */
+async function oneFingerPan(gl: GlMapLike): Promise<{ lng: number; lat: number }> {
+	const box = gl.getCanvas().getBoundingClientRect();
+	const frameBox = (window.frameElement as HTMLElement | null)?.getBoundingClientRect();
+	const at = (px: number, py: number) => ({
+		x: (frameBox?.left ?? 0) + box.left + px,
+		y: (frameBox?.top ?? 0) + box.top + py
+	});
+	const send = cdp().send.bind(cdp()) as (m: string, p: unknown) => Promise<unknown>;
+	await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [at(200, 200)] });
+	for (const step of [20, 40, 60, 80]) {
+		await send("Input.dispatchTouchEvent", {
+			type: "touchMove",
+			touchPoints: [at(200 + step, 200)]
+		});
+	}
+	await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+	await wait(100);
+	let last = "";
+	let still = 0;
+	while (still < 5) {
+		await frame();
+		const now = JSON.stringify(gl.getCenter());
+		still = now === last ? still + 1 : 0;
+		last = now;
+	}
+	return gl.getCenter();
+}
+
 const overlay = () => document.querySelector(".maplibregl-cooperative-gesture-screen");
 
 describe("cooperative gestures", () => {
@@ -139,6 +175,16 @@ describe("cooperative gestures", () => {
 		} finally {
 			window.removeEventListener("error", onError);
 		}
+	});
+
+	it("one finger doesn't pan while on, and pans once switched off", async () => {
+		const map = newMap(true);
+		const gl = await mount(map);
+		const start = gl.getCenter();
+		expect(await oneFingerPan(gl)).toEqual(start);
+
+		map.setCooperativeGestures(false);
+		expect((await oneFingerPan(gl)).lng).toBeLessThan(start.lng);
 	});
 
 	it("creates the map with a setting changed before it was created", async () => {
