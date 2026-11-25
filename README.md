@@ -1038,8 +1038,9 @@ local sjvair.com stack at `http://localhost:8000`.
 - **New API: `featureclick`'s `touch`.** `true` when the feature was tapped on a touch screen,
   `false` for a mouse or pen click. A pick in the feature list gives `true` only when the row was
   tapped; a mouse click on a row, Enter or Space gives `false`. It reads the press
-  (`pointerdown`), not the click, which iOS Safari reports as a mouse; a synthetic click
-  (`element.click()`, assistive technology) is never a tap. Handlers that don't read it see no
+  (`pointerdown`, anywhere in the map's canvas container, a host's Marker included), not the
+  click, which iOS Safari reports as a mouse. A click with no pointer (`pointerType: ""`, as Chrome
+  and Firefox send for `element.click()` and keyboard activation) is never a tap. Handlers that don't read it see no
   change; a test fake that builds these events itself needs `touch`.
 - **Taps on iPhone toggle again in `multiple` mode.** iOS Safari since 18.2 reports a tap's click
   as a mouse click, so a tap replaced the selection there instead of adding to it as on other touch

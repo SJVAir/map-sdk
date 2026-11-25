@@ -87,8 +87,8 @@ export class InteractionRouter {
 	#gl: GlMapLike | null = null;
 	#canvas: HTMLCanvasElement | null = null;
 	/**
-	 * The `pointerType` of the latest `pointerdown` on the canvas, for `isTouchClick`. Cleared after
-	 * each click and on `pointercancel`.
+	 * The `pointerType` of the latest `pointerdown` in the canvas's container, for `isTouchClick`.
+	 * Cleared after each click and on `pointercancel`.
 	 */
 	#lastPointerType: string | null = null;
 	#hovered = $state.raw<Hovered | null>(null);
@@ -209,9 +209,11 @@ export class InteractionRouter {
 		gl.on("boxzoomstart", this.#onBoxZoomStart);
 		gl.on("boxzoomcancel", this.#onBoxZoomCancel);
 		this.#canvas = gl.getCanvas();
-		this.#canvas.addEventListener("pointerdown", this.#onPointerDown);
-		this.#canvas.addEventListener("pointercancel", this.#onPointerCancel);
 		this.#pointerRoot = this.#canvas.parentElement ?? this.#canvas;
+		// The canvas's container, not the canvas: MapLibre fires a map click for a press on anything
+		// in it (a host's Marker over a feature, too).
+		this.#pointerRoot.addEventListener("pointerdown", this.#onPointerDown);
+		this.#pointerRoot.addEventListener("pointercancel", this.#onPointerCancel);
 		this.#pointerRoot.addEventListener("pointerdown", this.#onPointerType);
 		this.#pointerRoot.addEventListener("pointermove", this.#onPointerType);
 	}
@@ -226,8 +228,8 @@ export class InteractionRouter {
 		gl.off("boxzoomstart", this.#onBoxZoomStart);
 		gl.off("boxzoomcancel", this.#onBoxZoomCancel);
 		this.#boxDrawn = false;
-		this.#canvas?.removeEventListener("pointerdown", this.#onPointerDown);
-		this.#canvas?.removeEventListener("pointercancel", this.#onPointerCancel);
+		this.#pointerRoot?.removeEventListener("pointerdown", this.#onPointerDown);
+		this.#pointerRoot?.removeEventListener("pointercancel", this.#onPointerCancel);
 		this.#pointerRoot?.removeEventListener("pointerdown", this.#onPointerType);
 		this.#pointerRoot?.removeEventListener("pointermove", this.#onPointerType);
 		this.#pointerRoot = null;

@@ -95,9 +95,10 @@ export type FeatureClickHandler = (e: {
 	properties?: Readonly<Record<string, unknown>>;
 	/**
 	 * `true` when the click was a touch tap: the press's `pointerdown` was a touch, whatever the
-	 * click itself says (iOS Safari reports a tap's click as `"mouse"`). A synthetic click
-	 * (`element.click()`, assistive technology) is `false`. For a pick in the feature list, `true`
-	 * only when the row was tapped; a mouse click on a row or a key (Enter, Space) gives `false`.
+	 * click itself says (iOS Safari reports a tap's click as `"mouse"`). A click with no pointer
+	 * (`pointerType: ""`, as Chrome and Firefox send for `element.click()` and keyboard activation)
+	 * is `false`. For a pick in the feature list, `true` only when the row was tapped; a mouse
+	 * click on a row or a key (Enter, Space) gives `false`.
 	 */
 	touch: boolean;
 }) => void;

@@ -107,7 +107,42 @@ describe("featureclick's touch", () => {
 		expect(events[1]).toMatchObject({ pluginId: "monitors", touch: true });
 	});
 
-	it("is true for a tapped list row, false for a clicked one or Enter", async () => {
+	it("reads a press on a marker over a feature, after a touch pan left touch behind", async () => {
+		const { gl, canvas, events } = await siteMap();
+		const { x, y } = gl.project(SITE);
+		// A host's Marker: a DOM element in the canvas's container, over the feature.
+		const marker = document.createElement("div");
+		marker.style.cssText = `position: absolute; left: ${x - 6}px; top: ${y - 6}px; width: 12px; height: 12px`;
+		canvas.parentElement!.append(marker);
+		// A touch pan on the canvas: a press with no click and no pointercancel.
+		const box = canvas.getBoundingClientRect();
+		const send = cdp().send.bind(cdp()) as (m: string, p: unknown) => Promise<unknown>;
+		const frame = (window.frameElement as HTMLElement | null)?.getBoundingClientRect();
+		const at = (px: number, py: number) => ({
+			x: (frame?.left ?? 0) + box.left + px,
+			y: (frame?.top ?? 0) + box.top + py
+		});
+		await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [at(100, 100)] });
+		for (const step of [20, 40, 60, 80]) {
+			await send("Input.dispatchTouchEvent", {
+				type: "touchMove",
+				touchPoints: [at(100 + step, 100)]
+			});
+		}
+		await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+		await new Promise((r) => setTimeout(r, 100));
+		expect(events).toHaveLength(0);
+		const moved = gl.project(SITE);
+		marker.style.left = `${moved.x - 6}px`;
+		marker.style.top = `${moved.y - 6}px`;
+
+		await page.elementLocator(marker).click();
+		await vi.waitFor(() => expect(events).toHaveLength(1));
+		expect(events[0]).toMatchObject({ pluginId: "monitors", touch: false });
+	});
+
+	/** A FeatureList with one row, and each featureclick's `touch`. */
+	async function oneRowList() {
 		const map = createMap({ config: { maptilerKey: "test-key" } });
 		const item: FeatureListItem = {
 			refKey: "monitor:1",
@@ -125,7 +160,11 @@ describe("featureclick's touch", () => {
 		render(FeatureList, { map });
 		const row = page.getByRole("option", { name: /Arvin/ });
 		await expect.element(row).toBeVisible();
+		return { row, seen };
+	}
 
+	it("is true for a tapped list row, false for a clicked one or Enter", async () => {
+		const { row, seen } = await oneRowList();
 		const r = row.element().getBoundingClientRect();
 		await tap(r.left + r.width / 2, r.top + r.height / 2);
 		await vi.waitFor(() => expect(seen).toEqual([true]));
@@ -138,23 +177,7 @@ describe("featureclick's touch", () => {
 	});
 
 	it("reads a list row's press, not its click: iOS, Safari before 17, synthetic, cancelled", async () => {
-		const map = createMap({ config: { maptilerKey: "test-key" } });
-		const item: FeatureListItem = {
-			refKey: "monitor:1",
-			ref: { kind: "monitor", id: "1" },
-			name: "Arvin",
-			value: 5,
-			level: pm25Scale.levels[0],
-			units: "µg/m³",
-			lngLat: [-119.5, 36.5],
-			selectable: true
-		};
-		map.addPlugin({ id: "monitors", setup: () => () => {}, features: () => [item] });
-		const seen: boolean[] = [];
-		map.on("featureclick", (e) => seen.push(e.touch));
-		render(FeatureList, { map });
-		const row = page.getByRole("option", { name: /Arvin/ });
-		await expect.element(row).toBeVisible();
+		const { row, seen } = await oneRowList();
 		const el = row.element();
 		const down = (type: string) =>
 			el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerType: type }));
@@ -174,6 +197,10 @@ describe("featureclick's touch", () => {
 		down("touch");
 		el.dispatchEvent(new PointerEvent("pointercancel", { bubbles: true, pointerType: "touch" }));
 		el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-		expect(seen).toEqual([true, true, false, false]);
+		// A long-press into the context menu, then a click with no pointer type.
+		down("touch");
+		el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+		el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		expect(seen).toEqual([true, true, false, false, false]);
 	});
 });

@@ -54,7 +54,7 @@
 	let menuSentTimer: ReturnType<typeof setTimeout> | undefined;
 	// Focus from a pointer: the click picks the row, so focusing doesn't activate the first one.
 	let pointerFocus = false;
-	/** The last pointerdown's type, for `isTouchClick`; cleared on each row click and on cancel. */
+	/** The last pointerdown's type, for `isTouchClick`; cleared by a row click, cancel, or menu. */
 	let downPointerType: string | null = null;
 	// While the listbox has focus it filters by the bounds from when focus arrived: each key press
 	// pans the map, and re-filtering on that pan's moveend would reshuffle the rows under the user.
@@ -259,6 +259,8 @@
 	}
 
 	function oncontextmenu(e: MouseEvent) {
+		// A long-press that opens a menu ends the press without a click.
+		downPointerType = null;
 		// A row's own event (a right-click) bubbles as is. The browser's keyboard menu event
 		// targets the focused listbox instead, so it goes to the active row.
 		if (e.target !== listbox || activeIndex < 0) return;

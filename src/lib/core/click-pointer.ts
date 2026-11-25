@@ -7,8 +7,9 @@
  *   282988).
  * - A click with no `pointerType` at all (Safari before 17 dispatches `click` as a `MouseEvent`)
  *   takes the recorded press.
- * - A click whose `pointerType` is `""` (a synthetic click: `element.click()`, assistive
- *   technology) is never a tap, whatever an earlier press left recorded.
+ * - A click whose `pointerType` is `""` is never a tap, whatever an earlier press left recorded:
+ *   Chrome and Firefox send that for `element.click()` and keyboard activation. (Safari's type
+ *   for those is unverified.)
  */
 export function isTouchClick(own: string | undefined, recorded: string | null): boolean {
 	if (own === "") return false;
