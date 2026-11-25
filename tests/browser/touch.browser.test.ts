@@ -198,7 +198,7 @@ describe("featureclick's touch", () => {
 	});
 
 	it("reads a press on a marker over a feature, after a touch pan left touch behind", async () => {
-		const { gl, canvas, events } = await siteMap();
+		const { map, gl, canvas, events } = await siteMap();
 		const { x, y } = gl.project(SITE);
 		// A host's Marker: a DOM element in the canvas's container, over the feature.
 		const marker = document.createElement("div");
@@ -220,9 +220,21 @@ describe("featureclick's touch", () => {
 			});
 		}
 		await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-		await new Promise((r) => setTimeout(r, 100));
+		// The pan glides on (inertia), longer on a slow machine: wait until the site holds still
+		// over a few frames, so the marker goes over it and the click lands on the feature.
+		const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r(null)));
+		await vi.waitFor(
+			async () => {
+				const before = gl.project(SITE);
+				for (let i = 0; i < 3; i++) await nextFrame();
+				const after = gl.project(SITE);
+				expect([after.x, after.y]).toEqual([before.x, before.y]);
+			},
+			{ timeout: 5000 }
+		);
 		expect(events).toHaveLength(0);
 		const moved = gl.project(SITE);
+		expect(map.featuresAt(moved)).toHaveLength(1);
 		marker.style.left = `${moved.x - 6}px`;
 		marker.style.top = `${moved.y - 6}px`;
 
