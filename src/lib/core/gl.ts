@@ -75,5 +75,11 @@ export interface GlMapLike {
 	/** Position at a canvas pixel. */
 	unproject(point: [number, number]): { lng: number; lat: number };
 	getCanvas(): HTMLCanvasElement;
+	/** MapLibre's cooperative gestures handler. Optional, so a fake map can leave it out. */
+	readonly cooperativeGestures?: {
+		enable(): void;
+		disable(): void;
+		isEnabled(): boolean;
+	};
 	remove(): void;
 }

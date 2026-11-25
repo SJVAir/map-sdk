@@ -68,6 +68,9 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   (`inPlace`) when that point lies on the new shape, else at its own point, no pan; `MapTooltip`
   moves focus to the card on a swap a click or key inside the card caused, `tabindex` only then),
   `pickWith`/`canSelect` plugin options with `togglePick` and `notice` (a refused pick's message),
+  `cooperativeGestures`/`setCooperativeGestures(on)` (reactive; `config.cooperativeGestures` is
+  the starting value; applied at once to the attached map and on `attach`, through `GlMapLike`'s
+  optional engine handler),
   `featureForElement`, camera moves (`easeTo`/`flyTo`/`fitBounds`), `ready`, `gl`,
   `projection`/`space`/`telemetry` config (`telemetry: false` turns MapTiler's page-wide telemetry
   off before the GL map is made; sessions stay on, as MapTiler bills by them), and the `maptilerMap()` escape hatch (for markers

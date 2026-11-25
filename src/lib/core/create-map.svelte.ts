@@ -30,6 +30,11 @@ export interface MapConfig {
 	maptilerKey: string;
 	basemaps?: BasemapConfig;
 	initialView?: CameraState;
+	/**
+	 * Default `false`. `true`: a plain scroll over the map scrolls the page and Ctrl/⌘ + scroll
+	 * zooms; on touch, one finger scrolls the page and two pan the map. The starting value:
+	 * `MapContext.setCooperativeGestures` changes it while the map runs.
+	 */
 	cooperativeGestures?: boolean;
 	/** Default `"mercator"`. `"globe"` draws the map on a globe when zoomed out. */
 	projection?: "mercator" | "globe";
@@ -142,6 +147,16 @@ export interface MapContext {
 	 * never add sources or layers through it.
 	 */
 	readonly gl: GlMapLike | null;
+	/**
+	 * Reactive. Whether cooperative gestures are on: `config.cooperativeGestures` until
+	 * `setCooperativeGestures` changes it.
+	 */
+	readonly cooperativeGestures: boolean;
+	/**
+	 * Turns cooperative gestures on or off (see `MapConfig.cooperativeGestures`): at once on the
+	 * attached map, and on any map attached later. Off, a plain scroll zooms and one finger pans.
+	 */
+	setCooperativeGestures(on: boolean): void;
 	/**
 	 * @internal For `MapView` only; hosts never call it. Marks the attached map ready. Does
 	 * nothing while detached.
@@ -361,6 +376,7 @@ class MapContextImpl implements MapContext {
 	/** `markReady` came while plugin setups were queued; the queued run sets `ready`. */
 	#readyRequested = false;
 	#glState = $state.raw<GlMapLike | null>(null);
+	#cooperativeGestures = $state(false);
 	#focusedKey = $state<string | null>(null);
 	#focusedPluginId = $state<string | null>(null);
 	#focusedAnchor = $state.raw<[number, number] | null>(null);
@@ -391,6 +407,7 @@ class MapContextImpl implements MapContext {
 			initialView,
 			cooperativeGestures: options.config.cooperativeGestures ?? false
 		};
+		this.#cooperativeGestures = this.config.cooperativeGestures ?? false;
 		this.metadata = options.metadata ?? createDefaultMetadata();
 		this.messages = options.messages ?? defaultMessages;
 		this.format = options.format ?? createDefaultFormat();
@@ -793,12 +810,29 @@ class MapContextImpl implements MapContext {
 		);
 	}
 
+	get cooperativeGestures(): boolean {
+		return this.#cooperativeGestures;
+	}
+
+	setCooperativeGestures(on: boolean): void {
+		this.#cooperativeGestures = on;
+		if (this.#gl) this.#applyGestures(this.#gl);
+	}
+
+	#applyGestures(gl: GlMapLike): void {
+		const handler = gl.cooperativeGestures;
+		if (!handler || handler.isEnabled() === this.#cooperativeGestures) return;
+		if (this.#cooperativeGestures) handler.enable();
+		else handler.disable();
+	}
+
 	attach(gl: GlMapLike): void {
 		this.#assertAlive();
 		if (this.#gl === gl) return;
 		if (this.#gl) this.detach();
 		this.#gl = gl;
 		this.#glState = gl;
+		this.#applyGestures(gl);
 		this.#host.attach(gl);
 		this.#router.attach(gl);
 		gl.on("moveend", this.#onMoveEnd);
