@@ -572,7 +572,7 @@ The badges' glyphs are Lucide's `school` and `baby` icons (lucide.dev, ISC licen
 `OptionsToolbar` is monitor-map 5.0's toolbar, shared: the same groups (Pollutant, Monitors,
 Layers, Overlays, Settings), rows, words, and sizes. Pass it as `MapView`'s `toolbar` snippet:
 it sits top-left and runs to 0.5rem short of the controls at top-right (1rem from the edge with
-none), the List button stacks below it, and the map's box gets
+`controls: "none"`), the List button stacks below it, and the map's box gets
 `--mapsdk-toolbar-height` (px from the map's top to the toolbar's bottom) for your own overlays.
 A map at least 48rem wide (the map's box, or the `layoutRoot` you pass; never the window) shows
 a row of joined dropdown buttons; a narrower one shows one options button that opens a "Map
@@ -1051,8 +1051,9 @@ local sjvair.com stack at `http://localhost:8000`.
   - The bar's right edge stops 0.5rem short of the controls at top-right, measured (map-sdk's
     zoom buttons, the engine's with `controls: "engine"`, and any control a host adds to that
     corner), instead of a fixed 4rem from the map's edge: about 6px more room with map-sdk's
-    buttons, about 13px with the engine's. It keeps 4rem until the engine has drawn its controls.
-    `controls: "none"`, or nothing at top-right, gives 1rem.
+    buttons, about 13px with the engine's. With the engine's, it keeps 4rem until they're drawn
+    (on the map's `load`), and while a host hides them. With map-sdk's buttons hidden, or
+    `controls: "none"`, it's 1rem; under `"none"` a host's own top-right control isn't measured.
   - Each dropdown trigger has 0.625rem of side padding instead of 0.75rem, 4px narrower; an
     icon-only trigger is a 40×40px square. Height (40px), type, colours and contrast are
     unchanged, so every trigger stays a full target. Every host's toolbar (data-dashboard's Map

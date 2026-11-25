@@ -321,8 +321,8 @@
 	// How far the top-right controls column (map-sdk's zoom buttons, and the engine's corner, which
 	// holds its controls or a host's own) reaches in from the map's right edge, so the toolbar's bar
 	// stops 0.5rem short of it rather than a fixed 4rem. null until measured (the 4rem fallback),
-	// 0 with nothing there (1rem, as with `controls: "none"`; a host that hides the zoom buttons
-	// gets that too). Measured, as the column's size is the engine's or the theme's.
+	// 0 with nothing there (1rem, as with `controls: "none"`; with map-sdk's buttons, a host that
+	// hides them gets that too). Measured, as the column's size is the engine's or the theme's.
 	let controlsReach = $state<number | null>(null);
 	$effect(() => {
 		void projector;
@@ -337,16 +337,22 @@
 				const r = el?.getBoundingClientRect();
 				if (r && r.width > 0) reach = Math.max(reach, right - r.left);
 			}
-			// The engine adds its controls once the style loads: until then its corner is empty,
-			// not measured.
+			// The engine adds its controls on the map's `load` (after fetching the tiles' metadata):
+			// until then, or while a host hides them, its corner is empty, and 4rem stands.
 			controlsReach = reach === 0 && kind === "engine" ? null : reach;
 		};
-		// The bar's inset moves only the bar, never the map or the column: no ResizeObserver loop.
-		const observer = new ResizeObserver(measure);
+		// Measured a frame later: the engine's corner sits as deep as the bar, so changing the bar
+		// inside the callback is a ResizeObserver loop.
+		let frame = 0;
+		const observer = new ResizeObserver(() => {
+			cancelAnimationFrame(frame);
+			frame = requestAnimationFrame(measure);
+		});
 		observer.observe(root);
 		for (const el of [zoom(), corner()]) if (el) observer.observe(el);
 		measure();
 		return () => {
+			cancelAnimationFrame(frame);
 			observer.disconnect();
 			controlsReach = null;
 		};

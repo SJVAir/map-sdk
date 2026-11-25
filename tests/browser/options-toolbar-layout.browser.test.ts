@@ -131,7 +131,7 @@ describe("OptionsToolbar in MapView", () => {
 		expect(trigger("Monitors").query()).toBeNull();
 	});
 
-	it("the bar stops 0.5rem short of the controls at top-right, or 1rem from the edge without", async () => {
+	it("the bar stops 0.5rem short of the top-right controls, or 1rem without", async () => {
 		const barRight = () =>
 			document.querySelector("[data-mapsdk-toolbar-bar]")!.getBoundingClientRect().right;
 		await setup();
@@ -176,7 +176,7 @@ describe("OptionsToolbar in MapView", () => {
 		expect(bar.right).toBeCloseTo(box.right - 64, 1);
 	});
 
-	it("stops short of a host's own control in the engine's corner, beside map-sdk's buttons", async () => {
+	it("stops short of a host's control in the engine corner, beside the zoom", async () => {
 		const { map } = await setup();
 		await vi.waitFor(() => expect(maptilerMap(map)).toBeTruthy());
 		const wide = document.createElement("div");
@@ -444,6 +444,27 @@ describe("OptionsToolbar narrow panel, final review fixes", () => {
 });
 
 describe("OptionsToolbar measuring", () => {
+	it("the engine controls loading or hiding raise no ResizeObserver loop error", async () => {
+		const errors: string[] = [];
+		const onerror = (e: ErrorEvent) => errors.push(e.message);
+		window.addEventListener("error", onerror);
+		try {
+			const { root } = await setup({ controls: "engine" });
+			const corner = () => root().querySelector<HTMLElement>(".maplibregl-ctrl-top-right")!;
+			await vi.waitFor(() => expect(corner().getBoundingClientRect().width).toBeGreaterThan(0), {
+				timeout: 5000
+			});
+			for (const display of ["none", ""]) {
+				corner().style.display = display;
+				await settle();
+				await settle();
+			}
+		} finally {
+			window.removeEventListener("error", onerror);
+		}
+		expect(errors.filter((m) => /ResizeObserver/.test(m))).toEqual([]);
+	});
+
 	it("crossing to narrow and back raises no ResizeObserver loop error", async () => {
 		const errors: string[] = [];
 		const onerror = (e: ErrorEvent) => errors.push(e.message);
@@ -490,6 +511,8 @@ describe("layoutRoot", () => {
 	 * Monitor-map's toolbar: two clusters of icon-and-label triggers and the icon-only Settings,
 	 * with a 40px search button. Each label is pinned to its width in monitor-map (its triggers
 	 * measured 119/135/121/136/44px there), so the row is the app's whatever this browser's font.
+	 * With map-sdk's zoom buttons, which reach further in than monitor-map's engine controls: the
+	 * tighter case.
 	 */
 	async function appToolbar() {
 		const icon = { svg: "<svg viewBox='0 0 16 16'><circle cx='8' cy='8' r='6'/></svg>" };
