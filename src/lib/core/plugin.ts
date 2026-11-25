@@ -290,6 +290,12 @@ export interface MapPlugin {
 	 */
 	tooltipShowsName?: boolean;
 	/**
+	 * False: a touch tap on one of this plugin's features leaves no hover tooltip (a phone has no
+	 * pointer to move off it, so it would stay until the next tap). A mouse hover still shows one,
+	 * and a pinned card (`MapView`'s `card`), list focus and clicks are unchanged. Default true.
+	 */
+	tooltipOnTouch?: boolean;
+	/**
 	 * Tooltip content for a hovered hit that isn't a listed feature (e.g. a cluster bubble's hover
 	 * hit from `PluginContext.blocking`).
 	 */

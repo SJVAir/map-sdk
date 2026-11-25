@@ -155,6 +155,12 @@ export interface PointsOptions<P extends MapFeatureProperties> {
 	 * it.
 	 */
 	tooltipShowsName?: boolean;
+	/**
+	 * False: a touch tap on one of its features leaves no hover tooltip (a phone has no
+	 * pointer to move off it, so it would stay until the next tap). A mouse hover still shows one,
+	 * and a pinned card (`MapView`'s `card`), list focus and clicks are unchanged. Default true.
+	 */
+	tooltipOnTouch?: boolean;
 }
 
 /** Properties the plugin adds to each feature it hands MapLibre. */
@@ -776,6 +782,7 @@ export function pointsPlugin<P extends MapFeatureProperties>(options: PointsOpti
 	if (options.marksPlaces) plugin.drawnAt = drawnAt;
 	if (options.tooltip) plugin.tooltip = featureTooltip;
 	if (options.tooltipShowsName) plugin.tooltipShowsName = true;
+	if (options.tooltipOnTouch === false) plugin.tooltipOnTouch = false;
 	if (cluster?.tooltip) plugin.hoverTooltip = clusterTooltip;
 	return plugin;
 }

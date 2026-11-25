@@ -432,6 +432,19 @@ describe("hover", () => {
 		expect(seen).toEqual([null, "monitor:3", null]);
 	});
 
+	it("marks a hover from touch (a tap's emulated mousemove), and only that one", async () => {
+		const { map, gl } = await setUp("none");
+		gl.setRenderedFeatures([rendered(map, "monitors", "3")]);
+		const move = () =>
+			gl.emit("mousemove", { point: { x: 1, y: 2 }, lngLat: { lng: -119.5, lat: 36.5 } });
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
+		move();
+		expect(map.hovered?.touch).toBe(true);
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointermove"), { pointerType: "mouse" }));
+		move();
+		expect(map.hovered).not.toHaveProperty("touch");
+	});
+
 	it("clears hovered on mousemove off every registered layer", async () => {
 		const { map, gl } = await setUp("none");
 		gl.setRenderedFeatures([rendered(map, "monitors", "3")]);

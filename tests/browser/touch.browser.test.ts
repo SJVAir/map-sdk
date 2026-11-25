@@ -49,7 +49,7 @@ async function tap(x: number, y: number) {
 }
 
 /** A MapView with one monitor at `SITE`, and the featureclick events it reports. */
-async function siteMap() {
+async function siteMap(tooltipOnTouch?: boolean) {
 	const map = createMap({
 		config: {
 			maptilerKey: "test-key",
@@ -62,6 +62,7 @@ async function siteMap() {
 			id: "monitors",
 			layerLabel: "Monitors",
 			circle: { radius: 12 },
+			tooltipOnTouch,
 			source: staticSource(
 				{
 					type: "FeatureCollection",
@@ -92,6 +93,44 @@ async function siteMap() {
 	await vi.waitFor(() => expect(map.featuresAt(gl.project(SITE))).toHaveLength(1));
 	return { map, gl, canvas, events };
 }
+
+describe("tooltipOnTouch", () => {
+	/**
+	 * Whether a hover tooltip showed at any point during `act`. Desktop Chrome moves its real mouse
+	 * back after a tap (a phone has none), which ends the hover, so a check after the tap is too late.
+	 */
+	async function tooltipShownDuring(act: () => Promise<void>): Promise<boolean> {
+		let shown = document.querySelector("[role=tooltip]") !== null;
+		const observer = new MutationObserver(() => {
+			if (document.querySelector("[role=tooltip]")) shown = true;
+		});
+		observer.observe(document.body, { childList: true, subtree: true });
+		try {
+			await act();
+			await new Promise((r) => setTimeout(r, 300));
+		} finally {
+			observer.disconnect();
+		}
+		return shown;
+	}
+
+	it("false: a tapped feature leaves no hover tooltip, while a mouse hover still shows one", async () => {
+		const { gl, canvas } = await siteMap(false);
+		const { x, y } = gl.project(SITE);
+		const box = canvas.getBoundingClientRect();
+		expect(await tooltipShownDuring(() => tap(box.left + x, box.top + y))).toBe(false);
+
+		await page.elementLocator(canvas).hover({ position: { x, y } });
+		await expect.element(page.getByRole("tooltip")).toBeVisible();
+	});
+
+	it("unset: a tapped feature shows its hover tooltip, as before", async () => {
+		const { gl, canvas } = await siteMap();
+		const { x, y } = gl.project(SITE);
+		const box = canvas.getBoundingClientRect();
+		expect(await tooltipShownDuring(() => tap(box.left + x, box.top + y))).toBe(true);
+	});
+});
 
 describe("featureclick's touch", () => {
 	it("is false for a mouse click on a map feature and true for a touch tap", async () => {

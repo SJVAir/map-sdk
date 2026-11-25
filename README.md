@@ -844,7 +844,11 @@ bubble's (collocation sites under monitor clusters). Clicks always go to the top
 on a bubble still zooms into it. A plugin with `hoverable: false` never takes the hover: its
 features show no hover tooltip or pointer cursor and are passed over as if they weren't drawn, so
 whatever is beneath gets the hover. They are still clicked, returned by `featuresAt`, and pin
-their tooltip when focused from the feature list. A plugin with `summarizeEmpty: false` has no
+their tooltip when focused from the feature list. A plugin with `tooltipOnTouch: false`
+(`pointsPlugin` and `monitorsPlugin` take it too) shows no hover tooltip when one of its features
+is tapped on a touch screen: a phone has no pointer to move off it, so the tooltip would stay over
+whatever the host opens for that tap until the next one. A mouse hover still shows it, and the
+pinned card, list focus and clicks are unchanged. A plugin with `summarizeEmpty: false` has no
 line in the view summary (the map's live region) while none of its features is in view, instead
 of "0 <layer>"; `focusAreaPlugin` uses it.
 
@@ -1047,6 +1051,13 @@ local sjvair.com stack at `http://localhost:8000`.
   screens. The press's own type now decides, for the selection as for `featureclick`.
 - **`MapContext.pickFromList`** (internal, for `FeatureList`) takes an optional fourth argument,
   `touch` (default `false`). A hand-written fake of `MapContext` still type-checks without it.
+- **New API: `tooltipOnTouch: false`** on `MapPlugin`, `pointsPlugin` and `monitorsPlugin` (a
+  monitor and its cluster bubbles): a feature tapped on a touch screen leaves no hover tooltip.
+  A tap's emulated mouse move hovered the feature, and with no pointer to move off it the tooltip
+  stayed, covering what the host opened for the tap. A mouse hover still shows the tooltip; the
+  pinned card, list focus and clicks are unchanged. Unset, nothing changes.
+- **`map.hovered`** has `touch: true` when the hover came from a tap. It's left out otherwise, so
+  a mouse hover's object is as before.
 - No new message keys; nothing removed.
 
 ### 0.1.0-beta.23

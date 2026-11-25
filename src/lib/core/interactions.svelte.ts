@@ -55,6 +55,11 @@ export interface Hovered {
 	 * new feature's shape): the card is drawn at `lngLat`, not at the feature's own point.
 	 */
 	inPlace?: true;
+	/**
+	 * The hover came from touch: a tap's emulated mouse move (the latest `pointerdown` or
+	 * `pointermove` was a touch). Set only then, on `hovered`.
+	 */
+	touch?: boolean;
 }
 
 /**
@@ -524,7 +529,9 @@ export class InteractionRouter {
 		this.#updateOwn(features, byLayer, [e.lngLat.lng, e.lngLat.lat]);
 		const found = this.#lookup(point, true, features);
 		const hit = found.blocked ? (found.hover ?? found.blocker) : found.hover;
-		this.#hovered = hit ? { hit, lngLat: [e.lngLat.lng, e.lngLat.lat] } : null;
+		const lngLat: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+		const touch = this.#movePointerType === "touch";
+		this.#hovered = hit ? (touch ? { hit, lngLat, touch } : { hit, lngLat }) : null;
 		this.#setPointer(found.blocked || hit !== null);
 	};
 

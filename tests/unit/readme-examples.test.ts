@@ -393,8 +393,10 @@ describe("README examples", () => {
 		const store = createMonitorsStore();
 		const plugin: MapPlugin = monitorsPlugin({
 			source: store.dataSource,
-			layerLabel: "Monitors"
+			layerLabel: "Monitors",
+			tooltipOnTouch: false
 		});
+		expect(plugin.tooltipOnTouch).toBe(false);
 		map.addPlugin(plugin);
 		map.setSelection("monitors", { kind: "monitors", ids: ["abc"] });
 		const off = map.on(

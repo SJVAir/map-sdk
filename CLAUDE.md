@@ -73,7 +73,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   off before the GL map is made; sessions stay on, as MapTiler bills by them), and the `maptilerMap()` escape hatch (for markers
   and popups only).
   It has no GL map of its own; `MapView` attaches one. `plugin.ts` defines `MapPlugin`
-  (`hoverPriority`, `tooltipShowsName`, `hoverable`, `properties` for `featureclick`, `drawnAt`)
+  (`hoverPriority`, `tooltipShowsName`, `hoverable`, `tooltipOnTouch` (false: `MapTooltip` skips
+  a hover whose `touch` is set, a tap's emulated move), `properties` for `featureclick`, `drawnAt`)
   and `PluginContext` (`addCustomLayer`, `coveredAt`: another plugin draws a marker exactly there;
   `hoverOf(pluginId)`: that plugin's own topmost feature under the pointer even beneath another's,
   with `touch`, from the router's `watchHover` so unwatched plugins cost moves nothing; `pinned`,
@@ -104,8 +105,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 - **Plugins** (`src/lib/plugins/`): the general `pointsPlugin` (icons, clusters; `selectedStyle`,
   `icon.mutedColor`, `zoomRange`, `legendDisplay`, `legendTitle`, `detail` for features with no
   level, `truncateValues` to cut values off instead of rounding, `marksPlaces` for `drawnAt`,
-  answers per point refreshed at the map's `idle`; `count` numbers circle markers and sums them in
-  clusters as `mapsdk:count`; the number is black or white by the level's color
+  answers per point refreshed at the map's `idle`; `tooltipOnTouch`; `count` numbers circle
+  markers and sums them in clusters as `mapsdk:count`; the number is black or white by the level's color
   (`readableTextExpression`), the edge `countMarkerText` (`--background`)) and `shapesPlugin`
   (`zoomRange` from `zoom-range.svelte.ts`, shared with points; out of range it lists nothing and
   has no legend; `tooltip`; `noFigureLabel` (the layer's text for "No data", outline only) and
@@ -130,8 +131,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   unfilled `--foreground` edge, a `no-figure` line layer under `outline: "none"`, and `noFigure` on
   those polygons' items, by the legend's rule. Plus shared style expressions, scale resolution,
   and the exported marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
-- **Presets** (`src/lib/presets/`): `monitorsPlugin` (`detail`, `legendUnits` and `legendNote` pass
-  through; `figureLabel` replaces the tooltip's interval note and names a cluster's figure, never
+- **Presets** (`src/lib/presets/`): `monitorsPlugin` (`detail`, `legendUnits`, `legendNote` and
+  `tooltipOnTouch` pass through; `figureLabel` replaces the tooltip's interval note and names a cluster's figure, never
   the legend; the reading box gives screen
   readers a `mapsdk_reading_pause` before each line under the value), `collocationSitesPlugin`, `regionsPlugin`,
   `calHeatScorePlugin`, `forecastZonesPlugin` (`regionsPlugin` passes `noFigure`/`fillOpacity`/

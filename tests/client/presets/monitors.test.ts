@@ -166,6 +166,11 @@ describe("monitorsPlugin legend title", () => {
 		});
 	});
 
+	it("passes tooltipOnTouch through", async () => {
+		expect((await titled(pm25, { tooltipOnTouch: false })).tooltipOnTouch).toBe(false);
+		expect("tooltipOnTouch" in (await titled(pm25))).toBe(false);
+	});
+
 	it("leaves them out when unset", async () => {
 		const plugin = await titled(pm25);
 		await settle();
