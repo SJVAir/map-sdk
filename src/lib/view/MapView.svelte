@@ -318,29 +318,33 @@
 		};
 	});
 
-	// How far the top-right controls column (map-sdk's zoom buttons, or the engine's corner) reaches
-	// in from the map's right edge, so the toolbar's bar stops 0.5rem short of it rather than a
-	// fixed 4rem: null until measured, 0 with none drawn. Measured, as the column's size is the
-	// engine's or the theme's.
+	// How far the top-right controls column (map-sdk's zoom buttons, and the engine's corner, which
+	// holds its controls or a host's own) reaches in from the map's right edge, so the toolbar's bar
+	// stops 0.5rem short of it rather than a fixed 4rem. null until measured (the 4rem fallback),
+	// 0 with nothing there (1rem, as with `controls: "none"`; a host that hides the zoom buttons
+	// gets that too). Measured, as the column's size is the engine's or the theme's.
 	let controlsReach = $state<number | null>(null);
 	$effect(() => {
 		void projector;
 		const kind = controls;
 		if (!toolbar || kind === "none") return;
-		const column = () =>
-			kind === "mapsdk"
-				? root.querySelector(".mapsdk-zoom")
-				: glContainer.querySelector(".maplibregl-ctrl-top-right");
+		const corner = () => glContainer.querySelector(".maplibregl-ctrl-top-right");
+		const zoom = () => (kind === "mapsdk" ? root.querySelector(".mapsdk-zoom") : null);
 		const measure = () => {
-			const r = column()?.getBoundingClientRect();
-			controlsReach =
-				r && r.width > 0 ? Math.max(0, root.getBoundingClientRect().right - r.left) : 0;
+			const right = root.getBoundingClientRect().right;
+			let reach = 0;
+			for (const el of [zoom(), corner()]) {
+				const r = el?.getBoundingClientRect();
+				if (r && r.width > 0) reach = Math.max(reach, right - r.left);
+			}
+			// The engine adds its controls once the style loads: until then its corner is empty,
+			// not measured.
+			controlsReach = reach === 0 && kind === "engine" ? null : reach;
 		};
 		// The bar's inset moves only the bar, never the map or the column: no ResizeObserver loop.
 		const observer = new ResizeObserver(measure);
 		observer.observe(root);
-		const el = column();
-		if (el) observer.observe(el);
+		for (const el of [zoom(), corner()]) if (el) observer.observe(el);
 		measure();
 		return () => {
 			observer.disconnect();

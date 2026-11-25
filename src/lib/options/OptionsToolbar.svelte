@@ -356,8 +356,10 @@
 		font-weight: 600;
 	}
 
-	/* Narrow: each group is a section that expands in place. */
+	/* Narrow: each group is a section that expands in place. It has the room, so its header keeps
+	   0.75rem of side padding, in line with its rows (the wide row's triggers have 0.625rem). */
 	.mapsdk-options-panel :global(.mapsdk-options-trigger) {
+		padding: 0 0.75rem;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-control, var(--radius));
 		background: var(--background);
