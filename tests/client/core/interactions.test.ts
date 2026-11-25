@@ -445,6 +445,39 @@ describe("hover", () => {
 		expect(map.hovered).not.toHaveProperty("touch");
 	});
 
+	it("keeps a tap's move as touch past a stray mouse pointermove at its point (iOS)", async () => {
+		const { map, gl } = await setUp("none");
+		gl.setRenderedFeatures([rendered(map, "monitors", "3")]);
+		const pointer = (type: string, pointerType: string, x: number, y: number) =>
+			gl.canvas.dispatchEvent(
+				Object.assign(new Event(type), { pointerType, clientX: x, clientY: y })
+			);
+		const move = (x: number, y: number) =>
+			gl.emit("mousemove", {
+				point: { x: 1, y: 2 },
+				lngLat: { lng: -119.5, lat: 36.5 },
+				originalEvent: { clientX: x, clientY: y }
+			});
+		map.hoverOf("monitors"); // Watched from the first ask.
+		const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+		try {
+			pointer("pointerdown", "touch", 40, 50);
+			pointer("pointerup", "touch", 40, 50);
+			pointer("pointermove", "mouse", 40, 50);
+			move(40, 50);
+			expect(map.hovered?.touch).toBe(true);
+			expect(map.hoverOf("monitors")?.touch).toBe(true);
+			// A real mouse elsewhere, or at the tap's point once the tap is long past, is a mouse.
+			move(140, 50);
+			expect(map.hovered).not.toHaveProperty("touch");
+			now.mockReturnValue(2500);
+			move(40, 50);
+			expect(map.hovered).not.toHaveProperty("touch");
+		} finally {
+			now.mockRestore();
+		}
+	});
+
 	it("clears hovered on mousemove off every registered layer", async () => {
 		const { map, gl } = await setUp("none");
 		gl.setRenderedFeatures([rendered(map, "monitors", "3")]);

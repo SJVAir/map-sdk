@@ -1,3 +1,4 @@
+import { createRawSnippet } from "svelte";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-svelte";
 import { cdp, page, userEvent } from "vitest/browser";
@@ -9,6 +10,7 @@ import type { FeatureListItem } from "../../src/lib/core/plugin.js";
 import { staticSource } from "../../src/lib/data/static-source.js";
 import type { MapFeatureProperties } from "../../src/lib/data/types.js";
 import FeatureList from "../../src/lib/ui/FeatureList.svelte";
+import { rootEffect } from "../fixtures/effects.svelte.js";
 import { pm25Scale } from "../fixtures/scales.js";
 import { parkPointer } from "./park-pointer.js";
 
@@ -33,7 +35,9 @@ beforeAll(() => {
 	document.head.append(sized);
 	vi.spyOn(globalThis, "fetch").mockImplementation(() => Promise.reject(new TypeError("offline")));
 });
+const stops: Array<() => void> = [];
 afterEach(async () => {
+	for (const stop of stops.splice(0)) stop();
 	await parkPointer();
 	document.body.replaceChildren();
 });
@@ -48,8 +52,15 @@ async function tap(x: number, y: number) {
 	await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
 }
 
-/** A MapView with one monitor at `SITE`, and the featureclick events it reports. */
-async function siteMap(tooltipOnTouch?: boolean) {
+/** A second site close enough to `SITE` to cluster with it at zoom 10. */
+const NEAR: [number, number] = [SITE[0] + 0.002, SITE[1]];
+const clusterTip = createRawSnippet(() => ({ render: () => "<span>Two sites</span>" }));
+
+/**
+ * A MapView with one monitor at `SITE` (or, `clustered`, a bubble of it and one at `NEAR`), the
+ * featureclick events it reports, and every touch hover it sets.
+ */
+async function siteMap(tooltipOnTouch?: boolean, clustered = false) {
 	const map = createMap({
 		config: {
 			maptilerKey: "test-key",
@@ -63,6 +74,7 @@ async function siteMap(tooltipOnTouch?: boolean) {
 			layerLabel: "Monitors",
 			circle: { radius: 12 },
 			tooltipOnTouch,
+			cluster: clustered ? { radius: 60, maxZoom: 14, tooltip: () => clusterTip } : undefined,
 			source: staticSource(
 				{
 					type: "FeatureCollection",
@@ -71,7 +83,16 @@ async function siteMap(tooltipOnTouch?: boolean) {
 							type: "Feature",
 							geometry: { type: "Point", coordinates: SITE },
 							properties: { refKey: "feature:s1", name: "Site", value: 10 }
-						}
+						},
+						...(clustered
+							? [
+									{
+										type: "Feature" as const,
+										geometry: { type: "Point" as const, coordinates: NEAR },
+										properties: { refKey: "feature:s2", name: "Near", value: 12 }
+									}
+								]
+							: [])
 					]
 				},
 				pm25Scale
@@ -90,8 +111,20 @@ async function siteMap(tooltipOnTouch?: boolean) {
 	await vi.waitFor(() => expect(map.ready).toBe(true), { timeout: 5000 });
 	const gl = attached[0];
 	const canvas = gl.getCanvas();
-	await vi.waitFor(() => expect(map.featuresAt(gl.project(SITE))).toHaveLength(1));
-	return { map, gl, canvas, events };
+	// Drawn: a point's hit, or a bubble (which `featuresAt` leaves out).
+	await vi.waitFor(() => {
+		const { x, y } = gl.project(SITE);
+		expect(gl.queryRenderedFeatures([x, y]).length).toBeGreaterThan(0);
+	});
+	// Desktop Chrome moves its real mouse back after a tap, so a touch hover may last only a moment.
+	const touchHovers: string[] = [];
+	stops.push(
+		rootEffect(() => {
+			const h = map.hovered;
+			if (h?.touch) touchHovers.push(h.hit.refKey);
+		})
+	);
+	return { map, gl, canvas, events, touchHovers };
 }
 
 describe("tooltipOnTouch", () => {
@@ -115,13 +148,31 @@ describe("tooltipOnTouch", () => {
 	}
 
 	it("false: a tapped feature leaves no hover tooltip, while a mouse hover still shows one", async () => {
-		const { gl, canvas } = await siteMap(false);
+		const { gl, canvas, touchHovers } = await siteMap(false);
 		const { x, y } = gl.project(SITE);
 		const box = canvas.getBoundingClientRect();
 		expect(await tooltipShownDuring(() => tap(box.left + x, box.top + y))).toBe(false);
+		// The tap did hover the feature: the tooltip was left out, not never asked for.
+		expect(touchHovers).toContain("feature:s1");
 
-		await page.elementLocator(canvas).hover({ position: { x, y } });
+		// A few pixels off the tap: a mouse move right at its point just after is the tap's own.
+		await page.elementLocator(canvas).hover({ position: { x: x + 7, y } });
 		await expect.element(page.getByRole("tooltip")).toBeVisible();
+	});
+
+	it("false: a tapped cluster bubble leaves no hover tooltip, while a mouse hover shows it", async () => {
+		const { map, gl, canvas, touchHovers } = await siteMap(false, true);
+		const mid: [number, number] = [(SITE[0] + NEAR[0]) / 2, SITE[1]];
+		const { x, y } = gl.project(mid);
+		await page.elementLocator(canvas).hover({ position: { x, y } });
+		await expect.element(page.getByRole("tooltip")).toHaveTextContent("Two sites");
+		await parkPointer();
+		await expect.element(page.getByRole("tooltip")).not.toBeInTheDocument();
+		expect(map.hovered).toBeNull();
+
+		const box = canvas.getBoundingClientRect();
+		expect(await tooltipShownDuring(() => tap(box.left + x, box.top + y))).toBe(false);
+		expect(touchHovers.length).toBeGreaterThan(0);
 	});
 
 	it("unset: a tapped feature shows its hover tooltip, as before", async () => {
@@ -213,6 +264,41 @@ describe("featureclick's touch", () => {
 
 		await userEvent.keyboard("{Enter}");
 		await vi.waitFor(() => expect(seen).toEqual([true, false, false]));
+	});
+
+	it("adds tapped list rows to a multiple selection; a mouse click still replaces", async () => {
+		const map = createMap({ config: { maptilerKey: "test-key" } });
+		const row = (id: string, name: string): FeatureListItem => ({
+			refKey: `monitor:${id}`,
+			ref: { kind: "monitor", id },
+			name,
+			value: 5,
+			level: pm25Scale.levels[0],
+			units: "µg/m³",
+			lngLat: [-119.5, 36.5],
+			selectable: true
+		});
+		const items = [row("1", "Arvin"), row("2", "Bakersfield"), row("3", "Clovis")];
+		map.addPlugin(
+			{ id: "monitors", setup: () => () => {}, features: () => items },
+			{ selectionMode: "multiple" }
+		);
+		render(FeatureList, { map });
+		const tapRow = async (name: string) => {
+			const option = page.getByRole("option", { name: new RegExp(name) });
+			await expect.element(option).toBeVisible();
+			const r = option.element().getBoundingClientRect();
+			await tap(r.left + r.width / 2, r.top + r.height / 2);
+		};
+		await tapRow("Arvin");
+		await tapRow("Bakersfield");
+		await vi.waitFor(() =>
+			expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["1", "2"] })
+		);
+		await page.getByRole("option", { name: /Clovis/ }).click();
+		await vi.waitFor(() =>
+			expect(map.getSelection("monitors")).toEqual({ kind: "monitors", ids: ["3"] })
+		);
 	});
 
 	it("reads a list row's press, not its click: iOS, Safari before 17, synthetic, cancelled", async () => {

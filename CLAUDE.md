@@ -106,10 +106,11 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   `icon.mutedColor`, `zoomRange`, `legendDisplay`, `legendTitle`, `detail` for features with no
   level, `truncateValues` to cut values off instead of rounding, `marksPlaces` for `drawnAt`,
   answers per point refreshed at the map's `idle`; `tooltipOnTouch`; `count` numbers circle
-  markers and sums them in clusters as `mapsdk:count`; the number is black or white by the level's color
-  (`readableTextExpression`), the edge `countMarkerText` (`--background`)) and `shapesPlugin`
-  (`zoomRange` from `zoom-range.svelte.ts`, shared with points; out of range it lists nothing and
-  has no legend; `tooltip`; `noFigureLabel` (the layer's text for "No data", outline only) and
+  markers and sums them in clusters as `mapsdk:count`; the number is black or white by the
+  level's color (`readableTextExpression`), the edge `countMarkerText` (`--background`)) and
+  `shapesPlugin` (`zoomRange` from `zoom-range.svelte.ts`, shared with points; out of range it
+  lists nothing and has no legend; `tooltip`; `noFigureLabel` (the layer's text for "No data",
+  outline only) and
   `detail(props)` (a no-figure feature's reason beside it, or in place of "No level");
   `lens-hooks.ts`'s symbol-keyed hooks for a lens: `shown`, `live`, `keys`, `geometryOf`,
   `setHidden` by the `lensHidden` feature state, the paint's case added only once a lens hides
@@ -132,8 +133,8 @@ not shipped. Specs live in top-level `tests/`, never in `src/lib`.
   those polygons' items, by the legend's rule. Plus shared style expressions, scale resolution,
   and the exported marker shapes (`circle`, `square`, `triangle`, `withCrosshair`).
 - **Presets** (`src/lib/presets/`): `monitorsPlugin` (`detail`, `legendUnits`, `legendNote` and
-  `tooltipOnTouch` pass through; `figureLabel` replaces the tooltip's interval note and names a cluster's figure, never
-  the legend; the reading box gives screen
+  `tooltipOnTouch` pass through; `figureLabel` replaces the tooltip's interval note and names a
+  cluster's figure, never the legend; the reading box gives screen
   readers a `mapsdk_reading_pause` before each line under the value), `collocationSitesPlugin`, `regionsPlugin`,
   `calHeatScorePlugin`, `forecastZonesPlugin` (`regionsPlugin` passes `noFigure`/`fillOpacity`/
   `outline`/`noFigureLabel`/`detail`/`legendUnits`/`legendNote` through), `hmsSmokePlugin`,

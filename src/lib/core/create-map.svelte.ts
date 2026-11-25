@@ -65,8 +65,8 @@ export interface PluginOptions {
 	selection?: SpatialSelection | null;
 	onselectionchange?(sel: SpatialSelection | null): void;
 	/**
-	 * `"click"` (default): today's rules (a click selects; Shift/⌘/Ctrl or a tap adds in
-	 * `"multiple"` mode). `"modifier"`: a plain click or tap only pins the card (use it with
+	 * `"click"` (default): today's rules (a click selects; Shift/⌘/Ctrl or a tap, on the map or a
+	 * list row, adds in `"multiple"` mode). `"modifier"`: a plain click or tap only pins the card (use it with
 	 * `MapView`'s `card`), and Shift/⌘/Ctrl-click, or the list's Space or Shift+Enter, toggles the
 	 * feature in the selection without opening or closing the card.
 	 */
@@ -175,7 +175,8 @@ export interface MapContext {
 	 * `featureclick`, then applies the same selection rules (`additive` adds or toggles in
 	 * `multiple` mode), calling `onselectionchange` if the selection changes. An item that isn't
 	 * selectable is still clicked but not selected. Does nothing for a refKey the plugin doesn't list.
-	 * `touch` (default `false`) is the `featureclick`'s: the row was tapped.
+	 * `touch` (default `false`): the row was tapped. It's the `featureclick`'s, and in `multiple`
+	 * mode it adds or toggles, as a map tap does (never a modifier pick).
 	 */
 	pickFromList(pluginId: string, refKey: string, additive: boolean, touch?: boolean): void;
 	/**
@@ -606,7 +607,11 @@ class MapContextImpl implements MapContext {
 			(untrack(() => this.#focusedPluginId) ?? pluginId) === pluginId;
 		const anchor = (focused && untrack(() => this.#focusedAnchor)) || this.anchorFor(item);
 		this.#emitClick(pluginId, item.ref, anchor, refKey, touch);
-		if (item.selectable) this.#applyPick(pluginId, item.ref, { additive, modifier: additive });
+		// A tapped row adds in `multiple` mode, as a map tap does (a phone has no Shift), but isn't a
+		// modifier pick: under `pickWith: "modifier"` it only opens the card.
+		if (item.selectable) {
+			this.#applyPick(pluginId, item.ref, { additive: additive || touch, modifier: additive });
+		}
 	}
 
 	clearSelection(pluginId: string): void {

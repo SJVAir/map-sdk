@@ -848,7 +848,9 @@ their tooltip when focused from the feature list. A plugin with `tooltipOnTouch:
 (`pointsPlugin` and `monitorsPlugin` take it too) shows no hover tooltip when one of its features
 is tapped on a touch screen: a phone has no pointer to move off it, so the tooltip would stay over
 whatever the host opens for that tap until the next one. A mouse hover still shows it, and the
-pinned card, list focus and clicks are unchanged. A plugin with `summarizeEmpty: false` has no
+pinned card, list focus and clicks are unchanged. Where features overlap, the plugin that wins the
+hover (by `hoverPriority`) decides. Another preset's plugin opts out when you set the field on it
+(`plugin.tooltipOnTouch = false`) before adding it. A plugin with `summarizeEmpty: false` has no
 line in the view summary (the map's live region) while none of its features is in view, instead
 of "0 <layer>"; `focusAreaPlugin` uses it.
 
@@ -889,7 +891,8 @@ The root entry exports the types a plugin needs (`MapPlugin`, `PluginContext`, `
 
 Each plugin has a mode: `none`, `single`, or `multiple` (set it with `addPlugin`'s
 `selectionMode` or `map.setSelectionMode(id, mode)`). Click or tap picks; Shift/Cmd/Ctrl-click adds
-or removes in `multiple`, and a tap does the same on touch. The selection is a `SpatialSelection`,
+or removes in `multiple`, and a tap does the same on touch, on the map or on a list row. The
+selection is a `SpatialSelection`,
 `{ kind: "monitors" | "regions", ids: string[] }` (region ids are `<type>:<code>`), and the host
 owns it:
 
@@ -931,7 +934,8 @@ map.addPlugin(plugin, {
 `map.togglePick(pluginId, ref)` is a user's toggle for your own controls (the card's Select or
 Remove): the same rule, `canSelect`, and `onselectionchange` as a modifier-click.
 
-`map.on("featureclick", ({ pluginId, ref, lngLat, properties, touch }) => …)` fires for every click on a feature,
+`map.on("featureclick", ({ pluginId, ref, lngLat, properties, touch }) => …)` fires for every
+click on a feature,
 whatever the mode, and also for a pick in the feature list, so keyboard users get the same event;
 `lngLat` is the click point. For a list pick it's where the item's tooltip pins: the item's
 position, or for a shape whose label point is off-screen, a point of the shape in view.
@@ -939,7 +943,8 @@ position, or for a shape whose label point is off-screen, a point of the shape i
 `schoolsPlugin` does), and absent otherwise. `touch` is `true` when the click was a touch tap
 (for a list pick, when the row was tapped; a mouse click or Enter on a row gives `false`), so a host
 can, say, let a tap elsewhere close what a tapped feature opened while a click keeps it open. It
-returns an unsubscribe function. For your own context menu, `map.featuresAt({ x, y })` returns the hits under
+returns an unsubscribe function. For your own context menu, `map.featuresAt({ x, y })`
+returns the hits under
 a canvas point, topmost first, and `map.featureForElement(element)` returns the hit for a row of
 the feature list (an element with `data-mapsdk-ref`). Both return nothing while the map is
 detached.
@@ -1039,13 +1044,17 @@ local sjvair.com stack at `http://localhost:8000`.
 
 ### 0.1.0-beta.24
 
+- **A tapped list row adds to the selection in `multiple` mode**, as a tapped map feature does (a
+  phone has no Shift key); before, it replaced the selection. A mouse click on a row still
+  replaces, and Space, Shift+Enter or a modifier-click still add. Under `pickWith: "modifier"` a
+  tapped row only opens the card, as on the map.
 - **New API: `featureclick`'s `touch`.** `true` when the feature was tapped on a touch screen,
   `false` for a mouse or pen click. A pick in the feature list gives `true` only when the row was
   tapped; a mouse click on a row, Enter or Space gives `false`. It reads the press
   (`pointerdown`, anywhere in the map's canvas container, a host's Marker included), not the
-  click, which iOS Safari reports as a mouse. A click with no pointer (`pointerType: ""`, as Chrome
-  and Firefox send for `element.click()` and keyboard activation) is never a tap. Handlers that don't read it see no
-  change; a test fake that builds these events itself needs `touch`.
+  click, which iOS Safari reports as a mouse. A click with no pointer (`pointerType: ""`, as
+  Chrome and Firefox send for `element.click()` and keyboard activation) is never a tap. Handlers
+  that don't read it see no change; a test fake that builds these events itself needs `touch`.
 - **Taps on iPhone toggle again in `multiple` mode.** iOS Safari since 18.2 reports a tap's click
   as a mouse click, so a tap replaced the selection there instead of adding to it as on other touch
   screens. The press's own type now decides, for the selection as for `featureclick`.
@@ -1055,9 +1064,12 @@ local sjvair.com stack at `http://localhost:8000`.
   monitor and its cluster bubbles): a feature tapped on a touch screen leaves no hover tooltip.
   A tap's emulated mouse move hovered the feature, and with no pointer to move off it the tooltip
   stayed, covering what the host opened for the tap. A mouse hover still shows the tooltip; the
-  pinned card, list focus and clicks are unchanged. Unset, nothing changes.
-- **`map.hovered`** has `touch: true` when the hover came from a tap. It's left out otherwise, so
-  a mouse hover's object is as before.
+  pinned card, list focus and clicks are unchanged. Where features overlap, the plugin that wins
+  the hover decides. Unset, nothing changes.
+- **`map.hovered`** has `touch: true` when the hover came from a tap: the latest pointer was a
+  touch, or the mouse move lands where a touch press was, within a second of it (iOS Safari has
+  sent stray mouse pointer events around a tap). It's left out otherwise, so a mouse hover's object
+  is as before.
 - No new message keys; nothing removed.
 
 ### 0.1.0-beta.23
