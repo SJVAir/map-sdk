@@ -61,7 +61,8 @@ air-quality data on the MapTiler SDK. The demo page in `demo/` is the dev server
 not shipped. Specs live in top-level `tests/`, never in `src/lib`.
 
 - **Core** (`src/lib/core/`): `createMap()` returns a `MapContext` (`create-map.svelte.ts`):
-  reactive camera, bounds, basemap, plugin list, selection per plugin, `featureclick`, `featuresAt`,
+  reactive camera, bounds, basemap, plugin list, selection per plugin, `featureclick` (`touch`: a
+  tap, or a tapped list row, `pickFromList`'s optional fourth argument), `featuresAt`,
   `pinned`/`unpin()` (the card pinned by a click, a tap, or list focus while `MapView`'s `card` is on;
   `pin(pluginId, refKey)` pins one from host code in place of the open card, kept exactly there
   (`inPlace`) when that point lies on the new shape, else at its own point, no pan; `MapTooltip`

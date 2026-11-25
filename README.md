@@ -927,12 +927,15 @@ map.addPlugin(plugin, {
 `map.togglePick(pluginId, ref)` is a user's toggle for your own controls (the card's Select or
 Remove): the same rule, `canSelect`, and `onselectionchange` as a modifier-click.
 
-`map.on("featureclick", ({ pluginId, ref, lngLat, properties }) => …)` fires for every click on a feature,
+`map.on("featureclick", ({ pluginId, ref, lngLat, properties, touch }) => …)` fires for every click on a feature,
 whatever the mode, and also for a pick in the feature list, so keyboard users get the same event;
 `lngLat` is the click point. For a list pick it's where the item's tooltip pins: the item's
 position, or for a shape whose label point is off-screen, a point of the shape in view.
 `properties` is the feature's own data when its plugin gives it (`MapPlugin.properties(refKey)`;
-`schoolsPlugin` does), and absent otherwise. It returns an unsubscribe function. For your own context menu, `map.featuresAt({ x, y })` returns the hits under
+`schoolsPlugin` does), and absent otherwise. `touch` is `true` when the click was a touch tap
+(for a list pick, when the row was tapped; a mouse click or Enter on a row gives `false`), so a host
+can, say, let a tap elsewhere close what a tapped feature opened while a click keeps it open. It
+returns an unsubscribe function. For your own context menu, `map.featuresAt({ x, y })` returns the hits under
 a canvas point, topmost first, and `map.featureForElement(element)` returns the hit for a row of
 the feature list (an element with `data-mapsdk-ref`). Both return nothing while the map is
 detached.
@@ -1029,6 +1032,16 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 0.1.0-beta.24
+
+- **New API: `featureclick`'s `touch`.** `true` when the feature was tapped on a touch screen,
+  `false` for a mouse or pen click. A pick in the feature list gives `true` only when the row was
+  tapped; a mouse click on a row, Enter or Space gives `false`. Hosts that don't read it see no
+  change.
+- **`MapContext.pickFromList`** (internal, for `FeatureList`) takes an optional fourth argument,
+  `touch` (default `false`). A hand-written fake of `MapContext` still type-checks without it.
+- No new message keys; nothing removed.
 
 ### 0.1.0-beta.23
 

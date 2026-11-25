@@ -156,9 +156,9 @@ describe("FeatureList", () => {
 		render(FeatureList, { map });
 		await focusList();
 		await userEvent.keyboard("{Enter}");
-		expect(pick).toHaveBeenLastCalledWith("monitors", "monitor:1", false);
+		expect(pick).toHaveBeenLastCalledWith("monitors", "monitor:1", false, false);
 		await userEvent.keyboard("{Shift>}{Enter}{/Shift}");
-		expect(pick).toHaveBeenLastCalledWith("monitors", "monitor:1", true);
+		expect(pick).toHaveBeenLastCalledWith("monitors", "monitor:1", true, false);
 	});
 
 	it("moves with Down, Up, Home, and End, focusing each row's feature", async () => {

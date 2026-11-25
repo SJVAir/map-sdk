@@ -85,7 +85,8 @@ describe("picking", () => {
 		expect(handler).toHaveBeenCalledExactlyOnceWith({
 			pluginId: "monitors",
 			ref: { kind: "monitor", id: "7" },
-			lngLat: [-119, 36]
+			lngLat: [-119, 36],
+			touch: false
 		});
 		expect(map.getSelection("monitors")).toBeNull();
 	});
@@ -107,7 +108,8 @@ describe("picking", () => {
 			pluginId: "monitors",
 			ref: { kind: "monitor", id: "7" },
 			lngLat: [-119, 36],
-			properties: { refKey: "monitor:7", external_id: "X7" }
+			properties: { refKey: "monitor:7", external_id: "X7" },
+			touch: false
 		});
 		expect(lookup).toHaveBeenCalledWith("monitor:7");
 	});
@@ -122,6 +124,30 @@ describe("picking", () => {
 		gl.setRenderedFeatures([rendered(map, "monitors", "7")]);
 		click(gl);
 		expect(seen).toEqual([{ kind: "monitor", id: "7" }]);
+	});
+
+	it("says whether featureclick was a touch tap", async () => {
+		const { map, gl } = await setUp("none");
+		const seen: boolean[] = [];
+		map.on("featureclick", (e) => seen.push(e.touch));
+		gl.setRenderedFeatures([rendered(map, "monitors", "7")]);
+		click(gl, { pointerType: "mouse" });
+		click(gl, { pointerType: "touch" });
+		click(gl, { pointerType: "pen" });
+		click(gl, {});
+		expect(seen).toEqual([false, true, false, false]);
+	});
+
+	it("reports a MouseEvent click after a touch pointerdown as a touch featureclick", async () => {
+		// Safari before 17 dispatches click as a MouseEvent, with no pointerType.
+		const { map, gl } = await setUp("none");
+		const seen: boolean[] = [];
+		map.on("featureclick", (e) => seen.push(e.touch));
+		gl.setRenderedFeatures([rendered(map, "monitors", "7")]);
+		gl.canvas.dispatchEvent(Object.assign(new Event("pointerdown"), { pointerType: "touch" }));
+		click(gl, {});
+		click(gl, {});
+		expect(seen).toEqual([true, false]);
 	});
 
 	it("replaces the selection on a plain click", async () => {
@@ -481,7 +507,8 @@ describe("blocking layers", () => {
 		expect(handler).toHaveBeenCalledWith({
 			pluginId: "regions",
 			ref: { kind: "region", type: "county", code: "019" },
-			lngLat: [-119, 36]
+			lngLat: [-119, 36],
+			touch: false
 		});
 		expect(bubbleClicks).toEqual([]);
 	});

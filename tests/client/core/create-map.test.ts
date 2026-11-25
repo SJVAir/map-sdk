@@ -661,6 +661,18 @@ describe("pickFromList", () => {
 		expect(seen).toEqual([{ refKey: "monitor:1", source: "cde" }]);
 	});
 
+	it("reports a list pick's featureclick as a touch tap only when the row was tapped", async () => {
+		const map = createMap({ config });
+		const seen: boolean[] = [];
+		map.on("featureclick", (e) => seen.push(e.touch));
+		map.addPlugin(plugin("monitors", [], { features: () => [listItem("1")] }));
+		await tick();
+		map.pickFromList("monitors", "monitor:1", false);
+		map.pickFromList("monitors", "monitor:1", false, true);
+		map.pickFromList("monitors", "monitor:1", false, false);
+		expect(seen).toEqual([false, true, false]);
+	});
+
 	it("leaves properties out of featureclick for a plugin without them", async () => {
 		const map = createMap({ config });
 		const events: object[] = [];

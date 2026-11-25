@@ -53,6 +53,8 @@
 	let menuSentTimer: ReturnType<typeof setTimeout> | undefined;
 	// Focus from a pointer: the click picks the row, so focusing doesn't activate the first one.
 	let pointerFocus = false;
+	/** The last pointerdown's type, for a click sent as a plain MouseEvent (Safari before 17). */
+	let downPointerType: string | null = null;
 	// While the listbox has focus it filters by the bounds from when focus arrived: each key press
 	// pans the map, and re-filtering on that pan's moveend would reshuffle the rows under the user.
 	let frozen = $state.raw<{ bounds: Bounds | null } | null>(null);
@@ -140,8 +142,8 @@
 		map.focusFeature(row.refKey, row.pluginId);
 	}
 
-	function pick(row: Row, additive: boolean) {
-		map.pickFromList(row.pluginId, row.refKey, additive);
+	function pick(row: Row, additive: boolean, touch = false) {
+		map.pickFromList(row.pluginId, row.refKey, additive, touch);
 	}
 
 	function pageSize(): number {
@@ -266,8 +268,10 @@
 	}
 
 	function onrowclick(e: MouseEvent, index: number) {
+		const pointerType = (e as PointerEvent).pointerType || downPointerType;
+		downPointerType = null;
 		activate(index);
-		pick(rows[index], e.shiftKey || e.metaKey || e.ctrlKey);
+		pick(rows[index], e.shiftKey || e.metaKey || e.ctrlKey, pointerType === "touch");
 	}
 
 	onDestroy(() => {
@@ -328,7 +332,10 @@
 			{onfocus}
 			{onblur}
 			{oncontextmenu}
-			onpointerdown={() => (pointerFocus = true)}
+			onpointerdown={(e) => {
+				pointerFocus = true;
+				downPointerType = e.pointerType;
+			}}
 		>
 			{#each windowRows as row, i (row.key)}
 				{@const index = range.start + i}

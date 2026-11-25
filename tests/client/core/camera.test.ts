@@ -142,7 +142,8 @@ describe("featureclick lngLat", () => {
 		expect(handler).toHaveBeenCalledExactlyOnceWith({
 			pluginId: "monitors",
 			ref: { kind: "monitor", id: "1" },
-			lngLat: [1, 2]
+			lngLat: [1, 2],
+			touch: false
 		});
 	});
 
@@ -156,7 +157,8 @@ describe("featureclick lngLat", () => {
 		expect(handler).toHaveBeenCalledExactlyOnceWith({
 			pluginId: "monitors",
 			ref: { kind: "monitor", id: "1" },
-			lngLat: [3, 4]
+			lngLat: [3, 4],
+			touch: false
 		});
 	});
 });
