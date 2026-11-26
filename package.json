@@ -1,7 +1,7 @@
 {
 	"name": "@sjvair/map-sdk",
 	"description": "Svelte 5 map components for SJVAir air-quality data",
-	"version": "0.1.0-beta.26",
+	"version": "1.0.0",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -58,7 +58,7 @@
 		}
 	},
 	"peerDependencies": {
-		"@sjvair/sdk": "npm:@jsr/sjvair__sdk@^5.0.0-beta.2",
+		"@sjvair/sdk": "npm:@jsr/sjvair__sdk@^5.0.0",
 		"svelte": "^5.57.0"
 	},
 	"dependencies": {
@@ -76,7 +76,7 @@
 		"@eslint/js": "^10.0.1",
 		"@maplibre/maplibre-gl-style-spec": "^24.10.0",
 		"@playwright/test": "^1.64.1",
-		"@sjvair/sdk": "npm:@jsr/sjvair__sdk@5.0.0-beta.15",
+		"@sjvair/sdk": "npm:@jsr/sjvair__sdk@5.0.0",
 		"@sveltejs/package": "^2.5.8",
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",
 		"@tailwindcss/vite": "^4.3.3",
