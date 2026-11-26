@@ -9,10 +9,8 @@ Supported browsers: Chrome/Edge 111+, Safari 16.4+, Firefox 128+. MIT licensed.
 
 ## Install
 
-map-sdk is in beta. Betas are published under the `next` tag:
-
 ```bash
-npm install @sjvair/map-sdk@next
+npm install @sjvair/map-sdk
 ```
 
 Peer dependencies: `svelte` (^5.57) and `@sjvair/sdk`, which is published to
@@ -21,7 +19,7 @@ JSR and installed through npm's JSR registry as an alias:
 ```json
 {
 	"dependencies": {
-		"@sjvair/sdk": "npm:@jsr/sjvair__sdk@^5.0.0-beta.2"
+		"@sjvair/sdk": "npm:@jsr/sjvair__sdk@^5.0.0"
 	}
 }
 ```
@@ -1064,6 +1062,14 @@ local sjvair.com stack at `http://localhost:8000`.
    ```
 
 ## Changes
+
+### 1.0.0
+
+- **The first stable release.** Its API is `0.1.0-beta.26`'s; nothing is added or removed.
+- **Needs `@sjvair/sdk` `5.0.0`**: the peer range is `^5.0.0` (was `^5.0.0-beta.2`), so a host
+  on an `@sjvair/sdk` beta moves to `5.0.0`. No code changed for it.
+- Published under npm's `latest` tag; betas were under `next`.
+- No new message keys; nothing removed.
 
 ### 0.1.0-beta.26
 
